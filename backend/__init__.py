@@ -1,0 +1,1 @@
+"""ILIAS Alternative Backend Package."""
