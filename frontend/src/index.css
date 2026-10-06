@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    border-color: var(--color-slate-200);
+  }
+
+  math {
+    font-family: 'Cambria Math', 'Latin Modern Math', 'STIX Two Math', 'Times New Roman', serif;
+    font-size: 1.05em;
+    vertical-align: -0.1em;
+  }
+
+  /* Rich text styling for ILIAS imported content */
+  .ilias-rich-content p {
+    margin-bottom: 0.5rem;
+  }
+  .ilias-rich-content p:last-child {
+    margin-bottom: 0;
+  }
+  .ilias-rich-content ul {
+    list-style-type: disc;
+    margin-left: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+  .ilias-rich-content ol {
+    list-style-type: decimal;
+    margin-left: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+  .ilias-rich-content li {
+    margin-bottom: 0.25rem;
+  }
+  .ilias-rich-content a {
+    color: var(--color-red-600);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .ilias-rich-content a:hover {
+    color: var(--color-red-700);
+  }
+}
+
