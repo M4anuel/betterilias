@@ -87,6 +87,12 @@ def _clean_math_in_soup(soup: BeautifulSoup) -> None:
 
 def _parse_single_item(el, seen_ref_ids: set) -> Optional[MaterialItem]:
     """Parse a single ILIAS container list item."""
+    # Exclude items located in sidebars, right column, news blocks, or footers
+    if el.find_parent(["aside", "footer"]) or el.find_parent(id=re.compile(r"right_col|news", re.I)):
+        return None
+    if el.find_parent(lambda tag: bool(tag.get("id", "").startswith("block_news_") or "ilNewsForContextBlockGUI" in tag.get("class", []))):
+        return None
+
     title_link = (
         el.select_one("h3 a, h4 a, .il_ContainerItemTitle a, a.il_ContainerItemTitle, .il-item-title a")
         or el.select_one("h3 button, h4 button, .il_ContainerItemTitle button, .il-item-title button")
@@ -105,6 +111,14 @@ def _parse_single_item(el, seen_ref_ids: set) -> Optional[MaterialItem]:
     if not title:
         return None
     if "previous sessions" in title.lower() or "previoussessions" in raw_url.lower():
+        return None
+
+    # Exclude news headlines that notify about added files/materials
+    title_lower = title.lower()
+    if any(k in title_lower for k in [
+        "has been added", "have been added", "wurde hinzugefügt", "wurden hinzugefügt",
+        "one file has been", "several files have been", "eine datei wurde", "dateien wurden"
+    ]):
         return None
 
     # Extract description
@@ -373,8 +387,11 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
                             sections[-1].groups.append(grp)
                             sections[-1].items.extend(group_items)
 
-    # Strategy 2: Collect any missed container items across the whole soup
-    for item_el in soup.select(".ilContainerListItem, .il_ContainerListItem, .il-item, .il-std-item"):
+    # Strategy 2: Collect any missed container items within the main content area
+    search_scope = center if center else soup.select_one("main, #ilContentContainer") or soup
+    for item_el in search_scope.select(".ilContainerListItem, .il_ContainerListItem, .il-item, .il-std-item"):
+        if item_el.find_parent(["aside", "footer"]) or item_el.find_parent(id=re.compile(r"right_col|news", re.I)):
+            continue
         item = _parse_single_item(item_el, seen_ref_ids)
         if item:
             items.append(item)
@@ -391,7 +408,10 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
 
     # Strategy 3: Fallback for direct links
     if not items:
-        for a in soup.find_all("a", href=True):
+        search_scope = center if center else soup.select_one("main, #ilContentContainer") or soup
+        for a in search_scope.find_all("a", href=True):
+            if a.find_parent(["aside", "footer"]) or a.find_parent(id=re.compile(r"right_col|news", re.I)):
+                continue
             href = a.get("href", "")
             if "ref_id=" in href and ("cmd=sendfile" in href or "file" in href or "fold" in href or "exc" in href or "target=" in href):
                 ref_id = _extract_ref_id_from_url(href)
