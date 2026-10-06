@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <title>Bewertung Teilnehmer</title>
+</head>
+<body>
+    <form action="ilias.php?cmdClass=ilobjexercisegui&cmd=saveStatusParticipant&ref_id=99003" method="post" id="form_grading">
+        <input type="hidden" name="rtoken" value="secret_csrf_token_999" />
+        <input type="hidden" name="cmdNode" value="w4:vk" />
+        <input type="hidden" name="part_id" value="102" />
+
+        <div class="form-group">
+            <label for="status">Status:</label>
+            <select name="status" id="status">
+                <option value="passed">Bestanden</option>
+                <option value="failed">Nicht bestanden</option>
+                <option value="not_graded" selected="selected">Nicht bewertet</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="mark">Note / Punkte:</label>
+            <input type="text" name="mark" id="mark" value="" />
+        </div>
+
+        <div class="form-group">
+            <label for="feedback">Rückmeldung an Teilnehmende:</label>
+            <textarea name="feedback" id="feedback"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="notice">Interne Notiz:</label>
+            <textarea name="notice" id="notice"></textarea>
+        </div>
+
+        <input type="submit" name="cmd[saveStatusParticipant]" value="Speichern" class="btn btn-primary" />
+    </form>
+</body>
+</html>
+

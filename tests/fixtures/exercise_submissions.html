@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <title>Übungseinheit 1: Abgaben</title>
+</head>
+<body>
+    <h1 class="ilHeader">Übungsblatt 01 - Hello World & Algorithmen</h1>
+    <div class="ilAssignmentInstructions">Implementieren Sie die Algorithmen gemäss Aufgabenstellung.</div>
+    <div class="ilAssignmentDeadline">Abgabetermin: 15.03.2026 23:59 Uhr</div>
+
+    <form action="ilias.php?cmdClass=ilobjexercisegui&cmd=saveStatusAll&ref_id=99003" method="post" id="form_submissions">
+        <input type="hidden" name="rtoken" value="abc123xyz_csrf_token" />
+        <input type="hidden" name="cmdNode" value="w4:vk" />
+
+        <table id="tbl_il_exc_mem" class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Teilnehmer</th>
+                    <th>Abgegeben</th>
+                    <th>Abgelieferte Dateien</th>
+                    <th>Status</th>
+                    <th>Note / Punkte</th>
+                    <th>Feedback an Studierende</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Student 1: submitted, graded -->
+                <tr>
+                    <td>
+                        <input type="hidden" name="user_id[101]" value="101" />
+                        <a href="ilias.php?cmdClass=ilobjexercisegui&cmd=showParticipant&part_id=101&ref_id=99003">Muster, Anna (amuster)</a>
+                    </td>
+                    <td>Ja (14.03.2026 18:22)</td>
+                    <td>
+                        <a href="ilias.php?cmdClass=ilobjexercisegui&cmd=downloadFile&file_id=501">solution_anna.py</a>
+                    </td>
+                    <td>
+                        <select name="status[101]">
+                            <option value="passed" selected="selected">Bestanden</option>
+                            <option value="failed">Nicht bestanden</option>
+                            <option value="not_graded">Nicht bewertet</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input type="text" name="mark[101]" value="6.0" />
+                    </td>
+                    <td>
+                        <textarea name="feedback[101]">Hervorragende Implementierung und saubere Tests!</textarea>
+                    </td>
+                </tr>
+
+                <!-- Student 2: submitted, pending grading -->
+                <tr>
+                    <td>
+                        <input type="hidden" name="user_id[102]" value="102" />
+                        <a href="ilias.php?cmdClass=ilobjexercisegui&cmd=showParticipant&part_id=102&ref_id=99003">Meier, Beat (bmeier)</a>
+                    </td>
+                    <td>Ja (15.03.2026 22:10)</td>
+                    <td>
+                        <a href="ilias.php?cmdClass=ilobjexercisegui&cmd=downloadFile&file_id=502">main.py</a>
+                    </td>
+                    <td>
+                        <select name="status[102]">
+                            <option value="passed">Bestanden</option>
+                            <option value="failed">Nicht bestanden</option>
+                            <option value="not_graded" selected="selected">Nicht bewertet</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input type="text" name="mark[102]" value="" />
+                    </td>
+                    <td>
+                        <textarea name="feedback[102]"></textarea>
+                    </td>
+                </tr>
+
+                <!-- Student 3: not submitted -->
+                <tr>
+                    <td>
+                        <input type="hidden" name="user_id[103]" value="103" />
+                        <a href="ilias.php?cmdClass=ilobjexercisegui&cmd=showParticipant&part_id=103&ref_id=99003">Schmidt, Claudia (cschmidt)</a>
+                    </td>
+                    <td>Nein</td>
+                    <td>Keine Dateien</td>
+                    <td>
+                        <select name="status[103]">
+                            <option value="passed">Bestanden</option>
+                            <option value="failed">Nicht bestanden</option>
+                            <option value="not_graded" selected="selected">Nicht bewertet</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input type="text" name="mark[103]" value="" />
+                    </td>
+                    <td>
+                        <textarea name="feedback[103]"></textarea>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <input type="submit" name="cmd[saveStatusAll]" value="Speichern" class="btn btn-primary" />
+    </form>
+</body>
+</html>
+
