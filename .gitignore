@@ -1,0 +1,45 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment and sensitive data
+.env
+session_cookies.json
+.env.*
+!.env.example
+
+# Logs & scraped dumps
+logs/
+*.log
+
+# Pytest & testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Playwright
+.playwright/
+test-results/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local downloads and exploratory work
+htmlfromilias/
+brain/
+scratch/
+
+# Frontend dependencies and build output
+node_modules/
+dist/
+dist-ssr/
