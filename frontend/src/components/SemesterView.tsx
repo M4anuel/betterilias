@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, ArrowRight, Clock, GraduationCap, Calendar, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, ArrowRight, Clock, GraduationCap, Calendar, RefreshCw, LayoutGrid, List } from 'lucide-react';
 import { SemesterScreenResponse, CourseItem } from '../types';
 import { cache } from '../lib/cache';
 import { CourseIcon } from './CourseIcon';
@@ -46,6 +46,14 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
 }) => {
   // Find last opened course object if available
   const lastOpenedCourse = coursesList.find((c) => c.ref_id === lastOpenedCourseId);
+
+  // View mode: 'cards' or 'list'
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>(() => cache.getSemesterViewMode());
+
+  const handleViewModeChange = (mode: 'cards' | 'list') => {
+    setViewMode(mode);
+    cache.setSemesterViewMode(mode);
+  };
 
   // Quick pills: recent semesters plus active if not already in recent
   const defaultPillIds = ['HS2026', 'FS2026', 'HS2025', 'FS2025'];
@@ -109,7 +117,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
             </p>
           </div>
 
-          {/* Combined Selection Controls: Quick Pills + Full Archive Dropdown */}
+          {/* Combined Selection Controls: Quick Pills + Full Archive Dropdown + View Mode */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Quick Pills */}
             <div className="flex items-center gap-1 rounded-xl bg-slate-200/70 p-1">
@@ -166,6 +174,34 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                 <Calendar className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               </div>
             </div>
+
+            {/* View Mode Toggle: Cards vs. List */}
+            <div className="flex items-center gap-0.5 rounded-xl bg-slate-200/70 p-1" title="Ansicht umschalten">
+              <button
+                type="button"
+                onClick={() => handleViewModeChange('cards')}
+                className={`rounded-lg p-1.5 transition ${
+                  viewMode === 'cards'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                }`}
+                title="Kartenansicht"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleViewModeChange('list')}
+                className={`rounded-lg p-1.5 transition ${
+                  viewMode === 'list'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                }`}
+                title="Kompakte Listenansicht"
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -190,7 +226,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
           </div>
         )}
 
-        {/* Categories & Course Cards */}
+        {/* Categories & Course Cards / List */}
         {semesterData && Object.keys(semesterData.grouped_by_category).length > 0 && (
           <div className="space-y-8">
             {Object.entries(semesterData.grouped_by_category).map(([category, courses]) => (
@@ -201,54 +237,104 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                   <span className="text-xs font-semibold text-slate-400">{courses.length} Vorlesungen</span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {courses.map((course) => {
-                    const displayName = cache.getDisplayName(course.ref_id, course.title);
-                    const iconName = cache.getCourseIcon(course.ref_id);
+                {viewMode === 'cards' ? (
+                  /* Cards Grid View */
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {courses.map((course) => {
+                      const displayName = cache.getDisplayName(course.ref_id, course.title);
+                      const iconName = cache.getCourseIcon(course.ref_id);
 
-                    return (
-                      <div
-                        key={course.ref_id}
-                        onClick={() => onSelectCourse(course.ref_id)}
-                        className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-red-300 hover:shadow-md cursor-pointer"
-                      >
-                        <div>
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-red-50 group-hover:text-red-600 transition">
-                              <CourseIcon iconName={iconName} className="h-5 w-5" />
+                      return (
+                        <div
+                          key={course.ref_id}
+                          onClick={() => onSelectCourse(course.ref_id)}
+                          className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-red-300 hover:shadow-md cursor-pointer"
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-red-50 group-hover:text-red-600 transition">
+                                <CourseIcon iconName={iconName} className="h-5 w-5" />
+                              </div>
+                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-600">
+                                {course.ref_id}
+                              </span>
                             </div>
-                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-600">
-                              {course.ref_id}
-                            </span>
+
+                            <h4 className="mt-3.5 text-base font-bold text-slate-900 group-hover:text-red-600 transition leading-snug">
+                              {displayName}
+                            </h4>
+
+                            {displayName !== course.title && (
+                              <p className="mt-1 text-xs text-slate-400 line-clamp-1" title={course.title}>
+                                {course.title}
+                              </p>
+                            )}
                           </div>
 
-                          <h4 className="mt-3.5 text-base font-bold text-slate-900 group-hover:text-red-600 transition leading-snug">
-                            {displayName}
-                          </h4>
-
-                          {displayName !== course.title && (
-                            <p className="mt-1 text-xs text-slate-400 line-clamp-1" title={course.title}>
-                              {course.title}
-                            </p>
-                          )}
+                          {/* Contact or Lecturer */}
+                          <div className="mt-5 border-t border-slate-100 pt-3 flex items-center justify-between text-xs text-slate-500">
+                            {course.description ? (
+                              <div className="flex items-center gap-1.5 truncate pr-2">
+                                <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                <span className="truncate">{course.description.replace('Contact: ', '')}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">Keine Dozenten-Info</span>
+                            )}
+                            <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-red-600 group-hover:translate-x-0.5 transition shrink-0" />
+                          </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* Compact List View */
+                  <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden">
+                    {courses.map((course) => {
+                      const displayName = cache.getDisplayName(course.ref_id, course.title);
+                      const iconName = cache.getCourseIcon(course.ref_id);
 
-                        {/* Contact or Lecturer */}
-                        <div className="mt-5 border-t border-slate-100 pt-3 flex items-center justify-between text-xs text-slate-500">
-                          {course.description ? (
-                            <div className="flex items-center gap-1.5 truncate pr-2">
-                              <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                              <span className="truncate">{course.description.replace('Contact: ', '')}</span>
+                      return (
+                        <div
+                          key={course.ref_id}
+                          onClick={() => onSelectCourse(course.ref_id)}
+                          className="group flex items-center justify-between p-3.5 hover:bg-slate-50/80 transition cursor-pointer gap-4"
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-red-50 group-hover:text-red-600 transition">
+                              <CourseIcon iconName={iconName} className="h-4 w-4" />
                             </div>
-                          ) : (
-                            <span className="text-slate-400">Keine Dozenten-Info</span>
-                          )}
-                          <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-red-600 group-hover:translate-x-0.5 transition shrink-0" />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-bold text-slate-900 group-hover:text-red-600 transition truncate">
+                                  {displayName}
+                                </h4>
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500 shrink-0">
+                                  {course.ref_id}
+                                </span>
+                              </div>
+                              {displayName !== course.title && (
+                                <p className="text-xs text-slate-400 truncate max-w-xl">{course.title}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 shrink-0 text-xs text-slate-500">
+                            {course.description && (
+                              <span className="hidden sm:inline-block max-w-xs truncate text-slate-400 text-[11px]">
+                                {course.description.replace('Contact: ', '')}
+                              </span>
+                            )}
+                            <span className="inline-flex items-center gap-1 font-semibold text-slate-700 group-hover:text-red-600 transition text-xs">
+                              Öffnen
+                              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition" />
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ))}
           </div>

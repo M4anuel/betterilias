@@ -21,7 +21,16 @@ export const App: React.FC = () => {
   const [changeNotifications, setChangeNotifications] = useState<ChangeNotification[]>([]);
 
   // --- Semester & Courses State ---
-  const [semesterData, setSemesterData] = useState<SemesterScreenResponse | null>(null);
+  const [semesterData, setSemesterData] = useState<SemesterScreenResponse | null>(() => {
+    const sem = cache.getSelectedSemester();
+    const raw = localStorage.getItem(`ilias_semester_cache_${sem}`);
+    if (raw) {
+      try {
+        return JSON.parse(raw);
+      } catch {}
+    }
+    return null;
+  });
   const [isLoadingSemester, setIsLoadingSemester] = useState(false);
   const [selectedSemester, setSelectedSemester] = useState<string>(() =>
     cache.getSelectedSemester()
@@ -40,6 +49,9 @@ export const App: React.FC = () => {
     return lastId ? cache.getCachedMaterials(lastId) : null;
   });
   const [isRevalidatingMaterials, setIsRevalidatingMaterials] = useState(false);
+  const [loadMaterialsError, setLoadMaterialsError] = useState<string | null>(null);
+  const materialsRequestSeq = useRef<number>(0);
+  const activeContainerRef = useRef<string | null>(cache.getLastOpenedCourseId());
 
   // --- Sidebar & Modal State ---
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() =>
@@ -67,27 +79,36 @@ export const App: React.FC = () => {
     setIsLoadingSemester(true);
     const cacheKey = `ilias_semester_cache_${semId}`;
 
-    await cache.fetchWithSWR<SemesterScreenResponse>(
-      cacheKey,
-      () => api.getSemesters(semId),
-      (cached) => {
-        if (reqId === semesterRequestSeq.current) {
-          setSemesterData(cached);
-        }
-      },
-      (fresh) => {
-        if (reqId === semesterRequestSeq.current) {
-          setSemesterData(fresh);
-          setIsLoadingSemester(false);
-        }
-      },
-      (err) => {
-        if (reqId === semesterRequestSeq.current) {
-          console.error('Error fetching semester data', err);
-          setIsLoadingSemester(false);
-        }
+    // 1. Immediately read cache or clear stale semester data
+    let cached: SemesterScreenResponse | null = null;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) cached = JSON.parse(raw);
+    } catch {}
+
+    if (reqId === semesterRequestSeq.current) {
+      setSemesterData(cached);
+    }
+
+    // 2. Fetch fresh semester data
+    try {
+      const fresh = await api.getSemesters(semId);
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(fresh));
+      } catch {}
+
+      if (reqId === semesterRequestSeq.current) {
+        setSemesterData(fresh);
       }
-    );
+    } catch (err) {
+      if (reqId === semesterRequestSeq.current) {
+        console.error('Error fetching semester data', err);
+      }
+    } finally {
+      if (reqId === semesterRequestSeq.current) {
+        setIsLoadingSemester(false);
+      }
+    }
   }, []);
 
   // --- Semester Selection Handler ---
@@ -100,91 +121,105 @@ export const App: React.FC = () => {
     [loadSemesters]
   );
 
-  // --- Load Course Materials with Instant Serve + SWR Revalidation ---
+  // --- Load Course Materials with Instant Serve + SWR Revalidation & Race-Condition Protection ---
   const loadCourseMaterials = useCallback(
     async (refId: string, isCourseRoot: boolean = true) => {
-      // 1. Instant serve from cache
+      const reqId = ++materialsRequestSeq.current;
+      activeContainerRef.current = refId;
+      setLoadMaterialsError(null);
+
+      // 1. Instant serve from cache (0ms)
+      // CRITICAL: If cached data exists for this specific container, serve it immediately.
+      // If uncached, set to null so the previous course's contents are NEVER displayed!
       const cached = cache.getCachedMaterials(refId);
-      if (cached) {
-        setMaterialsData(cached);
-      }
+      setMaterialsData(cached || null);
 
       // 2. Background revalidation
       setIsRevalidatingMaterials(true);
       try {
         const fresh = await api.getMaterials(refId);
 
-        // Change detection: compare cached vs fresh to notify user
-        if (cached) {
-          const detected: ChangeNotification[] = [];
-
-          // 1. Check for newly added materials/files
-          const cachedItemIds = new Set(cached.items.map((i) => i.ref_id));
-          const newItems = fresh.items.filter((i) => !cachedItemIds.has(i.ref_id));
-          for (const item of newItems) {
-            detected.push({
-              id: `item-${item.ref_id}`,
-              type: item.item_type === 'file' ? 'file' : item.item_type === 'mcst' ? 'podcast' : 'general',
-              title: item.title,
-              subtitle: item.item_type === 'file' ? 'Neue Datei hinzugefügt' : 'Neues Material',
-            });
-          }
-
-          // 2. Check for newly added sessions
-          const cachedSessionIds = new Set((cached.sessions || []).map((s) => s.ref_id));
-          const newSessions = (fresh.sessions || []).filter((s) => !cachedSessionIds.has(s.ref_id));
-          for (const s of newSessions) {
-            detected.push({
-              id: `sess-${s.ref_id}`,
-              type: 'session',
-              title: s.title,
-              subtitle: 'Neuer Vorlesungstermin / Sitzung',
-            });
-          }
-
-          // 3. Check for newly added files inside sessions
-          const cachedSessionMatIds = new Set(
-            (cached.sessions || []).flatMap((s) => s.materials.map((m) => m.ref_id))
-          );
-          const newSessionMats = (fresh.sessions || []).flatMap((s) =>
-            s.materials.filter((m) => !cachedSessionMatIds.has(m.ref_id))
-          );
-          for (const sm of newSessionMats) {
-            detected.push({
-              id: `sess-mat-${sm.ref_id}`,
-              type: 'file',
-              title: sm.title,
-              subtitle: 'Neuer Anhang in Sitzung hinterlegt',
-            });
-          }
-
-          // 4. Check for new logs
-          const cachedLogKeys = new Set(
-            (cached.logs || []).map((l) => `${l.title}_${l.target || ''}_${l.date || ''}`)
-          );
-          const newLogs = (fresh.logs || []).filter(
-            (l) => !cachedLogKeys.has(`${l.title}_${l.target || ''}_${l.date || ''}`)
-          );
-          for (const nl of newLogs) {
-            detected.push({
-              id: `log-${nl.title}-${nl.date || Date.now()}`,
-              type: 'log',
-              title: nl.title,
-              subtitle: nl.target || nl.date,
-            });
-          }
-
-          if (detected.length > 0) {
-            setChangeNotifications(detected);
-          }
-        }
-
+        // Always cache fresh result so subsequent loads are instant
         cache.setCachedMaterials(refId, fresh);
-        setMaterialsData(fresh);
-      } catch (err) {
-        console.error(`Error revalidating materials for ${refId}`, err);
+
+        // Discard stale responses from out-of-order network requests
+        if (reqId === materialsRequestSeq.current && activeContainerRef.current === refId) {
+          // Change detection: compare cached vs fresh to notify user
+          if (cached) {
+            const detected: ChangeNotification[] = [];
+
+            // 1. Check for newly added materials/files
+            const cachedItemIds = new Set(cached.items.map((i) => i.ref_id));
+            const newItems = fresh.items.filter((i) => !cachedItemIds.has(i.ref_id));
+            for (const item of newItems) {
+              detected.push({
+                id: `item-${item.ref_id}`,
+                type: item.item_type === 'file' ? 'file' : item.item_type === 'mcst' ? 'podcast' : 'general',
+                title: item.title,
+                subtitle: item.item_type === 'file' ? 'Neue Datei hinzugefügt' : 'Neues Material',
+              });
+            }
+
+            // 2. Check for newly added sessions
+            const cachedSessionIds = new Set((cached.sessions || []).map((s) => s.ref_id));
+            const newSessions = (fresh.sessions || []).filter((s) => !cachedSessionIds.has(s.ref_id));
+            for (const s of newSessions) {
+              detected.push({
+                id: `sess-${s.ref_id}`,
+                type: 'session',
+                title: s.title,
+                subtitle: 'Neuer Vorlesungstermin / Sitzung',
+              });
+            }
+
+            // 3. Check for newly added files inside sessions
+            const cachedSessionMatIds = new Set(
+              (cached.sessions || []).flatMap((s) => s.materials.map((m) => m.ref_id))
+            );
+            const newSessionMats = (fresh.sessions || []).flatMap((s) =>
+              s.materials.filter((m) => !cachedSessionMatIds.has(m.ref_id))
+            );
+            for (const sm of newSessionMats) {
+              detected.push({
+                id: `sess-mat-${sm.ref_id}`,
+                type: 'file',
+                title: sm.title,
+                subtitle: 'Neuer Anhang in Sitzung hinterlegt',
+              });
+            }
+
+            // 4. Check for new logs
+            const cachedLogKeys = new Set(
+              (cached.logs || []).map((l) => `${l.title}_${l.target || ''}_${l.date || ''}`)
+            );
+            const newLogs = (fresh.logs || []).filter(
+              (l) => !cachedLogKeys.has(`${l.title}_${l.target || ''}_${l.date || ''}`)
+            );
+            for (const nl of newLogs) {
+              detected.push({
+                id: `log-${nl.title}-${nl.date || Date.now()}`,
+                type: 'log',
+                title: nl.title,
+                subtitle: nl.target || nl.date,
+              });
+            }
+
+            if (detected.length > 0) {
+              setChangeNotifications((prev) => [...prev, ...detected]);
+            }
+          }
+
+          setMaterialsData(fresh);
+        }
+      } catch (err: any) {
+        if (reqId === materialsRequestSeq.current && activeContainerRef.current === refId) {
+          console.error(`Error revalidating materials for ${refId}`, err);
+          setLoadMaterialsError(err?.message || 'Fehler beim Abrufen der Vorlesungsinhalte');
+        }
       } finally {
-        setIsRevalidatingMaterials(false);
+        if (reqId === materialsRequestSeq.current) {
+          setIsRevalidatingMaterials(false);
+        }
       }
     },
     []
@@ -207,6 +242,7 @@ export const App: React.FC = () => {
   const handleSelectCourse = (courseRefId: string) => {
     setSelectedCourseId(courseRefId);
     setCurrentContainerId(courseRefId);
+    activeContainerRef.current = courseRefId;
     cache.setLastOpenedCourseId(courseRefId);
     loadCourseMaterials(courseRefId, true);
   };
@@ -214,21 +250,26 @@ export const App: React.FC = () => {
   // --- Subfolder Navigation Handler ---
   const handleNavigateFolder = (folderRefId: string) => {
     setCurrentContainerId(folderRefId);
+    activeContainerRef.current = folderRefId;
     loadCourseMaterials(folderRefId, false);
   };
 
   // --- Return to Course Root ---
   const handleNavigateCourseRoot = (courseRefId: string) => {
     setCurrentContainerId(courseRefId);
+    activeContainerRef.current = courseRefId;
     loadCourseMaterials(courseRefId, true);
   };
 
   // --- Return to Semester Overview ---
   const handleNavigateHome = () => {
+    materialsRequestSeq.current++;
+    activeContainerRef.current = null;
     setSelectedCourseId(null);
     setCurrentContainerId(null);
     cache.setLastOpenedCourseId(null);
     setMaterialsData(null);
+    setLoadMaterialsError(null);
   };
 
   // --- Toggle Sidebar ---
@@ -254,8 +295,13 @@ export const App: React.FC = () => {
 
   const currentCourse = allCourses.find((c) => c.ref_id === selectedCourseId);
   const currentNickname = selectedCourseId
-    ? cache.getDisplayName(selectedCourseId, currentCourse?.title || '')
+    ? cache.getDisplayName(selectedCourseId, currentCourse?.title || materialsData?.title || '')
     : '';
+
+  // Enforce strict container matching so CourseView NEVER receives data from a different lecture/container
+  const isMatchingContainer =
+    materialsData !== null && materialsData.container_ref_id === currentContainerId;
+  const effectiveMaterialsData = isMatchingContainer ? materialsData : null;
 
   return (
     <div className="flex h-screen w-screen flex-col bg-slate-50 overflow-hidden text-slate-900 font-sans">
@@ -287,15 +333,17 @@ export const App: React.FC = () => {
         <main className="flex-1 overflow-y-auto bg-slate-50/50">
           {selectedCourseId && currentContainerId ? (
             <CourseView
+              key={`${selectedCourseId}_${currentContainerId}`}
               courseRefId={selectedCourseId}
               courseNickname={currentNickname}
-              materialsData={materialsData}
+              materialsData={effectiveMaterialsData}
               onNavigateFolder={handleNavigateFolder}
               onNavigateHome={handleNavigateHome}
               onNavigateCourseRoot={handleNavigateCourseRoot}
               isRevalidating={isRevalidatingMaterials}
               onManualRefresh={() => loadCourseMaterials(currentContainerId, false)}
               onNotifyChange={(notifs) => setChangeNotifications((prev) => [...prev, ...notifs])}
+              loadError={loadMaterialsError}
             />
           ) : (
             <SemesterView

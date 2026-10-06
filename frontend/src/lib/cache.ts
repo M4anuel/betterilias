@@ -1,5 +1,25 @@
 import { CourseMaterialsResponse } from '../types';
 
+export type ContentSectionId =
+  | 'folders'
+  | 'files'
+  | 'podcasts'
+  | 'sessions'
+  | 'exercises'
+  | 'richtext'
+  | 'sections';
+
+export const DEFAULT_SECTION_ORDER: ContentSectionId[] = [
+  'folders',
+  'files',
+  'podcasts',
+  'sessions',
+  'exercises',
+  'richtext',
+  'sections',
+];
+
+const CONTENT_SECTION_ORDER_KEY = 'ilias_content_section_order';
 const NICKNAMES_KEY = 'ilias_course_nicknames';
 const COURSE_ICONS_KEY = 'ilias_course_icons';
 const SELECTED_SEMESTER_KEY = 'ilias_selected_semester';
@@ -90,6 +110,52 @@ export const cache = {
       localStorage.setItem(SELECTED_SEMESTER_KEY, semesterId);
     } catch (e) {
       console.error('Failed to save selected semester', e);
+    }
+  },
+
+  // --- Semester View Mode (Cards vs Compact List) ---
+  getSemesterViewMode(): 'cards' | 'list' {
+    try {
+      return (localStorage.getItem('ilias_semester_view_mode') as 'cards' | 'list') || 'cards';
+    } catch {
+      return 'cards';
+    }
+  },
+
+  setSemesterViewMode(mode: 'cards' | 'list') {
+    try {
+      localStorage.setItem('ilias_semester_view_mode', mode);
+    } catch (e) {
+      console.error('Failed to save semester view mode', e);
+    }
+  },
+
+  // --- Content Section Order (Customizable Layout) ---
+  getContentSectionOrder(): ContentSectionId[] {
+    try {
+      const raw = localStorage.getItem(CONTENT_SECTION_ORDER_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const set = new Set<ContentSectionId>(parsed);
+          const fullOrder = [...parsed];
+          for (const s of DEFAULT_SECTION_ORDER) {
+            if (!set.has(s)) fullOrder.push(s);
+          }
+          return fullOrder;
+        }
+      }
+    } catch {
+      // fallback
+    }
+    return DEFAULT_SECTION_ORDER;
+  },
+
+  setContentSectionOrder(order: ContentSectionId[]) {
+    try {
+      localStorage.setItem(CONTENT_SECTION_ORDER_KEY, JSON.stringify(order));
+    } catch (e) {
+      console.error('Failed to save content section order', e);
     }
   },
 

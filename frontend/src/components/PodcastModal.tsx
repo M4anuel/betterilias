@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   X,
   Play,
@@ -36,6 +36,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
   const [series, setSeries] = useState<PodcastSeriesResponse | null>(null);
   const [filter, setFilter] = useState<'available' | 'scheduled' | 'all'>('available');
   const [search, setSearch] = useState('');
+  const backdropMouseDownRef = useRef(false);
 
   const fetchPodcasts = async () => {
     // 1. Check cache for 0ms instant display
@@ -113,11 +114,23 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+      onMouseDown={(e) => {
+        backdropMouseDownRef.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && backdropMouseDownRef.current) {
+          onClose();
+        }
+        backdropMouseDownRef.current = false;
+      }}
+    >
       <div
         className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150"
         role="dialog"
         aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
         <div className="flex items-start justify-between border-b border-slate-100 p-5 bg-gradient-to-r from-slate-50 to-white">

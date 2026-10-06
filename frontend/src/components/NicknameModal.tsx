@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Check, RotateCcw, ChevronDown, Smile } from 'lucide-react';
 import { CourseItem } from '../types';
 import { cache } from '../lib/cache';
@@ -20,6 +20,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
   const [nicknames, setNicknames] = useState<Record<string, string>>({});
   const [icons, setIcons] = useState<Record<string, string>>({});
   const [activePickerRefId, setActivePickerRefId] = useState<string | null>(null);
+  const backdropMouseDownRef = useRef(false);
 
   // Sync state whenever modal opens
   useEffect(() => {
@@ -29,6 +30,16 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
       setActivePickerRefId(null);
     }
   }, [isOpen]);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -61,8 +72,22 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
+      onMouseDown={(e) => {
+        backdropMouseDownRef.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && backdropMouseDownRef.current) {
+          onClose();
+        }
+        backdropMouseDownRef.current = false;
+      }}
+    >
+      <div
+        className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
