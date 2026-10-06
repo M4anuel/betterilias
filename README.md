@@ -19,6 +19,8 @@ A modern, fast REST API bridge and scraper for the University of Bern's ILIAS le
   * **Grade Submission (`POST /api/exercises/{exercise_id}/submissions/{member_id}/grade`):** Scrapes hidden form fields and CSRF tokens (`rtoken`, `cmdNode`), constructs the POST request, submits grades/feedback, and verifies ILIAS response.
 * **Phase 4: Modern React 19 + TypeScript Frontend:**
   * **Zero-Latency Serving (SWR):** Instantly renders courses, podcasts, and logs from `localStorage` in 0ms while silently revalidating in the background.
+  * **Semester View Layout Switcher:** 1-click toggle between responsive card grid and compact high-density list, persisted in `localStorage`.
+  * **Repository-Wide Subfolder Search:** Searches across the current folder and all course subfolders (up to 3 levels deep) in real time with location breadcrumbs and filter pills.
   * **VS Code-Style Bottom-Right Notification Toast:** Floating toast alerts user to new files, sessions, or podcasts detected during background revalidation (10s auto-dismiss, progress bar, fold-out list).
   * **Compact Navigation:** Custom course nicknames, 20 selectable academic icons, clean filtered breadcrumbs, and full semester archives back to 2021.
 * **The AI Maintenance Protocol:**

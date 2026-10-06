@@ -90,6 +90,38 @@
   * Pause-on-hover timer and manual 'X' dismiss button.
   * Single change displays directly; multiple changes display a collapsible summary with a `ChevronUp` fold-out arrow.
 
+### Phase 7: Layout Switcher, News Shield & Repository-Wide Search — [COMPLETED]
+
+* [x] **Semester Overview Layout Switcher (Cards vs. List):**
+  * Added view toggle (`LayoutGrid` vs. `List`) in `SemesterView.tsx`.
+  * Saved to `localStorage` (`cache.getSemesterViewMode()` / `cache.setSemesterViewMode()`).
+  * Sleek compact list view displaying icons, course codes, titles, contact info, and fast open actions.
+* [x] **Scraper News Isolation Shield (`backend/scrapers/materials.py`):**
+  * Strictly excluded `aside`, `#il_right_col`, and `block_news_*` DOM trees from material scraping.
+  * Added headline filters for notifications (e.g., "One file has been added").
+* [x] **Repository-Wide Subfolder Search (`CourseView.tsx`):**
+  * Crawls top-level folders and subfolders (up to 3 levels deep) from local cache in 0ms and on-demand background fetch.
+  * Location badges with breadcrumb paths (`📁 Folien aus dem Unterricht › Woche 1`).
+  * Contextual action buttons: "In Ordner anzeigen", direct download, podcast launcher.
+  * Category filter pills: "Alle", "Dateien & Folien", "Unterordner", "Podcasts", "Übungen & Weiteres".
+* [x] **Outside-Click Dialog Dismissal:**
+  * Enabled outside-click and Escape key handlers across all modal windows (`NicknameModal`, `PodcastModal`).
+
+### Phase 8: Elimination of Double Loading & Course Switching Race Conditions — [COMPLETED]
+
+* [x] **Stale Course Content Purge on Navigation:**
+  * When switching courses or containers in `App.tsx`, if the target course is not yet cached, `materialsData` is immediately cleared to `null` instead of keeping the previous lecture's contents visible while fetching.
+  * Displays the clean "Lade Vorlesungsinhalte..." spinner instead of displaying the wrong lecture under the new lecture's header.
+* [x] **Request Sequencing & Out-of-Order Rejection (`materialsRequestSeq` & `activeContainerRef`):**
+  * Added monotonic sequence IDs and active container tracking to `loadCourseMaterials`.
+  * If a slower background request for a previously clicked lecture finishes later, it is discarded for UI updates (while still cached silently for future visits).
+* [x] **Strict Container Matching Guard:**
+  * In `App.tsx`, `materialsData` is only forwarded to `CourseView` if `materialsData.container_ref_id === currentContainerId`. If mismatched during state transitions, it defaults to `null`, preventing cross-course rendering flashes.
+* [x] **Unique React Keying on `CourseView`:**
+  * Added `key={`${selectedCourseId}_${currentContainerId}`}` on `<CourseView>` to ensure complete, clean component unmounting/remounting on course changes. Resets all local search states, subfolder crawlers, and drawer toggles.
+* [x] **Retryable Error Boundary:**
+  * Added `loadError` handling in `CourseView.tsx` with a friendly error box and "Erneut versuchen" button if an uncached lecture fails to load.
+
 ---
 
 ## 3. Project Directory Structure
