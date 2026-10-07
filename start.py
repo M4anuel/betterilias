@@ -23,18 +23,44 @@ else:
     VENV_PYTHON = BASE_DIR / "venv" / "bin" / "python"
     NPM_CMD = "npm"
 
-PYTHON_BIN = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
+PYTHON_BIN = sys.executable
+
+
+def select_python():
+    """Use a local virtual environment only if its base interpreter still works."""
+    for directory in ("venv", ".venv"):
+        candidate = BASE_DIR / directory / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        if not candidate.exists():
+            continue
+        try:
+            result = subprocess.run(
+                [str(candidate), "--version"], capture_output=True, text=True, timeout=10
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            result = None
+        if result is not None and result.returncode == 0:
+            return str(candidate)
+        print(f"[!] Virtual environment is broken: {candidate}. Skipping it.")
+    return sys.executable
 
 
 def check_prerequisites():
     """Verify that dependencies exist before launching."""
+    global PYTHON_BIN
+    PYTHON_BIN = select_python()
+    print(f"Using Python: {PYTHON_BIN}")
+    result = subprocess.run(
+        [PYTHON_BIN, "-c", "import fastapi, uvicorn, playwright, bs4, lxml, httpx, pydantic, pydantic_settings, dotenv"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Backend dependencies could not be imported:\n{result.stderr}"
+            f'Install them with: "{PYTHON_BIN}" -m pip install -r requirements.txt'
+        )
     if not (FRONTEND_DIR / "node_modules").exists():
         print("[!] Frontend node_modules not found. Installing packages...")
         subprocess.run([NPM_CMD, "install"], cwd=str(FRONTEND_DIR), check=True)
-
-    if not VENV_PYTHON.exists():
-        print(f"[!] Warning: Virtual environment at {VENV_PYTHON} not found. Using system Python: {PYTHON_BIN}")
-
 
 def main():
     print("=" * 65)
@@ -58,6 +84,8 @@ def main():
 
         # Give backend a moment to start
         time.sleep(1.2)
+        if backend_proc.poll() is not None:
+            raise RuntimeError(f"Backend failed to start (exit code: {backend_proc.returncode}).")
 
         # 2. Start React Frontend (Vite)
         print("[2/2] Launching Frontend (Vite) on http://localhost:5173 ...")
@@ -104,4 +132,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
