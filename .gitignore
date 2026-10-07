@@ -12,6 +12,7 @@ __pycache__/
 # Environment and sensitive data
 .env
 session_cookies.json
+.browser_profile/
 .env.*
 !.env.example
 

@@ -13,20 +13,15 @@ logger = logging.getLogger("ilias.login")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 
-async def run_browser_login(
-    headless: Optional[bool] = None,
-    timeout_seconds: Optional[int] = None,
+async def _async_login_impl(
+    headless: bool,
+    timeout: int,
     progress_callback: Optional[callable] = None,
 ) -> Tuple[bool, Dict[str, str], str]:
     """
-    Launch a browser using Playwright, navigate to Uni Bern ILIAS,
-    wait for user to complete SWITCH edu-ID login, and capture session cookies.
-    
-    Returns:
-        (success, cookies_dict, status_message)
+    Internal async implementation of the Playwright login flow.
+    Runs inside a ProactorEventLoop on Windows.
     """
-    is_headless = settings.playwright_headless if headless is None else headless
-    timeout = settings.playwright_timeout_seconds if timeout_seconds is None else timeout_seconds
     start_time = time.time()
 
     def update_status(msg: str):
@@ -34,72 +29,107 @@ async def run_browser_login(
         if progress_callback:
             progress_callback(msg)
 
-    update_status("Starting Playwright browser for Uni Bern ILIAS authentication...")
+    update_status("Starting browser for Uni Bern ILIAS authentication...")
 
     try:
+        settings.browser_profile_path.mkdir(parents=True, exist_ok=True)
+
         async with async_playwright() as p:
-            try:
-                browser = await p.chromium.launch(
-                    headless=is_headless,
-                    args=["--disable-blink-features=AutomationControlled"]
-                )
-            except Exception as launch_err:
+            context = None
+            last_err = None
+            channels_to_try = ["chrome", "msedge", None]
+
+            for channel in channels_to_try:
+                try:
+                    kwargs = {
+                        "user_data_dir": str(settings.browser_profile_path),
+                        "headless": headless,
+                        "user_agent": settings.user_agent,
+                        "viewport": {"width": 1280, "height": 850},
+                        "args": ["--disable-blink-features=AutomationControlled"],
+                    }
+                    if channel:
+                        kwargs["channel"] = channel
+                    context = await p.chromium.launch_persistent_context(**kwargs)
+                    logger.info(f"Launched browser context using channel: {channel or 'bundled chromium'}")
+                    break
+                except Exception as err:
+                    last_err = err
+                    logger.debug(f"Channel {channel} unavailable: {err}")
+                    continue
+
+            if context is None:
                 msg = (
-                    f"Failed to launch Chromium browser: {launch_err}. "
-                    "Make sure browser binaries are installed with: playwright install chromium"
+                    f"Failed to launch browser: {last_err}. "
+                    "Make sure Google Chrome or Microsoft Edge is installed, or run: playwright install chromium"
                 )
                 logger.error(msg)
                 return False, {}, msg
 
-            context = await browser.new_context(
-                user_agent=settings.user_agent,
-                viewport={"width": 1280, "height": 800}
-            )
-            page = await context.new_page()
+            page = context.pages[0] if context.pages else await context.new_page()
 
             update_status(f"Navigating to ILIAS: {settings.ilias_base_url} ...")
-            await page.goto(settings.ilias_base_url, wait_until="domcontentloaded")
+            try:
+                await page.goto(settings.ilias_base_url, wait_until="domcontentloaded")
+            except Exception as nav_err:
+                logger.warning(f"Initial navigation notice: {nav_err}")
 
             update_status(
                 "Waiting for SWITCH edu-ID login to complete. "
                 "Please log in via the opened browser window..."
             )
 
-            # Loop and check URL and cookies until timeout
             captured_cookies: Dict[str, str] = {}
             authenticated = False
 
             while time.time() - start_time < timeout:
-                current_url = page.url.lower()
+                active_pages = [p for p in context.pages if not p.is_closed()]
+                if not active_pages:
+                    await context.close()
+                    return False, {}, "Das Browser-Fenster wurde vor Abschluss des Logins geschlossen."
 
-                # Check if current URL is on ILIAS domain and not a login/switch page
-                is_ilias_domain = "ilias.unibe.ch" in current_url
-                is_auth_redirect = any(
-                    token in current_url
-                    for token in ["login.php", "wayf", "eduid", "aai", "idp", "shibboleth"]
-                )
-                is_desktop = (
-                    "baseclass=ilpersonaldesktopgui" in current_url
-                    or "ilias.php" in current_url
-                )
-
-                if is_ilias_domain and not is_auth_redirect and is_desktop:
-                    # Check cookies in context
+                # Retrieve all cookies in context
+                try:
                     cookies_list = await context.cookies()
                     cookies_dict = {c["name"]: c["value"] for c in cookies_list}
+                except Exception:
+                    await asyncio.sleep(0.5)
+                    continue
 
-                    if "PHPSESSID" in cookies_dict:
-                        captured_cookies = cookies_dict
-                        # Set default ilClientId if missing
-                        if "ilClientId" not in captured_cookies:
-                            captured_cookies["ilClientId"] = settings.ilias_client_id
+                for p in active_pages:
+                    try:
+                        current_url = p.url.lower()
+                    except Exception:
+                        continue
 
-                        authenticated = True
-                        break
+                    is_ilias_domain = "ilias.unibe.ch" in current_url
+                    is_auth_redirect = any(
+                        token in current_url
+                        for token in ["login.php", "wayf", "eduid", "aai", "idp", "shibboleth"]
+                    )
+                    is_desktop = (
+                        "baseclass=ilpersonaldesktopgui" in current_url
+                        or "ilias.php" in current_url
+                    )
 
-                await asyncio.sleep(1.0)
+                    if is_ilias_domain and not is_auth_redirect and is_desktop:
+                        if "PHPSESSID" in cookies_dict:
+                            captured_cookies = cookies_dict
+                            if "ilClientId" not in captured_cookies:
+                                captured_cookies["ilClientId"] = settings.ilias_client_id
 
-            await browser.close()
+                            authenticated = True
+                            break
+
+                if authenticated:
+                    break
+
+                await asyncio.sleep(0.8)
+
+            try:
+                await context.close()
+            except Exception:
+                pass
 
             if not authenticated:
                 return (
@@ -113,7 +143,6 @@ async def run_browser_login(
                 captured_cookies,
                 metadata={
                     "source": "playwright_browser_login",
-                    "final_url": page.url,
                     "cookies_count": len(captured_cookies),
                 }
             )
@@ -127,32 +156,71 @@ async def run_browser_login(
         return False, {}, err_msg
 
 
-def main():
-    """CLI Entry point for python -m backend.auth.playwright_login"""
-    print("\n" + "=" * 60)
-    print("Uni Bern ILIAS - Playwright Login Assistant")
-    print("=" * 60)
-    print("A browser window will open shortly.")
-    print("Please select 'Universität Bern' and log in with your SWITCH edu-ID.")
-    print("=" * 60 + "\n")
-
-    loop = asyncio.new_event_loop()
+def _sync_worker(
+    headless: bool,
+    timeout: int,
+    progress_callback: Optional[callable] = None,
+) -> Tuple[bool, Dict[str, str], str]:
+    """
+    Dedicated worker thread executor.
+    Guarantees a ProactorEventLoop on Windows so asyncio.create_subprocess_exec works,
+    even when uvicorn is running a SelectorEventLoop.
+    """
+    if sys.platform == "win32":
+        loop = asyncio.ProactorEventLoop()
+    else:
+        loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        success, cookies, message = loop.run_until_complete(
-            run_browser_login(headless=False)
+        return loop.run_until_complete(
+            _async_login_impl(headless, timeout, progress_callback)
         )
-        if success:
-            print("\n SUCCESS: " + message)
-            print(f"Captured {len(cookies)} cookies (PHPSESSID: {cookies.get('PHPSESSID')[:8]}...)")
-            sys.exit(0)
-        else:
-            print("\n FAILED: " + message)
-            sys.exit(1)
     finally:
         loop.close()
 
 
+async def run_browser_login(
+    headless: Optional[bool] = None,
+    timeout_seconds: Optional[int] = None,
+    progress_callback: Optional[callable] = None,
+) -> Tuple[bool, Dict[str, str], str]:
+    """
+    Launch a browser using Playwright, navigate to Uni Bern ILIAS,
+    wait for user to complete SWITCH edu-ID login, and capture session cookies.
+    
+    Delegates to a worker thread with ProactorEventLoop to prevent NotImplementedError
+    when running under uvicorn's WindowsSelectorEventLoop.
+    
+    Returns:
+        (success, cookies_dict, status_message)
+    """
+    is_headless = settings.playwright_headless if headless is None else headless
+    timeout = settings.playwright_timeout_seconds if timeout_seconds is None else timeout_seconds
+
+    return await asyncio.to_thread(_sync_worker, is_headless, timeout, progress_callback)
+
+
+def main():
+    """CLI Entry point for python -m backend.auth.playwright_login or login.py"""
+    print("\n" + "=" * 60)
+    print("Uni Bern ILIAS - Browser Login Assistant")
+    print("=" * 60)
+    print("A browser window will open shortly.")
+    print("Please select 'Universitaet Bern' and log in with your SWITCH edu-ID.")
+    print("=" * 60 + "\n")
+
+    success, cookies, message = _sync_worker(
+        headless=False,
+        timeout=settings.playwright_timeout_seconds
+    )
+    if success:
+        print("\n SUCCESS: " + message)
+        print(f"Captured {len(cookies)} cookies (PHPSESSID: {cookies.get('PHPSESSID', '')[:8]}...)")
+        sys.exit(0)
+    else:
+        print("\n FAILED: " + message)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     main()
-
