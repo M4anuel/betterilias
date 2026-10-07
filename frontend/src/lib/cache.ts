@@ -1,4 +1,10 @@
-import { CourseMaterialsResponse } from '../types';
+import {
+  CourseMaterialsResponse,
+  ExerciseOverviewResponse,
+  ExerciseSubmissionsResponse,
+  ExerciseInfoResponse,
+  StudentAssignmentDetail,
+} from '../types';
 
 export type ContentSectionId =
   | 'folders'
@@ -27,6 +33,10 @@ const LAST_OPENED_KEY = 'ilias_last_opened_course';
 const SIDEBAR_COLLAPSED_KEY = 'ilias_sidebar_collapsed';
 const MATERIALS_CACHE_PREFIX = 'ilias_materials_cache_';
 const SEMESTER_CACHE_KEY = 'ilias_semester_cache';
+const EXERCISE_OVERVIEW_PREFIX = 'ilias_exercise_overview_';
+const EXERCISE_SUBMISSIONS_PREFIX = 'ilias_exercise_submissions_';
+const EXERCISE_INFO_PREFIX = 'ilias_exercise_info_';
+const STUDENT_ASSIGNMENT_PREFIX = 'ilias_student_assignment_';
 
 export const cache = {
   // --- Nicknames ---
@@ -314,6 +324,81 @@ export const cache = {
     } catch (err) {
       if (onError) onError(err);
     }
-  }
+  },
+
+  // --- Exercise Overview Cache ---
+  getCachedExerciseOverview(refId: string): ExerciseOverviewResponse | null {
+    try {
+      const raw = localStorage.getItem(EXERCISE_OVERVIEW_PREFIX + refId);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedExerciseOverview(refId: string, data: ExerciseOverviewResponse) {
+    try {
+      localStorage.setItem(EXERCISE_OVERVIEW_PREFIX + refId, JSON.stringify(data));
+    } catch (e) {
+      console.warn('Storage quota exceeded for exercise overview cache', e);
+    }
+  },
+
+  // --- Exercise Submissions Cache ---
+  getCachedExerciseSubmissions(refId: string, assId?: string): ExerciseSubmissionsResponse | null {
+    try {
+      const key = `${EXERCISE_SUBMISSIONS_PREFIX}${refId}_${assId || 'default'}`;
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedExerciseSubmissions(refId: string, assId: string | undefined, data: ExerciseSubmissionsResponse) {
+    try {
+      const key = `${EXERCISE_SUBMISSIONS_PREFIX}${refId}_${assId || 'default'}`;
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+      console.warn('Storage quota exceeded for exercise submissions cache', e);
+    }
+  },
+
+  // --- Exercise Info Cache ---
+  getCachedExerciseInfo(refId: string): ExerciseInfoResponse | null {
+    try {
+      const raw = localStorage.getItem(EXERCISE_INFO_PREFIX + refId);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedExerciseInfo(refId: string, data: ExerciseInfoResponse) {
+    try {
+      localStorage.setItem(EXERCISE_INFO_PREFIX + refId, JSON.stringify(data));
+    } catch (e) {
+      console.warn('Storage quota exceeded for exercise info cache', e);
+    }
+  },
+
+  // --- Student Assignment Detail Cache ---
+  getCachedStudentAssignment(refId: string, assId: string): StudentAssignmentDetail | null {
+    try {
+      const raw = localStorage.getItem(`${STUDENT_ASSIGNMENT_PREFIX}${refId}_${assId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedStudentAssignment(refId: string, assId: string, data: StudentAssignmentDetail) {
+    try {
+      localStorage.setItem(`${STUDENT_ASSIGNMENT_PREFIX}${refId}_${assId}`, JSON.stringify(data));
+    } catch (e) {
+      console.warn('Storage quota exceeded for student assignment cache', e);
+    }
+  },
 };
+
 

@@ -28,6 +28,7 @@ import { CourseLogsPanel } from './CourseLogsPanel';
 import { PodcastModal } from './PodcastModal';
 import { SessionDrawer } from './SessionDrawer';
 import { ContentOrderModal } from './ContentOrderModal';
+import { ExerciseView } from './ExerciseView';
 import { api } from '../lib/api';
 import { cache, ContentSectionId } from '../lib/cache';
 
@@ -76,6 +77,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [activePodcast, setActivePodcast] = useState<{ refId: string; title: string } | null>(null);
+  const [activeExerciseRefId, setActiveExerciseRefId] = useState<string | null>(null);
   const [subfolderMaterials, setSubfolderMaterials] = useState<
     Record<string, { materials: CourseMaterialsResponse; path: string[] }>
   >({});
@@ -343,6 +345,22 @@ export const CourseView: React.FC<CourseViewProps> = ({
     );
   }
 
+  if (activeExerciseRefId) {
+    return (
+      <ExerciseView
+        exerciseRefId={activeExerciseRefId}
+        courseNickname={courseNickname}
+        courseRefId={courseRefId}
+        onBack={() => setActiveExerciseRefId(null)}
+        onNavigateFolder={(folderRefId) => {
+          onNavigateFolder(folderRefId);
+          setActiveExerciseRefId(null);
+        }}
+        onNotifyChange={onNotifyChange}
+      />
+    );
+  }
+
   const isInsideSubfolder = materialsData.container_ref_id !== courseRefId;
   const sections = materialsData.sections || [];
   const richTextBlocks = materialsData.rich_text_blocks || [];
@@ -472,6 +490,11 @@ export const CourseView: React.FC<CourseViewProps> = ({
       item.item_type === 'mcst' ||
       item.title.toLowerCase().includes('podcast') ||
       item.url.toLowerCase().includes('xoct');
+    const isExercise =
+      item.item_type === 'exc' ||
+      item.url.toLowerCase().includes('ilexercise') ||
+      item.title.toLowerCase().includes('übung') ||
+      item.title.toLowerCase().includes('exercise');
     const downloadUrl = isFile ? api.getDownloadUrl(item.ref_id, item.download_url) : null;
 
     return (
@@ -537,6 +560,15 @@ export const CourseView: React.FC<CourseViewProps> = ({
             >
               <Play className="h-3 w-3" />
               <span>Aufzeichnungen</span>
+            </button>
+          ) : isExercise ? (
+            <button
+              type="button"
+              onClick={() => setActiveExerciseRefId(item.ref_id)}
+              className="flex items-center gap-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 text-xs font-semibold transition shadow-2xs cursor-pointer"
+            >
+              <Layers className="h-3 w-3" />
+              <span>Übungen</span>
             </button>
           ) : isFile && downloadUrl ? (
             <a
@@ -612,6 +644,11 @@ export const CourseView: React.FC<CourseViewProps> = ({
       item.item_type === 'mcst' ||
       item.title.toLowerCase().includes('podcast') ||
       item.url.toLowerCase().includes('xoct');
+    const isExercise =
+      item.item_type === 'exc' ||
+      item.url.toLowerCase().includes('ilexercise') ||
+      item.title.toLowerCase().includes('übung') ||
+      item.title.toLowerCase().includes('exercise');
     const downloadUrl = isFile ? api.getDownloadUrl(item.ref_id, item.download_url) : null;
 
     if (isFolder) {
@@ -695,6 +732,44 @@ export const CourseView: React.FC<CourseViewProps> = ({
             >
               <Play className="h-3 w-3 fill-white" />
               <span>Aufnahmen</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (isExercise) {
+      return (
+        <div
+          key={item.ref_id}
+          onClick={() => setActiveExerciseRefId(item.ref_id)}
+          className="flex items-center justify-between p-3 hover:bg-indigo-50/70 transition rounded-xl border border-transparent hover:border-indigo-200 cursor-pointer group gap-3"
+        >
+          <div className="flex items-center gap-3 truncate">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shrink-0 group-hover:scale-105 transition">
+              <Layers className="h-4 w-4" />
+            </div>
+            <div className="truncate">
+              <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-800 transition block truncate">
+                {item.title}
+              </span>
+              <span className="text-[10px] text-indigo-600 font-medium block truncate">
+                {item.description || 'Übungsblätter, Abgaben & Bewertungen verwalten'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveExerciseRefId(item.ref_id);
+              }}
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-indigo-700 transition shadow-2xs cursor-pointer"
+            >
+              <Layers className="h-3 w-3" />
+              <span>Öffnen</span>
             </button>
           </div>
         </div>

@@ -5,7 +5,16 @@ from backend.scrapers.logs import parse_course_logs
 from backend.scrapers.materials import parse_course_materials
 from backend.scrapers.podcasts import parse_podcast_series
 from backend.scrapers.semester import parse_semester_courses
-from backend.scrapers.submissions import parse_exercise_submissions, parse_exercise_overview
+from backend.scrapers.submissions import (
+    parse_exercise_submissions,
+    parse_exercise_overview,
+    parse_student_assignment_detail,
+    parse_exercise_info,
+    parse_student_submitted_files_screen,
+    parse_student_upload_form,
+    StudentUploadFormInfo,
+)
+from backend.scrapers.feedback_files import parse_feedback_files
 
 __all__ = [
     "parse_dashboard",
@@ -14,6 +23,12 @@ __all__ = [
     "parse_podcast_series",
     "parse_exercise_submissions",
     "parse_exercise_overview",
+    "parse_student_assignment_detail",
+    "parse_exercise_info",
+    "parse_student_submitted_files_screen",
+    "parse_student_upload_form",
+    "StudentUploadFormInfo",
+    "parse_feedback_files",
     "parse_semester_courses",
     "extract_grading_form",
     "verify_grading_success",

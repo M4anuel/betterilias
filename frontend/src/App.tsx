@@ -18,6 +18,7 @@ export const App: React.FC = () => {
   // --- Auth & Session State ---
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const authRequestSeq = useRef(0);
   const [changeNotifications, setChangeNotifications] = useState<ChangeNotification[]>([]);
 
   // --- Semester & Courses State ---
@@ -65,9 +66,10 @@ export const App: React.FC = () => {
 
   // --- Check Auth Status ---
   const checkAuth = useCallback(async () => {
+    const reqId = ++authRequestSeq.current;
     try {
       const status = await api.getAuthStatus();
-      setAuthStatus(status);
+      if (reqId === authRequestSeq.current) setAuthStatus(status);
     } catch (e) {
       console.warn('Auth check failed', e);
     }
@@ -227,6 +229,18 @@ export const App: React.FC = () => {
 
   // --- Initial Mount Effect ---
   useEffect(() => {
+    const handleSession = (event: Event) => {
+      const authenticated = (event as CustomEvent<boolean>).detail;
+      ++authRequestSeq.current;
+      setAuthStatus((previous) => ({
+        ...previous,
+        authenticated,
+        cookies_present: authenticated,
+        user_name: authenticated ? previous?.user_name : undefined,
+      }));
+    };
+    window.addEventListener('ilias-session', handleSession);
+    window.addEventListener('focus', checkAuth);
     checkAuth();
     const initialSemester = cache.getSelectedSemester();
     loadSemesters(initialSemester);
@@ -236,6 +250,11 @@ export const App: React.FC = () => {
     if (initialCourseId) {
       loadCourseMaterials(initialCourseId, true);
     }
+    return () => {
+      ++authRequestSeq.current;
+      window.removeEventListener('ilias-session', handleSession);
+      window.removeEventListener('focus', checkAuth);
+    };
   }, [checkAuth, loadSemesters, loadCourseMaterials]);
 
   // --- Course Selection Handler ---
@@ -283,8 +302,10 @@ export const App: React.FC = () => {
   const handleTriggerLogin = async () => {
     setIsLoggingIn(true);
     try {
-      await api.triggerBrowserLogin();
-      await checkAuth();
+      const result = await api.triggerBrowserLogin();
+      if (!result.success) throw new Error(result.message || 'Anmeldung fehlgeschlagen');
+      ++authRequestSeq.current;
+      setAuthStatus({ authenticated: true, cookies_present: true });
       loadSemesters(selectedSemester);
     } catch (err: any) {
       alert(`Login Fehler: ${err.message}`);

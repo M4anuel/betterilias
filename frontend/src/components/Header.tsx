@@ -40,7 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-base font-bold text-slate-900 tracking-tight">ILIAS Alternative</span>
+              <span className="text-base font-bold text-slate-900 tracking-tight">BetterIlias</span>
               <span className="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 border border-red-200">
                 Uni Bern
               </span>
@@ -65,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 border border-amber-200">
               <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
-              <span>Nicht angemeldet</span>
+              <span>{isLoggingIn ? 'Anmeldung läuft…' : authStatus === null ? 'Anmeldestatus wird geprüft…' : 'Nicht angemeldet'}</span>
             </div>
             <button
               onClick={onTriggerLogin}
@@ -81,4 +81,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-

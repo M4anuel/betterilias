@@ -141,7 +141,127 @@ export interface AssignmentItem {
   edit_until?: string;
   requirement?: string;
   status?: string;
+  is_ongoing?: boolean;
+  is_ended?: boolean;
+  create_team_url?: string;
+  ass_type?: string;
+  is_selected?: boolean;
+  properties?: Record<string, string>;
+}
+
+export interface SubmissionFile {
+  filename: string;
+  download_url: string;
+  upload_time?: string;
+  file_size?: string;
+  delivered_id?: string;
+}
+
+export interface TAQuickFilter {
+  id: string;
+  label: string;
+  color: 'indigo' | 'emerald' | 'amber' | 'rose' | 'purple' | 'sky' | 'slate';
+  gradeStatus: string[];
+  submissionStatus: 'all' | 'submitted' | 'not_submitted';
+}
+
+export interface SubmissionItem {
+  member_id: string;
+  student_name: string;
+  team_members?: string[];
+  login?: string;
+  team_name?: string;
+  team_id?: string;
+  submission_status: string; // 'submitted' | 'not_submitted' | 'late'
+  submission_time?: string;
+  graded_on?: string;
+  evaluation_on?: string;
+  sent_on?: string;
+  individual_deadline?: string;
+  files: SubmissionFile[];
+  download_url?: string;
+  mark?: string;
+  passed_status?: string; // 'passed' | 'failed' | 'not_graded'
+  feedback?: string;
+  notice?: string;
+  feedback_mail_url?: string;
+  team_log_url?: string;
+  evaluation_by_file_url?: string;
+  can_grade?: boolean;
+  additional_columns?: Record<string, string>;
+}
+
+export interface ExerciseInfo {
+  ref_id: string;
+  title: string;
+  instructions?: string;
+  deadline?: string;
+  total_participants: number;
+  submitted_count: number;
+  graded_count: number;
+}
+
+export interface ExerciseSubmissionsResponse {
+  exercise: ExerciseInfo;
+  available_assignments?: AssignmentItem[];
+  active_assignment_id?: string;
+  submissions: SubmissionItem[];
+  form_action_url?: string;
+  rtoken?: string;
+  fetched_at: string;
+}
+
+export interface GradeSubmissionRequest {
+  member_id: string;
+  ass_id?: string;
+  status?: string;
+  mark?: string;
+  feedback?: string;
+  notice?: string;
+  rtoken?: string;
+}
+
+export interface GradeSubmissionResponse {
+  success: boolean;
+  message: string;
+  member_id: string;
+  status?: string;
+  feedback?: string;
+}
+
+export interface StudentAssignmentDetail {
+  exercise_ref_id: string;
+  ass_id: string;
+  title: string;
+  instructions?: string;
+  start_time?: string;
+  ended_on?: string;
+  time_remaining?: string;
+  is_ended: boolean;
+  exercise_files: SubmissionFile[];
+  team_members: string[];
+  team_status_text?: string;
+  create_team_url?: string;
+  manage_team_url?: string;
+  submitted_files: SubmissionFile[];
+  last_submission?: string;
+  submission_status: string;
+  evaluation_statement?: string;
+  passed_status?: string;
+  mark?: string;
+  fetched_at: string;
+}
+
+export interface ExerciseInfoSection {
+  title: string;
   properties: Record<string, string>;
+}
+
+export interface ExerciseInfoResponse {
+  ref_id: string;
+  title: string;
+  sections: ExerciseInfoSection[];
+  fetched_at: string;
 }
 
 export interface ExerciseOverviewResponse {
@@ -149,6 +269,26 @@ export interface ExerciseOverviewResponse {
   title: string;
   breadcrumbs: BreadcrumbItem[];
   submissions_and_grades_url?: string;
+  has_ta_access?: boolean;
+  active_mode?: string;
   assignments: AssignmentItem[];
   fetched_at: string;
 }
+
+export interface FeedbackFileItem {
+  id: string;
+  title: string;
+  size?: string;
+  created_on?: string;
+  file_type?: string;
+  download_url?: string;
+  remove_url?: string;
+}
+
+export interface FeedbackFilesResponse {
+  member_id: string;
+  student_name?: string;
+  files: FeedbackFileItem[];
+  upload_url?: string;
+}
+

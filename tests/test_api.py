@@ -12,6 +12,7 @@ from backend.schemas import (
     GradeSubmissionResponse,
     MaterialItem,
     SubmissionItem,
+    StudentAssignmentDetail,
 )
 from backend.services.ilias_client import SessionExpiredError
 
@@ -55,6 +56,30 @@ def test_logout_endpoint(tmp_path, monkeypatch):
     response = client.post("/api/auth/logout")
     assert response.status_code == 200
     assert not test_cookie_file.exists()
+
+
+def test_login_browser_endpoint_success():
+    with patch(
+        "backend.api.routes.auth.run_browser_login",
+        new_callable=AsyncMock,
+        return_value=(True, {"PHPSESSID": "dummy_sess"}, "Login successful")
+    ):
+        response = client.post("/api/auth/login-browser")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "PHPSESSID" in data["cookies_captured"]
+
+
+def test_login_browser_endpoint_failure():
+    with patch(
+        "backend.api.routes.auth.run_browser_login",
+        new_callable=AsyncMock,
+        return_value=(False, {}, "Authentication timed out")
+    ):
+        response = client.post("/api/auth/login-browser")
+        assert response.status_code == 400
+        assert "Authentication timed out" in response.json()["detail"]
 
 
 def test_dashboard_endpoint_authorized():
@@ -167,6 +192,40 @@ def test_exercise_submissions_and_grade_endpoint():
         assert res_grade.json()["success"] is True
 
 
+def test_exercise_student_assignment_detail_endpoint():
+    from backend.schemas import StudentAssignmentDetail, SubmissionFile
+
+    mock_detail = StudentAssignmentDetail(
+        exercise_ref_id="3803739",
+        ass_id="53188",
+        title="Übung 3: Heuristische Evaluation",
+        instructions="Führen Sie die Evaluation durch.",
+        start_time="Gestern, 00:00",
+        ended_on="13. Okt 2026, 09:00",
+        time_remaining="5 Tage, 15 Stunden",
+        is_ended=False,
+        exercise_files=[
+            SubmissionFile(filename="3_Heuristische_Evaluation.pdf", download_url="http://test/file.pdf")
+        ],
+        team_members=["user1", "user2"],
+        submitted_files=[],
+        submission_status="not_submitted",
+        passed_status="not_graded",
+    )
+    with patch(
+        "backend.api.routes.exercises.IliasClient.get_student_assignment_detail",
+        new_callable=AsyncMock,
+        return_value=mock_detail,
+    ):
+        response = client.get("/api/exercises/3803739/assignment/53188")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["title"] == "Übung 3: Heuristische Evaluation"
+        assert len(data["exercise_files"]) == 1
+        assert data["team_members"] == ["user1", "user2"]
+
+
+
 def test_semester_dashboard_endpoint():
     from backend.schemas import SemesterScreenResponse, SemesterItem
     mock_sem_res = SemesterScreenResponse(
@@ -260,5 +319,71 @@ def test_course_logs_endpoint():
         assert data["course_id"] == "3715339"
         assert len(data["logs"]) == 1
         assert data["total_pages"] == 5
+
+
+def test_delete_student_assignment_submission_file_endpoint():
+    mock_detail = StudentAssignmentDetail(
+        exercise_ref_id="3803739",
+        ass_id="53188",
+        title="Übung 1",
+        exercise_files=[],
+        submitted_files=[],
+    )
+    with patch(
+        "backend.api.routes.exercises.IliasClient.delete_student_assignment_file",
+        new_callable=AsyncMock,
+        return_value=mock_detail,
+    ) as mock_delete:
+        response = client.delete("/api/exercises/3803739/assignment/53188/submission/1145505")
+        assert response.status_code == 200
+        mock_delete.assert_called_once_with(
+            exercise_ref_id="3803739", ass_id="53188", delivered_id="1145505"
+        )
+        data = response.json()
+        assert data["ass_id"] == "53188"
+        assert len(data["submitted_files"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_ilias_client_delete_student_assignment_file():
+    from backend.services.ilias_client import IliasClient
+    from unittest.mock import MagicMock
+
+    step1_html = """
+    <html>
+      <form action="ilias.php?cmd=post" method="post">
+        <input type="hidden" name="rtoken" value="abc123token" />
+        <input type="checkbox" name="delivered[]" value="1145505" />
+      </form>
+    </html>
+    """
+    step2_html = """
+    <html>
+      <form action="ilias.php?cmd=post&step=2" method="post">
+        <input type="hidden" name="rtoken" value="abc123token" />
+        <input type="hidden" name="confirmed" value="1" />
+      </form>
+    </html>
+    """
+    final_detail = StudentAssignmentDetail(exercise_ref_id="3803739", ass_id="53188", title="Done", exercise_files=[], submitted_files=[])
+
+    ilias_cli = IliasClient()
+    ilias_cli.session_manager = MagicMock()
+    ilias_cli.session_manager.is_authenticated = True
+
+    mock_http = AsyncMock()
+    mock_http.get.return_value = MagicMock(status_code=200, text=step1_html, url="https://ilias.unibe.ch/sub")
+    mock_http.post.return_value = MagicMock(status_code=200, text=step2_html, url="https://ilias.unibe.ch/post")
+
+    mock_cm = AsyncMock()
+    mock_cm.__aenter__.return_value = mock_http
+    mock_cm.__aexit__.return_value = None
+    ilias_cli.session_manager.get_http_client.return_value = mock_cm
+
+    with patch.object(ilias_cli, "get_student_assignment_detail", new_callable=AsyncMock, return_value=final_detail):
+        res = await ilias_cli.delete_student_assignment_file("3803739", "53188", "1145505")
+        assert res.ass_id == "53188"
+        assert mock_http.post.call_count == 2
+
 
 

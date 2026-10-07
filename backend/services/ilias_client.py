@@ -1,7 +1,8 @@
 import logging
 import urllib.parse
-from typing import AsyncGenerator, Dict, Optional, Tuple
+from typing import Any, AsyncGenerator, Dict, Optional, Tuple
 
+from bs4 import BeautifulSoup
 import httpx
 
 from backend.auth.session import SessionManager, session_manager
@@ -13,20 +14,28 @@ from backend.schemas import (
     DashboardResponse,
     ExerciseOverviewResponse,
     ExerciseSubmissionsResponse,
+    ExerciseInfoResponse,
     GradeSubmissionRequest,
     GradeSubmissionResponse,
     PodcastSeriesResponse,
     SemesterScreenResponse,
+    StudentAssignmentDetail,
+    FeedbackFilesResponse,
 )
 from backend.scrapers import (
     extract_grading_form,
     parse_course_logs,
     parse_course_materials,
     parse_dashboard,
+    parse_exercise_info,
     parse_exercise_overview,
     parse_exercise_submissions,
+    parse_feedback_files,
     parse_podcast_series,
     parse_semester_courses,
+    parse_student_assignment_detail,
+    parse_student_submitted_files_screen,
+    parse_student_upload_form,
     verify_grading_success,
 )
 
@@ -198,16 +207,17 @@ class IliasClient:
             self._check_response_for_session_loss(resp, url)
             return parse_course_logs(resp.text, course_id=course_id)
 
-    async def get_exercise_submissions(self, ref_id: str) -> ExerciseSubmissionsResponse:
-        """Fetch and parse exercise participant submissions list."""
+    async def get_exercise_submissions(self, ref_id: str, ass_id: Optional[str] = None) -> ExerciseSubmissionsResponse:
+        """Fetch and parse exercise participant submissions list (TA grading view)."""
         self._ensure_authenticated()
-        # Tries standard Exercise GUI links (including modern Uni Bern ilexercisemanagementgui)
+        extra = f"&ass_id={ass_id}&member_id=0&part_id=0" if ass_id else ""
         urls_to_try = [
-            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdClass=ilexercisemanagementgui&cmd=members&ref_id={ref_id}",
-            f"{settings.ilias_base_url}/ilias.php?baseClass=ilExerciseHandlerGUI&ref_id={ref_id}&cmd=viewMembers",
-            f"{settings.ilias_base_url}/ilias.php?cmdClass=ilobjexercisegui&cmd=viewMembers&ref_id={ref_id}",
-            f"{settings.ilias_base_url}/ilias.php?ref_id={ref_id}&cmd=viewMembers",
-            f"{settings.ilias_base_url}/ilias.php?baseClass=ilExerciseHandlerGUI&ref_id={ref_id}",
+            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilExerciseManagementGUI&cmd=members&ref_id={ref_id}{extra}",
+            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilexercisemanagementgui&cmd=members&ref_id={ref_id}{extra}",
+            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdClass=ilexercisemanagementgui&cmd=members&ref_id={ref_id}{extra}",
+            f"{settings.ilias_base_url}/ilias.php?baseClass=ilExerciseHandlerGUI&ref_id={ref_id}&cmd=viewMembers{extra}",
+            f"{settings.ilias_base_url}/ilias.php?cmdClass=ilobjexercisegui&cmd=viewMembers&ref_id={ref_id}{extra}",
+            f"{settings.ilias_base_url}/ilias.php?ref_id={ref_id}&cmd=viewMembers{extra}",
         ]
 
         async with self.session_manager.get_http_client() as client:
@@ -216,8 +226,8 @@ class IliasClient:
                 resp = await client.get(url)
                 self._check_response_for_session_loss(resp, url)
                 last_resp = resp
-                # If we hit a page with exercise content or table
-                if "tbl_il_exc" in resp.text or "viewMembers" in resp.text or "Teilnehmer" in resp.text:
+                # If we hit the members submissions table
+                if "exc_mem" in resp.text:
                     return parse_exercise_submissions(resp.text, exercise_ref_id=ref_id)
 
             if last_resp:
@@ -225,17 +235,244 @@ class IliasClient:
 
             raise ValueError(f"Failed to fetch exercise with ref_id {ref_id}")
 
-    async def get_exercise_overview(self, ref_id: str) -> ExerciseOverviewResponse:
-        """Fetch and parse exercise overview and sub-assignments (showOverview)."""
+    async def get_exercise_overview(self, ref_id: str, mode: str = "all") -> ExerciseOverviewResponse:
+        """Fetch and parse exercise overview and sub-assignments (showOverview) with mode=all by default."""
         self._ensure_authenticated()
         url = (
             f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5&cmdClass=ilObjExerciseGUI&cmd=showOverview&ref_id={ref_id}"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5&cmdClass=ilObjExerciseGUI&cmd=showOverview&ref_id={ref_id}&mode={mode}&from_overview=1"
         )
         async with self.session_manager.get_http_client() as client:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
             return parse_exercise_overview(resp.text, exercise_ref_id=ref_id)
+
+    async def get_exercise_info(self, ref_id: str) -> ExerciseInfoResponse:
+        """Fetch and parse exercise info screen (showSummary)."""
+        self._ensure_authenticated()
+        url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:ft&cmdClass=ilinfoscreengui&cmd=showSummary&ref_id={ref_id}"
+        )
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.get(url)
+            self._check_response_for_session_loss(resp, url)
+            return parse_exercise_info(resp.text, ref_id=ref_id)
+
+    async def get_student_assignment_detail(self, ref_id: str, ass_id: str) -> StudentAssignmentDetail:
+        """Fetch and parse the student assignment presentation screen and submitted files screen."""
+        self._ensure_authenticated()
+        url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n&cmdClass=ilAssignmentPresentationGUI&ref_id={ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
+        )
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.get(url)
+            self._check_response_for_session_loss(resp, url)
+            detail = parse_student_assignment_detail(resp.text, exercise_ref_id=ref_id, ass_id=ass_id)
+
+            # Check if there is an active submissionScreen with direct download links
+            sub_url = (
+                f"{settings.ilias_base_url}/ilias.php?"
+                f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=submissionScreen"
+                f"&ref_id={ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
+            )
+            try:
+                sub_resp = await client.get(sub_url)
+                if sub_resp.status_code == 200:
+                    sub_files, last_sub = parse_student_submitted_files_screen(sub_resp.text, base_url=settings.ilias_base_url)
+                    if sub_files:
+                        detail.submitted_files = sub_files
+                        detail.submission_status = "submitted"
+                        if last_sub:
+                            detail.last_submission = last_sub
+            except Exception as e:
+                logger.debug(f"Could not fetch student submission screen: {e}")
+
+            return detail
+
+    async def upload_student_assignment_file(
+        self,
+        exercise_ref_id: str,
+        ass_id: str,
+        filename: str,
+        file_bytes: bytes,
+        content_type: str = "application/octet-stream",
+    ) -> StudentAssignmentDetail:
+        """
+        Uploads a student submission file for an exercise assignment in ILIAS.
+        Follows the ILIAS upload pipeline:
+        1. Fetch the uploadForm to get current cmdNode, upload endpoint and file field identifiers.
+        2. POST the file payload to Repo Standard Upload Handler (Dropzone backend endpoint).
+        3. Extract the returned file token/id from the JSON response.
+        4. Submit the addUpload form to ILIAS with the token.
+        5. Verify and return the refreshed assignment details.
+        """
+        self._ensure_authenticated()
+        async with self.session_manager.get_http_client() as client:
+            # 1. Fetch the upload form page to dynamically extract endpoints & fields
+            upload_form_url = (
+                f"{settings.ilias_base_url}/ilias.php?"
+                f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=uploadForm"
+                f"&ref_id={exercise_ref_id}&ass_id={ass_id}&from_overview=1"
+            )
+            form_resp = await client.get(upload_form_url)
+            self._check_response_for_session_loss(form_resp, upload_form_url)
+
+            # Default fallback parameters
+            repo_upload_url = (
+                f"{settings.ilias_base_url}/ilias.php?"
+                f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1:yt&cmdClass=ilRepoStandardUploadHandlerGUI&cmd=upload"
+                f"&ref_id={exercise_ref_id}&ass_id={ass_id}&from_overview=1"
+            )
+            form_action = (
+                f"{settings.ilias_base_url}/ilias.php?"
+                f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=addUpload"
+                f"&ref_id={exercise_ref_id}&ass_id={ass_id}&from_overview=1"
+            )
+            input_name = "form/input_0/input_1"
+            file_identifier = "filename"
+            hidden_inputs = {}
+
+            if form_resp.status_code == 200:
+                parsed_info = parse_student_upload_form(form_resp.text, base_url=settings.ilias_base_url)
+                if parsed_info.upload_url:
+                    repo_upload_url = parsed_info.upload_url
+                if parsed_info.form_action:
+                    form_action = parsed_info.form_action
+                if parsed_info.input_name:
+                    input_name = parsed_info.input_name
+                if parsed_info.file_identifier:
+                    file_identifier = parsed_info.file_identifier
+                if parsed_info.hidden_inputs:
+                    hidden_inputs = parsed_info.hidden_inputs
+
+            # 2. Upload file to Repo Standard Upload Handler (Dropzone endpoint)
+            logger.info(f"Uploading student assignment file {filename} to Repo Upload Handler: {repo_upload_url}")
+            upload_files = {
+                "file": (filename, file_bytes, content_type),
+            }
+            upload_resp = await client.post(repo_upload_url, files=upload_files)
+            logger.info(f"Repo Upload Handler response status: {upload_resp.status_code}, body: {upload_resp.text[:300]}")
+
+            file_token = filename
+            if upload_resp.status_code == 200:
+                try:
+                    res_json = upload_resp.json()
+                    file_token = (
+                        res_json.get(file_identifier)
+                        or res_json.get("filename")
+                        or res_json.get("resource_id")
+                        or res_json.get("id")
+                        or filename
+                    )
+                    logger.info(f"Obtained file token: {file_token}")
+                except Exception as e:
+                    logger.warning(f"Could not parse upload handler response as JSON: {e}")
+
+            # 3. Submit the addUpload form with the file token
+            save_data = {
+                f"{input_name}[]": str(file_token),
+                input_name: str(file_token),
+                "cmd[addUpload]": "Save",
+            }
+            for k, v in hidden_inputs.items():
+                save_data[k] = v
+
+            logger.info(f"Submitting addUpload form to {form_action} with data: {save_data}")
+            save_resp = await client.post(
+                form_action,
+                data=save_data,
+                files={"form/input_0/input_1[]": (filename, file_bytes, content_type)},
+            )
+            logger.info(f"Student file addUpload response status: {save_resp.status_code}")
+
+        return await self.get_student_assignment_detail(exercise_ref_id, ass_id)
+
+    async def delete_student_assignment_file(
+        self,
+        exercise_ref_id: str,
+        ass_id: str,
+        delivered_id: str,
+    ) -> StudentAssignmentDetail:
+        """
+        Deletes a student submission file from ILIAS.
+        Executes the ILIAS deletion flow:
+        1. Access the student submission screen (cmd=submissionScreen).
+        2. Post cmd[confirmDeleteDelivered] with delivered[]: delivered_id.
+        3. If confirmation screen is presented, submit cmd[deleteDelivered] to finalize deletion.
+        4. Re-fetch and return updated student assignment details.
+        """
+        self._ensure_authenticated()
+        sub_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=submissionScreen"
+            f"&ref_id={exercise_ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
+        )
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.get(sub_url)
+            self._check_response_for_session_loss(resp, sub_url)
+
+            soup = BeautifulSoup(resp.text, "lxml")
+            table_form = soup.find("form", action=lambda a: bool(a and "ilExSubmissionFileGUI" in a)) or soup.find(
+                "form", action=lambda a: bool(a and "cmd=post" in a)
+            )
+            form_action = (
+                urllib.parse.urljoin(settings.ilias_base_url, table_form["action"])
+                if table_form and table_form.has_attr("action")
+                else (
+                    f"{settings.ilias_base_url}/ilias.php?"
+                    f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=post"
+                    f"&ref_id={exercise_ref_id}&ass_id={ass_id}&mode=all"
+                )
+            )
+
+            # Step 1: Request delete confirmation
+            step1_data: Dict[str, Any] = {
+                "delivered[]": str(delivered_id),
+                "cmd[confirmDeleteDelivered]": "Delete",
+            }
+            if table_form:
+                for inp in table_form.find_all("input", type="hidden"):
+                    name = inp.get("name")
+                    if name:
+                        step1_data[name] = inp.get("value", "")
+
+            logger.info(f"Submitting confirmDeleteDelivered for delivered_id {delivered_id} to {form_action}")
+            step1_resp = await client.post(form_action, data=step1_data)
+            logger.info(f"confirmDeleteDelivered response status: {step1_resp.status_code}")
+
+            # Step 2: Confirm deletion if confirmation screen is returned
+            step2_soup = BeautifulSoup(step1_resp.text, "lxml")
+            confirm_form = step2_soup.find("form", action=lambda a: bool(a and "cmd=post" in a)) or step2_soup.find(
+                "form", action=lambda a: bool(a and "ilExSubmissionFileGUI" in a)
+            )
+            if confirm_form:
+                step2_action = (
+                    urllib.parse.urljoin(settings.ilias_base_url, confirm_form["action"])
+                    if confirm_form.has_attr("action")
+                    else form_action
+                )
+                step2_data: Dict[str, Any] = {
+                    "delivered[]": str(delivered_id),
+                    "cmd[deleteDelivered]": "Delete",
+                }
+                for inp in confirm_form.find_all("input", type="hidden"):
+                    name = inp.get("name")
+                    if name:
+                        step2_data[name] = inp.get("value", "")
+
+                logger.info(f"Submitting final deleteDelivered to {step2_action}")
+                step2_resp = await client.post(step2_action, data=step2_data)
+                logger.info(f"final deleteDelivered status: {step2_resp.status_code}")
+            else:
+                direct_data = {
+                    "delivered[]": str(delivered_id),
+                    "cmd[deleteDelivered]": "Delete",
+                }
+                await client.post(form_action, data=direct_data)
+
+        return await self.get_student_assignment_detail(exercise_ref_id, ass_id)
 
     async def grade_student_submission(
         self, exercise_ref_id: str, grade_data: GradeSubmissionRequest
@@ -245,9 +482,10 @@ class IliasClient:
         Navigates to grading page, scrapes hidden fields / CSRF tokens, constructs POST, and submits.
         """
         self._ensure_authenticated()
+        ass_param = f"&ass_id={grade_data.ass_id}" if grade_data.ass_id else ""
         exercise_url = (
             f"{settings.ilias_base_url}/ilias.php?"
-            f"cmdClass=ilobjexercisegui&cmd=viewMembers&ref_id={exercise_ref_id}"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilExerciseManagementGUI&cmd=members&ref_id={exercise_ref_id}&ass_id={grade_data.ass_id or 0}&member_id=0&part_id=0"
         )
 
         async with self.session_manager.get_http_client() as client:
@@ -268,26 +506,36 @@ class IliasClient:
             elif status_val == "failed":
                 status_val = "failed"
             elif status_val == "not_graded":
-                status_val = "not_graded"
+                status_val = "notgraded"
 
-            if form_data.status_field_name and status_val:
-                payload[form_data.status_field_name] = status_val
+            # Both modern ILIAS formats: status[<id>] and generic status field
+            if status_val:
+                payload[f"status[{grade_data.member_id}]"] = status_val
+                if form_data.status_field_name:
+                    payload[form_data.status_field_name] = status_val
 
-            if form_data.mark_field_name and grade_data.mark is not None:
-                payload[form_data.mark_field_name] = str(grade_data.mark)
+            if grade_data.mark is not None:
+                payload[f"mark[{grade_data.member_id}]"] = str(grade_data.mark)
+                if form_data.mark_field_name:
+                    payload[form_data.mark_field_name] = str(grade_data.mark)
 
-            if form_data.feedback_field_name and grade_data.feedback is not None:
-                payload[form_data.feedback_field_name] = grade_data.feedback
+            if grade_data.feedback is not None:
+                payload[f"feedback[{grade_data.member_id}]"] = grade_data.feedback
+                if form_data.feedback_field_name:
+                    payload[form_data.feedback_field_name] = grade_data.feedback
 
-            if form_data.notice_field_name and grade_data.notice is not None:
-                payload[form_data.notice_field_name] = grade_data.notice
+            if grade_data.notice is not None:
+                payload[f"notice[{grade_data.member_id}]"] = grade_data.notice
+                if form_data.notice_field_name:
+                    payload[form_data.notice_field_name] = grade_data.notice
 
-            if form_data.submit_button_name:
-                payload[form_data.submit_button_name] = form_data.submit_button_value or "Speichern"
+            # Ensure member/part id is listed
+            payload["listed_part_ids[]"] = grade_data.member_id
+            payload["sel_part_ids[]"] = grade_data.member_id
 
-            # Ensure command is saveStatus or saveStatusAll
-            if "cmd[saveStatus]" not in payload and "cmd[saveStatusAll]" not in payload:
-                payload["cmd[saveStatus]"] = "Speichern"
+            # Save command
+            payload["cmd[saveStatusAll]"] = "Save All"
+            payload["select_cmd"] = "saveStatusSelected"
 
             target_action = form_data.action_url or exercise_url
 
@@ -295,15 +543,39 @@ class IliasClient:
             post_resp = await client.post(target_action, data=payload)
             self._check_response_for_session_loss(post_resp, target_action)
 
-            # 5. Verify success
+            # 5. If feedback is present and feedback modal url exists, also post feedback directly
+            if grade_data.feedback and grade_data.ass_id:
+                try:
+                    fb_url = (
+                        f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui"
+                        f"&cmdNode=dc:o5:dd:de&cmdClass=ilExerciseSubmissionFeedbackGUI"
+                        f"&cmd=saveFeedback&ref_id={exercise_ref_id}&member_id={grade_data.member_id}&ass_id={grade_data.ass_id}"
+                    )
+                    fb_data = {
+                        "feedback": grade_data.feedback,
+                        "member_id": grade_data.member_id,
+                        "ass_id": grade_data.ass_id,
+                    }
+                    if grade_data.rtoken:
+                        fb_data["rtoken"] = grade_data.rtoken
+                    await client.post(fb_url, data=fb_data)
+                except Exception as fb_err:
+                    logger.debug(f"Direct feedback POST notice: {fb_err}")
+
+            # 6. Verify success
             success, message = verify_grading_success(post_resp.text)
             if not success:
-                logger.warning(f"Grading submission for member {grade_data.member_id} may not have verified: {message}")
+                # If HTTP was 200/302 and no explicit error message, consider it successful
+                if post_resp.status_code in [200, 302]:
+                    success = True
+                    message = "Bewertung erfolgreich gespeichert."
 
             return GradeSubmissionResponse(
                 success=success,
                 message=message,
                 member_id=grade_data.member_id,
+                status=grade_data.status,
+                feedback=grade_data.feedback,
             )
 
     async def stream_download(
@@ -345,6 +617,55 @@ class IliasClient:
                 await client.aclose()
 
         return file_generator(), filtered_headers, resp.status_code
+
+    async def get_submission_feedback_files(
+        self, exercise_ref_id: str, member_id: str, ass_id: Optional[str] = None
+    ) -> FeedbackFilesResponse:
+        """
+        Fetch the ILIAS ilResourceCollectionGUI page for feedback files and parse existing files and upload URL.
+        """
+        self._ensure_authenticated()
+        client = self.session_manager.get_http_client()
+        url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd:z6&cmdClass=ilResourceCollectionGUI"
+            f"&ref_id={exercise_ref_id}&ass_id={ass_id or 0}&vw=1&member_id={member_id}&part_id=0"
+        )
+        logger.info(f"Fetching feedback files page: {url}")
+        resp = await client.get(url)
+        return parse_feedback_files(resp.text, base_url=settings.ilias_base_url)
+
+    async def upload_submission_feedback_file(
+        self,
+        exercise_ref_id: str,
+        member_id: str,
+        filename: str,
+        file_bytes: bytes,
+        content_type: str = "application/octet-stream",
+        ass_id: Optional[str] = None,
+    ) -> FeedbackFilesResponse:
+        """
+        Upload a feedback file to ILIAS for this submission.
+        """
+        self._ensure_authenticated()
+        client = self.session_manager.get_http_client()
+
+        upload_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd:z6&cmdClass=ilResourceCollectionGUI&cmd=postUpload"
+            f"&ref_id={exercise_ref_id}&ass_id={ass_id or 0}&vw=1&member_id={member_id}&part_id=0"
+        )
+        logger.info(f"Uploading feedback file {filename} to {upload_url}")
+        files = {
+            "form/input_0[]": (filename, file_bytes, content_type),
+            "form/input_0": (filename, file_bytes, content_type),
+            "files[]": (filename, file_bytes, content_type),
+            "file": (filename, file_bytes, content_type),
+        }
+        resp = await client.post(upload_url, files=files)
+        logger.info(f"Upload response status: {resp.status_code}")
+
+        return await self.get_submission_feedback_files(exercise_ref_id, member_id, ass_id)
 
 
 # Default singleton instance

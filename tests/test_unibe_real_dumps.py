@@ -212,3 +212,257 @@ def test_real_unibe_show_news_full_logs():
     assert any("1_PO-Organisation_2026.pdf" in t for t in targets)
 
 
+def test_real_unibe_ta_exercise_submissions():
+    from backend.scrapers.submissions import parse_exercise_submissions
+
+    html_path = Path("htmlfromilias/MMS Way To Exercise Teaching Assistang Grading/4Assignment View_ Submissions and Grades_ Übungen_ ILIAS Universität Bern.html")
+    if not html_path.exists():
+        pytest.skip("TA exercise dump not found")
+
+    html = html_path.read_text(encoding="utf-8", errors="replace")
+    res = parse_exercise_submissions(html, exercise_ref_id="3803739")
+
+    assert len(res.submissions) == 34
+    assert res.exercise.submitted_count >= 20
+    assert res.exercise.graded_count >= 20
+    assert len(res.available_assignments) == 11
+    assert res.active_assignment_id == "53187"
+    assert res.rtoken is not None
+
+    s0 = res.submissions[0]
+    assert "Hediger" in s0.student_name
+    assert s0.team_id == "39146"
+    assert s0.passed_status == "passed"
+    assert s0.download_url is not None
+    assert s0.feedback is not None
+    assert "Schnittstelle" in s0.feedback
+
+
+def test_real_unibe_student_feedback():
+    from backend.scrapers.submissions import parse_student_assignment_detail
+
+    html_path = Path("htmlfromilias/MMS Exercises as Student/received_feedback_Current Semester_ 5. Auftrag_ Prototyping_ ILIAS Universität Bern.html")
+    if not html_path.exists():
+        pytest.skip("Student feedback dump not found")
+
+    html = html_path.read_text(encoding="utf-8", errors="replace")
+    res = parse_student_assignment_detail(html, exercise_ref_id="3113748", ass_id="40983")
+
+    assert "5. Auftrag" in res.title
+    assert res.start_time is not None
+    assert res.ended_on is not None
+    assert res.is_ended is True
+    assert len(res.exercise_files) == 1
+    assert "5_Prototyp.pdf" in res.exercise_files[0].download_url
+    assert len(res.team_members) == 3
+    assert "r.wolf11" in res.team_members
+    assert res.passed_status == "passed"
+    assert res.evaluation_statement is not None
+    assert "Figma" in res.evaluation_statement
+
+
+def test_real_unibe_exercise_overview_all_assignments():
+    from backend.scrapers.submissions import parse_exercise_overview
+
+    html_path = Path("htmlfromilias/MMS Way To Exercise Teaching Assistang Grading/3View_ Assignments_ Übungen_ ILIAS Universität Bern.html")
+    if not html_path.exists():
+        pytest.skip("Exercise overview dump not found")
+
+    html = html_path.read_text(encoding="utf-8", errors="replace")
+    res = parse_exercise_overview(html, exercise_ref_id="3803739")
+
+    assert res.has_ta_access is True
+    assert res.active_mode == "all"
+    assert len(res.assignments) == 11
+    # Check that Übung 3 is detected as ongoing with Create Team button
+    u3 = next(a for a in res.assignments if "3" in a.title)
+    assert u3.is_ongoing is True
+    assert u3.create_team_url is not None
+    assert "createTeam" in u3.create_team_url
+    assert u3.time_remaining is not None
+
+    # Check that Übung 1 is detected as ended
+    u1 = next(a for a in res.assignments if "Übung 1:" in a.title or "1: Einführung" in a.title)
+    assert u1.is_ended is True
+
+
+def test_real_unibe_exercise_info_parsing():
+    from backend.scrapers.submissions import parse_exercise_info
+
+    html_path = Path("htmlfromilias/KW Way To Exercise Student/Info_ 1. Übung_ Einführung und Mensch_ ILIAS Universität Bern.html")
+    if not html_path.exists():
+        pytest.skip("Exercise info dump not found")
+
+    html = html_path.read_text(encoding="utf-8", errors="replace")
+    res = parse_exercise_info(html, ref_id="3479509")
+
+    assert len(res.sections) >= 3
+    sec_titles = [s.title for s in res.sections]
+    assert any("Overview" in t for t in sec_titles)
+    overview_sec = next(s for s in res.sections if "Overview" in s.title)
+    assert "Assignments" in overview_sec.properties
+    assert "Pass Mode" in overview_sec.properties
+    assert "mandatory" in overview_sec.properties["Pass Mode"].lower()
+
+
+def test_real_unibe_uebung_2_and_11_submissions():
+    from backend.scrapers.submissions import parse_exercise_submissions
+
+    html_path = Path("htmlfromilias/KW Way To Exercise Student/Assignment View_ Submissions and Grades_ Übungen_ ILIAS Universität Bern.html")
+    if not html_path.exists():
+        pytest.skip("Übung 2 & 11 dump not found")
+
+    html = html_path.read_text(encoding="utf-8", errors="replace")
+    res = parse_exercise_submissions(html, exercise_ref_id="3803739")
+
+    assert res.active_assignment_id == "53198"
+    assert len(res.submissions) == 8
+    assert len(res.available_assignments) == 11
+
+    # Verify student entries
+    s0 = res.submissions[0]
+    assert "Bragalini" in s0.student_name
+    assert " • " in s0.student_name
+    assert len(s0.team_members) == 3
+    assert s0.team_members == ["Bragalini, Alan", "Jordi, Tim Frederik", "Nawrozi, Mobina"]
+    assert s0.team_id == "39372"
+    assert s0.download_url is not None
+    assert "downloadReturned" in s0.download_url
+    assert "ass_id=53198" in s0.download_url
+    assert "Team" in s0.additional_columns
+
+
+def test_real_unibe_ta_grading_timestamps_and_eval():
+    from backend.scrapers.submissions import parse_exercise_submissions
+
+    html_path = Path("htmlfromilias/MMS Way To Exercise Teaching Assistang Grading/4Assignment View_ Submissions and Grades_ Übungen_ ILIAS Universität Bern.html")
+    if not html_path.exists():
+        pytest.skip("TA grading dump not found")
+
+    html = html_path.read_text(encoding="utf-8", errors="replace")
+    res = parse_exercise_submissions(html, exercise_ref_id="3803739")
+
+    assert len(res.submissions) >= 1
+    s0 = res.submissions[0]
+    assert s0.student_name == "Hediger, Marlon Gabriel"
+    assert s0.team_id == "39146"
+    assert s0.submission_time == "29. Sep 2026, 08:56:56"
+    assert s0.feedback is not None
+    assert "A1: ich rate dir" in s0.feedback
+    assert s0.download_url is not None
+
+
+def test_real_unibe_submitted_not_graded_example():
+    from backend.scrapers.submissions import parse_exercise_submissions
+
+    html_path = Path("htmlfromilias/KW Way To Exercise Student/Submitted_example_Assignment View_ Submissions and Grades_ Übungen_ ILIAS Universität Bern.html")
+    if not html_path.exists():
+        pytest.skip("Submitted example dump not found")
+
+    html = html_path.read_text(encoding="utf-8", errors="replace")
+    res = parse_exercise_submissions(html, exercise_ref_id="3803739")
+
+    assert len(res.submissions) == 1
+    s0 = res.submissions[0]
+    assert s0.team_members == ["Bragalini, Alan", "Jordi, Tim Frederik", "Nawrozi, Mobina"]
+    assert s0.submission_time == "5. Oct 2026, 16:57:37"
+    assert s0.passed_status == "not_graded"
+    assert s0.download_url is not None
+    assert s0.evaluation_by_file_url is not None
+    assert s0.feedback_mail_url is not None
+    assert s0.submission_status == "submitted"
+
+
+def test_real_unibe_feedback_file_upload_dump():
+    from backend.scrapers.feedback_files import parse_feedback_files
+
+    html_path = Path("htmlfromilias/File_Upload_Übungen_ ILIAS Universität Bern.html")
+    if not html_path.exists():
+        pytest.skip("File upload dump not found")
+
+    html = html_path.read_text(encoding="utf-8", errors="replace")
+    res = parse_feedback_files(html)
+
+    assert res.student_name == "Bragalini, Alan"
+    assert res.member_id == "3205653"
+    assert res.upload_url is not None
+    assert "postUpload" in res.upload_url or "upload" in res.upload_url
+    assert "ilResourceCollectionGUI" in res.upload_url
+    assert len(res.files) == 0  # Page has "No records"
+
+
+def test_real_unibe_student_submitted_files_screen():
+    from backend.scrapers.submissions import parse_student_submitted_files_screen
+
+    # 1. Screen with submitted file
+    html_path = Path("htmlfromilias/KW Way To Exercise Student/Submission_ Abgabe Übung 2_ ILIAS Universität Bern.html")
+    if not html_path.exists():
+        pytest.skip("Submission dump not found")
+
+    html = html_path.read_text(encoding="utf-8", errors="replace")
+    files, last_sub = parse_student_submitted_files_screen(html)
+
+    assert len(files) == 1
+    assert "Valuation" in files[0].filename
+    assert "4. Nov 2025" in (files[0].upload_time or "")
+    assert files[0].download_url is not None
+    assert "cmd=download" in files[0].download_url
+    assert "delivered=1004572" in files[0].download_url
+    assert files[0].delivered_id == "1004572"
+    assert last_sub is not None
+    assert "4. Nov 2025" in last_sub
+
+    # 2. Hand-in screen with no existing records
+    handin_path = Path("htmlfromilias/KW Way To Exercise Student/Hand_In_Submission_ Übungen_ ILIAS Universität Bern.html")
+    if handin_path.exists():
+        handin_html = handin_path.read_text(encoding="utf-8", errors="replace")
+        empty_files, empty_sub = parse_student_submitted_files_screen(handin_html)
+        assert len(empty_files) == 0
+        assert empty_sub is None
+
+
+def test_real_unibe_student_upload_form_dump():
+    from backend.scrapers.submissions import parse_student_upload_form
+
+    html_path = Path("htmlfromilias/KW Way To Exercise Student/Hand_In_Upload_Submission_ Übungen_ ILIAS Universität Bern.html")
+    if not html_path.exists():
+        pytest.skip("Upload form dump not found")
+
+    html = html_path.read_text(encoding="utf-8", errors="replace")
+    info = parse_student_upload_form(html)
+
+    assert info.upload_url is not None
+    assert "ilRepoStandardUploadHandlerGUI" in info.upload_url
+    assert "cmd=upload" in info.upload_url
+    assert info.form_action is not None
+    assert "cmd=addUpload" in info.form_action
+    assert info.input_name == "form/input_0/input_1"
+    assert info.file_identifier == "filename"
+
+
+def test_real_unibe_student_delete_submission_screen():
+    from backend.scrapers.submissions import parse_student_submitted_files_screen
+
+    dump_folder = Path("htmlfromilias/KW Way To Exercise Student")
+    delete_files = list(dump_folder.glob("*Delete_Submission*.html"))
+    if not delete_files:
+        pytest.skip("Delete submission dump not found")
+
+    html = delete_files[0].read_text(encoding="utf-8", errors="replace")
+    files, last_sub = parse_student_submitted_files_screen(html)
+
+    assert len(files) == 1
+    assert files[0].delivered_id == "1145504"
+    assert "MMS" in files[0].filename
+    assert "1145504" in files[0].download_url
+
+
+
+
+
+
+
+
+
+
+

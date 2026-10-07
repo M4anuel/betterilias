@@ -130,20 +130,33 @@ class SubmissionFile(BaseModel):
     download_url: str
     upload_time: Optional[str] = None
     file_size: Optional[str] = None
+    delivered_id: Optional[str] = None
 
 class SubmissionItem(BaseModel):
     member_id: str  # participant/user ID or submission ID
     student_name: str
+    team_members: List[str] = Field(default_factory=list)
     login: Optional[str] = None
+    team_name: Optional[str] = None
+    team_id: Optional[str] = None
     submission_status: str  # submitted, not_submitted, late, etc.
     submission_time: Optional[str] = None
+    graded_on: Optional[str] = None
+    evaluation_on: Optional[str] = None
+    sent_on: Optional[str] = None
+    individual_deadline: Optional[str] = None
     files: List[SubmissionFile] = Field(default_factory=list)
+    download_url: Optional[str] = None
     mark: Optional[str] = None  # grade/points (e.g. 5.5 or 10/10)
     passed_status: Optional[str] = None  # passed, failed, not_graded
     feedback: Optional[str] = None
     notice: Optional[str] = None
+    feedback_mail_url: Optional[str] = None
+    team_log_url: Optional[str] = None
+    evaluation_by_file_url: Optional[str] = None
     can_grade: bool = True
     hidden_form_fields: Optional[Dict[str, str]] = None
+    additional_columns: Dict[str, str] = Field(default_factory=dict)
 
 class ExerciseInfo(BaseModel):
     ref_id: str
@@ -153,23 +166,6 @@ class ExerciseInfo(BaseModel):
     total_participants: int = 0
     submitted_count: int = 0
     graded_count: int = 0
-
-class ExerciseSubmissionsResponse(BaseModel):
-    exercise: ExerciseInfo
-    submissions: List[SubmissionItem]
-    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class GradeSubmissionRequest(BaseModel):
-    member_id: str
-    status: Optional[str] = Field(None, description="e.g. 'passed', 'failed', 'not_graded'")
-    mark: Optional[str] = Field(None, description="Grade or points (e.g. '6.0' or '10')")
-    feedback: Optional[str] = Field(None, description="TA Feedback text visible to student")
-    notice: Optional[str] = Field(None, description="Internal notice/notes for tutors")
-
-class GradeSubmissionResponse(BaseModel):
-    success: bool
-    message: str
-    member_id: str
 
 # ---------------------------------------------------------
 # Assignments Overview Schemas
@@ -182,14 +178,78 @@ class AssignmentItem(BaseModel):
     edit_until: Optional[str] = None
     requirement: Optional[str] = None
     status: Optional[str] = None
+    is_ongoing: bool = False
+    is_ended: bool = False
+    create_team_url: Optional[str] = None
+    ass_type: Optional[str] = None
+    is_selected: bool = False
     properties: Dict[str, str] = Field(default_factory=dict)
+
+class ExerciseSubmissionsResponse(BaseModel):
+    exercise: ExerciseInfo
+    available_assignments: List[AssignmentItem] = Field(default_factory=list)
+    active_assignment_id: Optional[str] = None
+    submissions: List[SubmissionItem]
+    form_action_url: Optional[str] = None
+    rtoken: Optional[str] = None
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class GradeSubmissionRequest(BaseModel):
+    member_id: str
+    ass_id: Optional[str] = None
+    status: Optional[str] = Field(None, description="e.g. 'passed', 'failed', 'not_graded'")
+    mark: Optional[str] = Field(None, description="Grade or points (e.g. '6.0' or '10')")
+    feedback: Optional[str] = Field(None, description="TA Feedback text visible to student")
+    notice: Optional[str] = Field(None, description="Internal notice/notes for tutors")
+    rtoken: Optional[str] = None
+
+class GradeSubmissionResponse(BaseModel):
+    success: bool
+    message: str
+    member_id: str
+    status: Optional[str] = None
+    feedback: Optional[str] = None
+
+class StudentAssignmentDetail(BaseModel):
+    exercise_ref_id: str
+    ass_id: str
+    title: str
+    instructions: Optional[str] = None
+    start_time: Optional[str] = None
+    ended_on: Optional[str] = None
+    time_remaining: Optional[str] = None
+    is_ended: bool = False
+    exercise_files: List[SubmissionFile] = Field(default_factory=list)
+    team_members: List[str] = Field(default_factory=list)
+    team_status_text: Optional[str] = None
+    create_team_url: Optional[str] = None
+    manage_team_url: Optional[str] = None
+    submitted_files: List[SubmissionFile] = Field(default_factory=list)
+    last_submission: Optional[str] = None
+    submission_status: str = "not_submitted"
+    evaluation_statement: Optional[str] = None
+    passed_status: Optional[str] = None
+    mark: Optional[str] = None
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ExerciseOverviewResponse(BaseModel):
     exercise_ref_id: str
     title: str
     breadcrumbs: List[BreadcrumbItem] = Field(default_factory=list)
     submissions_and_grades_url: Optional[str] = None
+    has_ta_access: bool = False
+    active_mode: str = "all"
     assignments: List[AssignmentItem] = Field(default_factory=list)
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ExerciseInfoSection(BaseModel):
+    title: str
+    properties: Dict[str, str] = Field(default_factory=dict)
+
+class ExerciseInfoResponse(BaseModel):
+    ref_id: str
+    title: str
+    sections: List[ExerciseInfoSection] = Field(default_factory=list)
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # ---------------------------------------------------------
@@ -223,3 +283,22 @@ class FailedDumpDetail(BaseModel):
     context: str
     created_at: str
     html_content: str
+
+# ---------------------------------------------------------
+# Feedback / Evaluation File Schemas
+# ---------------------------------------------------------
+class FeedbackFileItem(BaseModel):
+    id: str
+    title: str
+    size: Optional[str] = None
+    created_on: Optional[str] = None
+    file_type: Optional[str] = None
+    download_url: Optional[str] = None
+    remove_url: Optional[str] = None
+
+class FeedbackFilesResponse(BaseModel):
+    member_id: str
+    student_name: Optional[str] = None
+    files: List[FeedbackFileItem] = Field(default_factory=list)
+    upload_url: Optional[str] = None
+
