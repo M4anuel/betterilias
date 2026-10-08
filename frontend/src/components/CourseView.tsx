@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 import { CourseMaterialsResponse, MaterialItem, CourseContentBlock } from '../types';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
-import { CourseLogsPanel } from './CourseLogsPanel';
 import { PodcastModal } from './PodcastModal';
 import { SessionDrawer } from './SessionDrawer';
 import { ContentOrderModal } from './ContentOrderModal';
@@ -562,7 +561,6 @@ export const CourseView: React.FC<CourseViewProps> = ({
   const sections = materialsData.sections || [];
   const richTextBlocks = materialsData.rich_text_blocks || [];
   const sessions = materialsData.sessions || [];
-  const logs = materialsData.logs || [];
   const hasDistinctSections =
     sections.length > 1 || (sections.length === 1 && sections[0].id !== 'general' && sections[0].groups.length > 1);
 
@@ -1465,14 +1463,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
         </div>
       </div>
 
-      {/* Main Grid: Content (Left) and Logs (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Main course content */}
+      <div>
         {/* Main Content Area */}
-        <div
-          className={`space-y-6 ${
-            logs.length > 0 ? 'lg:col-span-8 xl:col-span-8' : 'lg:col-span-12'
-          }`}
-        >
+        <div className="space-y-6">
           {/* SEARCH RESULTS VIEW (Repo-wide across current folder and all subfolders) */}
           {searchQuery.trim().length > 0 ? (
             <div className="space-y-6">
@@ -1617,15 +1611,6 @@ export const CourseView: React.FC<CourseViewProps> = ({
           )}
         </div>
 
-        {/* Right Column: Course Logs / News Widget */}
-        {logs.length > 0 && (
-          <div className="lg:col-span-4 xl:col-span-4 space-y-4 lg:sticky lg:top-6">
-            <CourseLogsPanel
-              courseId={materialsData.container_ref_id}
-              initialLogs={logs}
-            />
-          </div>
-        )}
       </div>
 
       {/* Opencast Podcast Modal */}

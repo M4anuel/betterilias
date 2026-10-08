@@ -50,8 +50,8 @@ def check_prerequisites():
     PYTHON_BIN = select_python()
     print(f"Using Python: {PYTHON_BIN}")
     result = subprocess.run(
-        [PYTHON_BIN, "-c", "import fastapi, uvicorn, playwright, bs4, lxml, httpx, pydantic, pydantic_settings, dotenv"],
-        capture_output=True, text=True,
+        [PYTHON_BIN, "-c", "import fastapi, uvicorn, playwright, bs4, lxml, httpx, pydantic, pydantic_settings, dotenv; from backend.main import app"],
+        cwd=str(BASE_DIR), capture_output=True, text=True,
     )
     if result.returncode != 0:
         raise RuntimeError(
