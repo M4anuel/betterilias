@@ -103,6 +103,20 @@ class CourseSessionItem(BaseModel):
     location: Optional[str] = None
     materials: List[MaterialItem] = Field(default_factory=list)
     is_past: bool = False
+    expand_id: Optional[str] = None
+    materials_count: Optional[int] = None
+
+class CourseContentBlock(BaseModel):
+    id: str
+    block_type: str  # 'heading' | 'drawer' | 'items' | 'text' | 'sessions' | 'all_files'
+    title: Optional[str] = None
+
+    items: List[MaterialItem] = Field(default_factory=list)
+    html_content: Optional[str] = None
+    plain_text: Optional[str] = None
+    level: Optional[int] = 3
+    child_blocks: List['CourseContentBlock'] = Field(default_factory=list)
+    sessions: List[CourseSessionItem] = Field(default_factory=list)
 
 class CourseLogsResponse(BaseModel):
     course_id: str
@@ -120,6 +134,8 @@ class CourseMaterialsResponse(BaseModel):
     rich_text_blocks: List[RichTextBlock] = Field(default_factory=list)
     sessions: List[CourseSessionItem] = Field(default_factory=list)
     logs: List[CourseLogItem] = Field(default_factory=list)
+    blocks: List[CourseContentBlock] = Field(default_factory=list)
+    layout_hash: Optional[str] = None
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # ---------------------------------------------------------

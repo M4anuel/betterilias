@@ -12,7 +12,9 @@ import {
   SemesterScreenResponse,
   StudentAssignmentDetail,
   FeedbackFilesResponse,
+  MaterialItem,
 } from '../types';
+
 
 const API_BASE = '/api';
 
@@ -70,6 +72,23 @@ export const api = {
     }
     return res.json();
   },
+
+  async getSessionMaterials(
+    courseId: string,
+    sessionId: string,
+    expandId?: string
+  ): Promise<MaterialItem[]> {
+    const query = expandId ? `?expand_id=${encodeURIComponent(expandId)}` : '';
+    const res = await sessionFetch(
+      `${API_BASE}/courses/${encodeURIComponent(courseId)}/sessions/${encodeURIComponent(sessionId)}/materials${query}`
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to fetch session materials');
+    }
+    return res.json();
+  },
+
 
   async getCourseLogs(courseId: string, page: number = 1): Promise<CourseLogsResponse> {
     const res = await sessionFetch(`${API_BASE}/courses/${encodeURIComponent(courseId)}/logs?page=${page}`);

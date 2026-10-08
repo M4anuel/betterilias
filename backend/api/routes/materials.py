@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
-from typing import Optional
+from typing import List, Optional
 
 from backend.api.deps import get_ilias_client
-from backend.schemas import CourseLogsResponse, CourseMaterialsResponse, PodcastSeriesResponse
+from backend.schemas import CourseLogsResponse, CourseMaterialsResponse, MaterialItem, PodcastSeriesResponse
 from backend.services.ilias_client import IliasClient
 
 router = APIRouter(tags=["Materials"])
@@ -18,6 +18,24 @@ async def get_materials(
     Fetch materials, subfolders, files, and exercises within a course or folder.
     """
     return await client.get_course_materials(ref_id=course_id)
+
+
+@router.get("/courses/{course_id}/sessions/{session_id}/materials", response_model=List[MaterialItem])
+async def get_session_materials(
+    course_id: str,
+    session_id: str,
+    expand_id: Optional[str] = Query(None, description="ILIAS expand parameter id"),
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Fetch materials (slides, attachments) for a specific session drawer.
+    """
+    return await client.get_session_materials(
+        course_ref_id=course_id,
+        session_ref_id=session_id,
+        expand_id=expand_id,
+    )
+
 
 
 @router.get("/courses/{course_id}/logs", response_model=CourseLogsResponse)

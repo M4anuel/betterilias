@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Calendar,
   Clock,
@@ -8,43 +8,136 @@ import {
   Download,
   FolderOpen,
   Filter,
+  RefreshCw,
 } from 'lucide-react';
-import { CourseSessionItem } from '../types';
+import { CourseSessionItem, MaterialItem } from '../types';
 import { api } from '../lib/api';
 
 interface SessionDrawerProps {
   sessions: CourseSessionItem[];
+  courseRefId?: string;
 }
 
-export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions }) => {
+export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRefId }) => {
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const [filterMode, setFilterMode] = useState<'all' | 'with_materials' | 'upcoming'>('all');
+  const [loadedMaterials, setLoadedMaterials] = useState<Record<string, MaterialItem[]>>({});
+  const [loadingSessions, setLoadingSessions] = useState<Record<string, boolean>>({});
+
+  const prefetchingRef = useRef<Set<string>>(new Set());
+
+  // Background idle-preload for sessions with materials_count > 0
+  useEffect(() => {
+    if (!courseRefId || !sessions) return;
+
+    let isCancelled = false;
+
+    const preloadUnloadedSessions = async () => {
+      for (const s of sessions) {
+        if (isCancelled) break;
+        const currentMats = loadedMaterials[s.ref_id] || s.materials;
+        const count = s.materials_count ?? 0;
+        if (currentMats.length === 0 && count > 0 && !prefetchingRef.current.has(s.ref_id)) {
+          prefetchingRef.current.add(s.ref_id);
+          try {
+            const items = await api.getSessionMaterials(courseRefId, s.ref_id, s.expand_id);
+            if (!isCancelled && items.length > 0) {
+              setLoadedMaterials((prev) => ({ ...prev, [s.ref_id]: items }));
+            }
+          } catch {
+            // Non-critical background fetch failure
+          }
+        }
+      }
+    };
+
+    preloadUnloadedSessions();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [courseRefId, sessions]);
 
   if (!sessions || sessions.length === 0) return null;
 
-  const toggleSession = (refId: string) => {
-    setExpandedSessions((prev) => ({
-      ...prev,
-      [refId]: !prev[refId],
-    }));
+  const getMaterialsForSession = (s: CourseSessionItem): MaterialItem[] => {
+    return loadedMaterials[s.ref_id] || s.materials || [];
   };
 
-  const toggleAll = () => {
+  const hasMaterials = (s: CourseSessionItem): boolean => {
+    const mats = getMaterialsForSession(s);
+    return mats.length > 0 || (s.materials_count ?? 0) > 0;
+  };
+
+  const getMaterialsCount = (s: CourseSessionItem): number => {
+    const mats = getMaterialsForSession(s);
+    if (mats.length > 0) return mats.length;
+    return s.materials_count ?? 0;
+  };
+
+  const toggleSession = async (session: CourseSessionItem) => {
+    const willExpand = !expandedSessions[session.ref_id];
+    setExpandedSessions((prev) => ({
+      ...prev,
+      [session.ref_id]: willExpand,
+    }));
+
+    if (willExpand) {
+      const currentMats = getMaterialsForSession(session);
+      const expectedCount = session.materials_count ?? 0;
+      if (currentMats.length === 0 && expectedCount > 0 && courseRefId) {
+        if (loadingSessions[session.ref_id]) return;
+        setLoadingSessions((prev) => ({ ...prev, [session.ref_id]: true }));
+        try {
+          const items = await api.getSessionMaterials(courseRefId, session.ref_id, session.expand_id);
+          setLoadedMaterials((prev) => ({ ...prev, [session.ref_id]: items }));
+        } catch (e) {
+          console.error('Failed to load session materials', e);
+        } finally {
+          setLoadingSessions((prev) => ({ ...prev, [session.ref_id]: false }));
+        }
+      }
+    }
+  };
+
+  const toggleAll = async () => {
     const hasAnyExpanded = sessions.some((s) => expandedSessions[s.ref_id]);
     const next: Record<string, boolean> = {};
     for (const s of sessions) {
       next[s.ref_id] = !hasAnyExpanded;
     }
     setExpandedSessions(next);
+
+    // If expanding all, load any unloaded materials
+    if (!hasAnyExpanded && courseRefId) {
+      for (const s of sessions) {
+        const currentMats = getMaterialsForSession(s);
+        if (currentMats.length === 0 && (s.materials_count ?? 0) > 0) {
+          if (!loadingSessions[s.ref_id]) {
+            setLoadingSessions((prev) => ({ ...prev, [s.ref_id]: true }));
+            api
+              .getSessionMaterials(courseRefId, s.ref_id, s.expand_id)
+              .then((items) => {
+                setLoadedMaterials((prev) => ({ ...prev, [s.ref_id]: items }));
+              })
+              .catch(() => {})
+              .finally(() => {
+                setLoadingSessions((prev) => ({ ...prev, [s.ref_id]: false }));
+              });
+          }
+        }
+      }
+    }
   };
 
   const filteredSessions = sessions.filter((s) => {
-    if (filterMode === 'with_materials') return s.materials.length > 0;
+    if (filterMode === 'with_materials') return hasMaterials(s);
     if (filterMode === 'upcoming') return !s.is_past;
     return true;
   });
 
-  const totalMaterials = sessions.reduce((acc, s) => acc + s.materials.length, 0);
+  const totalMaterials = sessions.reduce((acc, s) => acc + getMaterialsCount(s), 0);
+
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
@@ -87,7 +180,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions }) => {
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              Mit Dateien ({sessions.filter((s) => s.materials.length > 0).length})
+              Mit Dateien ({sessions.filter(hasMaterials).length})
             </button>
           </div>
 
@@ -107,7 +200,10 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions }) => {
       <div className="divide-y divide-slate-100">
         {filteredSessions.map((session) => {
           const isExpanded = !!expandedSessions[session.ref_id];
-          const hasMaterials = session.materials.length > 0;
+          const sessionHasMats = hasMaterials(session);
+          const matsCount = getMaterialsCount(session);
+          const mats = getMaterialsForSession(session);
+          const isLoading = !!loadingSessions[session.ref_id];
 
           return (
             <div
@@ -118,15 +214,15 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions }) => {
             >
               {/* Compact Drawer Trigger Row */}
               <div
-                onClick={() => hasMaterials && toggleSession(session.ref_id)}
+                onClick={() => sessionHasMats && toggleSession(session)}
                 className={`flex items-center justify-between p-3.5 hover:bg-slate-50 transition gap-3 select-none ${
-                  hasMaterials ? 'cursor-pointer group' : ''
+                  sessionHasMats ? 'cursor-pointer group' : ''
                 }`}
               >
                 <div className="flex items-center gap-3 truncate min-w-0">
                   <div
                     className={`flex h-7 w-7 items-center justify-center rounded-lg shrink-0 text-xs font-bold ${
-                      hasMaterials
+                      sessionHasMats
                         ? 'bg-emerald-50 text-emerald-600 group-hover:scale-105 transition'
                         : 'bg-slate-100 text-slate-400'
                     }`}
@@ -159,10 +255,17 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions }) => {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  {hasMaterials ? (
+                  {isLoading ? (
+                    <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                      <RefreshCw className="h-3 w-3 animate-spin text-emerald-600" />
+                      <span>Lade...</span>
+                    </div>
+                  ) : sessionHasMats ? (
                     <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 group-hover:bg-emerald-100 transition">
                       <FolderOpen className="h-3 w-3" />
-                      <span>{session.materials.length} {session.materials.length === 1 ? 'Datei' : 'Dateien'}</span>
+                      <span>
+                        {matsCount} {matsCount === 1 ? 'Datei' : 'Dateien'}
+                      </span>
                       {isExpanded ? (
                         <ChevronUp className="h-3.5 w-3.5 ml-0.5" />
                       ) : (
@@ -178,48 +281,59 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions }) => {
               </div>
 
               {/* Drawer Body: Attached Files / Slides */}
-              {isExpanded && hasMaterials && (
+              {isExpanded && sessionHasMats && (
                 <div className="bg-slate-50/70 p-3.5 pl-12 border-t border-slate-100 space-y-2 animate-in fade-in duration-150">
-                  <div className="space-y-1.5">
-                    {session.materials.map((mat) => {
-                      const downloadUrl = api.getDownloadUrl(mat.ref_id, mat.download_url);
+                  {isLoading ? (
+                    <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin text-emerald-600" />
+                      <span>Lade Sitzungsunterlagen...</span>
+                    </div>
+                  ) : mats.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {mats.map((mat) => {
+                        const downloadUrl = api.getDownloadUrl(mat.ref_id, mat.download_url);
 
-                      return (
-                        <div
-                          key={mat.ref_id}
-                          className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs hover:border-emerald-300 transition gap-3"
-                        >
-                          <div className="flex items-center gap-2.5 truncate">
-                            <FileText className="h-4 w-4 text-red-500 shrink-0" />
-                            <a
-                              href={downloadUrl}
-                              download
-                              className="text-xs font-bold text-slate-800 hover:text-emerald-700 transition truncate"
-                              title={mat.title}
-                            >
-                              {mat.title}
-                            </a>
-                          </div>
+                        return (
+                          <div
+                            key={mat.ref_id}
+                            className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs hover:border-emerald-300 transition gap-3"
+                          >
+                            <div className="flex items-center gap-2.5 truncate">
+                              <FileText className="h-4 w-4 text-red-500 shrink-0" />
+                              <a
+                                href={downloadUrl}
+                                download
+                                className="text-xs font-bold text-slate-800 hover:text-emerald-700 transition truncate"
+                                title={mat.title}
+                              >
+                                {mat.title}
+                              </a>
+                            </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
-                            {mat.file_size && (
-                              <span className="font-mono text-[10px] text-slate-400">
-                                {mat.file_size}
-                              </span>
-                            )}
-                            <a
-                              href={downloadUrl}
-                              download
-                              className="flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-600 hover:text-white transition shadow-2xs"
-                            >
-                              <Download className="h-3 w-3" />
-                              <span>Download</span>
-                            </a>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {mat.file_size && (
+                                <span className="font-mono text-[10px] text-slate-400">
+                                  {mat.file_size}
+                                </span>
+                              )}
+                              <a
+                                href={downloadUrl}
+                                download
+                                className="flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-600 hover:text-white transition shadow-2xs"
+                              >
+                                <Download className="h-3 w-3" />
+                                <span>Download</span>
+                              </a>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic py-1">
+                      Keine Dateien in dieser Sitzung gefunden
+                    </p>
+                  )}
                 </div>
               )}
             </div>

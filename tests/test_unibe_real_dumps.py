@@ -457,6 +457,164 @@ def test_real_unibe_student_delete_submission_screen():
     assert "1145504" in files[0].download_url
 
 
+def test_real_unibe_course_content_blocks():
+    from backend.scrapers.materials import parse_course_materials
+
+    # 1. Test KW blocks
+    kw_path = Path("htmlfromilias/KW Way To Exercise Student/1Content_ 8752-HS2025-0_ Kombinatorik und Wahrscheinlichkeitsrechnung_ ILIAS Universität Bern.html")
+    if kw_path.exists():
+        kw_html = kw_path.read_text(encoding="utf-8", errors="replace")
+        kw_res = parse_course_materials(kw_html, "8752")
+        assert len(kw_res.blocks) >= 8
+        assert kw_res.layout_hash is not None
+        block_titles = [b.title for b in kw_res.blocks if b.title]
+        assert any("Skript" in t for t in block_titles)
+        assert any("Podcast" in t for t in block_titles)
+        assert any("Testatrelevante" in t for t in block_titles)
+        assert any("Online-Zusatz" in t for t in block_titles)
+        assert any("Probe" in t for t in block_titles)
+        assert any("Forum" in t for t in block_titles)
+
+    # 2. Test P&O blocks (Headings, Drawers & Sessions)
+    po_path = Path("htmlfromilias/Content_ 24-HS2026-0_ Personal und Organisation_ ILIAS Universität Bern.html")
+    if po_path.exists():
+        po_html = po_path.read_text(encoding="utf-8", errors="replace")
+        po_res = parse_course_materials(po_html, "24")
+        assert len(po_res.blocks) == 11
+
+        # Headings (Teil Organisation, Teil Personal, Organisation + Personal)
+        headings = [b for b in po_res.blocks if b.block_type == "heading"]
+        assert len(headings) == 3
+        h_titles = [h.title for h in headings]
+        assert any("Organisation" in t for t in h_titles)
+        assert any("Personal" in t for t in h_titles)
+
+        # Drawers (Folien, Übungsfragen, Reflexionstexte, Informationen, Folien, Podcasts, Forum)
+        drawers = [b for b in po_res.blocks if b.block_type == "drawer"]
+        assert len(drawers) == 7
+        d_titles = [d.title for d in drawers]
+        assert any("Folien" in t for t in d_titles)
+        assert any("bungsfragen" in t or "Übungsfragen" in t for t in d_titles)
+        assert any("Reflexionstexte" in t for t in d_titles)
+        assert any("Informationen" in t for t in d_titles)
+        assert any("Podcast" in t for t in d_titles)
+        assert any("Forum" in t for t in d_titles)
+
+        # Flat: No drawers inside drawers!
+        for d in drawers:
+            assert len(d.child_blocks) == 0
+
+        # Sessions block parsed cleanly inside accordion
+        sess_blocks = [b for b in po_res.blocks if b.block_type == "sessions"]
+        assert len(sess_blocks) == 1
+        assert len(sess_blocks[0].sessions) == 7
+
+        # Live Voting detected
+        voting_drawer = next(d for d in drawers if "bungsfragen" in d.title)
+        assert any(it.item_type == "voting" for it in voting_drawer.items)
+
+        # No raw container HTML or ILIAS 3-dot menus leaked into html_content
+        for b in po_res.blocks:
+            if b.html_content:
+                assert "ilContainerBlock" not in b.html_content
+                assert "Add to Favourites" not in b.html_content
+                assert "Set Tags" not in b.html_content
+
+
+def test_real_unibe_new_work_drawers():
+    import glob
+    matches = glob.glob("**/*New Work*.html", recursive=True)
+    assert len(matches) > 0, "New Work dump not found"
+
+    html = Path(matches[0]).read_text(encoding="utf-8", errors="replace")
+    res = parse_course_materials(html, "3394943")
+
+    drawers = [b for b in res.blocks if b.block_type == "drawer"]
+    assert len(drawers) >= 2, f"Expected at least 2 drawers, got {len(drawers)}"
+
+    d_titles = [d.title for d in drawers]
+    assert any("Kursübersicht" in t or "Kurs" in t for t in d_titles)
+    assert any("Ankündigungen" in t or "nk" in t for t in d_titles)
+
+    # Drawer 1: Kursübersicht contains the figure/image
+    overview_drawer = next(d for d in drawers if "Kurs" in d.title)
+    assert overview_drawer.html_content is not None
+    assert "Block_1_a_2.png" in overview_drawer.html_content or "img" in overview_drawer.html_content
+
+    # Drawer 2: Ankündigungen contains announcement text
+    announcement_drawer = next(d for d in drawers if "nk" in d.title)
+    assert announcement_drawer.html_content is not None
+    assert "PostFinance" in announcement_drawer.html_content
+
+    # Items blocks: Block must be titled "Inhalte" (NOT "Ordner")
+    item_blocks = [b for b in res.blocks if b.block_type == "items"]
+    assert len(item_blocks) == 2
+    content_block = next(b for b in item_blocks if b.title == "Inhalte")
+    assert len(content_block.items) == 4
+    assert sum(1 for it in content_block.items if it.item_type == "fold") == 3
+    assert sum(1 for it in content_block.items if it.item_type == "frm") == 1
+
+    podcast_block = next(b for b in item_blocks if "Podcast" in b.title)
+    assert len(podcast_block.items) == 1
+    assert podcast_block.items[0].item_type == "mcst"
+
+
+def test_real_unibe_valuation_items_and_files():
+    import glob
+    matches = glob.glob("**/*Valuation*.html", recursive=True)
+    val_files = [p for p in matches if "BetterIlias" not in p]
+    assert len(val_files) > 0, "Valuation dump not found"
+
+    html = Path(val_files[0]).read_text(encoding="utf-8", errors="replace")
+    res = parse_course_materials(html, "5349")
+
+    # Main items block must be titled "Inhalte" (NOT "Ordner")
+    item_blocks = [b for b in res.blocks if b.block_type == "items"]
+    assert len(item_blocks) == 1
+    content_block = item_blocks[0]
+    assert content_block.title == "Inhalte"
+    assert len(content_block.items) == 16
+
+    # Verify that "Punkte Übung 2" and "Punkte Übung 3" are files, NOT exercises
+    punkte_files = [it for it in content_block.items if "Punkte" in it.title]
+    assert len(punkte_files) == 2
+    for pf in punkte_files:
+        assert pf.item_type == "file"
+        assert "sendfile" in (pf.download_url or "") or "sendfile" in pf.url
+
+
+def test_real_unibe_psychopathologie_sessions_and_expand():
+    import glob
+    matches = glob.glob("**/*Psychopathologie*.html", recursive=True)
+    assert len(matches) > 0, "Psychopathologie dump not found"
+
+    html = Path(matches[0]).read_text(encoding="utf-8", errors="replace")
+    res = parse_course_materials(html, "3364036")
+
+    assert len(res.sessions) == 14, f"Expected 14 sessions, got {len(res.sessions)}"
+
+    # First session was already expanded in dump
+    s0 = res.sessions[0]
+    assert len(s0.materials) == 1
+    assert "Definitionen" in s0.materials[0].title
+    assert s0.materials_count == 1
+    assert s0.expand_id == "-4375138"
+
+    # Closed sessions have expand_id and materials_count
+    s2 = res.sessions[2]  # 1. Oct 2025
+    assert len(s2.materials) == 0  # not rendered inline in closed drawer
+    assert s2.materials_count == 1
+    assert s2.expand_id == "4375142"
+
+    s12 = res.sessions[12]  # 10. Dec 2025
+    assert len(s12.materials) == 0
+    assert s12.materials_count == 3
+    assert s12.expand_id == "4375162"
+
+    s5 = res.sessions[5]  # 22. Oct 2025 (no materials)
+    assert s5.materials_count == 0
+
+
 
 
 

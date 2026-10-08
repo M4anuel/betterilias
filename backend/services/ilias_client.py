@@ -1,6 +1,6 @@
 import logging
 import urllib.parse
-from typing import Any, AsyncGenerator, Dict, Optional, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from bs4 import BeautifulSoup
 import httpx
@@ -17,6 +17,7 @@ from backend.schemas import (
     ExerciseInfoResponse,
     GradeSubmissionRequest,
     GradeSubmissionResponse,
+    MaterialItem,
     PodcastSeriesResponse,
     SemesterScreenResponse,
     StudentAssignmentDetail,
@@ -132,12 +133,58 @@ class IliasClient:
         """Fetch and parse course or folder repository contents."""
         self._ensure_authenticated()
         # ILIAS supports baseClass=ilRepositoryGUI&ref_id=X or goto_ilias3_unibe_crs_X.html
-        url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilRepositoryGUI&ref_id={ref_id}"
+        # Append crs_prev_sess=1 so ILIAS returns ALL sessions (previous and current/upcoming)
+        url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilRepositoryGUI&ref_id={ref_id}&crs_prev_sess=1"
 
         async with self.session_manager.get_http_client() as client:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
             return parse_course_materials(resp.text, container_ref_id=ref_id)
+
+    async def get_session_materials(
+        self,
+        course_ref_id: str,
+        session_ref_id: str,
+        expand_id: Optional[str] = None,
+    ) -> List[MaterialItem]:
+        """
+        Fetch materials attached to a specific session (especially when collapsed on ILIAS by default).
+        Uses the expand=<expand_id> parameter or session infoScreen.
+        """
+        self._ensure_authenticated()
+        async with self.session_manager.get_http_client() as client:
+            # Strategy 1: Expand session directly on course view
+            if expand_id:
+                clean_expand = expand_id.lstrip("-")
+                url = (
+                    f"{settings.ilias_base_url}/ilias.php?"
+                    f"baseClass=ilRepositoryGUI&ref_id={course_ref_id}&expand={clean_expand}&crs_prev_sess=1"
+                )
+                resp = await client.get(url)
+                self._check_response_for_session_loss(resp, url)
+                parsed = parse_course_materials(resp.text, container_ref_id=course_ref_id)
+                for sess in parsed.sessions or []:
+                    if sess.ref_id == session_ref_id or (sess.expand_id and sess.expand_id.lstrip("-") == clean_expand):
+                        if sess.materials:
+                            return sess.materials
+
+            # Strategy 2: Fetch session infoScreen / direct session repo page
+            session_urls = [
+                f"{settings.ilias_base_url}/ilias.php?baseClass=ilrepositorygui&cmd=infoScreen&ref_id={session_ref_id}",
+                f"{settings.ilias_base_url}/ilias.php?baseClass=ilRepositoryGUI&ref_id={session_ref_id}",
+            ]
+            for s_url in session_urls:
+                try:
+                    resp = await client.get(s_url)
+                    self._check_response_for_session_loss(resp, s_url)
+                    parsed = parse_course_materials(resp.text, container_ref_id=session_ref_id)
+                    if parsed.items:
+                        return parsed.items
+                except Exception:
+                    continue
+
+            return []
+
 
     async def get_podcast_series(self, ref_id: str) -> PodcastSeriesResponse:
         """

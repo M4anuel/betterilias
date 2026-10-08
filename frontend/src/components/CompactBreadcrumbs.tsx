@@ -13,7 +13,7 @@ interface CompactBreadcrumbsProps {
 }
 
 export const CompactBreadcrumbs: React.FC<CompactBreadcrumbsProps> = ({
-  rawBreadcrumbs,
+  rawBreadcrumbs = [],
   courseNickname,
   courseRefId,
   currentFolderRefId,

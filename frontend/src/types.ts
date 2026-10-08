@@ -96,6 +96,20 @@ export interface CourseSessionItem {
   location?: string;
   materials: MaterialItem[];
   is_past: boolean;
+  expand_id?: string;
+  materials_count?: number;
+}
+
+export interface CourseContentBlock {
+  id: string;
+  block_type: 'heading' | 'drawer' | 'items' | 'text' | 'sessions' | 'all_files';
+  title?: string;
+  items?: MaterialItem[];
+  html_content?: string;
+  plain_text?: string;
+  level?: number;
+  child_blocks?: CourseContentBlock[];
+  sessions?: CourseSessionItem[];
 }
 
 export interface CourseLogsResponse {
@@ -115,6 +129,8 @@ export interface CourseMaterialsResponse {
   rich_text_blocks?: RichTextBlock[];
   sessions?: CourseSessionItem[];
   logs?: CourseLogItem[];
+  blocks?: CourseContentBlock[];
+  layout_hash?: string;
   fetched_at: string;
 }
 

@@ -1,32 +1,39 @@
+import copy
+import hashlib
 import re
 import urllib.parse
 from typing import Dict, List, Optional
 from bs4 import BeautifulSoup
 
 from backend.config import settings
-from backend.schemas import BreadcrumbItem, CourseMaterialsResponse, MaterialItem
+from backend.schemas import BreadcrumbItem, CourseContentBlock, CourseMaterialsResponse, MaterialItem, CourseSessionItem
 from backend.scrapers.dashboard import _extract_ref_id_from_url
 from backend.scrapers.dumper import safe_parser
 
 
 def _detect_material_type(url: str, classes: str, icon_src: Optional[str], title: str = "") -> str:
-    """Detect item type (fold, file, exc, frm, tst, webr, sess, mcst, etc.)."""
-    s = f"{url} {classes} {icon_src or ''} {title}".lower()
-    if "_fold_" in s or "/go/fold/" in s or "icon_fold" in s or "folder" in s:
+    """Detect item type (fold, file, exc, frm, tst, webr, sess, mcst, voting, etc.)."""
+    s_meta = f"{url} {classes} {icon_src or ''}".lower()
+    s_full = f"{s_meta} {title}".lower()
+
+    if "_fold_" in s_meta or "/go/fold/" in s_meta or "icon_fold" in s_meta or "folder" in s_meta:
         return "fold"
-    if "_mcst_" in s or "/go/mcst/" in s or "icon_mcst" in s or "mediacast" in s or "video" in s or "xoct" in s or "podcast" in s or "opencast" in s:
+    if "_mcst_" in s_meta or "/go/mcst/" in s_meta or "icon_mcst" in s_meta or "mediacast" in s_meta or "video" in s_meta or "xoct" in s_meta or "podcast" in s_full or "opencast" in s_meta:
         return "mcst"
-    if "_file_" in s or "/go/file/" in s or "icon_file" in s or "sendfile" in s or (("file" in s or ".pdf" in s) and "xoct" not in s and "podcast" not in s):
+    if "voting" in s_meta or "xlvo" in s_meta or "voting" in title.lower():
+        return "voting"
+    if "_file_" in s_meta or "/go/file/" in s_meta or "icon_file" in s_meta or "sendfile" in s_meta or "ilobjfilegui" in s_meta or (("file" in s_meta or ".pdf" in s_full) and "xoct" not in s_meta and "podcast" not in s_full):
         return "file"
-    if "_exc_" in s or "/go/exc/" in s or "icon_exc" in s or "exercise" in s or "uebung" in s or "ilexercisehandlergui" in s:
+
+    if "_exc_" in s_meta or "/go/exc/" in s_meta or "icon_exc" in s_meta or "ilexercise" in s_meta or "ilobjexercisegui" in s_meta:
         return "exc"
-    if "_frm_" in s or "/go/frm/" in s or "icon_frm" in s or "forum" in s:
+    if "_frm_" in s_meta or "/go/frm/" in s_meta or "icon_frm" in s_meta or "forum" in s_full:
         return "frm"
-    if "_tst_" in s or "/go/tst/" in s or "icon_tst" in s or "test" in s:
+    if "_tst_" in s_meta or "/go/tst/" in s_meta or "icon_tst" in s_meta or "test" in s_meta:
         return "tst"
-    if "_webr_" in s or "/go/webr/" in s or "icon_webr" in s or "weblink" in s:
+    if "_webr_" in s_meta or "/go/webr/" in s_meta or "icon_webr" in s_meta or "weblink" in s_meta:
         return "webr"
-    if "_sess_" in s or "/go/sess/" in s or "icon_sess" in s or "session" in s:
+    if "_sess_" in s_meta or "/go/sess/" in s_meta or "icon_sess" in s_meta or "session" in s_meta:
         return "sess"
     return "other"
 
@@ -170,6 +177,396 @@ def _parse_single_item(el, seen_ref_ids: set) -> Optional[MaterialItem]:
     )
 
 
+def _calc_layout_hash(blocks: List[CourseContentBlock]) -> str:
+    """Compute a deterministic hash representing the ILIAS layout structure."""
+    tokens = []
+    for b in blocks:
+        tokens.append(f"{b.id}:{b.title or ''}:{b.block_type}")
+        for cb in b.child_blocks:
+            tokens.append(f"  {cb.id}:{cb.title or ''}:{cb.block_type}")
+    return hashlib.md5("||".join(tokens).encode("utf-8")).hexdigest()
+
+
+def parse_course_blocks(
+    soup: BeautifulSoup,
+    container_ref_id: str,
+    sessions: Optional[List[CourseSessionItem]] = None,
+    fallback_items: Optional[List[MaterialItem]] = None,
+) -> List[CourseContentBlock]:
+    """
+    Extract the sequential content blocks as structured on the ILIAS page.
+    Preserves lecturer-defined ordering of text, item groups, drawers, and sessions.
+    """
+    center = soup.select_one("#il_center_col") or soup.select_one(".il-layout-page-content, main, #ilContentContainer")
+    if not center:
+        return []
+
+    block_seen_ref_ids = set()
+    blocks: List[CourseContentBlock] = []
+
+    child_idx = 0
+    for child in center.find_all(recursive=False):
+        child_idx += 1
+        if child.name in ["script", "style", "nav"]:
+            continue
+        if child.name == "a" and "ilPageShowAdvContent" in child.get("class", []):
+            continue
+        if "il-copg-mob-fullscreen-modal" in child.get("class", []):
+            continue
+
+        # 1. Section Heading: H1 / H2 headings (e.g. "Teil Organisation", "Teil Personal", "Organisation + Personal")
+        is_heading = child.name in ["h1", "h2"] and (
+            "ilc_heading1" in "".join(child.get("class", []))
+            or "ilc_heading2" in "".join(child.get("class", []))
+            or "ilc_Paragraph" in "".join(child.get("class", []))
+        )
+        if is_heading:
+            sec_title = child.get_text(strip=True)
+            sec_title = re.sub(r'<!--.*?-->', '', sec_title)
+            sec_title = re.sub(r'\bBreak\b', '', sec_title).strip()
+            if sec_title:
+                slug = re.sub(r'[^a-zA-Z0-9]+', '-', sec_title.lower()).strip('-')
+                h_block = CourseContentBlock(
+                    id=f"heading-{slug or child_idx}-{child_idx}",
+                    block_type="heading",
+                    title=sec_title,
+                )
+                blocks.append(h_block)
+                continue
+
+        # 2. Page Accordions (Drawers)
+        acc_cntrs = child.select("[class*='AccordCntr'], .ilc_va_cntr_AccordCntr, .ilc_va_cntr_VAccordCntr, .ilc_ha_cntr_HAccordCntr")
+        if not acc_cntrs and any("accordcntr" in c.lower() for c in child.get("class", [])):
+            acc_cntrs = [child]
+
+        if acc_cntrs:
+            for acc in acc_cntrs:
+                icntrs = acc.select("[class*='AccordICntr'], .ilc_va_icntr_AccordICntr, .ilc_va_icntr_VAccordICntr")
+                for acc_idx, ic in enumerate(icntrs):
+                    head_el = ic.select_one("[class*='AccordIHeadCap'], [class*='AccordIHead']")
+                    head_title = head_el.get_text(strip=True) if head_el else f"Abschnitt {child_idx}"
+                    head_title = re.sub(r'<!--.*?-->', '', head_title)
+                    head_title = re.sub(r'\bBreak\b', '', head_title).strip()
+
+                    cont_el = ic.select_one(".il_VAccordionContentDef, .ilc_va_icont_VAccordICont, [class*='AccordICont']")
+                    if not cont_el:
+                        continue
+
+                    # Check if this drawer contains sessions
+                    acc_sess_lis = [
+                        li for li in cont_el.select("li.ilObjListRow, .ilContainerItemsContainer > li")
+                        if "sess" in li.get("id", "") or li.find("img", alt="Session") or li.select_one("img[src*='icon_sess']")
+                    ]
+                    if acc_sess_lis:
+                        session_items: List[CourseSessionItem] = []
+                        for sli in acc_sess_lis:
+                            title_a = sli.select_one("h3 a, h4 a, .il_ContainerItemTitle a, .il-item-title a") or sli.find("a")
+                            if not title_a or not title_a.get_text(strip=True):
+                                continue
+                            sess_title = title_a.get_text(strip=True)
+                            if not sess_title or "previous sessions" in sess_title.lower():
+                                continue
+                            raw_sess_id = sli.get("id", "")
+                            sess_m = re.search(r"sess-(\d+)", raw_sess_id)
+                            sess_ref_id = sess_m.group(1) if sess_m else ""
+                            if not sess_ref_id or sess_ref_id in block_seen_ref_ids:
+                                continue
+                            block_seen_ref_ids.add(sess_ref_id)
+                            date_m = re.search(r"(\d{1,2}\.\s+[A-Za-z]+\s+\d{4})", sess_title)
+                            date_str = date_m.group(1).strip() if date_m else None
+                            time_m = re.search(r"(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})", sess_title)
+                            time_str = time_m.group(1).strip() if time_m else None
+
+                            expand_id = None
+                            expand_a = sli.find("a", href=re.compile(r"expand="))
+                            if expand_a:
+                                m = re.search(r"expand=(-?\d+)", expand_a.get("href", ""))
+                                if m:
+                                    expand_id = m.group(1)
+
+                            materials_count = None
+                            full_text = sli.get_text(" ", strip=True)
+                            mat_m = re.search(r"Session Materials:\s*(\d+)", full_text, re.I)
+                            if mat_m:
+                                materials_count = int(mat_m.group(1))
+
+                            sess_materials: List[MaterialItem] = []
+                            for sub_el in sli.select(".ilContainerListItemOuter"):
+                                if sub_el.get("id", "") == raw_sess_id:
+                                    continue
+                                sub_item = _parse_single_item(sub_el, block_seen_ref_ids)
+                                if sub_item and sub_item.ref_id != sess_ref_id:
+                                    sess_materials.append(sub_item)
+
+                            if sess_materials:
+                                materials_count = len(sess_materials)
+                            elif materials_count is None:
+                                materials_count = 0
+
+                            session_items.append(CourseSessionItem(
+                                ref_id=sess_ref_id,
+                                title=sess_title,
+                                date_str=date_str,
+                                time_str=time_str,
+                                materials=sess_materials,
+                                expand_id=expand_id,
+                                materials_count=materials_count,
+                            ))
+
+                        slug = re.sub(r'[^a-zA-Z0-9]+', '-', head_title.lower()).strip('-')
+                        sess_block = CourseContentBlock(
+                            id=f"sessions-{slug or child_idx}-{child_idx}-{acc_idx}",
+                            block_type="sessions",
+                            title=head_title or "Sitzungen & Termine",
+                            sessions=session_items,
+                        )
+                        blocks.append(sess_block)
+                        continue
+
+                    # Normal container items inside accordion
+                    acc_items: List[MaterialItem] = []
+                    for item_el in cont_el.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item"):
+                        item = _parse_single_item(item_el, block_seen_ref_ids)
+                        if item:
+                            acc_items.append(item)
+
+                    # Check if rich content / media remains outside container blocks
+                    clone = copy.copy(cont_el)
+                    for cb in clone.select(".ilContainerBlock, .ilContainerItemsContainer, .il_ContainerListItem, .ilCLI, .dropdown, .ilFloatRight"):
+                        cb.decompose()
+
+                    rem_html = "".join(str(c) for c in clone.contents).strip()
+                    rem_html = re.sub(r'<!--.*?-->', '', rem_html)
+                    rem_html = re.sub(r'\bBreak\b', '', rem_html).strip()
+                    rem_text = clone.get_text(" ", strip=True)
+                    rem_text = re.sub(r'<!--.*?-->', '', rem_text)
+                    rem_text = re.sub(r'\bBreak\b', '', rem_text).strip()
+                    has_media = bool(clone.find_all(["img", "figure", "video", "audio", "iframe"]))
+
+                    html_content = rem_html if (rem_text or has_media) else None
+                    plain_text = rem_text if rem_text else None
+
+                    slug = re.sub(r'[^a-zA-Z0-9]+', '-', head_title.lower()).strip('-')
+                    acc_drawer = CourseContentBlock(
+                        id=f"drawer-{slug or child_idx}-{child_idx}-{acc_idx}",
+                        block_type="drawer",
+                        title=head_title,
+                        html_content=html_content,
+                        plain_text=plain_text,
+                        items=acc_items,
+                        child_blocks=[],
+                    )
+                    blocks.append(acc_drawer)
+            continue
+
+        # 3. Sessions Block
+        sess_lis = [
+            li for li in child.select("li.ilObjListRow, .ilContainerItemsContainer > li")
+            if "sess" in li.get("id", "") or li.find("img", alt="Session") or li.select_one("img[src*='icon_sess']")
+        ]
+        if sess_lis and ("sess" in "".join(child.get("class", [])) or "session" in child.get_text(" ", strip=True).lower() or any("sess" in li.get("id", "") for li in sess_lis)):
+            session_items: List[CourseSessionItem] = []
+            for sli in sess_lis:
+                title_a = sli.select_one("h3 a, h4 a, .il_ContainerItemTitle a, .il-item-title a") or sli.find("a")
+                if not title_a or not title_a.get_text(strip=True):
+                    continue
+                sess_title = title_a.get_text(strip=True)
+                if not sess_title or "previous sessions" in sess_title.lower():
+                    continue
+
+                raw_sess_id = sli.get("id", "")
+                sess_m = re.search(r"sess-(\d+)", raw_sess_id)
+                sess_ref_id = sess_m.group(1) if sess_m else _extract_ref_id_from_url(title_a.get("href", ""))
+                if not sess_ref_id or sess_ref_id in block_seen_ref_ids:
+                    continue
+                block_seen_ref_ids.add(sess_ref_id)
+
+                date_m = re.search(r"(\d{1,2}\.\s+[A-Za-z]+\s+\d{4})", sess_title)
+                date_str = date_m.group(1).strip() if date_m else None
+                time_m = re.search(r"(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})", sess_title)
+                time_str = time_m.group(1).strip() if time_m else None
+
+                # Expand ID and materials count
+                expand_id = None
+                expand_a = sli.find("a", href=re.compile(r"expand="))
+                if expand_a:
+                    m = re.search(r"expand=(-?\d+)", expand_a.get("href", ""))
+                    if m:
+                        expand_id = m.group(1)
+
+                materials_count = None
+                full_text = sli.get_text(" ", strip=True)
+                mat_m = re.search(r"Session Materials:\s*(\d+)", full_text, re.I)
+                if mat_m:
+                    materials_count = int(mat_m.group(1))
+
+                sess_materials: List[MaterialItem] = []
+                for sub_el in sli.select(".ilContainerListItemOuter"):
+                    if sub_el.get("id", "") == raw_sess_id:
+                        continue
+                    sub_item = _parse_single_item(sub_el, block_seen_ref_ids)
+                    if sub_item and sub_item.ref_id != sess_ref_id:
+                        sess_materials.append(sub_item)
+
+                if sess_materials:
+                    materials_count = len(sess_materials)
+                elif materials_count is None:
+                    materials_count = 0
+
+                session_items.append(
+                    CourseSessionItem(
+                        ref_id=sess_ref_id,
+                        title=sess_title,
+                        date_str=date_str,
+                        time_str=time_str,
+                        materials=sess_materials,
+                        expand_id=expand_id,
+                        materials_count=materials_count,
+                    )
+                )
+
+            if session_items:
+                sess_header = child.select_one("h2, h3, .ilHeader, .ilBlockHeader, legend")
+                sess_title = sess_header.get_text(strip=True) if sess_header else "Sitzungen & Termine"
+                sess_title = re.sub(r'^(Sessions|Sitzungen)\s*', 'Sitzungen & Termine', sess_title).strip()
+                sess_block = CourseContentBlock(
+                    id=f"sessions-{child_idx}",
+                    block_type="sessions",
+                    title=sess_title,
+                    sessions=session_items,
+                )
+                blocks.append(sess_block)
+                continue
+
+        # 4. Item Groups / Container Blocks
+        items_in_child = child.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item")
+        if items_in_child:
+            hdr_elem = child.select_one("h2, h3, h4, .ilHeader, .ilBlockHeader, legend")
+            raw_hdr = hdr_elem.get_text(strip=True) if hdr_elem else ""
+            if raw_hdr.lower() in ["content", "inhalt", "kursinhalte", "kursinhalt", "inhalte"]:
+                group_title = "Inhalte"
+            else:
+                group_title = raw_hdr
+
+            parsed_items: List[MaterialItem] = []
+            for item_el in items_in_child:
+                item = _parse_single_item(item_el, block_seen_ref_ids)
+                if item:
+                    parsed_items.append(item)
+
+            if parsed_items:
+                if not group_title:
+                    if all(it.item_type == "fold" for it in parsed_items):
+                        group_title = "Ordner"
+                    elif all(it.item_type == "file" for it in parsed_items):
+                        group_title = "Dateien & Unterlagen"
+                    elif all(it.item_type == "mcst" for it in parsed_items):
+                        group_title = "Podcasts & Aufzeichnungen"
+                    elif all(it.item_type == "exc" for it in parsed_items):
+                        group_title = "Übungen & Aufgaben"
+                    elif all(it.item_type == "frm" for it in parsed_items):
+                        group_title = "Forum"
+                    else:
+                        group_title = "Inhalte"
+
+                block_slug = re.sub(r'[^a-zA-Z0-9]+', '-', group_title.lower()).strip('-')
+                item_block = CourseContentBlock(
+                    id=f"items-{block_slug or child_idx}-{child_idx}",
+                    block_type="items",
+                    title=group_title,
+                    items=parsed_items,
+                )
+                blocks.append(item_block)
+                continue
+
+        # 5. Rich Text / Info Paragraphs
+        is_text = ("ilc_text_block_Standard" in child.get("class", []) or child.name in ["p", "blockquote", "ul", "ol", "div", "h2", "h3", "h4"])
+        if is_text:
+            inner_html = "".join(str(c) for c in child.contents).strip()
+            inner_html = re.sub(r'<!--.*?-->', '', inner_html)
+            inner_html = re.sub(r'\bBreak\b', '', inner_html).strip()
+            plain_txt = child.get_text(" ", strip=True)
+            plain_txt = re.sub(r'\bBreak\b', '', plain_txt).strip()
+
+            if plain_txt and not child.select(".ilContainerBlock, .il_ContainerListItem"):
+                hdr = None
+                lvl = 3
+                if child.name in ["h2", "h3", "h4", "h5"]:
+                    hdr = plain_txt
+                    lvl = int(child.name[1]) if child.name[1].isdigit() else 3
+                    snippet = f"<{child.name}>{inner_html}</{child.name}>"
+                elif child.name in ["ul", "ol", "blockquote"]:
+                    snippet = f"<{child.name}>{inner_html}</{child.name}>"
+                else:
+                    snippet = f"<p>{inner_html}</p>"
+
+                if blocks and blocks[-1].block_type == "text" and not hdr:
+                    blocks[-1].html_content = (blocks[-1].html_content or "") + "\n" + snippet
+                    blocks[-1].plain_text = ((blocks[-1].plain_text or "") + " " + plain_txt).strip()
+                else:
+                    t_block = CourseContentBlock(
+                        id=f"text-{child_idx}",
+                        block_type="text",
+                        title=hdr,
+                        html_content=snippet,
+                        plain_text=plain_txt,
+                        level=lvl,
+                    )
+                    blocks.append(t_block)
+                continue
+
+
+    # Fallback if no blocks were produced (e.g. standard subfolder with flat items)
+    if not blocks and fallback_items:
+        fold_items = [i for i in fallback_items if i.item_type == "fold"]
+        file_items = [i for i in fallback_items if i.item_type == "file"]
+        other_items = [i for i in fallback_items if i.item_type not in ["fold", "file"]]
+
+        if fold_items:
+            blocks.append(
+                CourseContentBlock(
+                    id=f"items-folders-{container_ref_id}",
+                    block_type="items",
+                    title="Ordner",
+                    items=fold_items,
+                )
+            )
+        if file_items:
+            blocks.append(
+                CourseContentBlock(
+                    id=f"items-files-{container_ref_id}",
+                    block_type="items",
+                    title="Dateien & Unterlagen",
+                    items=file_items,
+                )
+            )
+        if other_items:
+            blocks.append(
+                CourseContentBlock(
+                    id=f"items-other-{container_ref_id}",
+                    block_type="items",
+                    title="Materialien & Übungen",
+                    items=other_items,
+                )
+            )
+
+    # If sessions were detected globally but not added inside any block
+    if sessions:
+        has_sess = any(b.block_type == "sessions" or any(cb.block_type == "sessions" for cb in b.child_blocks) for b in blocks)
+        if not has_sess:
+            blocks.insert(
+                0,
+                CourseContentBlock(
+                    id=f"sessions-{container_ref_id}",
+                    block_type="sessions",
+                    title="Sitzungen & Termine",
+                    sessions=sessions,
+                ),
+            )
+
+    return blocks
+
+
 @safe_parser(context_name="course_materials")
 def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMaterialsResponse:
     """
@@ -251,6 +648,20 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
             except Exception:
                 pass
 
+        # Expand ID and materials count
+        expand_id = None
+        expand_a = sli.find("a", href=re.compile(r"expand="))
+        if expand_a:
+            m = re.search(r"expand=(-?\d+)", expand_a.get("href", ""))
+            if m:
+                expand_id = m.group(1)
+
+        materials_count = None
+        full_text = sli.get_text(" ", strip=True)
+        mat_m = re.search(r"Session Materials:\s*(\d+)", full_text, re.I)
+        if mat_m:
+            materials_count = int(mat_m.group(1))
+
         # Extract nested materials in this session drawer
         sess_materials: List[MaterialItem] = []
         for sub_el in sli.select(".ilContainerListItemOuter"):
@@ -260,6 +671,11 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
             if sub_item and sub_item.ref_id != sess_ref_id:
                 sess_materials.append(sub_item)
 
+        if sess_materials:
+            materials_count = len(sess_materials)
+        elif materials_count is None:
+            materials_count = 0
+
         sessions.append(
             CourseSessionItem(
                 ref_id=sess_ref_id,
@@ -268,6 +684,8 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
                 time_str=time_str,
                 materials=sess_materials,
                 is_past=is_past,
+                expand_id=expand_id,
+                materials_count=materials_count,
             )
         )
 
@@ -474,6 +892,9 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
                 )
             )
 
+    blocks = parse_course_blocks(soup, container_ref_id, sessions=sessions, fallback_items=items)
+    layout_hash = _calc_layout_hash(blocks)
+
     return CourseMaterialsResponse(
         container_ref_id=container_ref_id,
         title=container_title,
@@ -483,5 +904,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
         rich_text_blocks=rich_text_blocks,
         sessions=sessions,
         logs=logs,
+        blocks=blocks,
+        layout_hash=layout_hash,
     )
 

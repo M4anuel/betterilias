@@ -21,8 +21,11 @@ import {
   Radio,
   Play,
   SlidersHorizontal,
+  Bookmark,
+  Files,
+  MessageSquare,
 } from 'lucide-react';
-import { CourseMaterialsResponse, MaterialItem } from '../types';
+import { CourseMaterialsResponse, MaterialItem, CourseContentBlock } from '../types';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { CourseLogsPanel } from './CourseLogsPanel';
 import { PodcastModal } from './PodcastModal';
@@ -30,7 +33,7 @@ import { SessionDrawer } from './SessionDrawer';
 import { ContentOrderModal } from './ContentOrderModal';
 import { ExerciseView } from './ExerciseView';
 import { api } from '../lib/api';
-import { cache, ContentSectionId } from '../lib/cache';
+import { cache, CourseBlocksCustomization } from '../lib/cache';
 
 export interface CourseSearchResult {
   item: MaterialItem;
@@ -75,7 +78,13 @@ export const CourseView: React.FC<CourseViewProps> = ({
   loadError,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [collapsedDrawers, setCollapsedDrawers] = useState<Record<string, boolean>>(() =>
+    cache.getCourseDrawersState(courseRefId)
+  );
+
+  useEffect(() => {
+    setCollapsedDrawers(cache.getCourseDrawersState(courseRefId));
+  }, [courseRefId]);
   const [activePodcast, setActivePodcast] = useState<{ refId: string; title: string } | null>(null);
   const [activeExerciseRefId, setActiveExerciseRefId] = useState<string | null>(null);
   const [subfolderMaterials, setSubfolderMaterials] = useState<
@@ -86,14 +95,86 @@ export const CourseView: React.FC<CourseViewProps> = ({
   >({});
   const [isScanningTree, setIsScanningTree] = useState(false);
   const [searchCategoryFilter, setSearchCategoryFilter] = useState<'all' | 'file' | 'fold' | 'mcst' | 'exc'>('all');
-  const [sectionOrder, setSectionOrder] = useState<ContentSectionId[]>(() =>
-    cache.getContentSectionOrder()
-  );
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
-  const handleSaveSectionOrder = (newOrder: ContentSectionId[]) => {
-    setSectionOrder(newOrder);
-    cache.setContentSectionOrder(newOrder);
+  // Per-course dynamic blocks customization & ordering
+  const [blockOrder, setBlockOrder] = useState<string[]>(() => {
+    const saved = cache.getCourseBlocksCustomization(courseRefId);
+    return saved?.blockOrder || [];
+  });
+  const [hiddenBlockIds, setHiddenBlockIds] = useState<string[]>(() => {
+    const saved = cache.getCourseBlocksCustomization(courseRefId);
+    return saved?.hiddenBlockIds || [];
+  });
+  const [showAllFilesBlock, setShowAllFilesBlock] = useState<boolean>(() => {
+    const saved = cache.getCourseBlocksCustomization(courseRefId);
+    return !!saved?.showAllFilesBlock;
+  });
+
+  // Check ILIAS layout change and reset if hash mismatch
+  useEffect(() => {
+    if (!materialsData) return;
+    const currentHash = materialsData.layout_hash || '';
+    const saved = cache.getCourseBlocksCustomization(courseRefId);
+
+    if (saved) {
+      if (currentHash && saved.layoutHash && saved.layoutHash !== currentHash) {
+        // ILIAS layout changed on server (blocks added/renamed/moved); auto-reset to ILIAS default
+        cache.clearCourseBlocksCustomization(courseRefId);
+        setBlockOrder((materialsData.blocks || []).map((b) => b.id));
+        setHiddenBlockIds([]);
+        setShowAllFilesBlock(false);
+      } else {
+        setBlockOrder(saved.blockOrder || (materialsData.blocks || []).map((b) => b.id));
+        setHiddenBlockIds(saved.hiddenBlockIds || []);
+        setShowAllFilesBlock(!!saved.showAllFilesBlock);
+      }
+    } else {
+      setBlockOrder((materialsData.blocks || []).map((b) => b.id));
+      setHiddenBlockIds([]);
+      setShowAllFilesBlock(false);
+    }
+  }, [courseRefId, materialsData?.layout_hash]);
+
+  const handleSaveBlockOrder = (newOrder: string[]) => {
+    setBlockOrder(newOrder);
+    cache.setCourseBlocksCustomization(courseRefId, {
+      layoutHash: materialsData?.layout_hash || '',
+      blockOrder: newOrder,
+      hiddenBlockIds,
+      showAllFilesBlock,
+    });
+  };
+
+  const handleToggleHideBlock = (blockId: string) => {
+    const next = hiddenBlockIds.includes(blockId)
+      ? hiddenBlockIds.filter((id) => id !== blockId)
+      : [...hiddenBlockIds, blockId];
+    setHiddenBlockIds(next);
+    cache.setCourseBlocksCustomization(courseRefId, {
+      layoutHash: materialsData?.layout_hash || '',
+      blockOrder,
+      hiddenBlockIds: next,
+      showAllFilesBlock,
+    });
+  };
+
+  const handleToggleShowAllFiles = (show: boolean) => {
+    setShowAllFilesBlock(show);
+    cache.setCourseBlocksCustomization(courseRefId, {
+      layoutHash: materialsData?.layout_hash || '',
+      blockOrder,
+      hiddenBlockIds,
+      showAllFilesBlock: show,
+    });
+  };
+
+  const handleResetBlocksToDefault = () => {
+    const defaultOrder = (materialsData?.blocks || []).map((b) => b.id);
+    setBlockOrder(defaultOrder);
+    setHiddenBlockIds([]);
+    setShowAllFilesBlock(false);
+    cache.clearCourseBlocksCustomization(courseRefId);
   };
 
   const getFoldersFromRes = (res: CourseMaterialsResponse): MaterialItem[] => {
@@ -312,6 +393,122 @@ export const CourseView: React.FC<CourseViewProps> = ({
     };
   }, [courseRefId, materialsData?.container_ref_id]);
 
+  const toggleDrawer = (drawerId: string) => {
+    setCollapsedDrawers((prev) => {
+      const isCurrentlyCollapsed = !!prev[drawerId];
+      const next = {
+        ...prev,
+        [drawerId]: !isCurrentlyCollapsed,
+      };
+      cache.setCourseDrawersState(courseRefId, next);
+      return next;
+    });
+    setTimeout(() => {
+      if (window.MathJax?.typesetPromise) {
+        window.MathJax.typesetPromise().catch(() => {});
+      }
+    }, 50);
+  };
+
+
+  const countTotalItemsInBlock = (b: CourseContentBlock): number => {
+    let count = b.items?.length || 0;
+    if (b.sessions?.length) count += b.sessions.length;
+    if (b.child_blocks) {
+      for (const cb of b.child_blocks) {
+        count += countTotalItemsInBlock(cb);
+      }
+    }
+    return count;
+  };
+
+  // Collect all files in the course for the virtual "All Files" block
+  const allCourseFiles = React.useMemo(() => {
+    if (!materialsData) return [];
+    const files: MaterialItem[] = [];
+    const seen = new Set<string>();
+
+    const addFile = (item: MaterialItem) => {
+      if (item.item_type === 'file' && !seen.has(item.ref_id)) {
+        seen.add(item.ref_id);
+        files.push(item);
+      }
+    };
+
+    for (const item of materialsData.items || []) {
+      addFile(item);
+    }
+    for (const sec of materialsData.sections || []) {
+      for (const grp of sec.groups || []) {
+        for (const item of grp.items || []) {
+          addFile(item);
+        }
+      }
+    }
+    const collectFromBlocks = (blist: CourseContentBlock[]) => {
+      for (const b of blist) {
+        for (const it of b.items || []) {
+          addFile(it);
+        }
+        if (b.child_blocks) collectFromBlocks(b.child_blocks);
+      }
+    };
+    collectFromBlocks(materialsData.blocks || []);
+    return files;
+  }, [materialsData]);
+
+  // Construct available blocks (including virtual all-files block if enabled)
+  const rawBlocks = materialsData?.blocks || [];
+  const availableBlocks: CourseContentBlock[] = React.useMemo(() => {
+    if (!materialsData) return [];
+    if (!showAllFilesBlock) return rawBlocks;
+    const virtualBlock: CourseContentBlock = {
+      id: 'block-all-files',
+      block_type: 'all_files',
+      title: 'Alle Dateien des Kurses',
+      items: allCourseFiles,
+      level: 1,
+      child_blocks: [],
+      sessions: [],
+    };
+    return [...rawBlocks, virtualBlock];
+  }, [materialsData, rawBlocks, showAllFilesBlock, allCourseFiles]);
+
+  // Map of blocks by id for ordered rendering
+  const orderedBlocksToRender: CourseContentBlock[] = React.useMemo(() => {
+    if (!materialsData) return [];
+    const blockMap = new Map<string, CourseContentBlock>();
+    for (const b of availableBlocks) {
+      blockMap.set(b.id, b);
+    }
+
+    const ordered: CourseContentBlock[] = [];
+    const seenIds = new Set<string>();
+
+    // 1. Follow blockOrder
+    for (const id of blockOrder) {
+      const b = blockMap.get(id);
+      if (b && !seenIds.has(id)) {
+        if (!hiddenBlockIds.includes(id)) {
+          ordered.push(b);
+        }
+        seenIds.add(id);
+      }
+    }
+
+    // 2. Append any blocks from availableBlocks not yet ordered
+    for (const b of availableBlocks) {
+      if (!seenIds.has(b.id)) {
+        if (!hiddenBlockIds.includes(b.id)) {
+          ordered.push(b);
+        }
+        seenIds.add(b.id);
+      }
+    }
+
+    return ordered;
+  }, [materialsData, availableBlocks, blockOrder, hiddenBlockIds]);
+
   if (!materialsData) {
     if (loadError) {
       return (
@@ -469,7 +666,11 @@ export const CourseView: React.FC<CourseViewProps> = ({
     if (searchCategoryFilter === 'mcst')
       return r.item.item_type === 'mcst' || r.item.title.toLowerCase().includes('podcast');
     if (searchCategoryFilter === 'exc')
-      return !['fold', 'file', 'mcst'].includes(r.item.item_type) && !r.item.title.toLowerCase().includes('podcast');
+      return (
+        r.item.item_type === 'exc' ||
+        r.item.url.toLowerCase().includes('ilexercise') ||
+        r.item.url.toLowerCase().includes('/go/exc/')
+      );
     return true;
   });
 
@@ -479,7 +680,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
     (r) => r.item.item_type === 'mcst' || r.item.title.toLowerCase().includes('podcast')
   ).length;
   const searchExcCount = searchResults.filter(
-    (r) => !['fold', 'file', 'mcst'].includes(r.item.item_type) && !r.item.title.toLowerCase().includes('podcast')
+    (r) =>
+      r.item.item_type === 'exc' ||
+      r.item.url.toLowerCase().includes('ilexercise') ||
+      r.item.url.toLowerCase().includes('/go/exc/')
   ).length;
 
   const renderSearchResultRow = (result: CourseSearchResult) => {
@@ -487,14 +691,17 @@ export const CourseView: React.FC<CourseViewProps> = ({
     const isFile = item.item_type === 'file';
     const isFolder = item.item_type === 'fold';
     const isPodcast =
-      item.item_type === 'mcst' ||
-      item.title.toLowerCase().includes('podcast') ||
-      item.url.toLowerCase().includes('xoct');
+      !isFile &&
+      (item.item_type === 'mcst' ||
+        item.url.toLowerCase().includes('xoct') ||
+        item.url.toLowerCase().includes('/go/mcst/'));
     const isExercise =
-      item.item_type === 'exc' ||
-      item.url.toLowerCase().includes('ilexercise') ||
-      item.title.toLowerCase().includes('übung') ||
-      item.title.toLowerCase().includes('exercise');
+      !isFile &&
+      !isFolder &&
+      (item.item_type === 'exc' ||
+        item.url.toLowerCase().includes('ilexercise') ||
+        item.url.toLowerCase().includes('ilobjexercisegui') ||
+        item.url.toLowerCase().includes('/go/exc/'));
     const downloadUrl = isFile ? api.getDownloadUrl(item.ref_id, item.download_url) : null;
 
     return (
@@ -595,29 +802,15 @@ export const CourseView: React.FC<CourseViewProps> = ({
     );
   };
 
-  const toggleSection = (sectionId: string) => {
-    setCollapsedSections((prev) => ({
-      ...prev,
-      [sectionId]: !prev[sectionId],
-    }));
-  };
-
-  const toggleAllSections = () => {
-    const allCollapsed = sections.every((s) => collapsedSections[s.id]);
-    const next: Record<string, boolean> = {};
-    for (const s of sections) {
-      next[s.id] = !allCollapsed;
-    }
-    setCollapsedSections(next);
-  };
-
   const getItemIcon = (item: MaterialItem) => {
     if (item.item_type === 'fold') return <Folder className="h-4 w-4 text-amber-500 fill-amber-50 shrink-0" />;
     if (item.item_type === 'file') return <FileText className="h-4 w-4 text-red-500 fill-red-50 shrink-0" />;
     if (item.item_type === 'exc') return <Layers className="h-4 w-4 text-indigo-500 shrink-0" />;
     if (item.item_type === 'mcst') return <Radio className="h-4 w-4 text-sky-500 shrink-0" />;
     if (item.item_type === 'sess') return <Calendar className="h-4 w-4 text-emerald-500 shrink-0" />;
-    if (item.title.toLowerCase().includes('voting')) return <Vote className="h-4 w-4 text-purple-500 shrink-0" />;
+    if (item.item_type === 'voting' || item.title.toLowerCase().includes('voting') || item.url.includes('xlvo')) {
+      return <Vote className="h-4 w-4 text-purple-500 shrink-0" />;
+    }
     return <ExternalLink className="h-4 w-4 text-slate-400 shrink-0" />;
   };
 
@@ -641,14 +834,21 @@ export const CourseView: React.FC<CourseViewProps> = ({
     const isFile = item.item_type === 'file';
     const isFolder = item.item_type === 'fold';
     const isPodcast =
-      item.item_type === 'mcst' ||
-      item.title.toLowerCase().includes('podcast') ||
-      item.url.toLowerCase().includes('xoct');
+      !isFile &&
+      (item.item_type === 'mcst' ||
+        item.url.toLowerCase().includes('xoct') ||
+        item.url.toLowerCase().includes('/go/mcst/'));
     const isExercise =
-      item.item_type === 'exc' ||
-      item.url.toLowerCase().includes('ilexercise') ||
-      item.title.toLowerCase().includes('übung') ||
-      item.title.toLowerCase().includes('exercise');
+      !isFile &&
+      !isFolder &&
+      (item.item_type === 'exc' ||
+        item.url.toLowerCase().includes('ilexercise') ||
+        item.url.toLowerCase().includes('ilobjexercisegui') ||
+        item.url.toLowerCase().includes('/go/exc/'));
+    const isVoting =
+      item.item_type === 'voting' ||
+      item.title.toLowerCase().includes('voting') ||
+      item.url.toLowerCase().includes('xlvo');
     const downloadUrl = isFile ? api.getDownloadUrl(item.ref_id, item.download_url) : null;
 
     if (isFolder) {
@@ -776,6 +976,48 @@ export const CourseView: React.FC<CourseViewProps> = ({
       );
     }
 
+    if (isVoting) {
+      return (
+        <div
+          key={item.ref_id}
+          className="flex items-center justify-between p-3 hover:bg-purple-50/70 transition rounded-xl border border-transparent hover:border-purple-200 group gap-3"
+        >
+          <div className="flex items-center gap-3 truncate">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600 shrink-0 group-hover:scale-105 transition">
+              <Vote className="h-4 w-4" />
+            </div>
+            <div className="truncate">
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold text-slate-800 group-hover:text-purple-800 transition block truncate"
+                title={item.title}
+              >
+                {item.title}
+              </a>
+              <span className="text-[10px] text-purple-600 font-medium block truncate">
+                {item.description || 'ILIAS Live Voting'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-purple-700 transition shadow-2xs"
+            >
+              <Vote className="h-3 w-3" />
+              <span>Live Voting</span>
+              <ExternalLink className="h-3 w-3 opacity-80" />
+            </a>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div
         key={item.ref_id}
@@ -843,15 +1085,309 @@ export const CourseView: React.FC<CourseViewProps> = ({
     );
   };
 
+  const renderDrawerBlock = (block: CourseContentBlock): React.ReactNode => {
+    const isCollapsed = !!collapsedDrawers[block.id];
+    const totalCount = countTotalItemsInBlock(block);
+
+    return (
+      <div
+        key={block.id}
+        className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden transition"
+      >
+        <button
+          type="button"
+          onClick={() => toggleDrawer(block.id)}
+          className="flex w-full items-center justify-between p-4 bg-slate-50/70 hover:bg-slate-100/60 transition text-left select-none cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 text-rose-600 shrink-0">
+              <Bookmark className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">{block.title || 'Schublade'}</h3>
+              <p className="text-[11px] text-slate-400">
+                {(block.child_blocks?.length || 0)} {(block.child_blocks?.length === 1 ? 'Unterabschnitt' : 'Unterabschnitte')}
+                {totalCount > 0 ? ` • ${totalCount} ${totalCount === 1 ? 'Element' : 'Elemente'}` : ''}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-slate-400">
+            {isCollapsed ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
+          </div>
+        </button>
+
+        {!isCollapsed && (
+          <div className="p-4 space-y-6 border-t border-slate-100">
+            {block.html_content && (
+              <div
+                className="ilias-rich-content text-xs text-slate-700 leading-relaxed font-sans rounded-xl bg-slate-50 p-3.5"
+                dangerouslySetInnerHTML={{ __html: block.html_content }}
+              />
+            )}
+
+            {block.child_blocks && block.child_blocks.length > 0 && (
+              <div className="space-y-4">
+                {block.child_blocks.map(renderBlock)}
+              </div>
+            )}
+
+            {block.items && block.items.length > 0 && (
+              <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 bg-white shadow-2xs overflow-hidden">
+                {block.items.map(renderItemRow)}
+              </div>
+            )}
+
+            {block.sessions && block.sessions.length > 0 && (
+              <SessionDrawer sessions={block.sessions} courseRefId={courseRefId} />
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderTextBlock = (block: CourseContentBlock): React.ReactNode => {
+    if (!block.html_content && !block.plain_text) return null;
+    return (
+      <div
+        key={block.id}
+        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3 transition hover:border-slate-300"
+      >
+        {block.title && (
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+            {getRichBlockIcon(block.title)}
+            <h3 className="text-sm font-bold text-slate-900">{block.title}</h3>
+          </div>
+        )}
+        <div
+          className="ilias-rich-content text-xs text-slate-700 leading-relaxed font-sans"
+          dangerouslySetInnerHTML={{ __html: block.html_content || '' }}
+        />
+      </div>
+    );
+  };
+
+  const renderSessionsBlock = (block: CourseContentBlock): React.ReactNode => {
+    const sessList = block.sessions && block.sessions.length > 0 ? block.sessions : sessions;
+    if (sessList.length === 0) return null;
+
+    return (
+      <div key={block.id} className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+            <Calendar className="h-4 w-4 text-emerald-500" />
+            <span>{block.title || 'Sitzungen (Termine)'}</span>
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+              {sessList.length}
+            </span>
+          </h3>
+        </div>
+        <SessionDrawer sessions={sessList} courseRefId={courseRefId} />
+      </div>
+    );
+  };
+
+  const renderAllFilesBlock = (block: CourseContentBlock): React.ReactNode => {
+    if (!block.items || block.items.length === 0) return null;
+
+    return (
+      <div key={block.id} className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1.5">
+            <Files className="h-4 w-4 text-amber-500" />
+            <span>{block.title || 'Alle Dateien des Kurses'}</span>
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+              {block.items.length}
+            </span>
+          </h3>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden">
+          {block.items.map(renderItemRow)}
+        </div>
+      </div>
+    );
+  };
+
+  const renderItemsBlock = (block: CourseContentBlock): React.ReactNode => {
+    const items = block.items || [];
+    if (items.length === 0) return null;
+
+    // Check if all items are folders
+    const allFolders = items.every((i) => i.item_type === 'fold');
+    if (allFolders) {
+      return (
+        <div key={block.id} className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <Folder className="h-4 w-4 text-amber-500" />
+              <span>{block.title || 'Ordner'}</span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                {items.length}
+              </span>
+            </h3>
+            {isScanningTree && (
+              <div className="flex items-center gap-1.5 text-[11px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md font-medium">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                <span>Analysiere Unterordner...</span>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {items.map((folder) => {
+              const stat = folderStats[folder.ref_id];
+              return (
+                <div
+                  key={folder.ref_id}
+                  onClick={() => onNavigateFolder(folder.ref_id)}
+                  className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs transition hover:border-amber-300 hover:shadow-xs cursor-pointer gap-2.5"
+                >
+                  <div className="flex items-start gap-3 truncate pr-2">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 shrink-0 group-hover:scale-105 transition">
+                      <Folder className="h-5 w-5 fill-amber-100" />
+                    </div>
+                    <div className="min-w-0 flex-1 truncate">
+                      <span className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition block truncate">
+                        {folder.title}
+                      </span>
+                      {folder.description && (
+                        <span className="text-[10px] text-slate-400 truncate block mt-0.5">
+                          {folder.description}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px]">
+                    {stat ? (
+                      stat.isMapped ? (
+                        stat.isEmpty ? (
+                          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-medium text-slate-400">
+                            Leer
+                          </span>
+                        ) : (
+                          <span className="rounded-md bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700 border border-amber-200/50">
+                            {stat.files > 0
+                              ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}`
+                              : `${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`}
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-slate-400">Ordner</span>
+                      )
+                    ) : isScanningTree ? (
+                      <span className="inline-flex items-center gap-1 text-slate-400">
+                        <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                        <span>Prüfe...</span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">Ordner</span>
+                    )}
+
+                    <span className="font-semibold text-slate-400 group-hover:text-amber-600 transition">
+                      Öffnen →
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // Not all folders - check specific types for styling
+    let titleColor = 'text-slate-500';
+    let badgeClass = 'bg-slate-100 text-slate-600';
+    let icon = <Layers className="h-4 w-4 text-indigo-500" />;
+
+    const allPodcasts = items.length > 0 && items.every((i) => i.item_type === 'mcst' || i.title.toLowerCase().includes('podcast'));
+    const allExercises = items.length > 0 && items.every((i) => i.item_type === 'exc');
+    const allForums = items.length > 0 && items.every((i) => i.item_type === 'frm');
+    const allFiles = items.length > 0 && items.every((i) => i.item_type === 'file');
+
+    if (allPodcasts) {
+      titleColor = 'text-sky-600';
+      badgeClass = 'bg-sky-50 text-sky-700';
+      icon = <Radio className="h-4 w-4 text-sky-500" />;
+    } else if (allExercises) {
+      titleColor = 'text-indigo-600';
+      badgeClass = 'bg-indigo-50 text-indigo-700';
+      icon = <Layers className="h-4 w-4 text-indigo-500" />;
+    } else if (allForums) {
+      titleColor = 'text-purple-600';
+      badgeClass = 'bg-purple-50 text-purple-700';
+      icon = <MessageSquare className="h-4 w-4 text-purple-500" />;
+    } else if (allFiles) {
+      titleColor = 'text-red-600';
+      badgeClass = 'bg-red-50 text-red-700';
+      icon = <FileText className="h-4 w-4 text-red-500" />;
+    } else {
+      // Mixed contents (e.g. Inhalte, Materialien)
+      titleColor = 'text-indigo-600';
+      badgeClass = 'bg-indigo-50 text-indigo-700';
+      icon = <BookOpen className="h-4 w-4 text-indigo-500" />;
+    }
+
+    return (
+      <div key={block.id} className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className={`text-xs font-bold uppercase tracking-wider ${titleColor} flex items-center gap-1.5`}>
+            {icon}
+            <span>{block.title || 'Inhalte'}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badgeClass}`}>
+              {items.length}
+            </span>
+          </h3>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden">
+          {items.map(renderItemRow)}
+        </div>
+      </div>
+    );
+  };
+
+  const renderHeadingBlock = (block: CourseContentBlock): React.ReactNode => {
+    return (
+      <div key={block.id} className="pt-6 pb-2 border-b border-slate-200">
+        <div className="flex items-center gap-2.5">
+          <div className="h-5 w-1 rounded-full bg-indigo-600" />
+          <h2 className="text-base font-bold text-slate-800 tracking-tight">
+            {block.title || 'Abschnitt'}
+          </h2>
+        </div>
+      </div>
+    );
+  };
+
+  const renderBlock = (block: CourseContentBlock): React.ReactNode => {
+    switch (block.block_type) {
+      case 'heading':
+        return renderHeadingBlock(block);
+      case 'drawer':
+        return renderDrawerBlock(block);
+      case 'text':
+        return renderTextBlock(block);
+      case 'sessions':
+        return renderSessionsBlock(block);
+      case 'all_files':
+        return renderAllFilesBlock(block);
+      case 'items':
+      default:
+        return renderItemsBlock(block);
+    }
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
       {/* Top Header with Breadcrumbs & Sync Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <CompactBreadcrumbs
-          rawBreadcrumbs={materialsData.breadcrumbs}
+          rawBreadcrumbs={materialsData.breadcrumbs || []}
           courseNickname={courseNickname}
           courseRefId={courseRefId}
-          currentFolderRefId={materialsData.container_ref_id}
+          currentFolderRefId={materialsData.container_ref_id || ''}
           onNavigateHome={onNavigateHome}
           onNavigateCourse={onNavigateCourseRoot}
           onNavigateFolder={onNavigateFolder}
@@ -900,7 +1436,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             </h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            {materialsData.items.length} {materialsData.items.length === 1 ? 'Material' : 'Materialien'} verfügbar
+            {(materialsData.items?.length || 0)} {((materialsData.items?.length || 0) === 1 ? 'Material' : 'Materialien')} verfügbar
           </p>
         </div>
 
@@ -1062,313 +1598,11 @@ export const CourseView: React.FC<CourseViewProps> = ({
               )}
             </div>
           ) : (
-            /* NORMAL COURSE VIEW (Customizable Section Order) */
+            /* NORMAL COURSE VIEW (Customizable Course Blocks) */
             (() => {
-              const renderFoldersBlock = () => {
-                const folders = filteredFlatItems.filter((i) => i.item_type === 'fold');
-                if (folders.length === 0) return null;
+              const rendered = orderedBlocksToRender.map(renderBlock).filter(Boolean);
 
-                return (
-                  <div key="sec-folders" className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                        <Folder className="h-4 w-4 text-amber-500" />
-                        <span>Ordner</span>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                          {folders.length}
-                        </span>
-                      </h3>
-                      {isScanningTree && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md font-medium">
-                          <RefreshCw className="h-3 w-3 animate-spin" />
-                          <span>Analysiere Unterordner...</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {folders.map((folder) => {
-                        const stat = folderStats[folder.ref_id];
-                        return (
-                          <div
-                            key={folder.ref_id}
-                            onClick={() => onNavigateFolder(folder.ref_id)}
-                            className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs transition hover:border-amber-300 hover:shadow-xs cursor-pointer gap-2.5"
-                          >
-                            <div className="flex items-start gap-3 truncate pr-2">
-                              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 shrink-0 group-hover:scale-105 transition">
-                                <Folder className="h-5 w-5 fill-amber-100" />
-                              </div>
-                              <div className="min-w-0 flex-1 truncate">
-                                <span className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition block truncate">
-                                  {folder.title}
-                                </span>
-                                {folder.description && (
-                                  <span className="text-[10px] text-slate-400 truncate block mt-0.5">
-                                    {folder.description}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px]">
-                              {stat ? (
-                                stat.isMapped ? (
-                                  stat.isEmpty ? (
-                                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-medium text-slate-400">
-                                      Leer
-                                    </span>
-                                  ) : (
-                                    <span className="rounded-md bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700 border border-amber-200/50">
-                                      {stat.files > 0
-                                        ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}`
-                                        : `${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`}
-                                    </span>
-                                  )
-                                ) : (
-                                  <span className="text-slate-400">Ordner</span>
-                                )
-                              ) : isScanningTree ? (
-                                <span className="inline-flex items-center gap-1 text-slate-400">
-                                  <RefreshCw className="h-2.5 w-2.5 animate-spin" />
-                                  <span>Prüfe...</span>
-                                </span>
-                              ) : (
-                                <span className="text-slate-400">Ordner</span>
-                              )}
-
-                              <span className="font-semibold text-slate-400 group-hover:text-amber-600 transition">
-                                Öffnen →
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              };
-
-              const renderFilesBlock = () => {
-                const files = filteredFlatItems.filter((i) => i.item_type === 'file');
-                if (files.length === 0) return null;
-
-                return (
-                  <div key="sec-files" className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                      <FileText className="h-4 w-4 text-red-500" />
-                      <span>Dateien & Folien</span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                        {files.length}
-                      </span>
-                    </h3>
-                    <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden">
-                      {files.map(renderItemRow)}
-                    </div>
-                  </div>
-                );
-              };
-
-              const renderPodcastsBlock = () => {
-                const podcasts = filteredFlatItems.filter(
-                  (i) => i.item_type === 'mcst' || i.title.toLowerCase().includes('podcast')
-                );
-                if (podcasts.length === 0) return null;
-
-                return (
-                  <div key="sec-podcasts" className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-sky-600 flex items-center gap-1.5">
-                      <Radio className="h-4 w-4 text-sky-500" />
-                      <span>Podcasts & Vorlesungsaufzeichnungen</span>
-                      <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
-                        {podcasts.length}
-                      </span>
-                    </h3>
-                    <div className="rounded-2xl border border-sky-100 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden">
-                      {podcasts.map(renderItemRow)}
-                    </div>
-                  </div>
-                );
-              };
-
-              const renderSessionsBlock = () => {
-                if (sessions.length === 0) return null;
-
-                return (
-                  <div key="sec-sessions" className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
-                        <Calendar className="h-4 w-4 text-emerald-500" />
-                        <span>Sitzungen (Termine)</span>
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                          {sessions.length}
-                        </span>
-                      </h3>
-                    </div>
-                    <SessionDrawer sessions={sessions} />
-                  </div>
-                );
-              };
-
-              const renderExercisesBlock = () => {
-                const exercises = filteredFlatItems.filter(
-                  (i) => !['fold', 'file', 'mcst'].includes(i.item_type) && !i.title.toLowerCase().includes('podcast')
-                );
-                if (exercises.length === 0) return null;
-
-                return (
-                  <div key="sec-exercises" className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-500 flex items-center gap-1.5">
-                      <Layers className="h-4 w-4 text-indigo-500" />
-                      <span>Übungen & Sonstiges</span>
-                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
-                        {exercises.length}
-                      </span>
-                    </h3>
-                    <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden">
-                      {exercises.map(renderItemRow)}
-                    </div>
-                  </div>
-                );
-              };
-
-              const renderRichTextBlock = () => {
-                if (richTextBlocks.length === 0) return null;
-
-                return (
-                  <div key="sec-richtext" className="space-y-4">
-                    {richTextBlocks.map((block, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3 transition hover:border-slate-300"
-                      >
-                        {block.title && (
-                          <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                            {getRichBlockIcon(block.title)}
-                            <h3 className="text-sm font-bold text-slate-900">{block.title}</h3>
-                          </div>
-                        )}
-                        <div
-                          className="ilias-rich-content text-xs text-slate-700 leading-relaxed font-sans"
-                          dangerouslySetInnerHTML={{ __html: block.html_content }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                );
-              };
-
-              const renderSectionsBlock = () => {
-                if (!hasDistinctSections) return null;
-
-                return (
-                  <div key="sec-sections" className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                        Vorlesungsteile & Module
-                      </span>
-                      <button
-                        type="button"
-                        onClick={toggleAllSections}
-                        className="text-xs font-medium text-slate-500 hover:text-slate-800 transition cursor-pointer"
-                      >
-                        {sections.every((s) => collapsedSections[s.id]) ? 'Alle ausklappen' : 'Alle einklappen'}
-                      </button>
-                    </div>
-
-                    {sections.map((section) => {
-                      const isCollapsed = !!collapsedSections[section.id];
-                      const sectionItemCount = section.groups.reduce((acc, g) => acc + g.items.length, 0);
-
-                      return (
-                        <div
-                          key={section.id}
-                          className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden transition"
-                        >
-                          <button
-                            type="button"
-                            onClick={() => toggleSection(section.id)}
-                            className="flex w-full items-center justify-between p-4 bg-slate-50/70 hover:bg-slate-100/60 transition text-left select-none cursor-pointer"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-red-600 font-bold text-xs">
-                                {section.title.slice(0, 2).toUpperCase()}
-                              </div>
-                              <div>
-                                <h3 className="text-sm font-bold text-slate-900">{section.title}</h3>
-                                <p className="text-[11px] text-slate-400">
-                                  {section.groups.length} {section.groups.length === 1 ? 'Gruppe' : 'Gruppen'} • {sectionItemCount} Elemente
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 text-slate-400">
-                              {isCollapsed ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
-                            </div>
-                          </button>
-
-                          {!isCollapsed && (
-                            <div className="p-4 space-y-6 border-t border-slate-100">
-                              {section.rich_text_blocks.map((rb, rIdx) => (
-                                <div key={rIdx} className="rounded-xl bg-slate-50 p-3.5 space-y-2">
-                                  {rb.title && <h4 className="text-xs font-bold text-slate-800">{rb.title}</h4>}
-                                  <div
-                                    className="ilias-rich-content text-xs text-slate-600 leading-relaxed"
-                                    dangerouslySetInnerHTML={{ __html: rb.html_content }}
-                                  />
-                                </div>
-                              ))}
-
-                              {section.groups.map((group, gIdx) => (
-                                <div key={gIdx} className="space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                                      {group.title}
-                                    </h4>
-                                    <div className="h-px flex-1 bg-slate-100" />
-                                    <span className="text-[10px] font-semibold text-slate-400">
-                                      {group.items.length}
-                                    </span>
-                                  </div>
-
-                                  <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 bg-white shadow-2xs">
-                                    {group.items.map(renderItemRow)}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              };
-
-              const renderedBlocks = sectionOrder
-                .map((secKey) => {
-                  switch (secKey) {
-                    case 'folders':
-                      return renderFoldersBlock();
-                    case 'files':
-                      return renderFilesBlock();
-                    case 'podcasts':
-                      return renderPodcastsBlock();
-                    case 'sessions':
-                      return renderSessionsBlock();
-                    case 'exercises':
-                      return renderExercisesBlock();
-                    case 'richtext':
-                      return renderRichTextBlock();
-                    case 'sections':
-                      return renderSectionsBlock();
-                    default:
-                      return null;
-                  }
-                })
-                .filter(Boolean);
-
-              if (renderedBlocks.length === 0) {
+              if (rendered.length === 0) {
                 return (
                   <div className="flex h-44 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white text-center p-6">
                     <Search className="h-6 w-6 text-slate-300 mb-2" />
@@ -1378,7 +1612,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 );
               }
 
-              return <div className="space-y-6">{renderedBlocks}</div>;
+              return <div className="space-y-6">{rendered}</div>;
             })()
           )}
         </div>
@@ -1415,13 +1649,19 @@ export const CourseView: React.FC<CourseViewProps> = ({
         />
       )}
 
-      {/* Content Section Order Modal */}
+      {/* Content Blocks Order & Customization Modal */}
       {isOrderModalOpen && (
         <ContentOrderModal
           isOpen={isOrderModalOpen}
           onClose={() => setIsOrderModalOpen(false)}
-          order={sectionOrder}
-          onSaveOrder={handleSaveSectionOrder}
+          blocks={availableBlocks}
+          blockOrder={blockOrder}
+          hiddenBlockIds={hiddenBlockIds}
+          showAllFilesBlock={showAllFilesBlock}
+          onSaveOrder={handleSaveBlockOrder}
+          onToggleHideBlock={handleToggleHideBlock}
+          onToggleShowAllFiles={handleToggleShowAllFiles}
+          onResetToDefault={handleResetBlocksToDefault}
         />
       )}
     </div>

@@ -15,6 +15,13 @@ export type ContentSectionId =
   | 'richtext'
   | 'sections';
 
+export interface CourseBlocksCustomization {
+  layoutHash: string;
+  blockOrder: string[];
+  hiddenBlockIds?: string[];
+  showAllFilesBlock?: boolean;
+}
+
 export const DEFAULT_SECTION_ORDER: ContentSectionId[] = [
   'folders',
   'files',
@@ -168,6 +175,51 @@ export const cache = {
       console.error('Failed to save content section order', e);
     }
   },
+
+  // --- Per-Course Content Blocks Customization & Order ---
+  getCourseBlocksCustomization(courseRefId: string): CourseBlocksCustomization | null {
+    try {
+      const raw = localStorage.getItem(`ilias_course_blocks_order_${courseRefId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCourseBlocksCustomization(courseRefId: string, custom: CourseBlocksCustomization) {
+    try {
+      localStorage.setItem(`ilias_course_blocks_order_${courseRefId}`, JSON.stringify(custom));
+    } catch (e) {
+      console.error('Failed to save course blocks customization', e);
+    }
+  },
+
+  clearCourseBlocksCustomization(courseRefId: string) {
+    try {
+      localStorage.removeItem(`ilias_course_blocks_order_${courseRefId}`);
+    } catch (e) {
+      console.error('Failed to clear course blocks customization', e);
+    }
+  },
+
+  // --- Per-Course Drawers Open/Closed State Persistence ---
+  getCourseDrawersState(courseRefId: string): Record<string, boolean> {
+    try {
+      const raw = localStorage.getItem(`ilias_course_drawers_${courseRefId}`);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  },
+
+  setCourseDrawersState(courseRefId: string, state: Record<string, boolean>) {
+    try {
+      localStorage.setItem(`ilias_course_drawers_${courseRefId}`, JSON.stringify(state));
+    } catch (e) {
+      console.error('Failed to save course drawers state', e);
+    }
+  },
+
 
   // --- Last Opened Course ---
   getLastOpenedCourseId(): string | null {
