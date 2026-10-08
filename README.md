@@ -1,43 +1,61 @@
-# ILIAS Alternative - Backend (Uni Bern)
+# BetterILIAS - Backend & Frontend (Uni Bern)
 
-A modern, fast REST API bridge and scraper for the University of Bern's ILIAS learning management system.
+A modern, high-performance REST API bridge, scraper engine, and React 19 web application for the University of Bern's ILIAS learning management system.
+
+---
 
 ## 🚀 Key Features
 
-* **Phase 1: SWITCH edu-ID Authentication Workaround:**
+* **SWITCH edu-ID Authentication Workaround:**
   * Interactive browser login via Playwright Chromium (handles 2FA/MFA smoothly).
-  * Captures and stores session cookies (`PHPSESSID`, `ilClientId`).
-  * Seamless reuse of cookies in high-speed async HTTP requests (`httpx`).
-* **Phase 2: Read-Only Scrapers (Fast DOM extraction via BeautifulSoup):**
-  * **Dashboard / Courses (`GET /api/dashboard/courses`):** Extracts enrolled courses, groups, and links.
-  * **Course Materials (`GET /api/courses/{course_id}/materials`):** Parses folders, slides, PDFs, tests, exercises, accordions, rich text (MathML/TeX), and course activity logs ("News").
-  * **Course Sessions / Drawers:** Parses session schedules, dates, topics, and nested files (`SessionDrawer.tsx`).
-  * **Opencast Podcasts (`GET /api/podcasts/{ref_id}`):** Parses Uni Bern Opencast lecture recordings, traverses multi-page pagination, and automatically prioritizes streamable recorded episodes before scheduled dates. Cached locally for 0ms loading.
-  * **Exercise Submissions (`GET /api/exercises/{exercise_id}/submissions`):** Extracts student participant lists, submitted files, grades, and statuses.
-  * **File Streaming Proxy (`GET /api/materials/{ref_id}/download`):** Authenticated streaming download for course materials and PDFs.
-* **Phase 3: The Write-Path (TA Grading Automation):**
-  * **Grade Submission (`POST /api/exercises/{exercise_id}/submissions/{member_id}/grade`):** Scrapes hidden form fields and CSRF tokens (`rtoken`, `cmdNode`), constructs the POST request, submits grades/feedback, and verifies ILIAS response.
-* **Phase 4: Modern React 19 + TypeScript Frontend:**
+  * Captures and persists session cookies (`PHPSESSID`, `ilClientId`).
+  * High-speed authenticated async HTTP requests via `httpx`.
+* **Adaptive Course Layouts & Modular Blocks:**
+  * **Structure-Preserving Block Engine:** Faithfully preserves the lecturer's intended course layout (headings, drawers/accordions, podcasts, sessions, and materials).
+  * **Flat, Clean Block Architecture:** Section headings (`h1`/`h2`) render as crisp visual dividers; drawers/modules remain clean top-level blocks without confusing nested accordion-in-accordion recursion.
+  * **HTML Sanitization:** Strips raw ILIAS container markup, table wrappers, and 3-dot dropdown menus ("Add to Favourites", "Notes", "Set Tags").
+  * **Custom Block Ordering & Visibility:** Reorder blocks up and down, hide/show blocks, toggle a virtual "Alle Dateien" collector block, and automatically reset when ILIAS structure changes (layout hash detection).
+  * **Dynamic Session Materials:** On-demand slide and attachment loading for closed session drawers via `expand_id` (`GET /api/courses/{course_id}/sessions/{session_id}/materials`).
+  * **Native Live Voting (`xlvo`):** Automatically identifies live voting items and provides direct action links.
+* **Student Exercise Submissions (Hand-In Workflow):**
+  * **Assignment Overview & Details:** Deadlines, work instructions, mandatory assignment rules, and tutor feedback.
+  * **File Upload & Hand-In:** Upload solution files directly from BetterILIAS (`POST /api/exercises/{exercise_id}/assignment/{ass_id}/upload`).
+  * **Manage & Delete Submissions:** View submitted files, direct downloads, and delete submissions (`DELETE /api/exercises/{exercise_id}/assignment/{ass_id}/submission/{delivered_id}`).
+* **TA Grading Automation & Correction Mode:**
+  * **Participant & Submission Overview:** View submissions, grading status, and files filtered by assignment.
+  * **Advanced Multi-Filter Modal:** Customizable colored quick-filters (e.g. "Zu bewerten"), multi-select grade status (not graded, graded, passed, failed), radio submission filter, and multi-field sorting (submission date, name, grade).
+  * **Automated Grade Submission:** Scrapes hidden CSRF tokens and form fields (`rtoken`, `cmdNode`), submits grades/marks, pass status, and feedback text (`POST /api/exercises/{exercise_id}/submissions/{member_id}/grade`).
+  * **Feedback File Attachments:** Upload corrected files and evaluations directly to the student submission (`POST /api/exercises/{exercise_id}/submissions/{member_id}/feedback-files`).
+  * **Client-Side SWR Caching:** Cached submission views prevent UI flickering and race conditions during rapid assignment switching.
+* **Opencast Podcasts & Media:**
+  * Traverses multi-page pagination for Uni Bern Opencast lecture recordings (`GET /api/podcasts/{ref_id}`).
+  * Prioritizes available streamable recorded episodes before scheduled future recordings.
+* **Modern React 19 Frontend:**
   * **Zero-Latency Serving (SWR):** Instantly renders courses, podcasts, and logs from `localStorage` in 0ms while silently revalidating in the background.
-  * **Semester View Layout Switcher:** 1-click toggle between responsive card grid and compact high-density list, persisted in `localStorage`.
-  * **Repository-Wide Subfolder Search:** Searches across the current folder and all course subfolders (up to 3 levels deep) in real time with location breadcrumbs and filter pills.
-  * **VS Code-Style Bottom-Right Notification Toast:** Floating toast alerts user to new files, sessions, or podcasts detected during background revalidation (10s auto-dismiss, progress bar, fold-out list).
-  * **Compact Navigation:** Custom course nicknames, 20 selectable academic icons, clean filtered breadcrumbs, and full semester archives back to 2021.
+  * **Repository-Wide Subfolder Search:** Searches across current folders and deep subfolders in real time with location breadcrumbs and filter pills.
+  * **Bottom-Right Notification Toast:** Floating toast alerts user to new files, sessions, or podcasts detected during background revalidation.
+  * **Personalization:** Custom course nicknames, 20 selectable academic icons, clean filtered breadcrumbs, and full semester archives back to 2021.
 * **The AI Maintenance Protocol:**
   * Automatic error-catching decorator (`@safe_parser`): Any DOM parsing failure automatically dumps raw HTML to `logs/failed_html_dump_[context]_[timestamp].html`.
-  * Logs API (`GET /api/system/logs`) for easy inspection and copying into AI prompts when Uni Bern updates ILIAS markup.
+  * Logs API (`GET /api/system/logs`) and browser viewer (`/api/system/logs/{filename}/raw`) for inspection and AI-assisted selector updates.
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **Language:** Python 3.13+
-* **Web Framework:** FastAPI + Uvicorn
-* **HTTP Client:** `httpx` (async)
-* **Browser Automation:** Playwright (Chromium)
-* **HTML Parsing:** BeautifulSoup 4 + `lxml`
-* **Data Validation:** Pydantic v2 + Pydantic-Settings
-* **Testing:** Pytest + Pytest-Asyncio
+* **Backend:**
+  * **Language:** Python 3.13+
+  * **Web Framework:** FastAPI + Uvicorn
+  * **HTTP Client:** `httpx` (async)
+  * **Browser Automation:** Playwright (Chromium)
+  * **HTML Parsing:** BeautifulSoup 4 + `lxml`
+  * **Data Validation:** Pydantic v2 + Pydantic-Settings
+  * **Testing:** Pytest + Pytest-Asyncio
+* **Frontend:**
+  * **Framework:** React 19 + TypeScript
+  * **Build Tool:** Vite
+  * **Styling:** Tailwind CSS
+  * **Icons:** Lucide React
 
 ---
 
@@ -53,12 +71,12 @@ python start.py
 
 ---
 
-### Manual Step-by-Step Setup
+### Manual Setup
 
 #### 1. Setup Virtual Environment
 
 ```bash
-# Activate existing virtual environment (created during setup)
+# Windows PowerShell
 .\venv\Scripts\Activate.ps1
 ```
 
@@ -69,7 +87,7 @@ python -m venv venv
 .\venv\Scripts\playwright.exe install chromium
 ```
 
-### 2. Authenticate (Phase 1)
+#### 2. Authenticate
 
 Launch the interactive login assistant:
 ```bash
@@ -77,51 +95,86 @@ python login.py
 ```
 * A browser window will open displaying the Uni Bern ILIAS portal.
 * Select **"Universität Bern"** and complete your SWITCH edu-ID login (including 2FA if prompted).
-* Once you land on the dashboard, cookies are automatically extracted, saved to `session_cookies.json`, and the browser closes.
+* Cookies are automatically saved to `session_cookies.json`, and the browser closes.
 
-*(Alternatively, you can manually inject cookies via `POST /api/auth/cookies` or trigger browser login via `POST /api/auth/login-browser`)*
+*(Alternatively, inject cookies via `POST /api/auth/cookies` or trigger browser login via `POST /api/auth/login-browser`)*
 
-### 3. Run the Backend API
+#### 3. Run the Backend API
 
 ```bash
 python run.py
 ```
-The API server will start on:
 * **Base URL:** `http://127.0.0.1:8000`
 * **Interactive Swagger UI:** `http://127.0.0.1:8000/docs`
+* **ReDoc:** `http://127.0.0.1:8000/redoc`
 
-### 4. Run the React Frontend
+#### 4. Run the React Frontend
 
-In a second terminal:
+In a separate terminal:
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
-Open **`http://localhost:5173`** in your browser. All API requests are automatically proxied to the backend.
-* **ReDoc:** `http://127.0.0.1:8000/redoc`
+Open **`http://localhost:5173`** in your browser. All API requests are proxied to the backend.
 
 ---
 
 ## 📡 API Reference Overview
 
+### Health & Core
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/health` | Service health status |
-| `GET` | `/api/auth/status` | Check if ILIAS session is valid |
-| `POST` | `/api/auth/login-browser` | Launch Playwright login window |
-| `POST` | `/api/auth/cookies` | Set session cookies manually |
+| `GET` | `/health` | Service health status and ILIAS base URL |
+| `GET` | `/` | Root endpoint with documentation links |
+
+### Authentication (`/api/auth`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/auth/status` | Check if ILIAS session cookies are valid |
+| `POST` | `/api/auth/login-browser` | Launch headed Playwright login window |
+| `POST` | `/api/auth/cookies` | Set session cookies manually (`PHPSESSID`, `ilClientId`) |
 | `POST` | `/api/auth/logout` | Clear stored session cookies |
-| `GET` | `/api/dashboard/courses` | List enrolled courses & groups |
-| `GET` | `/api/dashboard/semesters` | Uni Bern: list courses grouped by semester & department |
-| `GET` | `/api/courses/{course_id}/materials` | Get folder & material contents (includes sections, sessions, rich text, and activity logs) |
-| `GET` | `/api/courses/{course_id}/logs` | Paginated activity history (`showNews`) with total page counts |
+
+### Dashboard & Semesters (`/api/dashboard`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/dashboard/courses` | List enrolled courses & groups from Personal Desktop |
+| `GET` | `/api/dashboard/semesters` | List courses grouped by semester (Uni Bern `iliLubModsSemesterGUI`) |
+
+### Courses, Materials & Sessions (`/api`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/courses/{course_id}/materials` | Get course contents, modular blocks, headings, drawers, sessions, and activity logs |
+| `GET` | `/api/courses/{course_id}/sessions/{session_id}/materials` | Load materials for a specific session drawer dynamically (`expand_id`) |
+| `GET` | `/api/courses/{course_id}/logs` | Paginated activity history (`showNews`) with page counts |
+| `GET` | `/api/materials/{ref_id}/download` | Stream and download material file (PDF, slides, archive) |
+
+### Podcasts (`/api/podcasts`)
+| Method | Endpoint | Description |
+|---|---|---|
 | `GET` | `/api/podcasts/{ref_id}` | Opencast / Mediacast episodes (auto-pagination, recorded episodes first, cached) |
-| `GET` | `/api/materials/{ref_id}/download` | Stream and download file |
-| `GET` | `/api/exercises/{exercise_id}/overview` | Get exercise sub-assignments, deadlines & TA link |
-| `GET` | `/api/exercises/{exercise_id}/submissions` | List student submissions (TA view) |
-| `POST` | `/api/exercises/{exercise_id}/submissions/{member_id}/grade` | Submit grade & feedback (TA write-path) |
-| `GET` | `/api/system/logs` | List failed HTML dumps for AI updates |
-| `GET` | `/api/system/logs/{filename}` | Retrieve raw dump details |
+
+### Exercises, Student Hand-Ins & TA Grading (`/api/exercises`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/exercises/{exercise_id}/overview` | Exercise sub-assignments, deadlines, remaining time & TA link |
+| `GET` | `/api/exercises/{exercise_id}/info` | Exercise info screen (summary, pass criteria, instructions) |
+| `GET` | `/api/exercises/{exercise_id}/assignment/{ass_id}` | Student assignment detail (instructions, submitted files, feedback) |
+| `POST` | `/api/exercises/{exercise_id}/assignment/{ass_id}/upload` | Student upload submission file to ILIAS |
+| `DELETE` | `/api/exercises/{exercise_id}/assignment/{ass_id}/submission/{delivered_id}` | Student delete submitted file from ILIAS |
+| `GET` | `/api/exercises/{exercise_id}/submissions` | List student submissions (TA grading view, filter by `ass_id`) |
+| `POST` | `/api/exercises/{exercise_id}/submissions/{member_id}/grade` | Submit grade, points/mark, passed status & feedback (TA write-path) |
+| `GET` | `/api/exercises/{exercise_id}/submissions/{member_id}/feedback-files` | List existing TA feedback files for a submission |
+| `POST` | `/api/exercises/{exercise_id}/submissions/{member_id}/feedback-files` | Upload TA feedback file for a submission |
+
+### System & AI Maintenance (`/api/system`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/system/logs` | List all failed HTML scraping dumps |
+| `GET` | `/api/system/logs/{filename}` | Retrieve raw dump details for AI debugging prompts |
+| `GET` | `/api/system/logs/{filename}/raw` | View raw HTML dump directly in browser |
+| `DELETE` | `/api/system/logs/{filename}` | Delete resolved dump file |
 
 ---
 
@@ -129,7 +182,12 @@ Open **`http://localhost:5173`** in your browser. All API requests are automatic
 
 Run the full automated test suite:
 ```bash
-.\venv\Scripts\pytest.exe -v
+pytest -v
+```
+
+Run real UNIBE HTML dump parsing tests:
+```bash
+pytest tests/test_unibe_real_dumps.py -v
 ```
 
 ---
@@ -142,4 +200,3 @@ When Uni Bern updates the ILIAS version and an HTML parser breaks:
 2. Follow **Section 3** of [`plan.md`](file:///c:/Users/manue/OneDrive/Dokumente/_Uni/IliasAlternative/plan.md) and copy the prompt template.
 3. Paste the target HTML snippet and the current parser function into Gemini to get the updated selector logic.
 4. Replace the function in `backend/scrapers/` and verify with `pytest`.
-
