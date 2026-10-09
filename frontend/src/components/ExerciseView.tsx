@@ -651,8 +651,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       const hasSubmitted = Boolean(
         s.download_url || s.files.length > 0 || ['submitted', 'late'].includes(s.submission_status)
       );
-      const curStatus = localEdits[s.member_id]?.status || s.passed_status || 'not_graded';
-      const curMark = localEdits[s.member_id]?.mark !== undefined ? localEdits[s.member_id]?.mark : s.mark;
+      const edit = localEdits[s.member_id];
+      const isUnsaved = Boolean(edit?.isDirty);
+      const curStatus = (isUnsaved ? s.passed_status : edit?.status) || s.passed_status || 'not_graded';
+      const curMark = isUnsaved
+        ? s.mark
+        : (edit?.mark !== undefined ? edit.mark : s.mark);
       const isGraded = ['passed', 'failed'].includes(curStatus) || Boolean(curMark && curMark.trim());
 
       if (hasSubmitted) submitted++;
@@ -738,8 +742,16 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
     if (taGradeFilter.length > 0) {
       list = list.filter((s) => {
-        const curStatus = localEdits[s.member_id]?.status || s.passed_status || 'not_graded';
-        const curMark = localEdits[s.member_id]?.mark !== undefined ? localEdits[s.member_id]?.mark : s.mark;
+        if (savedSuccessId === s.member_id) {
+          return true;
+        }
+
+        const edit = localEdits[s.member_id];
+        const isUnsaved = Boolean(edit?.isDirty);
+        const curStatus = (isUnsaved ? s.passed_status : edit?.status) || s.passed_status || 'not_graded';
+        const curMark = isUnsaved
+          ? s.mark
+          : (edit?.mark !== undefined ? edit.mark : s.mark);
         const isGraded = ['passed', 'failed'].includes(curStatus) || Boolean(curMark && curMark.trim());
 
         return taGradeFilter.some((filterVal) => {
@@ -811,12 +823,20 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         const nameB = (b.team_members && b.team_members.length > 0 ? b.team_members[0] : b.student_name) || '';
         comparison = nameA.localeCompare(nameB, 'de');
       } else if (taSortField === 'status') {
-        const statusA = localEdits[a.member_id]?.status || a.passed_status || 'not_graded';
-        const statusB = localEdits[b.member_id]?.status || b.passed_status || 'not_graded';
+        const editA = localEdits[a.member_id];
+        const editB = localEdits[b.member_id];
+        const statusA = (editA?.isDirty ? a.passed_status : editA?.status) || a.passed_status || 'not_graded';
+        const statusB = (editB?.isDirty ? b.passed_status : editB?.status) || b.passed_status || 'not_graded';
         comparison = statusA.localeCompare(statusB);
       } else if (taSortField === 'mark') {
-        const markA = localEdits[a.member_id]?.mark !== undefined ? localEdits[a.member_id]?.mark : (a.mark || '');
-        const markB = localEdits[b.member_id]?.mark !== undefined ? localEdits[b.member_id]?.mark : (b.mark || '');
+        const editA = localEdits[a.member_id];
+        const editB = localEdits[b.member_id];
+        const markA = editA?.isDirty
+          ? (a.mark || '')
+          : (editA?.mark !== undefined ? editA.mark : (a.mark || ''));
+        const markB = editB?.isDirty
+          ? (b.mark || '')
+          : (editB?.mark !== undefined ? editB.mark : (b.mark || ''));
         const numA = parseFloat(String(markA).replace(',', '.'));
         const numB = parseFloat(String(markB).replace(',', '.'));
         if (!isNaN(numA) && !isNaN(numB)) {
@@ -836,6 +856,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     taSubmissionFilter,
     taGradeFilter,
     localEdits,
+    savedSuccessId,
     taSortField,
     taSortOrder,
   ]);

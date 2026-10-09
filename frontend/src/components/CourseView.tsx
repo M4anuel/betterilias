@@ -51,6 +51,39 @@ declare global {
   }
 }
 
+export function cleanRichContentTitle(title?: string | null): string {
+  if (!title) return '';
+  return title
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/PageTocPH/g, '')
+    .replace(/Break(?=\s*<\/|\s*$|\s*<)|\bBreak\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function cleanRichContentHtml(html?: string | null, blockTitle?: string | null): string {
+  if (!html) return '';
+  let cleaned = html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/PageTocPH/g, '')
+    .replace(/Break(?=\s*<\/|\s*$|\s*<)|\bBreak\b/g, '');
+
+  if (blockTitle) {
+    const cleanTitle = cleanRichContentTitle(blockTitle);
+    if (cleanTitle) {
+      const escaped = cleanTitle
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\s+/g, '(?:\\s|&nbsp;|\\xa0)+');
+      cleaned = cleaned.replace(
+        new RegExp(`^\\s*<h[1-6][^>]*>\\s*(?:${escaped})?\\s*<\\/h[1-6]>`, 'i'),
+        ''
+      ).trim();
+    }
+  }
+  cleaned = cleaned.replace(/<h[1-6][^>]*>\s*<\/h[1-6]>/gi, '').trim();
+  return cleaned;
+}
+
 interface CourseViewProps {
   courseRefId: string;
   courseNickname: string;
@@ -1120,7 +1153,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             {block.html_content && (
               <div
                 className="ilias-rich-content text-xs text-slate-700 leading-relaxed font-sans rounded-xl bg-slate-50 p-3.5"
-                dangerouslySetInnerHTML={{ __html: block.html_content }}
+                dangerouslySetInnerHTML={{ __html: cleanRichContentHtml(block.html_content, block.title) }}
               />
             )}
 
@@ -1146,22 +1179,31 @@ export const CourseView: React.FC<CourseViewProps> = ({
   };
 
   const renderTextBlock = (block: CourseContentBlock): React.ReactNode => {
-    if (!block.html_content && !block.plain_text) return null;
+    const cleanTitle = cleanRichContentTitle(block.title);
+    const cleanedHtml = cleanRichContentHtml(block.html_content, cleanTitle || block.title);
+    const cleanedPlain = (block.plain_text || '')
+      .replace(/PageTocPH/g, '')
+      .replace(/Break(?=\s*<\/|\s*$|\s*<)|\bBreak\b/g, '')
+      .trim();
+
+    if (!cleanedHtml && !cleanedPlain && !cleanTitle) return null;
     return (
       <div
         key={block.id}
         className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3 transition hover:border-slate-300"
       >
-        {block.title && (
+        {cleanTitle && (
           <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-            {getRichBlockIcon(block.title)}
-            <h3 className="text-sm font-bold text-slate-900">{block.title}</h3>
+            {getRichBlockIcon(cleanTitle)}
+            <h3 className="text-sm font-bold text-slate-900">{cleanTitle}</h3>
           </div>
         )}
-        <div
-          className="ilias-rich-content text-xs text-slate-700 leading-relaxed font-sans"
-          dangerouslySetInnerHTML={{ __html: block.html_content || '' }}
-        />
+        {cleanedHtml && (
+          <div
+            className="ilias-rich-content text-xs text-slate-700 leading-relaxed font-sans"
+            dangerouslySetInnerHTML={{ __html: cleanedHtml }}
+          />
+        )}
       </div>
     );
   };

@@ -3,12 +3,35 @@ import hashlib
 import re
 import urllib.parse
 from typing import Dict, List, Optional
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 
 from backend.config import settings
 from backend.schemas import BreadcrumbItem, CourseContentBlock, CourseMaterialsResponse, MaterialItem, CourseSessionItem
 from backend.scrapers.dashboard import _extract_ref_id_from_url
 from backend.scrapers.dumper import safe_parser
+
+
+def _clean_rich_html(raw_html: str) -> str:
+    """Strip ILIAS comment artifacts, PageTocPH markers, and phantom Break tokens."""
+    if not raw_html:
+        return ""
+    cleaned = re.sub(r'<!--[\s\S]*?-->', '', raw_html)
+    cleaned = re.sub(r'PageTocPH', '', cleaned)
+    cleaned = re.sub(r'Break(?=\s*</|\s*$|\s*<)|\bBreak\b', '', cleaned)
+    cleaned = re.sub(r'<h[1-6][^>]*>\s*</h[1-6]>', '', cleaned)
+    return cleaned.strip()
+
+
+def _clean_plain_text(raw_text: str) -> str:
+    """Clean plain text from ILIAS comment artifacts and phantom Break tokens."""
+    if not raw_text:
+        return ""
+    cleaned = raw_text.replace('\xa0', ' ').replace('&nbsp;', ' ')
+    cleaned = re.sub(r'<!--[\s\S]*?-->', '', cleaned)
+    cleaned = re.sub(r'PageTocPH', '', cleaned)
+    cleaned = re.sub(r'Break(?=\s*</|\s*$|\s*<)|\bBreak\b', '', cleaned)
+    return " ".join(cleaned.split()).strip()
+
 
 
 def _detect_material_type(url: str, classes: str, icon_src: Optional[str], title: str = "") -> str:
@@ -201,6 +224,10 @@ def parse_course_blocks(
     if not center:
         return []
 
+    # Clean out any comment nodes upfront so they never leak into text/HTML representations
+    for comment in center.find_all(string=lambda s: isinstance(s, Comment)):
+        comment.extract()
+
     block_seen_ref_ids = set()
     blocks: List[CourseContentBlock] = []
 
@@ -221,9 +248,7 @@ def parse_course_blocks(
             or "ilc_Paragraph" in "".join(child.get("class", []))
         )
         if is_heading:
-            sec_title = child.get_text(strip=True)
-            sec_title = re.sub(r'<!--.*?-->', '', sec_title)
-            sec_title = re.sub(r'\bBreak\b', '', sec_title).strip()
+            sec_title = _clean_plain_text(child.get_text(" ", strip=True))
             if sec_title:
                 slug = re.sub(r'[^a-zA-Z0-9]+', '-', sec_title.lower()).strip('-')
                 h_block = CourseContentBlock(
@@ -244,9 +269,8 @@ def parse_course_blocks(
                 icntrs = acc.select("[class*='AccordICntr'], .ilc_va_icntr_AccordICntr, .ilc_va_icntr_VAccordICntr")
                 for acc_idx, ic in enumerate(icntrs):
                     head_el = ic.select_one("[class*='AccordIHeadCap'], [class*='AccordIHead']")
-                    head_title = head_el.get_text(strip=True) if head_el else f"Abschnitt {child_idx}"
-                    head_title = re.sub(r'<!--.*?-->', '', head_title)
-                    head_title = re.sub(r'\bBreak\b', '', head_title).strip()
+                    head_title = _clean_plain_text(head_el.get_text(" ", strip=True)) if head_el else f"Abschnitt {child_idx}"
+
 
                     cont_el = ic.select_one(".il_VAccordionContentDef, .ilc_va_icont_VAccordICont, [class*='AccordICont']")
                     if not cont_el:
@@ -334,13 +358,11 @@ def parse_course_blocks(
                     clone = copy.copy(cont_el)
                     for cb in clone.select(".ilContainerBlock, .ilContainerItemsContainer, .il_ContainerListItem, .ilCLI, .dropdown, .ilFloatRight"):
                         cb.decompose()
+                    for c in clone.find_all(string=lambda s: isinstance(s, Comment)):
+                        c.extract()
 
-                    rem_html = "".join(str(c) for c in clone.contents).strip()
-                    rem_html = re.sub(r'<!--.*?-->', '', rem_html)
-                    rem_html = re.sub(r'\bBreak\b', '', rem_html).strip()
-                    rem_text = clone.get_text(" ", strip=True)
-                    rem_text = re.sub(r'<!--.*?-->', '', rem_text)
-                    rem_text = re.sub(r'\bBreak\b', '', rem_text).strip()
+                    rem_html = _clean_rich_html(clone.decode_contents().strip())
+                    rem_text = _clean_plain_text(clone.get_text(" ", strip=True))
                     has_media = bool(clone.find_all(["img", "figure", "video", "audio", "iframe"]))
 
                     html_content = rem_html if (rem_text or has_media) else None
@@ -480,37 +502,51 @@ def parse_course_blocks(
                 continue
 
         # 5. Rich Text / Info Paragraphs
-        is_text = ("ilc_text_block_Standard" in child.get("class", []) or child.name in ["p", "blockquote", "ul", "ol", "div", "h2", "h3", "h4"])
+        is_text = ("ilc_text_block_Standard" in child.get("class", []) or child.name in ["p", "blockquote", "ul", "ol", "div", "h2", "h3", "h4", "h5"])
         if is_text:
-            inner_html = "".join(str(c) for c in child.contents).strip()
-            inner_html = re.sub(r'<!--.*?-->', '', inner_html)
-            inner_html = re.sub(r'\bBreak\b', '', inner_html).strip()
-            plain_txt = child.get_text(" ", strip=True)
-            plain_txt = re.sub(r'\bBreak\b', '', plain_txt).strip()
+            inner_html = _clean_rich_html(child.decode_contents().strip())
+            plain_txt = _clean_plain_text(child.get_text(" ", strip=True))
 
-            if plain_txt and not child.select(".ilContainerBlock, .il_ContainerListItem"):
-                hdr = None
-                lvl = 3
+            if (plain_txt or inner_html) and not child.select(".ilContainerBlock, .il_ContainerListItem"):
                 if child.name in ["h2", "h3", "h4", "h5"]:
                     hdr = plain_txt
                     lvl = int(child.name[1]) if child.name[1].isdigit() else 3
-                    snippet = f"<{child.name}>{inner_html}</{child.name}>"
-                elif child.name in ["ul", "ol", "blockquote"]:
-                    snippet = f"<{child.name}>{inner_html}</{child.name}>"
-                else:
-                    snippet = f"<p>{inner_html}</p>"
-
-                if blocks and blocks[-1].block_type == "text" and not hdr:
-                    blocks[-1].html_content = (blocks[-1].html_content or "") + "\n" + snippet
-                    blocks[-1].plain_text = ((blocks[-1].plain_text or "") + " " + plain_txt).strip()
-                else:
                     t_block = CourseContentBlock(
                         id=f"text-{child_idx}",
                         block_type="text",
                         title=hdr,
+                        html_content="",
+                        plain_text="",
+                        level=lvl,
+                    )
+                    blocks.append(t_block)
+                    continue
+
+                if child.name in ["ul", "ol", "blockquote"]:
+                    snippet = f"<{child.name}>{inner_html}</{child.name}>"
+                elif "<ul" in inner_html or "<ol" in inner_html or "<table" in inner_html:
+                    snippet = f"<div>{inner_html}</div>"
+                else:
+                    snippet = f"<p>{inner_html}</p>"
+
+                if blocks and blocks[-1].block_type == "text":
+                    if blocks[-1].html_content:
+                        blocks[-1].html_content = (blocks[-1].html_content + "\n" + snippet).strip()
+                    else:
+                        blocks[-1].html_content = snippet
+
+                    if blocks[-1].plain_text:
+                        blocks[-1].plain_text = (blocks[-1].plain_text + " " + plain_txt).strip()
+                    else:
+                        blocks[-1].plain_text = plain_txt
+                else:
+                    t_block = CourseContentBlock(
+                        id=f"text-{child_idx}",
+                        block_type="text",
+                        title=None,
                         html_content=snippet,
                         plain_text=plain_txt,
-                        level=lvl,
+                        level=3,
                     )
                     blocks.append(t_block)
                 continue
@@ -692,6 +728,10 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
     center = soup.select_one("#il_center_col") or soup.select_one(".il-layout-page-content, main, #ilContentContainer")
 
     if center:
+        # Clean out any comment nodes upfront
+        for comment in center.find_all(string=lambda s: isinstance(s, Comment)):
+            comment.extract()
+
         current_section: Optional[CourseSection] = None
         current_rich_block: Optional[RichTextBlock] = None
 
@@ -705,8 +745,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
 
             # 1. Section Divider: H1 / H2 headlines (e.g. "Teil Organisation", "Teil Personal")
             if child.name in ["h1", "h2"] and ("ilc_heading1_Headline1" in child.get("class", []) or "ilc_Paragraph" in child.get("class", [])):
-                sec_title = child.get_text(strip=True)
-                sec_title = re.sub(r'<!--.*?-->', '', sec_title).strip()
+                sec_title = _clean_plain_text(child.get_text(strip=True))
                 if sec_title:
                     slug = re.sub(r'[^a-zA-Z0-9]+', '-', sec_title.lower()).strip('-')
                     current_section = CourseSection(
@@ -722,7 +761,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
 
             # 2. Rich Text Header: H2, H3, H4 (e.g. "Suggested Literature", "Grading Policy")
             if child.name in ["h2", "h3", "h4", "h5"] and not child.select(".ilContainerBlock, .il_ContainerListItem"):
-                hdr_text = child.get_text(strip=True)
+                hdr_text = _clean_plain_text(child.get_text(strip=True))
                 level = int(child.name[1]) if child.name[1].isdigit() else 3
                 current_rich_block = RichTextBlock(
                     title=hdr_text,
@@ -741,12 +780,8 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
             has_items = bool(child.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item, .ilContainerBlock"))
 
             if is_text and not has_items:
-                inner_html = "".join(str(c) for c in child.contents).strip()
-                # Clean comments, PageToc anchors, and phantom "Break" tokens from ILIAS
-                inner_html = re.sub(r'<!--.*?-->', '', inner_html)
-                inner_html = re.sub(r'\bBreak\b', '', inner_html).strip()
-                plain_txt = child.get_text(" ", strip=True)
-                plain_txt = re.sub(r'\bBreak\b', '', plain_txt).strip()
+                inner_html = _clean_rich_html(child.decode_contents().strip())
+                plain_txt = _clean_plain_text(child.get_text(" ", strip=True))
                 if inner_html and plain_txt:
                     if child.name in ["ul", "ol", "blockquote"]:
                         snippet = f"<{child.name}>{inner_html}</{child.name}>"

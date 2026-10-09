@@ -1,4 +1,5 @@
 import logging
+import re
 import urllib.parse
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
@@ -25,6 +26,7 @@ from backend.schemas import (
 )
 from backend.scrapers import (
     extract_grading_form,
+    extract_feedback_modal_form,
     parse_course_logs,
     parse_course_materials,
     parse_dashboard,
@@ -527,12 +529,14 @@ class IliasClient:
         """
         Phase 3: The Write-Path for TAs.
         Navigates to grading page, scrapes hidden fields / CSRF tokens, constructs POST, and submits.
+        Persists status, mark, and tutor-internal notes to the submissions table,
+        and persists student-visible feedback / evaluation statement via ilExerciseSubmissionFeedbackGUI.
         """
         self._ensure_authenticated()
         ass_param = f"&ass_id={grade_data.ass_id}" if grade_data.ass_id else ""
         exercise_url = (
             f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilExerciseManagementGUI&cmd=members&ref_id={exercise_ref_id}&ass_id={grade_data.ass_id or 0}&member_id=0&part_id=0"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilExerciseManagementGUI&cmd=members&ref_id={exercise_ref_id}{ass_param}&part_id=0"
         )
 
         async with self.session_manager.get_http_client() as client:
@@ -540,10 +544,25 @@ class IliasClient:
             resp = await client.get(exercise_url)
             self._check_response_for_session_loss(resp, exercise_url)
 
-            # 2. Extract form structure and hidden tokens
+            # Resolve active ass_id if not explicitly provided
+            ass_id = grade_data.ass_id
+            if not ass_id:
+                m_ass = re.search(
+                    r'<select[^>]*name=["\']ass_id["\'][^>]*>.*?<option[^>]*value=["\'](\d+)["\'][^>]*selected',
+                    resp.text,
+                    re.DOTALL | re.IGNORECASE,
+                )
+                if m_ass:
+                    ass_id = m_ass.group(1)
+                else:
+                    m_ass2 = re.search(r"ass_id=(\d+)", resp.text)
+                    if m_ass2:
+                        ass_id = m_ass2.group(1)
+
+            # 2. Extract table form structure and hidden tokens
             form_data = extract_grading_form(resp.text, member_id=grade_data.member_id)
 
-            # 3. Construct POST payload
+            # 3. Construct POST payload for table grading (Status, Mark, Tutor Notice)
             payload: Dict[str, str] = dict(form_data.hidden_fields)
 
             # Map status (passed, failed, not_graded)
@@ -566,17 +585,12 @@ class IliasClient:
                 if form_data.mark_field_name:
                     payload[form_data.mark_field_name] = str(grade_data.mark)
 
-            if grade_data.feedback is not None:
-                payload[f"feedback[{grade_data.member_id}]"] = grade_data.feedback
-                if form_data.feedback_field_name:
-                    payload[form_data.feedback_field_name] = grade_data.feedback
-
             if grade_data.notice is not None:
                 payload[f"notice[{grade_data.member_id}]"] = grade_data.notice
                 if form_data.notice_field_name:
                     payload[form_data.notice_field_name] = grade_data.notice
 
-            # Ensure member/part id is listed
+            # Ensure member/part id is listed and selected
             payload["listed_part_ids[]"] = grade_data.member_id
             payload["sel_part_ids[]"] = grade_data.member_id
 
@@ -586,28 +600,83 @@ class IliasClient:
 
             target_action = form_data.action_url or exercise_url
 
-            # 4. Send POST request
+            # 4. Send POST request for table form
             post_resp = await client.post(target_action, data=payload)
             self._check_response_for_session_loss(post_resp, target_action)
 
-            # 5. If feedback is present and feedback modal url exists, also post feedback directly
-            if grade_data.feedback and grade_data.ass_id:
-                try:
-                    fb_url = (
+            # 5. Persist Student-Visible Feedback / Evaluation Statement (ilExerciseSubmissionFeedbackGUI)
+            if grade_data.feedback is not None:
+                # Resolve cmdNode for ilExerciseSubmissionFeedbackGUI
+                cmd_node = "dc:o5:dd:de"
+                m_node = re.search(r"cmdNode=([^&\"']+).*?cmdClass=ilExerciseSubmissionFeedbackGUI", resp.text)
+                if m_node:
+                    cmd_node = m_node.group(1)
+
+                # Locate async showFeedbackForm URL for this specific member in the page
+                fb_modal_url = None
+                pat = (
+                    rf'ilias\.php\?[^"\'\s<>\\]*cmdClass=ilExerciseSubmissionFeedbackGUI'
+                    rf'[^"\'\s<>\\]*cmd=showFeedbackForm[^"\'\s<>\\]*member_id={grade_data.member_id}[^"\'\s<>\\]*'
+                )
+                m_fb = re.search(pat, resp.text)
+                if m_fb:
+                    raw_fb = m_fb.group(0).replace("&amp;", "&").replace(r"\/", "/")
+                    fb_modal_url = urllib.parse.urljoin(settings.ilias_base_url, raw_fb)
+
+                if not fb_modal_url:
+                    fb_modal_url = (
                         f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui"
-                        f"&cmdNode=dc:o5:dd:de&cmdClass=ilExerciseSubmissionFeedbackGUI"
-                        f"&cmd=saveFeedback&ref_id={exercise_ref_id}&member_id={grade_data.member_id}&ass_id={grade_data.ass_id}"
+                        f"&cmdNode={cmd_node}&cmdClass=ilExerciseSubmissionFeedbackGUI"
+                        f"&cmd=showFeedbackForm&ref_id={exercise_ref_id}&ass_id={ass_id or 0}&vw=1"
+                        f"&member_id={grade_data.member_id}&part_id=0&cmdMode=asynch"
                     )
-                    fb_data = {
-                        "feedback": grade_data.feedback,
-                        "member_id": grade_data.member_id,
-                        "ass_id": grade_data.ass_id,
-                    }
-                    if grade_data.rtoken:
-                        fb_data["rtoken"] = grade_data.rtoken
-                    await client.post(fb_url, data=fb_data)
+
+                feedback_saved = False
+
+                # 5a. GET the async feedback modal to scrape exact form action, input names, CSRF tokens
+                try:
+                    modal_resp = await client.get(fb_modal_url)
+                    if modal_resp.status_code in [200, 302]:
+                        modal_info = extract_feedback_modal_form(modal_resp.text, base_url=settings.ilias_base_url)
+                        modal_action = modal_info.action_url or (
+                            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui"
+                            f"&cmdNode={cmd_node}&cmdClass=ilExerciseSubmissionFeedbackGUI"
+                            f"&cmd=validateAndSubmitFeedbackForm&ref_id={exercise_ref_id}"
+                            f"&ass_id={ass_id or 0}&member_id={grade_data.member_id}&part_id=0&cmdMode=asynch"
+                        )
+                        modal_payload = dict(modal_info.hidden_fields)
+                        modal_payload[modal_info.comment_field_name] = grade_data.feedback
+                        modal_payload["comment"] = grade_data.feedback
+                        if modal_info.submit_button_name:
+                            modal_payload[modal_info.submit_button_name] = modal_info.submit_button_value or "Save"
+                        if grade_data.rtoken and "rtoken" not in modal_payload:
+                            modal_payload["rtoken"] = grade_data.rtoken
+
+                        fb_post_resp = await client.post(modal_action, data=modal_payload)
+                        if fb_post_resp.status_code in [200, 302] and "alert-danger" not in fb_post_resp.text:
+                            feedback_saved = True
                 except Exception as fb_err:
-                    logger.debug(f"Direct feedback POST notice: {fb_err}")
+                    logger.warning(f"Failed submitting feedback modal form: {fb_err}")
+
+                # 5b. Fallback: post directly via saveCommentForLearners
+                if not feedback_saved:
+                    try:
+                        save_url = (
+                            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui"
+                            f"&cmdNode={cmd_node}&cmdClass=ilExerciseSubmissionFeedbackGUI"
+                            f"&cmd=saveCommentForLearners&ref_id={exercise_ref_id}&ass_id={ass_id or 0}"
+                            f"&member_id={grade_data.member_id}&part_id=0"
+                        )
+                        save_data = {
+                            "comment": grade_data.feedback,
+                            "member_id": str(grade_data.member_id),
+                            "ass_id": str(ass_id or 0),
+                        }
+                        if grade_data.rtoken:
+                            save_data["rtoken"] = grade_data.rtoken
+                        await client.post(save_url, data=save_data)
+                    except Exception as sl_err:
+                        logger.warning(f"Failed fallback saveCommentForLearners: {sl_err}")
 
             # 6. Verify success
             success, message = verify_grading_success(post_resp.text)

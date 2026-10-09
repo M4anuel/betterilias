@@ -115,3 +115,52 @@ def test_verify_grading_success():
     assert ok2 is False
     assert "Fehler" in msg2
 
+    redirect_html = "<script>window.location.href = 'ilias.php?cmd=members';</script>"
+    ok3, msg3 = verify_grading_success(redirect_html)
+    assert ok3 is True
+
+
+def test_extract_feedback_modal_form():
+    from backend.scrapers.forms import extract_feedback_modal_form
+
+    modal_html = """
+    <div class="modal-dialog">
+        <form action="ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd:de&cmdClass=ilExerciseSubmissionFeedbackGUI&cmd=validateAndSubmitFeedbackForm&ref_id=3803739&ass_id=53198&member_id=3205653" method="post">
+            <input type="hidden" name="rtoken" value="csrf_test_token_123" />
+            <input type="hidden" name="cmdNode" value="dc:o5:dd:de" />
+            <div class="form-group">
+                <textarea name="comment" rows="6">Bestehender Kommentar</textarea>
+            </div>
+            <button type="submit" name="cmd[validateAndSubmitFeedbackForm]" value="Speichern">Speichern</button>
+        </form>
+    </div>
+    """
+    info = extract_feedback_modal_form(modal_html)
+    assert info.action_url is not None
+    assert "validateAndSubmitFeedbackForm" in info.action_url
+    assert info.hidden_fields.get("rtoken") == "csrf_test_token_123"
+    assert info.hidden_fields.get("cmdNode") == "dc:o5:dd:de"
+    assert info.comment_field_name == "comment"
+    assert info.submit_button_name == "cmd[validateAndSubmitFeedbackForm]"
+    assert info.submit_button_value == "Speichern"
+
+
+def test_extract_grading_form_real_dump():
+    import glob
+    from pathlib import Path
+
+    dumps = glob.glob("htmlfromilias/**/Effectivly_saved*.html", recursive=True)
+    if not dumps:
+        pytest.skip("Effectivly_saved dump not found")
+
+    html = Path(dumps[0]).read_text(encoding="utf-8", errors="replace")
+    form_data = extract_grading_form(html, member_id="3205653")
+
+    assert "fallbackCmd=saveStatusAll" in form_data.action_url
+    assert form_data.status_field_name == "status[3205653]"
+    assert form_data.mark_field_name == "mark[3205653]"
+    assert form_data.notice_field_name == "notice[3205653]"
+    assert form_data.submit_button_name == "cmd[saveStatusAll]"
+    assert len(form_data.hidden_fields) >= 5
+
+

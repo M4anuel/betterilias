@@ -229,6 +229,25 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
         [memberId]: { ...prev[memberId], isDirty: false },
       }));
 
+      // Update in-memory submissions
+      setSubmissionsData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          submissions: prev.submissions.map((s) => {
+            if (s.member_id === memberId) {
+              return {
+                ...s,
+                passed_status: edit.status,
+                mark: edit.mark,
+                feedback: edit.feedback,
+              };
+            }
+            return s;
+          }),
+        };
+      });
+
       // Trigger success flash
       setSavedSuccessId(memberId);
       setTimeout(() => setSavedSuccessId(null), 2500);
@@ -243,9 +262,14 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
   const submissionsList = submissionsData?.submissions || [];
   const filteredSubmissions = useMemo(() => {
     return submissionsList.filter((s) => {
+      if (savedSuccessId === s.member_id) {
+        return true;
+      }
+
       // 1. Status Filter
       const edit = localEdits[s.member_id];
-      const curStatus = edit ? edit.status : s.passed_status;
+      const isUnsaved = Boolean(edit?.isDirty);
+      const curStatus = (isUnsaved ? s.passed_status : edit?.status) || s.passed_status || 'not_graded';
 
       if (statusFilter === 'passed' && curStatus !== 'passed') return false;
       if (statusFilter === 'failed' && curStatus !== 'failed') return false;
@@ -268,7 +292,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
 
       return true;
     });
-  }, [submissionsList, statusFilter, searchQuery, localEdits]);
+  }, [submissionsList, statusFilter, searchQuery, localEdits, savedSuccessId]);
 
   // Counts for TA filters
   const counts = useMemo(() => {
@@ -279,7 +303,8 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
 
     for (const s of submissionsList) {
       const edit = localEdits[s.member_id];
-      const st = edit ? edit.status : s.passed_status;
+      const isUnsaved = Boolean(edit?.isDirty);
+      const st = (isUnsaved ? s.passed_status : edit?.status) || s.passed_status || 'not_graded';
       if (st === 'passed') passed++;
       else if (st === 'failed') failed++;
       else notGraded++;

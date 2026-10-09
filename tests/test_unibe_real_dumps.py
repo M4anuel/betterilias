@@ -122,14 +122,71 @@ def test_real_unibe_graph_theory_rich_text_and_math():
     assert any("Suggested" in t for t in block_titles)
     assert any("Grading Policy" in t for t in block_titles)
 
+    # Assert no PageTocPH or Break leaking into rich text blocks
+    for b in res.rich_text_blocks:
+        if b.title:
+            assert "PageTocPH" not in b.title
+            assert "Break" not in b.title
+        assert "PageTocPH" not in b.html_content
+        assert "PageTocPH" not in b.plain_text
+
+    # Course Content Blocks (Sequential Layout)
+    assert len(res.blocks) >= 3
+    text_blocks = [b for b in res.blocks if b.block_type == "text"]
+    assert len(text_blocks) >= 3
+    for tb in text_blocks:
+        if tb.title:
+            assert "PageTocPH" not in tb.title
+            assert "Break" not in tb.title
+            # Ensure block title is not redundantly rendered as an h2/h3 heading inside html_content
+            if tb.html_content:
+                assert f"<h3" not in tb.html_content
+                assert "PageTocPH" not in tb.html_content
+        if tb.plain_text:
+            assert "PageTocPH" not in tb.plain_text
+
     # Mathematical MathML Notation in grading policy
     grading_block = next(b for b in res.rich_text_blocks if b.title and "Grading Policy" in b.title)
     assert "<math" in grading_block.html_content
     assert "</math>" in grading_block.html_content
 
+    grading_layout_block = next(b for b in text_blocks if b.title and "Grading Policy" in b.title)
+    assert "<math" in grading_layout_block.html_content
+    assert "</math>" in grading_layout_block.html_content
+
     # Material items
     assert len(res.items) >= 1
     assert any("Lectures slides" in it.title for it in res.items)
+
+
+def test_midterm_and_final_exam_pagetoc_cleaning():
+    """Verify bugfix: PageTocPH and Break stripped, block title is 'MIDTERM and final EXAM', no heading duplication."""
+    from bs4 import BeautifulSoup
+    from backend.scrapers.materials import parse_course_blocks
+
+    sample_html = """
+    <div id="il_center_col">
+        <h3 id="ilPageTocA39" class="ilc_Paragraph ilc_heading3_Headline3"><!--PageTocPH-->MIDTERM and final EXAM<!--Break--></h3>
+        <p class="ilc_Paragraph ilc_text_block_Standard">The midterm will take place on November 12, 2026, at 15:15.<br><br>The final exam will take place on February 11, 2027, from 10:00 to 12:00.<!--Break--></p>
+    </div>
+    """
+    soup = BeautifulSoup(sample_html, "html.parser")
+    blocks = parse_course_blocks(soup, container_ref_id="3684711")
+
+    assert len(blocks) == 1
+    midterm_block = blocks[0]
+    assert midterm_block.block_type == "text"
+    assert midterm_block.title == "MIDTERM and final EXAM"
+    assert "PageTocPH" not in midterm_block.title
+    assert "Break" not in midterm_block.title
+
+    # Content body contains the paragraph text and no duplicate heading or PageTocPH/Break artifacts
+    assert "The midterm will take place on November 12, 2026" in midterm_block.html_content
+    assert "<h3>" not in midterm_block.html_content
+    assert "PageTocPH" not in midterm_block.html_content
+    assert "Break" not in midterm_block.html_content
+    assert "PageTocPH" not in (midterm_block.plain_text or "")
+
 
 
 def test_real_unibe_course_logs_extraction():
@@ -613,6 +670,96 @@ def test_real_unibe_psychopathologie_sessions_and_expand():
 
     s5 = res.sessions[5]  # 22. Oct 2025 (no materials)
     assert s5.materials_count == 0
+
+
+@pytest.mark.asyncio
+async def test_real_unibe_grading_flow_with_feedback_and_notice():
+    import glob
+    from pathlib import Path
+    from unittest.mock import AsyncMock, MagicMock
+    from backend.services.ilias_client import IliasClient
+    from backend.schemas import GradeSubmissionRequest
+
+    dumps = glob.glob("htmlfromilias/**/Effectivly_saved*.html", recursive=True)
+    if not dumps:
+        pytest.skip("Effectivly_saved dump not found")
+
+    members_html = Path(dumps[0]).read_text(encoding="utf-8", errors="replace")
+    modal_html = """
+    <div class="modal-dialog">
+        <form action="ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd:de&cmdClass=ilExerciseSubmissionFeedbackGUI&cmd=validateAndSubmitFeedbackForm&ref_id=3803739&ass_id=53198&member_id=3205653" method="post">
+            <input type="hidden" name="rtoken" value="csrf_test_123" />
+            <input type="hidden" name="cmdNode" value="dc:o5:dd:de" />
+            <textarea name="comment"></textarea>
+            <button type="submit" name="cmd[validateAndSubmitFeedbackForm]">Speichern</button>
+        </form>
+    </div>
+    """
+
+    mock_manager = MagicMock()
+    mock_manager.has_cookies.return_value = True
+
+    client = IliasClient(manager=mock_manager)
+
+    captured_posts = []
+
+    async def mock_get(url, **kwargs):
+        resp = MagicMock()
+        resp.status_code = 200
+        if "showFeedbackForm" in str(url):
+            resp.text = modal_html
+        else:
+            resp.text = members_html
+        return resp
+
+    async def mock_post(url, data=None, **kwargs):
+        captured_posts.append((str(url), dict(data or {})))
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.text = "<script>window.location.href = 'ilias.php?cmd=members';</script>"
+        return resp
+
+    mock_http_client = AsyncMock()
+    mock_http_client.get = AsyncMock(side_effect=mock_get)
+    mock_http_client.post = AsyncMock(side_effect=mock_post)
+
+    class MockContextManager:
+        async def __aenter__(self):
+            return mock_http_client
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    mock_manager.get_http_client.return_value = MockContextManager()
+
+    req = GradeSubmissionRequest(
+        member_id="3205653",
+        status="passed",
+        mark="5.5",
+        notice="Tutor interne Notiz",
+        feedback="Projekt - Mobile Fridge. Akzeptiert!",
+    )
+
+    res = await client.grade_student_submission(exercise_ref_id="3803739", grade_data=req)
+
+    assert res.success is True
+    assert res.status == "passed"
+    assert res.feedback == "Projekt - Mobile Fridge. Akzeptiert!"
+
+    # Verify captured POSTs:
+    # 1. Main table form POST (Save All)
+    table_post = next(p for p in captured_posts if "saveStatusAll" in p[0])
+    table_data = table_post[1]
+    assert table_data.get("status[3205653]") == "passed"
+    assert table_data.get("mark[3205653]") == "5.5"
+    assert table_data.get("notice[3205653]") == "Tutor interne Notiz"
+    assert table_data.get("cmd[saveStatusAll]") == "Save All"
+
+    # 2. Feedback modal form POST (ilExerciseSubmissionFeedbackGUI)
+    fb_post = next(p for p in captured_posts if "validateAndSubmitFeedbackForm" in p[0])
+    fb_data = fb_post[1]
+    assert fb_data.get("comment") == "Projekt - Mobile Fridge. Akzeptiert!"
+    assert fb_data.get("rtoken") == "csrf_test_123"
+
 
 
 
