@@ -73,6 +73,13 @@ async def sync_extension_cookies(
         meta["user_name"] = user_or_msg
         target_manager.save_metadata(meta)
 
+        # Also update default single-tenant session_manager for seamless local fallback
+        try:
+            from backend.auth.session import session_manager as default_manager
+            default_manager.save_cookies(cookies, metadata=meta)
+        except Exception:
+            pass
+
     return ExtensionSyncResponse(
         success=True,
         authenticated=is_valid,

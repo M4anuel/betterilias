@@ -2,18 +2,43 @@
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 (async function () {
+  function applySessionToPage(sessionId) {
+    if (!sessionId) return;
+
+    // 1. Write to webpage localStorage (supporting Firefox wrappedJSObject and Chromium)
+    try {
+      if (typeof window.wrappedJSObject !== 'undefined' && window.wrappedJSObject.localStorage) {
+        window.wrappedJSObject.localStorage.setItem('betterilias_session_id', sessionId);
+      }
+    } catch (_) {}
+
+    try {
+      window.localStorage.setItem('betterilias_session_id', sessionId);
+    } catch (_) {}
+
+    // 2. Dispatch custom DOM event on document
+    try {
+      document.dispatchEvent(
+        new CustomEvent('BETTERILIAS_SESSION_SYNCED', {
+          detail: { sessionId }
+        })
+      );
+    } catch (_) {}
+
+    // 3. Post Message
+    try {
+      window.postMessage(
+        { type: 'BETTERILIAS_SESSION_SYNCED', sessionId },
+        '*'
+      );
+    } catch (_) {}
+  }
+
   try {
     // 1. Sync session from extension storage to web app localStorage if available
     const data = await browserAPI.storage.local.get(['sessionId']);
     if (data && data.sessionId) {
-      const current = window.localStorage.getItem('betterilias_session_id');
-      if (!current) {
-        window.localStorage.setItem('betterilias_session_id', data.sessionId);
-        window.postMessage(
-          { type: 'BETTERILIAS_SESSION_SYNCED', sessionId: data.sessionId },
-          '*'
-        );
-      }
+      applySessionToPage(data.sessionId);
     }
   } catch (e) {
     // Ignore context errors
@@ -23,11 +48,7 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
   browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message && message.type === 'BETTERILIAS_SESSION_SYNCED' && message.sessionId) {
       try {
-        window.localStorage.setItem('betterilias_session_id', message.sessionId);
-        window.postMessage(
-          { type: 'BETTERILIAS_SESSION_SYNCED', sessionId: message.sessionId },
-          '*'
-        );
+        applySessionToPage(message.sessionId);
         sendResponse({ success: true });
       } catch (err) {
         sendResponse({ success: false, error: err.message });
@@ -37,6 +58,7 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
   });
 
   // 3. Inform web app that the companion extension is installed
-  window.postMessage({ type: 'BETTERILIAS_EXTENSION_INSTALLED', version: '1.0.0', browser: 'firefox' }, '*');
+  try {
+    window.postMessage({ type: 'BETTERILIAS_EXTENSION_INSTALLED', version: '1.0.0', browser: 'firefox' }, '*');
+  } catch (_) {}
 })();
-

@@ -34,6 +34,23 @@ def get_session_manager(
         except Exception:
             pass
 
+    # Fallback 1: Default single-tenant manager (if it has cookies)
+    if session_manager.has_cookies():
+        return session_manager
+
+    # Fallback 2: Most recent active session in .sessions/
+    try:
+        from backend.config import settings
+        sessions_dir = settings.sessions_path
+        if sessions_dir.exists():
+            json_files = sorted(sessions_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+            if json_files:
+                latest_manager = SessionManager(session_id=json_files[0].stem)
+                if latest_manager.has_cookies():
+                    return latest_manager
+    except Exception:
+        pass
+
     return session_manager
 
 

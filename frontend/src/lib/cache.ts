@@ -51,6 +51,13 @@ export const cache = {
   // --- Multi-Tenant Session ID ---
   getSessionId(): string | null {
     try {
+      if (typeof window !== 'undefined' && window.location.search) {
+        const urlId = new URLSearchParams(window.location.search).get('session_id');
+        if (urlId && urlId.trim()) {
+          localStorage.setItem(SESSION_ID_KEY, urlId.trim());
+          return urlId.trim();
+        }
+      }
       return localStorage.getItem(SESSION_ID_KEY) || null;
     } catch {
       return null;

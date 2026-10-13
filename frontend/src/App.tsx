@@ -503,16 +503,33 @@ export const App: React.FC = () => {
       }));
     };
 
+    const reloadContent = () => {
+      checkAuth();
+      loadSemesters(selectedSemester);
+      if (currentContainerId) {
+        loadCourseMaterials(currentContainerId, currentContainerId === selectedCourseId);
+      }
+    };
+
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'BETTERILIAS_SESSION_SYNCED' && event.data?.sessionId) {
         cache.setSessionId(event.data.sessionId);
-        checkAuth();
+        reloadContent();
+      }
+    };
+
+    const handleCustomSync = (event: Event) => {
+      const customEvt = event as CustomEvent<{ sessionId?: string }>;
+      if (customEvt.detail?.sessionId) {
+        cache.setSessionId(customEvt.detail.sessionId);
+        reloadContent();
       }
     };
 
     theme.initTheme();
     window.addEventListener('ilias-session', handleSession);
     window.addEventListener('message', handleMessage);
+    document.addEventListener('BETTERILIAS_SESSION_SYNCED', handleCustomSync);
     window.addEventListener('focus', checkAuth);
     checkAuth();
 
@@ -527,6 +544,7 @@ export const App: React.FC = () => {
       ++authRequestSeq.current;
       window.removeEventListener('ilias-session', handleSession);
       window.removeEventListener('message', handleMessage);
+      document.removeEventListener('BETTERILIAS_SESSION_SYNCED', handleCustomSync);
       window.removeEventListener('focus', checkAuth);
     };
   }, [checkAuth, loadSemesters, loadCourseMaterials]);
