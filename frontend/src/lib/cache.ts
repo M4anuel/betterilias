@@ -45,8 +45,30 @@ const EXERCISE_OVERVIEW_PREFIX = 'ilias_exercise_overview_';
 const EXERCISE_SUBMISSIONS_PREFIX = 'ilias_exercise_submissions_';
 const EXERCISE_INFO_PREFIX = 'ilias_exercise_info_';
 const STUDENT_ASSIGNMENT_PREFIX = 'ilias_student_assignment_';
+const SESSION_ID_KEY = 'betterilias_session_id';
 
 export const cache = {
+  // --- Multi-Tenant Session ID ---
+  getSessionId(): string | null {
+    try {
+      return localStorage.getItem(SESSION_ID_KEY) || null;
+    } catch {
+      return null;
+    }
+  },
+
+  setSessionId(sessionId: string | null) {
+    try {
+      if (sessionId && sessionId.trim()) {
+        localStorage.setItem(SESSION_ID_KEY, sessionId.trim());
+      } else {
+        localStorage.removeItem(SESSION_ID_KEY);
+      }
+    } catch (e) {
+      console.error('Failed to update session ID', e);
+    }
+  },
+
   // --- Nicknames ---
   getNicknames(): Record<string, string> {
     try {

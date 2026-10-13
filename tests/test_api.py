@@ -386,4 +386,35 @@ async def test_ilias_client_delete_student_assignment_file():
         assert mock_http.post.call_count == 2
 
 
+def test_extension_sync_endpoint(tmp_path, monkeypatch):
+    from backend.config import settings
+    monkeypatch.setattr(settings, "sessions_dir", str(tmp_path / ".sessions"))
+
+    with patch("backend.auth.session.SessionManager.verify_session", new_callable=AsyncMock, return_value=(True, "Test User")):
+        payload = {
+            "cookies": {"PHPSESSID": "tenant_sess_abc", "ilClientId": "ilias3_unibe"},
+            "source": "chrome_extension"
+        }
+        response = client.post("/api/auth/sync", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["authenticated"] is True
+        assert data["user_name"] == "Test User"
+        session_id = data["session_id"]
+        assert session_id
+
+        # Check that this tenant can check its auth status with X-Session-Id header
+        status_res = client.get("/api/auth/status", headers={"X-Session-Id": session_id})
+        assert status_res.status_code == 200
+        status_data = status_res.json()
+        assert status_data["authenticated"] is True
+        assert status_data["session_id"] == session_id
+
+        # Check logout for this tenant
+        logout_res = client.post("/api/auth/logout", headers={"X-Session-Id": session_id})
+        assert logout_res.status_code == 200
+        assert logout_res.json()["success"] is True
+
+
 

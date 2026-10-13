@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { AlertCircle, LogIn } from 'lucide-react';
+import { AlertCircle, ExternalLink, Puzzle } from 'lucide-react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SemesterView } from './components/SemesterView';
 import { CourseView } from './components/CourseView';
 import { NicknameModal } from './components/NicknameModal';
+import { ExtensionInfoModal } from './components/ExtensionInfoModal';
 import { NotificationToast, ChangeNotification } from './components/NotificationToast';
 import {
   AuthStatus,
@@ -14,11 +15,12 @@ import {
 } from './types';
 import { api } from './lib/api';
 import { cache } from './lib/cache';
+import { theme } from './lib/theme';
 
 export const App: React.FC = () => {
   // --- Auth & Session State ---
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
   const authRequestSeq = useRef(0);
   const [changeNotifications, setChangeNotifications] = useState<ChangeNotification[]>([]);
 
@@ -252,6 +254,16 @@ export const App: React.FC = () => {
 
   // --- Initial Mount Effect ---
   useEffect(() => {
+    // 1. Check if session_id was passed in URL query param (e.g. from Chrome Extension)
+    const params = new URLSearchParams(window.location.search);
+    const urlSessionId = params.get('session_id');
+    if (urlSessionId) {
+      cache.setSessionId(urlSessionId);
+      params.delete('session_id');
+      const newQuery = params.toString() ? `?${params.toString()}` : '';
+      window.history.replaceState({}, '', `${window.location.pathname}${newQuery}${window.location.hash}`);
+    }
+
     const handleSession = (event: Event) => {
       const authenticated = (event as CustomEvent<boolean>).detail;
       ++authRequestSeq.current;
@@ -262,7 +274,17 @@ export const App: React.FC = () => {
         user_name: authenticated ? previous?.user_name : undefined,
       }));
     };
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'BETTERILIAS_SESSION_SYNCED' && event.data?.sessionId) {
+        cache.setSessionId(event.data.sessionId);
+        checkAuth();
+      }
+    };
+
+    theme.initTheme();
     window.addEventListener('ilias-session', handleSession);
+    window.addEventListener('message', handleMessage);
     window.addEventListener('focus', checkAuth);
     checkAuth();
     const initialSemester = cache.getSelectedSemester();
@@ -276,9 +298,22 @@ export const App: React.FC = () => {
     return () => {
       ++authRequestSeq.current;
       window.removeEventListener('ilias-session', handleSession);
+      window.removeEventListener('message', handleMessage);
       window.removeEventListener('focus', checkAuth);
     };
   }, [checkAuth, loadSemesters, loadCourseMaterials]);
+
+  // --- Logout Handler ---
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+      setAuthStatus({ authenticated: false, cookies_present: false });
+    } catch (err: any) {
+      console.error('Logout error', err);
+      cache.setSessionId(null);
+      setAuthStatus({ authenticated: false, cookies_present: false });
+    }
+  };
 
   // --- Course Selection Handler ---
   const handleSelectCourse = (courseRefId: string) => {
@@ -321,22 +356,6 @@ export const App: React.FC = () => {
     cache.setSidebarCollapsed(next);
   };
 
-  // --- Trigger Playwright Login ---
-  const handleTriggerLogin = async () => {
-    setIsLoggingIn(true);
-    try {
-      const result = await api.triggerBrowserLogin();
-      if (!result.success) throw new Error(result.message || 'Anmeldung fehlgeschlagen');
-      ++authRequestSeq.current;
-      setAuthStatus({ authenticated: true, cookies_present: true });
-      loadSemesters(selectedSemester);
-    } catch (err: any) {
-      alert(`Login Fehler: ${err.message}`);
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
   const currentCourse = allCourses.find((c) => c.ref_id === selectedCourseId);
   const currentNickname = selectedCourseId
     ? cache.getDisplayName(selectedCourseId, currentCourse?.title || materialsData?.title || '')
@@ -348,15 +367,15 @@ export const App: React.FC = () => {
   const effectiveMaterialsData = isMatchingContainer ? materialsData : null;
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-slate-50 overflow-hidden text-slate-900 font-sans">
+    <div className="flex h-screen w-screen flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden text-slate-900 dark:text-slate-100 font-sans transition-colors duration-150">
       {/* Top Header */}
       <Header
         authStatus={authStatus}
         onHomeClick={handleNavigateHome}
         onToggleSidebar={handleToggleSidebar}
         isSidebarCollapsed={isSidebarCollapsed}
-        onTriggerLogin={handleTriggerLogin}
-        isLoggingIn={isLoggingIn}
+        onLogout={handleLogout}
+        onOpenExtensionInfo={() => setIsExtensionModalOpen(true)}
       />
 
       {/* Main Workspace Layout */}
@@ -374,23 +393,34 @@ export const App: React.FC = () => {
         />
 
         {/* Center Content Area */}
-        <main className="flex-1 overflow-y-auto bg-slate-50/50">
+        <main className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50">
           {authStatus && !authStatus.authenticated && (
-            <div className="flex items-center justify-between border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-2xs dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
               <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600" />
+                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <span>
-                  <strong>Sitzung abgelaufen:</strong> Du bist aktuell nicht bei ILIAS angemeldet. Gespeicherte Inhalte werden aus dem Cache angezeigt.
+                  <strong>Sitzung nicht aktiv:</strong> Du bist aktuell nicht bei ILIAS angemeldet. Gespeicherte Inhalte werden aus dem Cache angezeigt.
                 </span>
               </div>
-              <button
-                onClick={handleTriggerLogin}
-                disabled={isLoggingIn}
-                className="ml-3 inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 transition disabled:opacity-50"
-              >
-                <LogIn className="h-3.5 w-3.5" />
-                <span>{isLoggingIn ? 'Öffne Browser...' : 'Jetzt anmelden'}</span>
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href="https://ilias.unibe.ch"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 shadow-2xs hover:bg-amber-100 transition dark:border-amber-800 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-slate-800"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Bei ILIAS anmelden</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setIsExtensionModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0AACA5] px-2.5 py-1 text-xs font-semibold text-white shadow-2xs hover:opacity-90 transition cursor-pointer"
+                >
+                  <Puzzle className="h-3.5 w-3.5" />
+                  <span>Browser-Erweiterung</span>
+                </button>
+              </div>
             </div>
           )}
           {selectedCourseId && currentContainerId ? (
@@ -427,6 +457,13 @@ export const App: React.FC = () => {
         isOpen={isNicknameModalOpen}
         onClose={() => setIsNicknameModalOpen(false)}
         onNicknamesUpdated={() => setNicknamesVersion((v) => v + 1)}
+      />
+
+      {/* Extension Info Modal */}
+      <ExtensionInfoModal
+        isOpen={isExtensionModalOpen}
+        onClose={() => setIsExtensionModalOpen(false)}
+        onSuccessSync={checkAuth}
       />
 
       {/* VS Code-style Bottom-Right Change Notification */}

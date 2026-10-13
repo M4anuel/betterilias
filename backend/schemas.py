@@ -11,11 +11,25 @@ class AuthStatus(BaseModel):
     cookies_present: bool = False
     message: Optional[str] = None
     user_name: Optional[str] = None
+    session_id: Optional[str] = None
 
 class ManualCookiesInput(BaseModel):
     phpsessid: str = Field(..., description="Value of PHPSESSID cookie")
     il_client_id: Optional[str] = Field("ilias3_unibe", description="Value of ilClientId cookie")
     additional_cookies: Optional[Dict[str, str]] = Field(default_factory=dict)
+    session_id: Optional[str] = Field(None, description="Existing session ID to update, or None to create new")
+
+class ExtensionSyncInput(BaseModel):
+    cookies: Dict[str, str] = Field(..., description="Cookies dictionary from ILIAS")
+    session_id: Optional[str] = Field(None, description="Existing session ID to refresh or update")
+    source: Optional[str] = Field("chrome_extension", description="Sync source identifier")
+
+class ExtensionSyncResponse(BaseModel):
+    success: bool
+    authenticated: bool
+    session_id: str
+    user_name: Optional[str] = None
+    message: str
 
 # ---------------------------------------------------------
 # Dashboard & Course Schemas

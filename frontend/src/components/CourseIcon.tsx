@@ -78,10 +78,11 @@ const ICON_MAP: Record<string, LucideIcon> = {
 interface CourseIconProps {
   iconName?: string;
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export const CourseIcon: React.FC<CourseIconProps> = ({ iconName = 'BookOpen', className = 'h-4 w-4' }) => {
+export const CourseIcon: React.FC<CourseIconProps> = ({ iconName = 'BookOpen', className = 'h-4 w-4', style }) => {
   const IconComponent = ICON_MAP[iconName] || BookOpen;
-  return <IconComponent className={className} />;
+  return <IconComponent className={className} style={style} />;
 };
 

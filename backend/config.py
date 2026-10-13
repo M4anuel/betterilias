@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     
     # Storage files and paths
     session_cookie_file: str = "session_cookies.json"
+    sessions_dir: str = ".sessions"
     browser_profile_dir: str = ".browser_profile"
     logs_dir: str = "logs"
 
@@ -46,6 +47,13 @@ class Settings(BaseSettings):
     @property
     def cookie_path(self) -> Path:
         p = Path(self.session_cookie_file)
+        if not p.is_absolute():
+            return BASE_DIR / p
+        return p
+
+    @property
+    def sessions_path(self) -> Path:
+        p = Path(self.sessions_dir)
         if not p.is_absolute():
             return BASE_DIR / p
         return p

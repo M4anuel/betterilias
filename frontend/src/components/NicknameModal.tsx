@@ -85,20 +85,20 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150 transition-colors"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900">Vorlesungen anpassen</h3>
-            <p className="text-xs text-slate-500">
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Vorlesungen anpassen</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Wähle ein individuelles Icon und einen kurzen Namen für deine Seitenleiste.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -120,16 +120,16 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
               return (
                 <div
                   key={course.ref_id}
-                  className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-3 transition hover:border-slate-300"
+                  className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-4 space-y-3 transition hover:border-slate-300 dark:hover:border-slate-700"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-xs font-semibold text-slate-700 leading-snug line-clamp-1" title={course.title}>
+                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-snug line-clamp-1" title={course.title}>
                       {course.title}
                     </div>
                     {hasCustomizations && (
                       <button
                         onClick={() => handleReset(course.ref_id)}
-                        className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-red-600 transition shrink-0"
+                        className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-red-500 transition shrink-0 cursor-pointer"
                         title="Auf Standard zurücksetzen"
                       >
                         <RotateCcw className="h-3 w-3" />
@@ -146,14 +146,14 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                       onClick={() =>
                         setActivePickerRefId(isPickerOpen ? null : course.ref_id)
                       }
-                      className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                      className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition cursor-pointer ${
                         isPickerOpen
-                          ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-100'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                          ? 'border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent-text)] ring-2 ring-[var(--accent)]/20'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
                       }`}
                       title="Icon auswählen"
                     >
-                      <CourseIcon iconName={currentIcon} className="h-4 w-4 text-red-600" />
+                      <CourseIcon iconName={currentIcon} className="h-4 w-4" style={{ color: 'var(--accent, #0AACA5)' }} />
                       <ChevronDown className="h-3 w-3 text-slate-400" />
                     </button>
 
@@ -176,14 +176,14 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                           [course.ref_id]: e.target.value,
                         })
                       }
-                      className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-red-500 focus:outline-hidden focus:ring-2 focus:ring-red-100 transition"
+                      className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[var(--accent)]/30 transition"
                     />
                   </div>
 
                   {/* Inline Icon Picker Grid */}
                   {isPickerOpen && (
-                    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs animate-in fade-in slide-in-from-top-1 duration-150">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-xs animate-in fade-in slide-in-from-top-1 duration-150">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
                         Icon auswählen
                       </div>
                       <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
@@ -200,10 +200,11 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                                 });
                                 setActivePickerRefId(null);
                               }}
-                              className={`flex h-9 w-9 items-center justify-center rounded-lg transition ${
+                              style={isSelected ? { backgroundColor: 'var(--accent, #0AACA5)' } : {}}
+                              className={`flex h-9 w-9 items-center justify-center rounded-lg transition cursor-pointer ${
                                 isSelected
-                                  ? 'bg-red-600 text-white shadow-xs'
-                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                  ? 'text-white shadow-xs'
+                                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white'
                               }`}
                               title={opt.label}
                             >
@@ -221,19 +222,20 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-3.5">
+        <div className="flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-3.5">
           <button
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200/60 transition"
+            className="rounded-lg px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition cursor-pointer"
           >
             Abbrechen
           </button>
           <button
             onClick={handleSave}
-            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-red-700 transition"
+            style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
+            className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition cursor-pointer"
           >
             <Check className="h-4 w-4" />
-            <span>Speichern</span>
+            <span>Änderungen speichern</span>
           </button>
         </div>
       </div>

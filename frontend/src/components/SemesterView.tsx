@@ -72,28 +72,43 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
     <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-200">
       {/* Hero Welcome & Last Opened Course banner */}
       {lastOpenedCourse && (
-        <div className="rounded-2xl border border-red-100 bg-gradient-to-r from-red-50 via-white to-slate-50 p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 dark:border-slate-800 dark:from-slate-900 dark:via-slate-900/80 dark:to-slate-800 transition-colors">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white shadow-sm">
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
+              style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
+            >
               <Clock className="h-6 w-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-red-700 uppercase tracking-wider">Zuletzt geöffnet</span>
-                <span className="rounded bg-red-100/60 px-1.5 py-0.5 text-[10px] font-semibold text-red-800">
+                <span
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: 'var(--accent, #0AACA5)' }}
+                >
+                  Zuletzt geöffnet
+                </span>
+                <span
+                  className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                  style={{
+                    backgroundColor: 'var(--accent-light, rgba(10, 172, 165, 0.12))',
+                    color: 'var(--accent-text, #088b85)',
+                  }}
+                >
                   {lastOpenedCourse.semester || selectedSemester}
                 </span>
               </div>
-              <h2 className="text-lg font-bold text-slate-900 mt-0.5">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-0.5">
                 {cache.getDisplayName(lastOpenedCourse.ref_id, lastOpenedCourse.title)}
               </h2>
-              <p className="text-xs text-slate-500 line-clamp-1">{lastOpenedCourse.title}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">{lastOpenedCourse.title}</p>
             </div>
           </div>
 
           <button
             onClick={() => onSelectCourse(lastOpenedCourse.ref_id)}
-            className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-red-700 transition shrink-0"
+            style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
+            className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:opacity-90 transition shrink-0 cursor-pointer"
           >
             <span>Weiterlernen</span>
             <ArrowRight className="h-4 w-4" />
@@ -105,22 +120,22 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <GraduationCap className="h-6 w-6 text-red-600" />
+            <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
+              <GraduationCap className="h-6 w-6" style={{ color: 'var(--accent, #0AACA5)' }} />
               <span>Vorlesungsübersicht</span>
               {isLoading && (
                 <RefreshCw className="h-4 w-4 animate-spin text-slate-400 ml-2" />
               )}
             </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Aktuell ausgewählt: <strong className="text-slate-800">{currentSemesterMeta.full}</strong>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Aktuell ausgewählt: <strong className="text-slate-800 dark:text-slate-200">{currentSemesterMeta.full}</strong>
             </p>
           </div>
 
           {/* Combined Selection Controls: Quick Pills + Full Archive Dropdown + View Mode */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Quick Pills */}
-            <div className="flex items-center gap-1 rounded-xl bg-slate-200/70 p-1">
+            <div className="flex items-center gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
               {pillIds.map((semId) => {
                 const isActive = semId === selectedSemester;
                 const semMeta = ALL_SEMESTERS.find((s) => s.id === semId);
@@ -131,10 +146,10 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                     key={semId}
                     type="button"
                     onClick={() => onSelectSemester(semId)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
                       isActive
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                        ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50'
                     }`}
                   >
                     {label}
@@ -149,7 +164,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                 <select
                   value={selectedSemester}
                   onChange={(e) => onSelectSemester(e.target.value)}
-                  className="appearance-none rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-xs font-semibold text-slate-700 shadow-xs hover:border-slate-300 focus:border-red-500 focus:outline-hidden focus:ring-2 focus:ring-red-100 transition cursor-pointer"
+                  className="appearance-none rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-xs font-semibold text-slate-700 shadow-xs hover:border-slate-300 focus:outline-hidden transition cursor-pointer dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                   title="Anderes Semester auswählen"
                 >
                   <optgroup label="Aktuelle & Künftige Semester">
@@ -176,14 +191,14 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
             </div>
 
             {/* View Mode Toggle: Cards vs. List */}
-            <div className="flex items-center gap-0.5 rounded-xl bg-slate-200/70 p-1" title="Ansicht umschalten">
+            <div className="flex items-center gap-0.5 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800" title="Ansicht umschalten">
               <button
                 type="button"
                 onClick={() => handleViewModeChange('cards')}
-                className={`rounded-lg p-1.5 transition ${
+                className={`rounded-lg p-1.5 transition cursor-pointer ${
                   viewMode === 'cards'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                    ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50'
                 }`}
                 title="Kartenansicht"
               >
@@ -192,10 +207,10 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleViewModeChange('list')}
-                className={`rounded-lg p-1.5 transition ${
+                className={`rounded-lg p-1.5 transition cursor-pointer ${
                   viewMode === 'list'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                    ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50'
                 }`}
                 title="Kompakte Listenansicht"
               >
@@ -207,9 +222,12 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
 
         {/* Loading state when no data exists yet */}
         {isLoading && !semesterData && (
-          <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white">
-            <div className="flex flex-col items-center gap-3 text-slate-400">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+          <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-col items-center gap-3 text-slate-400 dark:text-slate-500">
+              <div
+                className="h-6 w-6 animate-spin rounded-full border-2 border-t-transparent"
+                style={{ borderColor: 'var(--accent, #0AACA5)', borderTopColor: 'transparent' }}
+              />
               <span className="text-xs font-medium">Lade Semester-Angebote für {currentSemesterMeta.short}...</span>
             </div>
           </div>
@@ -217,10 +235,10 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
 
         {/* Empty state if semester has no courses */}
         {!isLoading && semesterData && Object.keys(semesterData.grouped_by_category).length === 0 && (
-          <div className="flex h-52 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center">
-            <GraduationCap className="h-8 w-8 text-slate-300 mb-2" />
-            <h4 className="text-sm font-bold text-slate-700">Keine Vorlesungen gefunden</h4>
-            <p className="text-xs text-slate-400 mt-1 max-w-sm">
+          <div className="flex h-52 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center dark:border-slate-800 dark:bg-slate-900">
+            <GraduationCap className="h-8 w-8 text-slate-300 dark:text-slate-600 mb-2" />
+            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Keine Vorlesungen gefunden</h4>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-sm">
               Für das Semester <strong>{currentSemesterMeta.full}</strong> sind keine eingeschriebenen Module vorhanden.
             </p>
           </div>
@@ -232,9 +250,9 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
             {Object.entries(semesterData.grouped_by_category).map(([category, courses]) => (
               <div key={category} className="space-y-3.5">
                 <div className="flex items-center gap-2.5">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600">{category}</h3>
-                  <div className="h-px flex-1 bg-slate-200" />
-                  <span className="text-xs font-semibold text-slate-400">{courses.length} Vorlesungen</span>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">{category}</h3>
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                  <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">{courses.length} Vorlesungen</span>
                 </div>
 
                 {viewMode === 'cards' ? (
@@ -248,40 +266,40 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                         <div
                           key={course.ref_id}
                           onClick={() => onSelectCourse(course.ref_id)}
-                          className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-red-300 hover:shadow-md cursor-pointer"
+                          className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:border-slate-400 hover:shadow-md cursor-pointer dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
                         >
                           <div>
                             <div className="flex items-start justify-between gap-2">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-red-50 group-hover:text-red-600 transition">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-slate-700 transition">
                                 <CourseIcon iconName={iconName} className="h-5 w-5" />
                               </div>
-                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-600">
+                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                                 {course.ref_id}
                               </span>
                             </div>
 
-                            <h4 className="mt-3.5 text-base font-bold text-slate-900 group-hover:text-red-600 transition leading-snug">
+                            <h4 className="mt-3.5 text-base font-bold text-slate-900 group-hover:text-[var(--accent)] dark:text-slate-100 dark:group-hover:text-[var(--accent)] transition leading-snug">
                               {displayName}
                             </h4>
 
                             {displayName !== course.title && (
-                              <p className="mt-1 text-xs text-slate-400 line-clamp-1" title={course.title}>
+                              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500 line-clamp-1" title={course.title}>
                                 {course.title}
                               </p>
                             )}
                           </div>
 
                           {/* Contact or Lecturer */}
-                          <div className="mt-5 border-t border-slate-100 pt-3 flex items-center justify-between text-xs text-slate-500">
+                          <div className="mt-5 border-t border-slate-100 dark:border-slate-800 pt-3 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                             {course.description ? (
                               <div className="flex items-center gap-1.5 truncate pr-2">
                                 <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                                 <span className="truncate">{course.description.replace('Contact: ', '')}</span>
                               </div>
                             ) : (
-                              <span className="text-slate-400">Keine Dozenten-Info</span>
+                              <span className="text-slate-400 dark:text-slate-600">Keine Dozenten-Info</span>
                             )}
-                            <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-red-600 group-hover:translate-x-0.5 transition shrink-0" />
+                            <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-[var(--accent)] group-hover:translate-x-0.5 transition shrink-0 dark:text-slate-600" />
                           </div>
                         </div>
                       );
@@ -289,7 +307,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                   </div>
                 ) : (
                   /* Compact List View */
-                  <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden">
+                  <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden dark:border-slate-800 dark:bg-slate-900 dark:divide-slate-800">
                     {courses.map((course) => {
                       const displayName = cache.getDisplayName(course.ref_id, course.title);
                       const iconName = cache.getCourseIcon(course.ref_id);
@@ -298,34 +316,34 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                         <div
                           key={course.ref_id}
                           onClick={() => onSelectCourse(course.ref_id)}
-                          className="group flex items-center justify-between p-3.5 hover:bg-slate-50/80 transition cursor-pointer gap-4"
+                          className="group flex items-center justify-between p-3.5 hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition cursor-pointer gap-4"
                         >
                           <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-red-50 group-hover:text-red-600 transition">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 transition">
                               <CourseIcon iconName={iconName} className="h-4 w-4" />
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <h4 className="text-sm font-bold text-slate-900 group-hover:text-red-600 transition truncate">
+                                <h4 className="text-sm font-bold text-slate-900 group-hover:text-[var(--accent)] dark:text-slate-100 transition truncate">
                                   {displayName}
                                 </h4>
-                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500 shrink-0">
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400 shrink-0">
                                   {course.ref_id}
                                 </span>
                               </div>
                               {displayName !== course.title && (
-                                <p className="text-xs text-slate-400 truncate max-w-xl">{course.title}</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-xl">{course.title}</p>
                               )}
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-4 shrink-0 text-xs text-slate-500">
+                          <div className="flex items-center gap-4 shrink-0 text-xs text-slate-500 dark:text-slate-400">
                             {course.description && (
-                              <span className="hidden sm:inline-block max-w-xs truncate text-slate-400 text-[11px]">
+                              <span className="hidden sm:inline-block max-w-xs truncate text-slate-400 dark:text-slate-500 text-[11px]">
                                 {course.description.replace('Contact: ', '')}
                               </span>
                             )}
-                            <span className="inline-flex items-center gap-1 font-semibold text-slate-700 group-hover:text-red-600 transition text-xs">
+                            <span className="inline-flex items-center gap-1 font-semibold text-slate-700 group-hover:text-[var(--accent)] dark:text-slate-300 transition text-xs">
                               Öffnen
                               <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition" />
                             </span>

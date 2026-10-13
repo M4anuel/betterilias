@@ -14,13 +14,24 @@ import {
   FeedbackFilesResponse,
   MaterialItem,
 } from '../types';
+import { cache } from './cache';
 
 
 const API_BASE = '/api';
 
 // Protected API responses confirm the current session, including expiry.
 async function sessionFetch(input: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(input, init);
+  const sessionId = cache.getSessionId();
+  const headers = new Headers(init?.headers);
+  if (sessionId && !headers.has('X-Session-Id')) {
+    headers.set('X-Session-Id', sessionId);
+  }
+
+  const response = await fetch(input, {
+    ...init,
+    headers,
+  });
+
   if (response.status === 401) {
     window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
   } else if (response.ok && !input.startsWith(`${API_BASE}/auth/`)) {
@@ -36,13 +47,62 @@ export const api = {
     return res.json();
   },
 
-  async triggerBrowserLogin(): Promise<{ success: boolean; message: string }> {
+  async triggerBrowserLogin(): Promise<{ success: boolean; session_id?: string; message: string }> {
     const res = await sessionFetch(`${API_BASE}/auth/login-browser`, { method: 'POST' });
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.detail || 'Browser login failed');
     }
-    return res.json();
+    const data = await res.json();
+    if (data.session_id) {
+      cache.setSessionId(data.session_id);
+    }
+    return data;
+  },
+
+  async syncExtensionCookies(payload: {
+    cookies: Record<string, string>;
+    sessionId?: string;
+  }): Promise<{ success: boolean; session_id: string; authenticated: boolean; user_name?: string; message: string }> {
+    const res = await sessionFetch(`${API_BASE}/auth/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Fehler beim Synchronisieren der Cookies');
+    }
+    const data = await res.json();
+    if (data.session_id) {
+      cache.setSessionId(data.session_id);
+    }
+    return data;
+  },
+
+  async setManualCookies(phpsessid: string, ilClientId: string = 'ilias3_unibe'): Promise<{ success: boolean; session_id?: string; message: string }> {
+    const res = await sessionFetch(`${API_BASE}/auth/cookies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phpsessid, il_client_id: ilClientId }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Fehler beim Speichern der Cookies');
+    }
+    const data = await res.json();
+    if (data.session_id) {
+      cache.setSessionId(data.session_id);
+    }
+    return data;
+  },
+
+  async logout(): Promise<void> {
+    try {
+      await sessionFetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+    } finally {
+      cache.setSessionId(null);
+    }
   },
 
   async getSemesters(semester?: string): Promise<SemesterScreenResponse> {
@@ -244,7 +304,11 @@ export const api = {
   },
 
   getDownloadUrl(refId: string, customUrl?: string): string {
-    const params = customUrl ? `?custom_url=${encodeURIComponent(customUrl)}` : '';
-    return `${API_BASE}/materials/${encodeURIComponent(refId)}/download${params}`;
+    const params = new URLSearchParams();
+    if (customUrl) params.set('custom_url', customUrl);
+    const sessionId = cache.getSessionId();
+    if (sessionId) params.set('session_id', sessionId);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return `${API_BASE}/materials/${encodeURIComponent(refId)}/download${qs}`;
   }
 };

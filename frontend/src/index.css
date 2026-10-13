@@ -1,8 +1,36 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --brand-better: #033683;
+  --brand-ilias: #0AACA5;
+  --accent: #0AACA5;
+  --accent-hover: #088b85;
+  --accent-light: rgba(10, 172, 165, 0.08);
+  --accent-border: rgba(10, 172, 165, 0.25);
+  --accent-text: #065e5a;
+}
+
+.dark {
+  --brand-better: #4d8bf5;
+  --brand-ilias: #26d6cf;
+  --accent-light: rgba(10, 172, 165, 0.15);
+  --accent-border: rgba(10, 172, 165, 0.35);
+  --accent-text: #38dcd5;
+}
+
 @layer base {
   * {
     border-color: var(--color-slate-200);
+  }
+
+  .dark * {
+    border-color: var(--color-slate-800);
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   math {
@@ -32,12 +60,12 @@
     margin-bottom: 0.25rem;
   }
   .ilias-rich-content a {
-    color: var(--color-red-600);
+    color: var(--accent);
     text-decoration: underline;
     text-underline-offset: 2px;
   }
   .ilias-rich-content a:hover {
-    color: var(--color-red-700);
+    color: var(--accent-hover);
   }
 }
 
