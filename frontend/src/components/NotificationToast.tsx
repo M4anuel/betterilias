@@ -63,7 +63,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
   const getIcon = (type: string) => {
     switch (type) {
       case 'file':
-        return <FileText className="h-4 w-4 text-red-400" />;
+        return <FileText className="h-4 w-4 text-teal-400" />;
       case 'podcast':
         return <Radio className="h-4 w-4 text-sky-400" />;
       case 'session':
@@ -71,7 +71,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
       case 'log':
         return <Activity className="h-4 w-4 text-amber-400" />;
       default:
-        return <Sparkles className="h-4 w-4 text-blue-400" />;
+        return <Sparkles className="h-4 w-4 text-teal-400" />;
     }
   };
 

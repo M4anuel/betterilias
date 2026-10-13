@@ -21,10 +21,10 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
 
   if (!isOpen) return null;
 
-  const extensionPath = 'c:\\Users\\manue\\OneDrive\\Dokumente\\_Uni\\IliasAlternative\\extension';
+  const extensionGithubUrl = 'https://github.com/M4anuel/betterilias/tree/main/extension';
 
-  const handleCopyPath = () => {
-    navigator.clipboard.writeText(extensionPath);
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(extensionGithubUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -97,21 +97,33 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
                 2
               </span>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-slate-900 dark:text-white">„Entpackte Erweiterung laden“</p>
-                <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5 mb-1.5">
-                  Klicke auf den Button und wähle den Ordner <code className="font-mono text-[10px]">extension/</code> aus:
+                <p className="font-semibold text-slate-900 dark:text-white">Erweiterung von GitHub laden</p>
+                <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5 mb-2">
+                  Lade den Ordner <code className="font-mono text-[10px] rounded bg-slate-200 px-1 py-0.5 dark:bg-slate-700">extension/</code> von GitHub herunter oder clone das Repository:
                 </p>
-                <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-mono text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                  <span className="truncate flex-1">{extensionPath}</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-2.5 dark:border-slate-700 dark:bg-slate-900">
+                  <a
+                    href={extensionGithubUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-[#0AACA5] hover:underline truncate"
+                    title="Erweiterung auf GitHub öffnen"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">github.com/M4anuel/betterilias/.../extension</span>
+                  </a>
                   <button
                     type="button"
-                    onClick={handleCopyPath}
-                    className="flex items-center gap-1 text-[10px] font-sans font-bold text-[#0AACA5] hover:underline shrink-0 cursor-pointer"
+                    onClick={handleCopyUrl}
+                    className="flex items-center justify-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition shrink-0 cursor-pointer"
                   >
-                    {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                    <span>{copied ? 'Kopiert!' : 'Kopieren'}</span>
+                    {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-slate-400" />}
+                    <span>{copied ? 'Kopiert!' : 'Link kopieren'}</span>
                   </button>
                 </div>
+                <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-2">
+                  Klicke anschliessend in Chrome auf <strong>„Entpackte Erweiterung laden“</strong> und wähle den heruntergeladenen <code className="font-mono text-[10px]">extension/</code>-Ordner aus.
+                </p>
               </div>
             </div>
 
@@ -164,16 +176,27 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-3 dark:border-slate-800 dark:bg-slate-850">
-          <a
-            href="https://ilias.unibe.ch"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-          >
-            <span>ILIAS Login öffnen</span>
-            <ExternalLink className="h-3 w-3" />
-          </a>
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-3.5 dark:border-slate-800 dark:bg-slate-800/80 flex-wrap gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <a
+              href="https://ilias.unibe.ch"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
+            >
+              <span>ILIAS Login</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href={extensionGithubUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
+            >
+              <span>GitHub</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
           <button
             onClick={onClose}
             className="rounded-xl bg-slate-200 px-4 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600 transition cursor-pointer"
@@ -186,3 +209,4 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
   );
 };
 
+export default ExtensionInfoModal;

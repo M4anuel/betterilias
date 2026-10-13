@@ -270,7 +270,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                         >
                           <div>
                             <div className="flex items-start justify-between gap-2">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-slate-700 transition">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200 group-hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-slate-700 dark:group-hover:text-slate-100 transition">
                                 <CourseIcon iconName={iconName} className="h-5 w-5" />
                               </div>
                               <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
@@ -319,7 +319,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                           className="group flex items-center justify-between p-3.5 hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition cursor-pointer gap-4"
                         >
                           <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 transition">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200 group-hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-slate-700 dark:group-hover:text-slate-100 transition">
                               <CourseIcon iconName={iconName} className="h-4 w-4" />
                             </div>
                             <div className="min-w-0">

@@ -96,6 +96,8 @@ interface CourseViewProps {
   onManualRefresh: () => void;
   onNotifyChange?: (notifications: any[]) => void;
   loadError?: string | null;
+  activeExerciseRefId?: string | null;
+  onSelectExercise?: (exerciseRefId: string | null) => void;
 }
 
 export const CourseView: React.FC<CourseViewProps> = ({
@@ -109,6 +111,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
   onManualRefresh,
   onNotifyChange,
   loadError,
+  activeExerciseRefId: controlledExerciseRefId,
+  onSelectExercise,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedDrawers, setCollapsedDrawers] = useState<Record<string, boolean>>(() =>
@@ -119,7 +123,16 @@ export const CourseView: React.FC<CourseViewProps> = ({
     setCollapsedDrawers(cache.getCourseDrawersState(courseRefId));
   }, [courseRefId]);
   const [activePodcast, setActivePodcast] = useState<{ refId: string; title: string } | null>(null);
-  const [activeExerciseRefId, setActiveExerciseRefId] = useState<string | null>(null);
+  const [internalExerciseRefId, setInternalExerciseRefId] = useState<string | null>(null);
+  const activeExerciseRefId =
+    controlledExerciseRefId !== undefined ? controlledExerciseRefId : internalExerciseRefId;
+  const setActiveExerciseRefId = (id: string | null) => {
+    if (onSelectExercise) {
+      onSelectExercise(id);
+    } else {
+      setInternalExerciseRefId(id);
+    }
+  };
   const [subfolderMaterials, setSubfolderMaterials] = useState<
     Record<string, { materials: CourseMaterialsResponse; path: string[] }>
   >({});
@@ -752,30 +765,30 @@ export const CourseView: React.FC<CourseViewProps> = ({
     return (
       <div
         key={`${containerRefId}_${item.ref_id}`}
-        className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 hover:bg-slate-50/80 transition gap-3"
+        className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition gap-3"
       >
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div className="mt-0.5">{getItemIcon(item)}</div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-slate-900 leading-snug">
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug">
                 {item.title}
               </span>
               {item.file_size && (
-                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-500">
+                <span className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-500 dark:text-slate-400">
                   {item.file_size}
                 </span>
               )}
             </div>
             {item.description && (
-              <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 line-clamp-1 mt-0.5">
                 {item.description}
               </p>
             )}
             {/* Breadcrumbs / Location Badge */}
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 bg-slate-100/90 px-2 py-0.5 rounded-md w-fit mt-1.5 border border-slate-200/50">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 bg-slate-100/90 dark:bg-slate-800 px-2 py-0.5 rounded-md w-fit mt-1.5 border border-slate-200/50 dark:border-slate-700/50">
               <Folder className="h-3 w-3 text-amber-500 shrink-0" />
-              <span className="font-semibold text-slate-600 truncate max-w-md">
+              <span className="font-semibold text-slate-600 dark:text-slate-300 truncate max-w-md">
                 {breadcrumbs.join(' › ') || 'Hauptordner'}
               </span>
             </div>
@@ -787,7 +800,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             <button
               type="button"
               onClick={() => onNavigateFolder(containerRefId)}
-              className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition shadow-2xs"
+              className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 transition shadow-2xs"
               title="Zu diesem Ordner navigieren"
             >
               <Folder className="h-3 w-3 text-amber-500" />
@@ -903,18 +916,18 @@ export const CourseView: React.FC<CourseViewProps> = ({
         <div
           key={item.ref_id}
           onClick={() => onNavigateFolder(item.ref_id)}
-          className="flex items-center justify-between p-3 hover:bg-slate-50/80 transition rounded-xl border border-transparent hover:border-amber-200 cursor-pointer group"
+          className="flex items-center justify-between p-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition rounded-xl border border-transparent hover:border-amber-200 dark:hover:border-amber-800/60 cursor-pointer group"
         >
           <div className="flex items-center gap-3 truncate pr-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600 shrink-0 group-hover:scale-105 transition">
-              <Folder className="h-4 w-4 fill-amber-100" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shrink-0 group-hover:scale-105 transition">
+              <Folder className="h-4 w-4 fill-amber-100 dark:fill-amber-950/60" />
             </div>
             <div className="truncate">
-              <span className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition block truncate">
+              <span className="text-xs font-bold text-slate-800 group-hover:text-amber-800 dark:text-slate-100 dark:group-hover:text-amber-300 transition block truncate">
                 {item.title}
               </span>
               {item.description && (
-                <span className="text-[10px] text-slate-400 truncate block">{item.description}</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate block">{item.description}</span>
               )}
             </div>
           </div>
@@ -922,11 +935,11 @@ export const CourseView: React.FC<CourseViewProps> = ({
             {stat ? (
               stat.isMapped ? (
                 stat.isEmpty ? (
-                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+                  <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
                     Leer
                   </span>
                 ) : (
-                  <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200/50">
+                  <span className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
                     {stat.files > 0
                       ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}`
                       : `${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`}
@@ -934,11 +947,11 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 )
               ) : null
             ) : isScanningTree ? (
-              <span className="text-[10px] text-slate-400 flex items-center gap-1">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
                 <RefreshCw className="h-2.5 w-2.5 animate-spin text-slate-400" />
               </span>
             ) : null}
-            <span className="text-[11px] font-semibold text-slate-400 group-hover:text-amber-600 transition shrink-0">
+            <span className="text-[11px] font-semibold text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition shrink-0">
               Öffnen →
             </span>
           </div>
@@ -951,17 +964,17 @@ export const CourseView: React.FC<CourseViewProps> = ({
         <div
           key={item.ref_id}
           onClick={() => setActivePodcast({ refId: item.ref_id, title: item.title })}
-          className="flex items-center justify-between p-3 hover:bg-sky-50/70 transition rounded-xl border border-transparent hover:border-sky-200 cursor-pointer group gap-3"
+          className="flex items-center justify-between p-3 hover:bg-sky-50/70 dark:hover:bg-sky-950/40 transition rounded-xl border border-transparent hover:border-sky-200 dark:hover:border-sky-800/60 cursor-pointer group gap-3"
         >
           <div className="flex items-center gap-3 truncate">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600 shrink-0 group-hover:scale-105 transition">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 shrink-0 group-hover:scale-105 transition">
               <Radio className="h-4 w-4" />
             </div>
             <div className="truncate">
-              <span className="text-xs font-bold text-slate-800 group-hover:text-sky-800 transition block truncate">
+              <span className="text-xs font-bold text-slate-800 group-hover:text-sky-800 dark:text-slate-100 dark:group-hover:text-sky-300 transition block truncate">
                 {item.title}
               </span>
-              <span className="text-[10px] text-sky-600 font-medium block truncate">
+              <span className="text-[10px] text-sky-600 dark:text-sky-400 font-medium block truncate">
                 {item.description || 'Opencast Vorlesungsaufzeichnungen ansehen'}
               </span>
             </div>
@@ -974,7 +987,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 e.stopPropagation();
                 setActivePodcast({ refId: item.ref_id, title: item.title });
               }}
-              className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs"
+              className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs cursor-pointer"
             >
               <Play className="h-3 w-3 fill-white" />
               <span>Aufnahmen</span>
@@ -989,17 +1002,17 @@ export const CourseView: React.FC<CourseViewProps> = ({
         <div
           key={item.ref_id}
           onClick={() => setActiveExerciseRefId(item.ref_id)}
-          className="flex items-center justify-between p-3 hover:bg-indigo-50/70 transition rounded-xl border border-transparent hover:border-indigo-200 cursor-pointer group gap-3"
+          className="flex items-center justify-between p-3 hover:bg-indigo-50/70 dark:hover:bg-indigo-950/40 transition rounded-xl border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800/60 cursor-pointer group gap-3"
         >
           <div className="flex items-center gap-3 truncate">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 shrink-0 group-hover:scale-105 transition">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 shrink-0 group-hover:scale-105 transition">
               <Layers className="h-4 w-4" />
             </div>
             <div className="truncate">
-              <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-800 transition block truncate">
+              <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-800 dark:text-slate-100 dark:group-hover:text-indigo-300 transition block truncate">
                 {item.title}
               </span>
-              <span className="text-[10px] text-indigo-600 font-medium block truncate">
+              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium block truncate">
                 {item.description || 'Übungsblätter, Abgaben & Bewertungen verwalten'}
               </span>
             </div>
@@ -1026,10 +1039,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
       return (
         <div
           key={item.ref_id}
-          className="flex items-center justify-between p-3 hover:bg-purple-50/70 transition rounded-xl border border-transparent hover:border-purple-200 group gap-3"
+          className="flex items-center justify-between p-3 hover:bg-purple-50/70 dark:hover:bg-purple-950/40 transition rounded-xl border border-transparent hover:border-purple-200 dark:hover:border-purple-800/60 group gap-3"
         >
           <div className="flex items-center gap-3 truncate">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600 shrink-0 group-hover:scale-105 transition">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 shrink-0 group-hover:scale-105 transition">
               <Vote className="h-4 w-4" />
             </div>
             <div className="truncate">
@@ -1037,12 +1050,12 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 href={item.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs font-bold text-slate-800 group-hover:text-purple-800 transition block truncate"
+                className="text-xs font-bold text-slate-800 group-hover:text-purple-800 dark:text-slate-100 dark:group-hover:text-purple-300 transition block truncate"
                 title={item.title}
               >
                 {item.title}
               </a>
-              <span className="text-[10px] text-purple-600 font-medium block truncate">
+              <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium block truncate">
                 {item.description || 'ILIAS Live Voting'}
               </span>
             </div>
@@ -1138,36 +1151,36 @@ export const CourseView: React.FC<CourseViewProps> = ({
     return (
       <div
         key={block.id}
-        className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden transition"
+        className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden transition dark:border-slate-800 dark:bg-slate-900"
       >
         <button
           type="button"
           onClick={() => toggleDrawer(block.id)}
-          className="flex w-full items-center justify-between p-4 bg-slate-50/70 hover:bg-slate-100/60 transition text-left select-none cursor-pointer"
+          className="flex w-full items-center justify-between p-4 bg-slate-50/70 hover:bg-slate-100/60 dark:bg-slate-800/70 dark:hover:bg-slate-800 transition text-left select-none cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 text-rose-600 shrink-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 shrink-0">
               <Bookmark className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">{block.title || 'Schublade'}</h3>
-              <p className="text-[11px] text-slate-400">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{block.title || 'Schublade'}</h3>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
                 {(block.child_blocks?.length || 0)} {(block.child_blocks?.length === 1 ? 'Unterabschnitt' : 'Unterabschnitte')}
                 {totalCount > 0 ? ` • ${totalCount} ${totalCount === 1 ? 'Element' : 'Elemente'}` : ''}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-slate-400">
+          <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
             {isCollapsed ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
           </div>
         </button>
 
         {!isCollapsed && (
-          <div className="p-4 space-y-6 border-t border-slate-100">
+          <div className="p-4 space-y-6 border-t border-slate-100 dark:border-slate-800">
             {block.html_content && (
               <div
-                className="ilias-rich-content text-xs text-slate-700 leading-relaxed font-sans rounded-xl bg-slate-50 p-3.5"
+                className="ilias-rich-content text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-sans rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3.5"
                 dangerouslySetInnerHTML={{ __html: cleanRichContentHtml(block.html_content, block.title) }}
               />
             )}
@@ -1179,7 +1192,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             )}
 
             {block.items && block.items.length > 0 && (
-              <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 bg-white shadow-2xs overflow-hidden">
+              <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 bg-white shadow-2xs overflow-hidden dark:border-slate-800 dark:divide-slate-800 dark:bg-slate-900">
                 {block.items.map(renderItemRow)}
               </div>
             )}
@@ -1205,17 +1218,17 @@ export const CourseView: React.FC<CourseViewProps> = ({
     return (
       <div
         key={block.id}
-        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3 transition hover:border-slate-300"
+        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3 transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
       >
         {cleanTitle && (
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
             {getRichBlockIcon(cleanTitle)}
-            <h3 className="text-sm font-bold text-slate-900">{cleanTitle}</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{cleanTitle}</h3>
           </div>
         )}
         {cleanedHtml && (
           <div
-            className="ilias-rich-content text-xs text-slate-700 leading-relaxed font-sans"
+            className="ilias-rich-content text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-sans"
             dangerouslySetInnerHTML={{ __html: cleanedHtml }}
           />
         )}
@@ -1230,10 +1243,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
     return (
       <div key={block.id} className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
             <Calendar className="h-4 w-4 text-emerald-500" />
             <span>{block.title || 'Sitzungen (Termine)'}</span>
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+            <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
               {sessList.length}
             </span>
           </h3>
@@ -1249,15 +1262,15 @@ export const CourseView: React.FC<CourseViewProps> = ({
     return (
       <div key={block.id} className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1.5">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
             <Files className="h-4 w-4 text-amber-500" />
             <span>{block.title || 'Alle Dateien des Kurses'}</span>
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+            <span className="rounded-full bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
               {block.items.length}
             </span>
           </h3>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden dark:border-slate-800 dark:bg-slate-900 dark:divide-slate-800">
           {block.items.map(renderItemRow)}
         </div>
       </div>
@@ -1274,15 +1287,15 @@ export const CourseView: React.FC<CourseViewProps> = ({
       return (
         <div key={block.id} className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <Folder className="h-4 w-4 text-amber-500" />
               <span>{block.title || 'Ordner'}</span>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+              <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
                 {items.length}
               </span>
             </h3>
             {isScanningTree && (
-              <div className="flex items-center gap-1.5 text-[11px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md font-medium">
+              <div className="flex items-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md font-medium">
                 <RefreshCw className="h-3 w-3 animate-spin" />
                 <span>Analysiere Unterordner...</span>
               </div>
@@ -1296,51 +1309,51 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 <div
                   key={folder.ref_id}
                   onClick={() => onNavigateFolder(folder.ref_id)}
-                  className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs transition hover:border-amber-300 hover:shadow-xs cursor-pointer gap-2.5"
+                  className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs transition hover:border-amber-300 hover:shadow-xs cursor-pointer gap-2.5 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-amber-700/60"
                 >
                   <div className="flex items-start gap-3 truncate pr-2">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 shrink-0 group-hover:scale-105 transition">
-                      <Folder className="h-5 w-5 fill-amber-100" />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shrink-0 group-hover:scale-105 transition">
+                      <Folder className="h-5 w-5 fill-amber-100 dark:fill-amber-950/60" />
                     </div>
                     <div className="min-w-0 flex-1 truncate">
-                      <span className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition block truncate">
+                      <span className="text-xs font-bold text-slate-800 group-hover:text-amber-800 dark:text-slate-100 dark:group-hover:text-amber-300 transition block truncate">
                         {folder.title}
                       </span>
                       {folder.description && (
-                        <span className="text-[10px] text-slate-400 truncate block mt-0.5">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate block mt-0.5">
                           {folder.description}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px]">
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-[10px]">
                     {stat ? (
                       stat.isMapped ? (
                         stat.isEmpty ? (
-                          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-medium text-slate-400">
+                          <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 font-medium text-slate-400 dark:text-slate-500">
                             Leer
                           </span>
                         ) : (
-                          <span className="rounded-md bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700 border border-amber-200/50">
+                          <span className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 font-semibold text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
                             {stat.files > 0
                               ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}`
                               : `${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`}
                           </span>
                         )
                       ) : (
-                        <span className="text-slate-400">Ordner</span>
+                        <span className="text-slate-400 dark:text-slate-500">Ordner</span>
                       )
                     ) : isScanningTree ? (
-                      <span className="inline-flex items-center gap-1 text-slate-400">
+                      <span className="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500">
                         <RefreshCw className="h-2.5 w-2.5 animate-spin" />
                         <span>Prüfe...</span>
                       </span>
                     ) : (
-                      <span className="text-slate-400">Ordner</span>
+                      <span className="text-slate-400 dark:text-slate-500">Ordner</span>
                     )}
 
-                    <span className="font-semibold text-slate-400 group-hover:text-amber-600 transition">
+                    <span className="font-semibold text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">
                       Öffnen →
                     </span>
                   </div>
@@ -1353,8 +1366,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
     }
 
     // Not all folders - check specific types for styling
-    let titleColor = 'text-slate-500';
-    let badgeClass = 'bg-slate-100 text-slate-600';
+    let titleColor = 'text-slate-500 dark:text-slate-400';
+    let badgeClass = 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
     let icon = <Layers className="h-4 w-4 text-indigo-500" />;
 
     const allPodcasts = items.length > 0 && items.every((i) => i.item_type === 'mcst' || i.title.toLowerCase().includes('podcast'));
@@ -1363,16 +1376,16 @@ export const CourseView: React.FC<CourseViewProps> = ({
     const allFiles = items.length > 0 && items.every((i) => i.item_type === 'file');
 
     if (allPodcasts) {
-      titleColor = 'text-sky-600';
-      badgeClass = 'bg-sky-50 text-sky-700';
+      titleColor = 'text-sky-600 dark:text-sky-400';
+      badgeClass = 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300';
       icon = <Radio className="h-4 w-4 text-sky-500" />;
     } else if (allExercises) {
-      titleColor = 'text-indigo-600';
-      badgeClass = 'bg-indigo-50 text-indigo-700';
+      titleColor = 'text-indigo-600 dark:text-indigo-400';
+      badgeClass = 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300';
       icon = <Layers className="h-4 w-4 text-indigo-500" />;
     } else if (allForums) {
-      titleColor = 'text-purple-600';
-      badgeClass = 'bg-purple-50 text-purple-700';
+      titleColor = 'text-purple-600 dark:text-purple-400';
+      badgeClass = 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300';
       icon = <MessageSquare className="h-4 w-4 text-purple-500" />;
     } else if (allFiles) {
       titleColor = 'text-teal-600 dark:text-teal-400';
@@ -1380,8 +1393,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
       icon = <FileText className="h-4 w-4 text-teal-500" />;
     } else {
       // Mixed contents (e.g. Inhalte, Materialien)
-      titleColor = 'text-indigo-600';
-      badgeClass = 'bg-indigo-50 text-indigo-700';
+      titleColor = 'text-indigo-600 dark:text-indigo-400';
+      badgeClass = 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300';
       icon = <BookOpen className="h-4 w-4 text-indigo-500" />;
     }
 
@@ -1396,7 +1409,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             </span>
           </h3>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden dark:border-slate-800 dark:bg-slate-900 dark:divide-slate-800">
           {items.map(renderItemRow)}
         </div>
       </div>
@@ -1405,10 +1418,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
   const renderHeadingBlock = (block: CourseContentBlock): React.ReactNode => {
     return (
-      <div key={block.id} className="pt-6 pb-2 border-b border-slate-200">
+      <div key={block.id} className="pt-6 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2.5">
           <div className="h-5 w-1 rounded-full bg-indigo-600" />
-          <h2 className="text-base font-bold text-slate-800 tracking-tight">
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 tracking-tight">
             {block.title || 'Abschnitt'}
           </h2>
         </div>
@@ -1437,7 +1450,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
       {/* Top Header with Breadcrumbs & Sync Status */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <CompactBreadcrumbs
           rawBreadcrumbs={materialsData?.breadcrumbs || []}
           courseNickname={courseNickname}
@@ -1451,12 +1464,12 @@ export const CourseView: React.FC<CourseViewProps> = ({
         {/* Sync / Refresh status */}
         <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
           {isRevalidating ? (
-            <div className="flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700">
+            <div className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:text-blue-300">
               <RefreshCw className="h-3 w-3 animate-spin" />
               <span>Synchronisiere...</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+            <div className="flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
               <CheckCircle className="h-3 w-3 text-emerald-500" />
               <span>Lokal bereitgestellt</span>
             </div>
@@ -1465,7 +1478,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
           <button
             onClick={onManualRefresh}
             disabled={isRevalidating}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition disabled:opacity-50 cursor-pointer"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-200 transition disabled:opacity-50 cursor-pointer"
             title="Neu von ILIAS abrufen"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -1480,17 +1493,17 @@ export const CourseView: React.FC<CourseViewProps> = ({
             {isInsideSubfolder && (
               <button
                 onClick={() => onNavigateCourseRoot(courseRefId)}
-                className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 <span>Zurück</span>
               </button>
             )}
-            <h1 className="text-xl font-bold text-slate-900 leading-tight">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
               {materialsData?.title || courseNickname}
             </h1>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
             {(materialsData?.items?.length || 0)} {((materialsData?.items?.length || 0) === 1 ? 'Material' : 'Materialien')} verfügbar
           </p>
         </div>
@@ -1593,7 +1606,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                     className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
                       searchCategoryFilter === 'fold'
                         ? 'bg-amber-600 text-white shadow-2xs'
-                        : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                        : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60'
                     }`}
                   >
                     Unterordner ({searchFoldCount})
@@ -1606,7 +1619,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                     className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
                       searchCategoryFilter === 'mcst'
                         ? 'bg-sky-600 text-white shadow-2xs'
-                        : 'bg-sky-50 text-sky-700 hover:bg-sky-100'
+                        : 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60'
                     }`}
                   >
                     Podcasts ({searchMcstCount})
@@ -1619,7 +1632,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                     className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
                       searchCategoryFilter === 'exc'
                         ? 'bg-indigo-600 text-white shadow-2xs'
-                        : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                        : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
                     }`}
                   >
                     Übungen & Weiteres ({searchExcCount})
@@ -1629,20 +1642,20 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
               {/* Search Results List */}
               {filteredSearchResults.length > 0 ? (
-                <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden">
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden">
                   {filteredSearchResults.map(renderSearchResultRow)}
                 </div>
               ) : (
-                <div className="flex h-52 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center">
-                  <Search className="h-8 w-8 text-slate-300 mb-2" />
-                  <h4 className="text-sm font-bold text-slate-700">Keine Suchergebnisse gefunden</h4>
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                <div className="flex h-52 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center">
+                  <Search className="h-8 w-8 text-slate-300 dark:text-slate-600 mb-2" />
+                  <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Keine Suchergebnisse gefunden</h4>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-sm">
                     In diesem Kurs oder dessen Unterordnern wurden keine Materialien zu &quot;{searchQuery}&quot; gefunden.
                   </p>
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="mt-4 rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+                    className="mt-4 rounded-xl bg-slate-100 dark:bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
                   >
                     Suche zurücksetzen
                   </button>
@@ -1690,10 +1703,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
               // 3. Request completed and confirmed empty
               if (rendered.length === 0) {
                 return (
-                  <div className="flex h-44 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white text-center p-6">
-                    <Search className="h-6 w-6 text-slate-300 mb-2" />
-                    <p className="text-xs font-bold text-slate-700">Keine Materialien vorhanden</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">In diesem Bereich wurden noch keine Materialien gefunden.</p>
+                  <div className="flex h-44 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center p-6">
+                    <Search className="h-6 w-6 text-slate-300 dark:text-slate-600 mb-2" />
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Keine Materialien vorhanden</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">In diesem Bereich wurden noch keine Materialien gefunden.</p>
                   </div>
                 );
               }

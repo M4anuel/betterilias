@@ -17,6 +17,47 @@ import { api } from './lib/api';
 import { cache } from './lib/cache';
 import { theme } from './lib/theme';
 
+export interface NavigationState {
+  semester: string;
+  courseId: string | null;
+  containerId: string | null;
+  exerciseId: string | null;
+}
+
+export function stateToUrl(state: NavigationState): string {
+  const params = new URLSearchParams();
+  if (state.courseId) {
+    params.set('course', state.courseId);
+    if (state.containerId && state.containerId !== state.courseId) {
+      params.set('folder', state.containerId);
+    }
+    if (state.exerciseId) {
+      params.set('exercise', state.exerciseId);
+    }
+  } else {
+    if (state.semester) {
+      params.set('semester', state.semester);
+    }
+  }
+  const qs = params.toString();
+  return qs ? `?${qs}` : window.location.pathname;
+}
+
+export function parseStateFromUrl(defaultSemester: string): NavigationState {
+  const params = new URLSearchParams(window.location.search);
+  const courseId = params.get('course');
+  const folderId = params.get('folder');
+  const exerciseId = params.get('exercise');
+  const semester = params.get('semester') || defaultSemester;
+
+  return {
+    semester,
+    courseId: courseId || null,
+    containerId: folderId || courseId || null,
+    exerciseId: exerciseId || null,
+  };
+}
+
 export const App: React.FC = () => {
   // --- Auth & Session State ---
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
@@ -24,32 +65,59 @@ export const App: React.FC = () => {
   const authRequestSeq = useRef(0);
   const [changeNotifications, setChangeNotifications] = useState<ChangeNotification[]>([]);
 
+  // --- URL Search Params Initialization ---
+  const initialParams = new URLSearchParams(window.location.search);
+  const initialSemesterParam = initialParams.get('semester');
+  const initialCourseParam = initialParams.get('course');
+  const initialFolderParam = initialParams.get('folder');
+  const initialExerciseParam = initialParams.get('exercise');
+
   // --- Semester & Courses State ---
+  const [selectedSemester, setSelectedSemester] = useState<string>(() => {
+    return initialSemesterParam || cache.getSelectedSemester();
+  });
   const [semesterData, setSemesterData] = useState<SemesterScreenResponse | null>(() => {
-    const sem = cache.getSelectedSemester();
+    const sem = initialSemesterParam || cache.getSelectedSemester();
     return cache.getCachedSemester(sem);
   });
   const [isLoadingSemester, setIsLoadingSemester] = useState(false);
-  const [selectedSemester, setSelectedSemester] = useState<string>(() =>
-    cache.getSelectedSemester()
-  );
   const semesterRequestSeq = useRef<number>(0);
 
   // --- Navigation & Course State ---
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() =>
-    cache.getLastOpenedCourseId()
-  );
-  const [currentContainerId, setCurrentContainerId] = useState<string | null>(() =>
-    cache.getLastOpenedCourseId()
-  );
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() => {
+    if (initialCourseParam) return initialCourseParam;
+    if (!initialSemesterParam) {
+      return cache.getLastOpenedCourseId();
+    }
+    return null;
+  });
+  const [currentContainerId, setCurrentContainerId] = useState<string | null>(() => {
+    if (initialFolderParam) return initialFolderParam;
+    if (initialCourseParam) return initialCourseParam;
+    if (!initialSemesterParam) {
+      return cache.getLastOpenedCourseId();
+    }
+    return null;
+  });
+  const [activeExerciseRefId, setActiveExerciseRefId] = useState<string | null>(() => {
+    return initialExerciseParam || null;
+  });
+
   const [materialsData, setMaterialsData] = useState<CourseMaterialsResponse | null>(() => {
-    const lastId = cache.getLastOpenedCourseId();
-    return lastId ? cache.getCachedMaterials(lastId) : null;
+    const containerId =
+      initialFolderParam ||
+      initialCourseParam ||
+      (!initialSemesterParam ? cache.getLastOpenedCourseId() : null);
+    return containerId ? cache.getCachedMaterials(containerId) : null;
   });
   const [isRevalidatingMaterials, setIsRevalidatingMaterials] = useState(false);
   const [loadMaterialsError, setLoadMaterialsError] = useState<string | null>(null);
   const materialsRequestSeq = useRef<number>(0);
-  const activeContainerRef = useRef<string | null>(cache.getLastOpenedCourseId());
+  const activeContainerRef = useRef<string | null>(
+    initialFolderParam ||
+      initialCourseParam ||
+      (!initialSemesterParam ? cache.getLastOpenedCourseId() : null)
+  );
 
   // --- Sidebar & Modal State ---
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() =>
@@ -115,15 +183,6 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // --- Semester Selection Handler ---
-  const handleSelectSemester = useCallback(
-    (semId: string) => {
-      setSelectedSemester(semId);
-      cache.setSelectedSemester(semId);
-      loadSemesters(semId);
-    },
-    [loadSemesters]
-  );
 
   // --- Load Course Materials with Instant Serve + SWR Revalidation & Race-Condition Protection ---
   const loadCourseMaterials = useCallback(
@@ -252,7 +311,151 @@ export const App: React.FC = () => {
     []
   );
 
-  // --- Initial Mount Effect ---
+  // --- Semester Selection Handler ---
+  const handleSelectSemester = useCallback(
+    (semId: string) => {
+      if (semId === selectedSemester && selectedCourseId === null && !activeExerciseRefId) {
+        return;
+      }
+      setSelectedSemester(semId);
+      cache.setSelectedSemester(semId);
+      setSelectedCourseId(null);
+      setCurrentContainerId(null);
+      setActiveExerciseRefId(null);
+      cache.setLastOpenedCourseId(null);
+      setMaterialsData(null);
+      setLoadMaterialsError(null);
+      loadSemesters(semId);
+
+      const nextState: NavigationState = {
+        semester: semId,
+        courseId: null,
+        containerId: null,
+        exerciseId: null,
+      };
+      window.history.pushState(nextState, '', stateToUrl(nextState));
+    },
+    [selectedSemester, selectedCourseId, activeExerciseRefId, loadSemesters]
+  );
+
+  // --- Course Selection Handler ---
+  const handleSelectCourse = useCallback(
+    (courseRefId: string) => {
+      if (
+        courseRefId === selectedCourseId &&
+        currentContainerId === courseRefId &&
+        !activeExerciseRefId
+      ) {
+        return;
+      }
+      setSelectedCourseId(courseRefId);
+      setCurrentContainerId(courseRefId);
+      setActiveExerciseRefId(null);
+      activeContainerRef.current = courseRefId;
+      cache.setLastOpenedCourseId(courseRefId);
+      loadCourseMaterials(courseRefId, true);
+
+      const nextState: NavigationState = {
+        semester: selectedSemester,
+        courseId: courseRefId,
+        containerId: courseRefId,
+        exerciseId: null,
+      };
+      window.history.pushState(nextState, '', stateToUrl(nextState));
+    },
+    [selectedCourseId, currentContainerId, activeExerciseRefId, selectedSemester, loadCourseMaterials]
+  );
+
+  // --- Subfolder Navigation Handler ---
+  const handleNavigateFolder = useCallback(
+    (folderRefId: string) => {
+      if (!selectedCourseId) return;
+      if (folderRefId === currentContainerId && !activeExerciseRefId) return;
+
+      setCurrentContainerId(folderRefId);
+      setActiveExerciseRefId(null);
+      activeContainerRef.current = folderRefId;
+      loadCourseMaterials(folderRefId, false);
+
+      const nextState: NavigationState = {
+        semester: selectedSemester,
+        courseId: selectedCourseId,
+        containerId: folderRefId,
+        exerciseId: null,
+      };
+      window.history.pushState(nextState, '', stateToUrl(nextState));
+    },
+    [selectedCourseId, currentContainerId, activeExerciseRefId, selectedSemester, loadCourseMaterials]
+  );
+
+  // --- Return to Course Root ---
+  const handleNavigateCourseRoot = useCallback(
+    (courseRefId: string) => {
+      if (currentContainerId === courseRefId && !activeExerciseRefId) return;
+
+      setCurrentContainerId(courseRefId);
+      setActiveExerciseRefId(null);
+      activeContainerRef.current = courseRefId;
+      loadCourseMaterials(courseRefId, true);
+
+      const nextState: NavigationState = {
+        semester: selectedSemester,
+        courseId: courseRefId,
+        containerId: courseRefId,
+        exerciseId: null,
+      };
+      window.history.pushState(nextState, '', stateToUrl(nextState));
+    },
+    [currentContainerId, activeExerciseRefId, selectedSemester, loadCourseMaterials]
+  );
+
+  // --- Return to Semester Overview ---
+  const handleNavigateHome = useCallback(() => {
+    if (selectedCourseId === null && !activeExerciseRefId) return;
+
+    materialsRequestSeq.current++;
+    activeContainerRef.current = null;
+    setSelectedCourseId(null);
+    setCurrentContainerId(null);
+    setActiveExerciseRefId(null);
+    cache.setLastOpenedCourseId(null);
+    setMaterialsData(null);
+    setLoadMaterialsError(null);
+
+    const nextState: NavigationState = {
+      semester: selectedSemester,
+      courseId: null,
+      containerId: null,
+      exerciseId: null,
+    };
+    window.history.pushState(nextState, '', stateToUrl(nextState));
+  }, [selectedCourseId, activeExerciseRefId, selectedSemester]);
+
+  // --- Exercise View Handler ---
+  const handleSelectExercise = useCallback(
+    (exerciseRefId: string | null) => {
+      if (exerciseRefId === activeExerciseRefId) return;
+
+      if (exerciseRefId === null) {
+        if (window.history.state?.exerciseId) {
+          window.history.back();
+          return;
+        }
+      }
+
+      setActiveExerciseRefId(exerciseRefId);
+      const nextState: NavigationState = {
+        semester: selectedSemester,
+        courseId: selectedCourseId,
+        containerId: currentContainerId,
+        exerciseId: exerciseRefId,
+      };
+      window.history.pushState(nextState, '', stateToUrl(nextState));
+    },
+    [activeExerciseRefId, selectedSemester, selectedCourseId, currentContainerId]
+  );
+
+  // --- Initial Mount Effect & History Priming ---
   useEffect(() => {
     // 1. Check if session_id was passed in URL query param (e.g. from Chrome Extension)
     const params = new URLSearchParams(window.location.search);
@@ -262,6 +465,31 @@ export const App: React.FC = () => {
       params.delete('session_id');
       const newQuery = params.toString() ? `?${params.toString()}` : '';
       window.history.replaceState({}, '', `${window.location.pathname}${newQuery}${window.location.hash}`);
+    }
+
+    // 2. Prime History Stack
+    const currentState: NavigationState = {
+      semester: selectedSemester,
+      courseId: selectedCourseId,
+      containerId: currentContainerId,
+      exerciseId: activeExerciseRefId,
+    };
+
+    if (!window.history.state) {
+      if (selectedCourseId) {
+        // If cold-loaded directly into a course (via last opened course or URL),
+        // prime the base history entry with Semester Overview so Mouse 4 / Back navigates to it!
+        const baseState: NavigationState = {
+          semester: selectedSemester,
+          courseId: null,
+          containerId: null,
+          exerciseId: null,
+        };
+        window.history.replaceState(baseState, '', stateToUrl(baseState));
+        window.history.pushState(currentState, '', stateToUrl(currentState));
+      } else {
+        window.history.replaceState(currentState, '', stateToUrl(currentState));
+      }
     }
 
     const handleSession = (event: Event) => {
@@ -287,14 +515,14 @@ export const App: React.FC = () => {
     window.addEventListener('message', handleMessage);
     window.addEventListener('focus', checkAuth);
     checkAuth();
-    const initialSemester = cache.getSelectedSemester();
-    loadSemesters(initialSemester);
 
-    // If there is a last opened course, load it instantly
-    const initialCourseId = cache.getLastOpenedCourseId();
-    if (initialCourseId) {
-      loadCourseMaterials(initialCourseId, true);
+    loadSemesters(selectedSemester);
+
+    // If there is an active container, load its materials
+    if (currentContainerId) {
+      loadCourseMaterials(currentContainerId, currentContainerId === selectedCourseId);
     }
+
     return () => {
       ++authRequestSeq.current;
       window.removeEventListener('ilias-session', handleSession);
@@ -302,6 +530,69 @@ export const App: React.FC = () => {
       window.removeEventListener('focus', checkAuth);
     };
   }, [checkAuth, loadSemesters, loadCourseMaterials]);
+
+  // --- History Navigation & PopState Effect ---
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const state: NavigationState =
+        (event.state as NavigationState) || parseStateFromUrl(cache.getSelectedSemester());
+
+      // 1. Update semester if changed
+      if (state.semester) {
+        setSelectedSemester(state.semester);
+        cache.setSelectedSemester(state.semester);
+        loadSemesters(state.semester);
+      }
+
+      // 2. Update exercise
+      setActiveExerciseRefId(state.exerciseId || null);
+
+      // 3. Update course & container
+      if (state.courseId && state.containerId) {
+        setSelectedCourseId(state.courseId);
+        setCurrentContainerId(state.containerId);
+        activeContainerRef.current = state.containerId;
+        cache.setLastOpenedCourseId(state.courseId);
+
+        // Instant serve from cache (0ms) + SWR revalidate
+        loadCourseMaterials(state.containerId, state.containerId === state.courseId);
+      } else {
+        // Return to Semester Overview
+        materialsRequestSeq.current++;
+        activeContainerRef.current = null;
+        setSelectedCourseId(null);
+        setCurrentContainerId(null);
+        cache.setLastOpenedCourseId(null);
+        setMaterialsData(null);
+        setLoadMaterialsError(null);
+      }
+    };
+
+    // Close any open modal on Mouse 4 (Back) if modal is open
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 3) {
+        if (isNicknameModalOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsNicknameModalOpen(false);
+          return;
+        }
+        if (isExtensionModalOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsExtensionModalOpen(false);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [loadSemesters, loadCourseMaterials, isNicknameModalOpen, isExtensionModalOpen]);
 
   // --- Logout Handler ---
   const handleLogout = async () => {
@@ -315,40 +606,6 @@ export const App: React.FC = () => {
     }
   };
 
-  // --- Course Selection Handler ---
-  const handleSelectCourse = (courseRefId: string) => {
-    setSelectedCourseId(courseRefId);
-    setCurrentContainerId(courseRefId);
-    activeContainerRef.current = courseRefId;
-    cache.setLastOpenedCourseId(courseRefId);
-    loadCourseMaterials(courseRefId, true);
-  };
-
-  // --- Subfolder Navigation Handler ---
-  const handleNavigateFolder = (folderRefId: string) => {
-    setCurrentContainerId(folderRefId);
-    activeContainerRef.current = folderRefId;
-    loadCourseMaterials(folderRefId, false);
-  };
-
-  // --- Return to Course Root ---
-  const handleNavigateCourseRoot = (courseRefId: string) => {
-    setCurrentContainerId(courseRefId);
-    activeContainerRef.current = courseRefId;
-    loadCourseMaterials(courseRefId, true);
-  };
-
-  // --- Return to Semester Overview ---
-  const handleNavigateHome = () => {
-    materialsRequestSeq.current++;
-    activeContainerRef.current = null;
-    setSelectedCourseId(null);
-    setCurrentContainerId(null);
-    cache.setLastOpenedCourseId(null);
-    setMaterialsData(null);
-    setLoadMaterialsError(null);
-  };
-
   // --- Toggle Sidebar ---
   const handleToggleSidebar = () => {
     const next = !isSidebarCollapsed;
@@ -360,6 +617,30 @@ export const App: React.FC = () => {
   const currentNickname = selectedCourseId
     ? cache.getDisplayName(selectedCourseId, currentCourse?.title || materialsData?.title || '')
     : '';
+
+  // --- Dynamic Document Title ---
+  useEffect(() => {
+    if (activeExerciseRefId) {
+      document.title = `BetterIlias – Übungen (${currentNickname || currentCourse?.title || 'Vorlesung'})`;
+    } else if (selectedCourseId) {
+      const courseTitle = currentNickname || currentCourse?.title || 'Vorlesung';
+      const folderTitle =
+        currentContainerId && currentContainerId !== selectedCourseId && materialsData?.title
+          ? ` – ${materialsData.title}`
+          : '';
+      document.title = `BetterIlias – ${courseTitle}${folderTitle}`;
+    } else {
+      document.title = `BetterIlias – ${selectedSemester} Vorlesungsübersicht`;
+    }
+  }, [
+    activeExerciseRefId,
+    selectedCourseId,
+    currentContainerId,
+    currentNickname,
+    currentCourse,
+    materialsData,
+    selectedSemester,
+  ]);
 
   // Enforce strict container matching so CourseView NEVER receives data from a different lecture/container
   const isMatchingContainer =
@@ -432,6 +713,8 @@ export const App: React.FC = () => {
               onNavigateFolder={handleNavigateFolder}
               onNavigateHome={handleNavigateHome}
               onNavigateCourseRoot={handleNavigateCourseRoot}
+              activeExerciseRefId={activeExerciseRefId}
+              onSelectExercise={handleSelectExercise}
               isRevalidating={isRevalidatingMaterials}
               onManualRefresh={() => loadCourseMaterials(currentContainerId, false)}
               onNotifyChange={(notifs) => setChangeNotifications((prev) => [...prev, ...notifs])}

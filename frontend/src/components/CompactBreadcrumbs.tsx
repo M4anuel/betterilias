@@ -69,11 +69,11 @@ export const CompactBreadcrumbs: React.FC<CompactBreadcrumbsProps> = ({
   }
 
   return (
-    <nav aria-label="Compact Breadcrumb" className="flex items-center text-xs text-slate-500 overflow-x-auto py-1">
+    <nav aria-label="Compact Breadcrumb" className="flex items-center text-xs text-slate-500 dark:text-slate-400 overflow-x-auto py-1">
       {/* Home / Semester trigger */}
       <button
         onClick={onNavigateHome}
-        className="flex items-center gap-1 font-medium hover:text-slate-900 transition shrink-0"
+        className="flex items-center gap-1 font-medium hover:text-slate-900 dark:hover:text-slate-100 transition shrink-0 cursor-pointer"
         title="Startseite / Semester"
       >
         <Home className="h-3.5 w-3.5" />
@@ -83,16 +83,16 @@ export const CompactBreadcrumbs: React.FC<CompactBreadcrumbsProps> = ({
       {/* Subject */}
       {subject && (
         <>
-          <ChevronRight className="h-3.5 w-3.5 text-slate-300 mx-1.5 shrink-0" />
-          <span className="font-medium text-slate-600 shrink-0">{subject.title}</span>
+          <ChevronRight className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600 mx-1.5 shrink-0" />
+          <span className="font-medium text-slate-600 dark:text-slate-300 shrink-0">{subject.title}</span>
         </>
       )}
 
       {/* Semester */}
       {semester && (
         <>
-          <ChevronRight className="h-3.5 w-3.5 text-slate-300 mx-1.5 shrink-0" />
-          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 shrink-0">
+          <ChevronRight className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600 mx-1.5 shrink-0" />
+          <span className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 shrink-0">
             {semester.title}
           </span>
         </>
@@ -101,11 +101,14 @@ export const CompactBreadcrumbs: React.FC<CompactBreadcrumbsProps> = ({
       {/* Course Title (or Nickname) */}
       {courseRefId && (
         <>
-          <ChevronRight className="h-3.5 w-3.5 text-slate-300 mx-1.5 shrink-0" />
+          <ChevronRight className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600 mx-1.5 shrink-0" />
           <button
             onClick={() => onNavigateCourse(courseRefId)}
-            className={`font-semibold shrink-0 hover:underline ${
-              currentFolderRefId === courseRefId ? 'text-red-600 font-bold' : 'text-slate-800'
+            style={currentFolderRefId === courseRefId ? { color: 'var(--accent, #0AACA5)' } : {}}
+            className={`font-semibold shrink-0 hover:underline cursor-pointer ${
+              currentFolderRefId === courseRefId
+                ? 'font-bold'
+                : 'text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             {courseNickname || 'Vorlesung'}
@@ -118,17 +121,17 @@ export const CompactBreadcrumbs: React.FC<CompactBreadcrumbsProps> = ({
         const isLast = idx === subfolders.length - 1;
         return (
           <React.Fragment key={sf.ref_id || idx}>
-            <ChevronRight className="h-3.5 w-3.5 text-slate-300 mx-1.5 shrink-0" />
+            <ChevronRight className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600 mx-1.5 shrink-0" />
             <button
               onClick={() => sf.ref_id && onNavigateFolder?.(sf.ref_id)}
               disabled={isLast || !sf.ref_id}
               className={`flex items-center gap-1 shrink-0 ${
                 isLast
-                  ? 'font-bold text-slate-900 cursor-default'
-                  : 'font-medium text-slate-600 hover:text-slate-900 hover:underline'
+                  ? 'font-bold text-slate-900 dark:text-slate-100 cursor-default'
+                  : 'font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:underline cursor-pointer'
               }`}
             >
-              <Folder className="h-3 w-3 text-amber-500" />
+              <Folder className="h-3 w-3 text-amber-500 fill-amber-100 dark:fill-amber-950/40" />
               <span>{sf.title}</span>
             </button>
           </React.Fragment>

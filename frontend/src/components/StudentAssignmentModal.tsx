@@ -140,27 +140,27 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       }}
     >
       <div
-        className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8 flex flex-col max-h-[90vh]"
+        className="relative w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8 flex flex-col max-h-[90vh] transition-colors"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/70 shrink-0">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4 bg-slate-50/70 dark:bg-slate-800/80 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 shrink-0">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shrink-0">
               <FileText className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-base font-bold text-slate-900 truncate">
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 truncate">
                 {detail?.title || assignmentTitle}
               </h2>
-              <p className="text-xs text-slate-400">Übungsblatt & Einreichung</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Übungsblatt & Einreichung</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition cursor-pointer"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
             title="Schließen (Esc)"
           >
             <X className="h-5 w-5" />
@@ -175,10 +175,10 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
               <p className="text-xs font-semibold">Lade Details zur Aufgabe...</p>
             </div>
           ) : errorMessage ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50/50 p-6 text-center space-y-2">
-              <AlertCircle className="h-6 w-6 text-red-600 mx-auto" />
-              <h3 className="text-sm font-bold text-red-900">Fehler beim Laden</h3>
-              <p className="text-xs text-red-600">{errorMessage}</p>
+            <div className="rounded-2xl border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/30 p-6 text-center space-y-2">
+              <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 mx-auto" />
+              <h3 className="text-sm font-bold text-red-900 dark:text-red-200">Fehler beim Laden</h3>
+              <p className="text-xs text-red-600 dark:text-red-400">{errorMessage}</p>
               <button
                 type="button"
                 onClick={onClose}
@@ -190,11 +190,11 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
           ) : detail ? (
             <>
               {/* Schedule & Fristen Banner */}
-              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-2.5">
+              <div className="rounded-2xl border border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/40 p-4 space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-indigo-600" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                    <Calendar className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-200">
                       Terminplan & Fristen
                     </h3>
                   </div>
@@ -202,8 +202,8 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     <span
                       className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
                         detail.is_ended
-                          ? 'bg-slate-200 text-slate-700'
-                          : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          ? 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          : 'bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
                       }`}
                     >
                       {detail.time_remaining}
@@ -211,20 +211,20 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-indigo-100/70">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-indigo-100/70 dark:border-indigo-900/50">
                   {detail.start_time && (
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <Clock className="h-3.5 w-3.5 text-indigo-500" />
+                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                      <Clock className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
                       <span>
-                        <strong className="text-slate-800">Start:</strong> {detail.start_time}
+                        <strong className="text-slate-800 dark:text-slate-100">Start:</strong> {detail.start_time}
                       </span>
                     </div>
                   )}
                   {detail.ended_on && (
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <Clock className="h-3.5 w-3.5 text-red-500" />
+                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                      <Clock className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
                       <span>
-                        <strong className="text-slate-800">Abgabefrist:</strong> {detail.ended_on}
+                        <strong className="text-slate-800 dark:text-slate-100">Abgabefrist:</strong> {detail.ended_on}
                       </span>
                     </div>
                   )}
@@ -233,12 +233,12 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
 
               {/* Instructions Panel */}
               {detail.instructions && (
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-2">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                     Arbeitsanweisung
                   </h3>
                   <div
-                    className="ilias-rich-content text-xs text-slate-700 leading-relaxed font-sans"
+                    className="ilias-rich-content text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans"
                     dangerouslySetInnerHTML={{ __html: detail.instructions }}
                   />
                 </div>
@@ -246,9 +246,9 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
 
               {/* Exercise Materials Download Panel */}
               {detail.exercise_files && detail.exercise_files.length > 0 && (
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                    <Download className="h-4 w-4 text-indigo-600" />
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2">
+                    <Download className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                     <span>Aufgaben-Materialien & Vorlagen</span>
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -257,15 +257,15 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         key={idx}
                         href={file.download_url}
                         download
-                        className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/60 p-3 hover:bg-indigo-50/50 hover:border-indigo-200 transition group"
+                        className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60 p-3 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/40 hover:border-indigo-200 dark:hover:border-indigo-800 transition group"
                       >
                         <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                          <FileText className="h-4 w-4 text-indigo-600 shrink-0" />
-                          <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-800 truncate block">
+                          <FileText className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-800 dark:group-hover:text-indigo-300 truncate block">
                             {file.filename}
                           </span>
                         </div>
-                        <Download className="h-4 w-4 text-slate-400 group-hover:text-indigo-600 transition shrink-0" />
+                        <Download className="h-4 w-4 text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition shrink-0" />
                       </a>
                     ))}
                   </div>
@@ -273,10 +273,10 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
               )}
 
               {/* Team Information & Team Creation */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3">
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                    <Users className="h-4 w-4 text-indigo-600" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2">
+                    <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                     <span>Team & Gruppenmitglieder</span>
                   </h3>
 
@@ -285,7 +285,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                       href={detail.create_team_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition border border-indigo-200"
+                      className="flex items-center gap-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition border border-indigo-200 dark:border-indigo-800"
                     >
                       <PlusCircle className="h-3.5 w-3.5" />
                       <span>Team erstellen (ILIAS)</span>
@@ -298,32 +298,32 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     {detail.team_members.map((member, idx) => (
                       <span
                         key={idx}
-                        className="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-800 border border-indigo-200/60 flex items-center gap-1"
+                        className="rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 text-xs font-medium text-indigo-800 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 flex items-center gap-1"
                       >
-                        <Users className="h-3 w-3 text-indigo-500" />
+                        <Users className="h-3 w-3 text-indigo-500 dark:text-indigo-400" />
                         <span>{member}</span>
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
                     {detail.team_status_text || 'Kein Team zugeordnet oder Einzelabgabe.'}
                   </p>
                 )}
               </div>
 
               {/* Submission Status & Uploaded Files */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3">
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       Eigene Einreichung
                     </h3>
                     <span
                       className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                         detail.submitted_files && detail.submitted_files.length > 0
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-slate-100 text-slate-600'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                       }`}
                     >
                       {detail.submitted_files && detail.submitted_files.length > 0
@@ -360,8 +360,8 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                 </div>
 
                 {uploadSuccessMessage && (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold flex items-center gap-1.5 animate-in fade-in">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 font-semibold flex items-center gap-1.5 animate-in fade-in">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>{uploadSuccessMessage}</span>
                   </div>
                 )}
@@ -369,7 +369,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                 {detail.submitted_files && detail.submitted_files.length > 0 ? (
                   <div className="space-y-2">
                     {detail.last_submission && (
-                      <p className="text-[11px] text-slate-500 font-medium">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                         Letzte Einreichung: {detail.last_submission}
                       </p>
                     )}
@@ -379,16 +379,16 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         return (
                           <div
                             key={idx}
-                            className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/80 p-3 hover:bg-slate-100/80 transition"
+                            className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/60 p-3 hover:bg-slate-100/80 dark:hover:bg-slate-800 transition"
                           >
                             <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                              <FileText className="h-4 w-4 text-emerald-600 shrink-0" />
+                              <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                               <div className="min-w-0">
-                                <span className="text-xs font-semibold text-slate-800 truncate block">
+                                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate block">
                                   {subFile.filename}
                                 </span>
                                 {subFile.upload_time && (
-                                  <span className="text-[10px] text-slate-400 block">
+                                  <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
                                     {subFile.upload_time}
                                   </span>
                                 )}
@@ -398,7 +398,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                               <a
                                 href={downloadTarget}
                                 download={subFile.filename}
-                                className="flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition shadow-2xs shrink-0"
+                                className="flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-2.5 py-1 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-700 dark:hover:text-indigo-300 hover:border-indigo-200 dark:hover:border-indigo-700 transition shadow-2xs shrink-0"
                                 title="Abgabe direkt herunterladen"
                               >
                                 <Download className="h-3.5 w-3.5" />
@@ -409,7 +409,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                                   type="button"
                                   onClick={() => handleDeleteStudentFile(subFile.delivered_id!, subFile.filename)}
                                   disabled={deletingDeliveredId === subFile.delivered_id}
-                                  className="flex items-center justify-center rounded-lg bg-white border border-rose-200 p-1.5 text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition shadow-2xs shrink-0 cursor-pointer disabled:opacity-50"
+                                  className="flex items-center justify-center rounded-lg bg-white dark:bg-slate-700 border border-rose-200 dark:border-rose-900/60 p-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:border-rose-300 transition shadow-2xs shrink-0 cursor-pointer disabled:opacity-50"
                                   title="Abgabe löschen"
                                 >
                                   {deletingDeliveredId === subFile.delivered_id ? (
@@ -426,19 +426,19 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 space-y-1">
-                    <p className="font-semibold text-slate-600">Noch keine Dateien eingereicht</p>
-                    <p className="text-[11px] text-slate-400">Nutzen Sie den Button oben rechts, um Ihre Ausarbeitung einzureichen.</p>
+                  <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-6 text-center text-xs text-slate-400 dark:text-slate-500 space-y-1">
+                    <p className="font-semibold text-slate-600 dark:text-slate-300">Noch keine Dateien eingereicht</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">Nutzen Sie den Button oben rechts, um Ihre Ausarbeitung einzureichen.</p>
                   </div>
                 )}
               </div>
 
               {/* Tutor Evaluation Feedback Card */}
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-5 shadow-2xs space-y-3">
+              <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/30 p-5 shadow-2xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Award className="h-4 w-4 text-amber-600" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-amber-900">
+                    <Award className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200">
                       Bewertung durch Tutor
                     </h3>
                   </div>
@@ -447,20 +447,20 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     <span
                       className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                         detail.passed_status === 'passed'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
                           : detail.passed_status === 'failed'
-                          ? 'bg-red-100 text-red-800 border border-red-300'
-                          : 'bg-slate-200 text-slate-700'
+                          ? 'bg-red-100 text-red-800 border border-red-300 dark:bg-red-950/60 dark:text-red-300 dark:border-red-800'
+                          : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                       }`}
                     >
                       {detail.passed_status === 'passed' ? (
                         <>
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                           <span>Bestanden</span>
                         </>
                       ) : detail.passed_status === 'failed' ? (
                         <>
-                          <AlertCircle className="h-3.5 w-3.5 text-red-600" />
+                          <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                           <span>Nicht bestanden</span>
                         </>
                       ) : (
@@ -471,17 +471,17 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                 </div>
 
                 {detail.mark && (
-                  <p className="text-xs text-amber-900 font-semibold">
+                  <p className="text-xs text-amber-900 dark:text-amber-200 font-semibold">
                     Note / Punkte: <span className="font-mono">{detail.mark}</span>
                   </p>
                 )}
 
                 {detail.evaluation_statement ? (
-                  <div className="rounded-xl bg-white p-3.5 border border-amber-200/80 text-xs text-slate-800 whitespace-pre-wrap leading-relaxed shadow-2xs">
+                  <div className="rounded-xl bg-white dark:bg-slate-800 p-3.5 border border-amber-200/80 dark:border-amber-900/60 text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed shadow-2xs">
                     {detail.evaluation_statement}
                   </div>
                 ) : (
-                  <p className="text-xs text-amber-800/70 italic">
+                  <p className="text-xs text-amber-800/70 dark:text-amber-400/70 italic">
                     Noch kein Feedback-Kommentar hinterlegt.
                   </p>
                 )}
@@ -491,12 +491,12 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3.5 bg-slate-50/70 shrink-0">
-          <span className="text-[11px] text-slate-400">Drücke Esc zum Schließen</span>
+        <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-6 py-3.5 bg-slate-50/70 dark:bg-slate-800/80 shrink-0">
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">Drücke Esc zum Schließen</span>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-slate-900 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer"
+            className="rounded-xl bg-slate-900 dark:bg-slate-800 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:hover:bg-slate-700 transition cursor-pointer"
           >
             Schließen
           </button>

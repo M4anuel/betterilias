@@ -684,32 +684,32 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       case 'emerald':
         return isActive
           ? 'bg-emerald-600 text-white shadow-2xs ring-2 ring-emerald-400/50'
-          : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200';
+          : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 dark:hover:bg-emerald-900/60';
       case 'amber':
         return isActive
           ? 'bg-amber-600 text-white shadow-2xs ring-2 ring-amber-400/50'
-          : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200';
+          : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 dark:hover:bg-amber-900/60';
       case 'rose':
         return isActive
           ? 'bg-rose-600 text-white shadow-2xs ring-2 ring-rose-400/50'
-          : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200';
+          : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800 dark:hover:bg-rose-900/60';
       case 'purple':
         return isActive
           ? 'bg-purple-600 text-white shadow-2xs ring-2 ring-purple-400/50'
-          : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200';
+          : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800 dark:hover:bg-purple-900/60';
       case 'sky':
         return isActive
           ? 'bg-sky-600 text-white shadow-2xs ring-2 ring-sky-400/50'
-          : 'bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200';
+          : 'bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800 dark:hover:bg-sky-900/60';
       case 'slate':
         return isActive
-          ? 'bg-slate-800 text-white shadow-2xs ring-2 ring-slate-400/50'
-          : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300';
+          ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-2xs ring-2 ring-slate-400/50'
+          : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700';
       case 'indigo':
       default:
         return isActive
           ? 'bg-indigo-600 text-white shadow-2xs ring-2 ring-indigo-400/50'
-          : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200';
+          : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800 dark:hover:bg-indigo-900/60';
     }
   };
 
@@ -1033,41 +1033,41 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
       {/* Top Header with Breadcrumbs & Back Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-2xs cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Zurück zur Vorlesung</span>
           </button>
-          <div className="h-4 w-px bg-slate-200" />
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 overflow-x-auto py-0.5">
+          <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 overflow-x-auto py-0.5">
             <button
               type="button"
               onClick={onBack}
-              className="font-semibold text-slate-600 hover:text-slate-900 transition truncate max-w-[180px] cursor-pointer"
+              className="font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition truncate max-w-[180px] cursor-pointer"
               title="Zurück zum Kurs"
             >
               {courseNickname}
             </button>
             {processedBreadcrumbs.map((b) => (
               <React.Fragment key={b.ref_id}>
-                <span>›</span>
+                <span className="text-slate-400 dark:text-slate-600">›</span>
                 <button
                   type="button"
                   onClick={() => (onNavigateFolder ? onNavigateFolder(b.ref_id) : onBack())}
-                  className="font-medium text-slate-600 hover:text-slate-900 transition truncate max-w-[180px] cursor-pointer"
+                  className="font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition truncate max-w-[180px] cursor-pointer"
                   title={`Zum Ordner ${b.title}`}
                 >
                   {b.title}
                 </button>
               </React.Fragment>
             ))}
-            <span>›</span>
-            <span className="font-bold text-slate-900 shrink-0">{overviewData?.title || 'Übungen'}</span>
+            <span className="text-slate-400 dark:text-slate-600">›</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 shrink-0">{overviewData?.title || 'Übungen'}</span>
           </div>
         </div>
 
@@ -1076,13 +1076,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           type="button"
           onClick={handleRefresh}
           disabled={isLoadingOverview && !overviewData}
-          className="flex items-center gap-1.5 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition disabled:opacity-50 cursor-pointer self-start sm:self-auto"
+          className="flex items-center gap-1.5 rounded-lg p-1.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition disabled:opacity-50 cursor-pointer self-start sm:self-auto"
           title="Neu laden"
         >
           <RefreshCw
             className={`h-4 w-4 ${
               isLoadingOverview || isRevalidatingOverview || (activeTab === 'ta_grading' && isLoadingTaSubmissions)
-                ? 'animate-spin text-indigo-600'
+                ? 'animate-spin text-indigo-600 dark:text-indigo-400'
                 : ''
             }`}
           />
@@ -1095,22 +1095,22 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 shadow-2xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shadow-2xs">
                 <Layers className="h-5 w-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold text-slate-900">
+                  <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                     {overviewData?.title || 'Übungsübersicht'}
                   </h1>
                   {isRevalidatingOverview && (
-                    <span className="flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 border border-indigo-100 animate-pulse">
+                    <span className="flex items-center gap-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800 animate-pulse">
                       <RefreshCw className="h-2.5 w-2.5 animate-spin" />
                       Aktualisiert...
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                   {(overviewData?.assignments || []).length} Übungsblätter verfügbar
                   {ongoingCount > 0 && ` • ${ongoingCount} aktuell aktiv`}
                 </p>
@@ -1119,19 +1119,19 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           </div>
 
           {/* Navigation Bar / Tabs */}
-          <div className="flex items-center gap-1 rounded-2xl bg-slate-100 p-1 border border-slate-200/60 self-start md:self-auto">
+          <div className="flex items-center gap-1 rounded-2xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200/60 dark:border-slate-700/60 self-start md:self-auto">
             <button
               type="button"
               onClick={() => setActiveTab('assignments')}
               className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
                 activeTab === 'assignments'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <FileText className="h-3.5 w-3.5" />
               <span>Übungsblätter</span>
-              <span className="rounded-full bg-slate-200/80 px-1.5 py-0.2 text-[10px]">
+              <span className="rounded-full bg-slate-200/80 dark:bg-slate-700 px-1.5 py-0.2 text-[10px]">
                 {(overviewData?.assignments || []).length}
               </span>
             </button>
@@ -1141,8 +1141,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               onClick={() => setActiveTab('info')}
               className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
                 activeTab === 'info'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <Info className="h-3.5 w-3.5" />
@@ -1157,7 +1157,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
                   activeTab === 'ta_grading'
                     ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-indigo-700 hover:bg-indigo-50'
+                    : 'text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50'
                 }`}
               >
                 <Award className="h-3.5 w-3.5" />
@@ -1174,7 +1174,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       {activeTab === 'assignments' && (
         <div className="space-y-6">
           {/* Filter Bar & Search */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             {/* Filter Pills */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <button
@@ -1182,8 +1182,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 onClick={() => setAssignmentFilterMode('all')}
                 className={`rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer ${
                   assignmentFilterMode === 'all'
-                    ? 'bg-slate-900 text-white shadow-2xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
                 Alle ({(overviewData?.assignments || []).length})
@@ -1195,7 +1195,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 className={`flex items-center gap-1 rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer ${
                   assignmentFilterMode === 'ongoing'
                     ? 'bg-emerald-600 text-white shadow-2xs'
-                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                    : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60'
                 }`}
               >
                 <Zap className="h-3 w-3" />
@@ -1208,7 +1208,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 className={`rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer ${
                   assignmentFilterMode === 'future'
                     ? 'bg-sky-600 text-white shadow-2xs'
-                    : 'bg-sky-50 text-sky-800 hover:bg-sky-100'
+                    : 'bg-sky-50 dark:bg-sky-950/50 text-sky-800 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60'
                 }`}
               >
                 Zukünftig ({(overviewData?.assignments || []).filter((a) => !a.is_ongoing && !a.is_ended).length})
@@ -1219,8 +1219,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 onClick={() => setAssignmentFilterMode('past')}
                 className={`rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer ${
                   assignmentFilterMode === 'past'
-                    ? 'bg-slate-700 text-white shadow-2xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-slate-700 dark:bg-slate-600 text-white shadow-2xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
                 Beendet ({(overviewData?.assignments || []).filter((a) => a.is_ended).length})
@@ -1229,34 +1229,34 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
             {/* Search */}
             <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
               <input
                 type="text"
                 placeholder="Übungsblatt suchen..."
                 value={assignmentSearchQuery}
                 onChange={(e) => setAssignmentSearchQuery(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden transition"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden transition"
               />
             </div>
           </div>
 
           {/* Assignments Grid */}
           {isLoadingOverview && !overviewData ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400">
-              <RefreshCw className="h-6 w-6 animate-spin text-indigo-600" />
+            <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
+              <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
               <p className="text-xs font-semibold">Lade Übungsblätter...</p>
             </div>
           ) : overviewError ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50/50 p-6 text-center space-y-2">
-              <AlertCircle className="h-6 w-6 text-red-600 mx-auto" />
-              <h3 className="text-sm font-bold text-red-900">Fehler beim Laden</h3>
-              <p className="text-xs text-red-600">{overviewError}</p>
+            <div className="rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/30 p-6 text-center space-y-2">
+              <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 mx-auto" />
+              <h3 className="text-sm font-bold text-red-900 dark:text-red-200">Fehler beim Laden</h3>
+              <p className="text-xs text-red-600 dark:text-red-300">{overviewError}</p>
             </div>
           ) : filteredAssignments.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center text-slate-400 space-y-2">
-              <Layers className="h-8 w-8 text-slate-300 mx-auto" />
-              <p className="text-xs font-bold text-slate-700">Keine Übungsblätter gefunden</p>
-              <p className="text-[11px] text-slate-400">Keine Einträge für die gewählte Filterung vorhanden.</p>
+            <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center text-slate-400 dark:text-slate-500 space-y-2">
+              <Layers className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto" />
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Keine Übungsblätter gefunden</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">Keine Einträge für die gewählte Filterung vorhanden.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1267,10 +1267,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 return (
                   <div
                     key={assignment.ass_id || idx}
-                    className={`rounded-2xl border bg-white p-5 shadow-2xs transition hover:shadow-xs flex flex-col justify-between gap-4 ${
+                    className={`rounded-2xl border bg-white dark:bg-slate-900 p-5 shadow-2xs transition hover:shadow-xs flex flex-col justify-between gap-4 ${
                       isOngoing
-                        ? 'border-emerald-300 ring-2 ring-emerald-100 bg-emerald-50/20'
-                        : 'border-slate-200 hover:border-slate-300'
+                        ? 'border-emerald-300 dark:border-emerald-700/80 ring-2 ring-emerald-100 dark:ring-emerald-950/60 bg-emerald-50/20 dark:bg-emerald-950/20'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
                     <div className="space-y-3">
@@ -1278,16 +1278,16 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-2">
                           {isOngoing ? (
-                            <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-300">
-                              <Zap className="h-3 w-3 fill-emerald-600" />
+                            <span className="flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/70 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                              <Zap className="h-3 w-3 fill-emerald-600 dark:fill-emerald-400" />
                               <span>Laufend</span>
                             </span>
                           ) : isEnded ? (
-                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
+                            <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
                               Beendet
                             </span>
                           ) : (
-                            <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 border border-sky-200">
+                            <span className="rounded-full bg-sky-50 dark:bg-sky-950/60 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
                               Zukünftig
                             </span>
                           )}
@@ -1297,8 +1297,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                                 assignment.requirement.toLowerCase().includes('mandatory') ||
                                 assignment.requirement.toLowerCase().includes('pflicht')
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-slate-100 text-slate-600'
+                                  ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                               }`}
                             >
                               {assignment.requirement}
@@ -1306,7 +1306,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           )}
 
                           {assignment.ass_type && (
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                            <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-400">
                               {assignment.ass_type}
                             </span>
                           )}
@@ -1316,8 +1316,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           <span
                             className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
                               assignment.status.toLowerCase().includes('passed')
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-slate-100 text-slate-500'
+                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                             }`}
                           >
                             {assignment.status}
@@ -1326,21 +1326,21 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       </div>
 
                       {/* Title */}
-                      <h3 className="text-base font-bold text-slate-900 leading-snug">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-snug">
                         {assignment.title}
                       </h3>
 
                       {/* Timeline info */}
-                      <div className="space-y-1 text-xs text-slate-500 pt-1 border-t border-slate-100">
+                      <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
                         {assignment.time_remaining && (
-                          <div className="flex items-center gap-1.5 font-medium text-slate-700">
-                            <Clock className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                          <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+                            <Clock className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />
                             <span>{assignment.time_remaining}</span>
                           </div>
                         )}
                         {assignment.edit_until && (
-                          <div className="flex items-center gap-1.5 text-slate-500">
-                            <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                            <Calendar className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                             <span>Frist: {assignment.edit_until}</span>
                           </div>
                         )}
@@ -1348,14 +1348,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                     </div>
 
                     {/* Bottom Action Buttons */}
-                    <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-100">
+                    <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                       {/* Create Team button if supported and available */}
                       {assignment.create_team_url ? (
                         <a
                           href={assignment.create_team_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center gap-1 rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition border border-indigo-200"
+                          className="flex items-center gap-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition border border-indigo-200 dark:border-indigo-800"
                         >
                           <PlusCircle className="h-3.5 w-3.5" />
                           <span>Team erstellen</span>
@@ -1374,7 +1374,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               title: assignment.title,
                             })
                           }
-                          className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition shadow-2xs cursor-pointer ml-auto"
+                          className="flex items-center gap-1.5 rounded-xl bg-slate-900 dark:bg-slate-800 px-4 py-1.5 text-xs font-bold text-white dark:text-slate-100 hover:bg-slate-800 dark:hover:bg-slate-700 transition shadow-2xs cursor-pointer ml-auto border dark:border-slate-700"
                         >
                           <span>Details & Abgabe</span>
                           <span>→</span>
@@ -1395,24 +1395,24 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       {activeTab === 'info' && (
         <div className="space-y-6 max-w-4xl mx-auto">
           {isLoadingInfo && !infoData ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400">
-              <RefreshCw className="h-6 w-6 animate-spin text-indigo-600" />
+            <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
+              <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
               <p className="text-xs font-semibold">Lade Kriterien & Informationen...</p>
             </div>
           ) : infoData && infoData.sections.length > 0 ? (
             <div className="space-y-4">
               {infoData.sections.map((sec, idx) => (
-                <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3">
-                  <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
+                <div key={idx} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-3">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-2">
                     {sec.title}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     {Object.entries(sec.properties).map(([k, v]) => (
-                      <div key={k} className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 space-y-0.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      <div key={k} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-0.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
                           {k}
                         </span>
-                        <span className="text-xs font-semibold text-slate-800 block">{v}</span>
+                        <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">{v}</span>
                       </div>
                     ))}
                   </div>
@@ -1420,8 +1420,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-400">
-              <Info className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center text-slate-400 dark:text-slate-500">
+              <Info className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
               <p className="text-xs font-semibold">Keine zusätzlichen Informationen verfügbar.</p>
             </div>
           )}
@@ -1434,15 +1434,15 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       {activeTab === 'ta_grading' && overviewData?.has_ta_access && (
         <div className="space-y-6">
           {/* Sub-Assignment Dropdown Selector */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 shrink-0 shadow-2xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shrink-0 shadow-2xs">
                 <Layers className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
                 <label
                   htmlFor="ta-assignment-select"
-                  className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block"
+                  className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block"
                 >
                   Zu korrigierendes Übungsblatt auswählen
                 </label>
@@ -1451,7 +1451,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                     id="ta-assignment-select"
                     value={selectedTaAssId || ''}
                     onChange={(e) => handleSelectTaAssignment(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-hidden transition cursor-pointer shadow-2xs"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800 px-3.5 py-2 text-xs font-bold text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-hidden transition cursor-pointer shadow-2xs"
                   >
                     {taAssignmentsList.map((ass) => (
                       <option key={ass.ass_id || ass.title} value={ass.ass_id || ''}>
@@ -1464,28 +1464,28 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             </div>
 
             {/* Submissions Stats Pill & Background Sync Badge */}
-            <div className="flex items-center gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 flex-wrap">
+            <div className="flex items-center gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 flex-wrap">
               {isLoadingTaSubmissions && taSubmissionsData && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold animate-pulse">
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-semibold animate-pulse">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
                   <span>Wird synchronisiert...</span>
                 </div>
               )}
               {taSubmissionsData?.exercise && (
                 <>
-                  <div className="px-3.5 py-1.5 rounded-xl bg-slate-50 border border-slate-100 text-center">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  <div className="px-3.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-center">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
                       Abgaben
                     </span>
-                    <span className="text-xs font-bold text-slate-800">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                       {taSubmissionsData.exercise.submitted_count}
                     </span>
                   </div>
-                  <div className="px-3.5 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-center">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 block">
+                  <div className="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800/80 text-center">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 dark:text-indigo-300 block">
                       Bewertet
                     </span>
-                    <span className="text-xs font-bold text-indigo-700">
+                    <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">
                       {taSubmissionsData.exercise.graded_count}
                     </span>
                   </div>
@@ -1495,10 +1495,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           </div>
 
           {/* TA Grading Menu Bar (Left: Quick-Filters, Middle: Radio & Multi-select, Right: Search, Sorting indicator, Settings 3-dot) */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             {/* Left: Quick-Filters collection */}
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 hidden sm:inline">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 hidden sm:inline">
                 Schnellfilter:
               </span>
               {quickFilters.map((qf) => {
@@ -1531,8 +1531,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             {/* Middle: Submission Radio toggle + Grade Multi-select */}
             <div className="flex items-center gap-2.5 flex-wrap">
               {/* Submission Radio Group */}
-              <div className="flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200/80 text-xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1.5 hidden md:inline">
+              <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
                   Abgabe:
                 </span>
                 <button
@@ -1540,8 +1540,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   onClick={() => handleSetSubmissionFilter('all')}
                   className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
                     taSubmissionFilter === 'all'
-                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                   title="Alle Abgaben anzeigen"
                 >
@@ -1553,7 +1553,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
                     taSubmissionFilter === 'submitted'
                       ? 'bg-sky-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                   title="Nur eingereichte Abgaben anzeigen"
                 >
@@ -1564,8 +1564,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   onClick={() => handleSetSubmissionFilter('not_submitted')}
                   className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
                     taSubmissionFilter === 'not_submitted'
-                      ? 'bg-slate-700 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-slate-700 dark:bg-slate-600 text-white shadow-2xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                   title="Nur noch nicht eingereichte anzeigen"
                 >
@@ -1574,8 +1574,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               </div>
 
               {/* Grade Status Multi-Select Group */}
-              <div className="flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200/80 text-xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1.5 hidden md:inline">
+              <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
                   Bewertung:
                 </span>
                 <button
@@ -1586,8 +1586,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   }}
                   className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
                     taGradeFilter.length === 0
-                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                   title="Alle Bewertungsstufen zulassen"
                 >
@@ -1599,7 +1599,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
                     taGradeFilter.includes('not_graded')
                       ? 'bg-amber-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                   title="Offene / noch nicht bewertete Abgaben filtern"
                 >
@@ -1611,7 +1611,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
                     taGradeFilter.includes('passed')
                       ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                   title="Bestandene Abgaben filtern"
                 >
@@ -1623,7 +1623,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
                     taGradeFilter.includes('failed')
                       ? 'bg-rose-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                   title="Nicht bestandene Abgaben filtern"
                 >
@@ -1636,19 +1636,19 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             <div className="flex items-center gap-2 shrink-0">
               <div className="flex flex-col gap-0.5">
                 <div className="relative w-full sm:w-44">
-                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                   <input
                     type="text"
                     placeholder="Student / Team..."
                     value={taSearchQuery}
                     onChange={(e) => setTaSearchQuery(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-8 pr-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-hidden transition"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800 pl-8 pr-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-hidden transition"
                   />
                 </div>
                 {/* Greyed-out sorting indication under search */}
-                <div className="flex items-center gap-1 px-1 text-[10px] text-slate-400">
+                <div className="flex items-center gap-1 px-1 text-[10px] text-slate-400 dark:text-slate-500">
                   <span>Sortiert:</span>
-                  <span className="text-slate-500 font-semibold">{sortFieldLabel}</span>
+                  <span className="text-slate-500 dark:text-slate-400 font-semibold">{sortFieldLabel}</span>
                   <span className="font-bold">{taSortOrder === 'asc' ? '↑' : '↓'}</span>
                 </div>
               </div>
@@ -1657,7 +1657,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsSettingsModalOpen(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition shadow-2xs cursor-pointer shrink-0"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 transition shadow-2xs cursor-pointer shrink-0"
                 title="Filter-, Sortier- & Kursansicht-Einstellungen öffnen"
               >
                 <MoreVertical className="h-4 w-4" />
@@ -1667,12 +1667,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
           {/* Submissions List */}
           {isLoadingTaSubmissions && !taSubmissionsData ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400">
-              <RefreshCw className="h-6 w-6 animate-spin text-indigo-600" />
+            <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
+              <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
               <p className="text-xs font-semibold">Lade Abgaben zur Bewertung...</p>
             </div>
           ) : filteredTaSubmissions.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-400">
+            <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center text-slate-400 dark:text-slate-500">
               <p className="text-xs font-semibold">Keine Abgaben für diesen Filter gefunden.</p>
             </div>
           ) : (
@@ -1696,10 +1696,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 return (
                   <div
                     key={sub.member_id}
-                    className={`rounded-2xl border bg-white p-4 transition shadow-2xs space-y-3 ${
+                    className={`rounded-2xl border bg-white dark:bg-slate-900 p-4 transition shadow-2xs space-y-3 ${
                       edit.isDirty
-                        ? 'border-amber-300 ring-1 ring-amber-200'
-                        : 'border-slate-200 hover:border-slate-300'
+                        ? 'border-amber-300 dark:border-amber-600/80 ring-1 ring-amber-200 dark:ring-amber-950/60'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
                     {/* Row Header: Student Info & Actions */}
@@ -1708,12 +1708,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         <div
                           className={`flex h-10 w-10 items-center justify-center rounded-xl text-xs font-bold shrink-0 ${
                             sub.team_members && sub.team_members.length > 1
-                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                              : 'bg-slate-100 text-slate-700'
+                              ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                           }`}
                         >
                           {sub.team_members && sub.team_members.length > 1 ? (
-                            <Users className="h-5 w-5 text-indigo-600" />
+                            <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                           ) : (
                             <span>{sub.student_name.slice(0, 2).toUpperCase()}</span>
                           )}
@@ -1725,42 +1725,42 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               sub.team_members.map((member, mIdx) => (
                                 <span
                                   key={mIdx}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1 text-xs font-semibold text-slate-800 border border-slate-200 shadow-2xs transition"
+                                  className="inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-2xs transition"
                                 >
-                                  <User className="h-3 w-3 text-slate-400 shrink-0" />
+                                  <User className="h-3 w-3 text-slate-400 dark:text-slate-500 shrink-0" />
                                   <span>{member}</span>
                                 </span>
                               ))
                             ) : (
-                              <span className="text-sm font-bold text-slate-900">
+                              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
                                 {sub.student_name}
                               </span>
                             )}
 
                             {sub.team_id && (
-                              <span className="rounded-lg bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200">
+                              <span className="rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                                 Team #{sub.team_id}
                               </span>
                             )}
                           </div>
 
                           {/* Submission Timestamps */}
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1">
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500 mt-1">
                             {sub.submission_time ? (
-                              <span className="flex items-center gap-1 font-medium text-slate-600">
-                                <Clock className="h-3 w-3 text-sky-500" />
+                              <span className="flex items-center gap-1 font-medium text-slate-600 dark:text-slate-400">
+                                <Clock className="h-3 w-3 text-sky-500 dark:text-sky-400" />
                                 <span>Abgabe: {sub.submission_time}</span>
                               </span>
                             ) : hasSubmitted ? (
-                              <span className="flex items-center gap-1 font-medium text-emerald-600">
-                                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                              <span className="flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
+                                <CheckCircle2 className="h-3 w-3 text-emerald-500 dark:text-emerald-400" />
                                 <span>Eingereicht</span>
                               </span>
                             ) : (
-                              <span className="text-slate-400">Keine Abgabe eingereicht</span>
+                              <span className="text-slate-400 dark:text-slate-500">Keine Abgabe eingereicht</span>
                             )}
                             {sub.graded_on && (
-                              <span className="text-slate-400">• Bewertet: {sub.graded_on}</span>
+                              <span className="text-slate-400 dark:text-slate-500">• Bewertet: {sub.graded_on}</span>
                             )}
                           </div>
                         </div>
@@ -1772,13 +1772,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           <a
                             href={sub.download_url}
                             download
-                            className="flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-600 hover:text-white transition shadow-2xs border border-indigo-200"
+                            className="flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition shadow-2xs border border-indigo-200 dark:border-indigo-800"
                           >
                             <Download className="h-3.5 w-3.5" />
                             <span>Abgabe herunterladen</span>
                           </a>
                         ) : (
-                          <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-400">
+                          <span className="rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">
                             Keine Datei
                           </span>
                         )}
@@ -1787,20 +1787,20 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         <button
                           type="button"
                           onClick={() => setDetailModalSubmission(sub)}
-                          className="flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition shadow-2xs cursor-pointer"
+                          className="flex items-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-700 dark:hover:text-indigo-300 hover:border-indigo-200 dark:hover:border-indigo-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 transition shadow-2xs cursor-pointer"
                           title="Alle ILIAS-Spalten & Details anzeigen / bearbeiten"
                         >
-                          <Info className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                          <Info className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                           <span className="hidden sm:inline">Details</span>
                         </button>
                       </div>
                     </div>
 
                     {/* Grading & Evaluation Area */}
-                    <div className="rounded-xl bg-slate-50/80 p-3 border border-slate-100 flex flex-col md:flex-row gap-3">
+                    <div className="rounded-xl bg-slate-50/80 dark:bg-slate-800/40 p-3 border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row gap-3">
                       {/* Left: Status Toggle & Grade */}
                       <div className="w-full md:w-56 shrink-0 space-y-2">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
                           Bewertung & Status
                         </label>
 
@@ -1812,7 +1812,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer border ${
                               edit.status === 'passed'
                                 ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                                : 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50'
+                                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
                             }`}
                           >
                             <span>Bestanden</span>
@@ -1825,7 +1825,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer border ${
                               edit.status === 'failed'
                                 ? 'bg-red-600 text-white border-red-600 shadow-2xs'
-                                : 'bg-white text-slate-700 border-slate-200 hover:bg-red-50'
+                                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-950/30'
                             }`}
                           >
                             <span>Nicht bestanden</span>
@@ -1837,8 +1837,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             onClick={() => handleStatusChange(sub.member_id, 'not_graded')}
                             className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer border ${
                               edit.status === 'not_graded'
-                                ? 'bg-slate-700 text-white border-slate-700 shadow-2xs'
-                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
+                                ? 'bg-slate-700 dark:bg-slate-600 text-white border-slate-700 dark:border-slate-600 shadow-2xs'
+                                : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                             }`}
                           >
                             <span>Nicht bewertet</span>
@@ -1854,12 +1854,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               value={edit.mark}
                               onChange={(e) => handleMarkChange(sub.member_id, e.target.value)}
                               placeholder="Note / Punkte (optional)"
-                              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden"
                             />
                           </div>
                         ) : edit.mark ? (
-                          <div className="flex items-center gap-1 text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                            <Award className="h-3 w-3 text-amber-500" />
+                          <div className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                            <Award className="h-3 w-3 text-amber-500 dark:text-amber-400" />
                             <span>Note/Pkt: <strong className="font-semibold">{edit.mark}</strong></span>
                           </div>
                         ) : null}
@@ -1869,7 +1869,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       {evalModeInOverview === 'statement' ? (
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1 rounded-lg bg-slate-200/70 p-0.5 text-[11px]">
+                            <div className="flex items-center gap-1 rounded-lg bg-slate-200/70 dark:bg-slate-800 p-0.5 text-[11px]">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -1877,8 +1877,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 }
                                 className={`px-2 py-0.5 rounded-md font-semibold transition cursor-pointer ${
                                   (rowTabState[sub.member_id] || 'feedback') === 'feedback'
-                                    ? 'bg-white text-slate-900 shadow-2xs'
-                                    : 'text-slate-500 hover:text-slate-900'
+                                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                                 }`}
                               >
                                 Kommentar {edit.feedback ? '•' : ''}
@@ -1890,14 +1890,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 }
                                 className={`px-2 py-0.5 rounded-md font-semibold transition cursor-pointer ${
                                   rowTabState[sub.member_id] === 'notice'
-                                    ? 'bg-white text-slate-900 shadow-2xs'
-                                    : 'text-slate-500 hover:text-slate-900'
+                                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                                 }`}
                               >
                                 Tutor-Notiz {edit.notice ? '•' : ''}
                               </button>
                             </div>
-                            <span className="text-[10px] text-slate-400">
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
                               {(rowTabState[sub.member_id] || 'feedback') === 'feedback'
                                 ? 'Für Studierende sichtbar'
                                 : 'Nur intern für Tutoren'}
@@ -1910,7 +1910,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               value={edit.feedback}
                               onChange={(e) => handleFeedbackChange(sub.member_id, e.target.value)}
                               placeholder="Korrektur-Kommentar für Studierende eingeben..."
-                              className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 font-sans"
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 font-sans"
                             />
                           ) : (
                             <textarea
@@ -1918,34 +1918,34 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               value={edit.notice}
                               onChange={(e) => handleNoticeChange(sub.member_id, e.target.value)}
                               placeholder="Interne Notiz für Tutoren (wird nicht an Studierende gesendet)..."
-                              className="w-full rounded-xl border border-amber-200 bg-amber-50/40 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-amber-500 focus:outline-hidden focus:ring-1 focus:ring-amber-500 font-sans"
+                              className="w-full rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/30 p-2.5 text-xs text-slate-800 dark:text-amber-200 placeholder-slate-400 dark:placeholder-amber-400/60 focus:border-amber-500 focus:outline-hidden focus:ring-1 focus:ring-amber-500 font-sans"
                             />
                           )}
                         </div>
                       ) : evalModeInOverview === 'file' ? (
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
                               Korrektur per Datei
                             </span>
                             {edit.feedback && (
-                              <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                              <span className="text-[10px] text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
                                 Kommentar hinterlegt
                               </span>
                             )}
                           </div>
 
-                          <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div className="text-xs text-indigo-900">
+                          <div className="rounded-xl border border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/30 p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="text-xs text-indigo-900 dark:text-indigo-200">
                               {fileUploadSuccessId === sub.member_id ? (
-                                <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                                <span className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
                                   <Check className="h-3.5 w-3.5" />
                                   <span>Korrekturdatei erfolgreich hochgeladen!</span>
                                 </span>
                               ) : sub.evaluation_by_file_url ? (
                                 <span>Korrekturdatei für diese Abgabe in ILIAS hochladen oder verwalten.</span>
                               ) : (
-                                <span className="text-slate-500">Keine separate Datei-Rückmeldung in ILIAS konfiguriert.</span>
+                                <span className="text-slate-500 dark:text-slate-400">Keine separate Datei-Rückmeldung in ILIAS konfiguriert.</span>
                               )}
                             </div>
 
@@ -1976,7 +1976,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                     href={sub.evaluation_by_file_url}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-indigo-700 bg-white px-2 py-1 rounded-lg border border-slate-200"
+                                    className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700"
                                     title="In ILIAS öffnen"
                                   >
                                     <span>ILIAS</span>
@@ -1994,29 +1994,29 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               value={edit.notice}
                               onChange={(e) => handleNoticeChange(sub.member_id, e.target.value)}
                               placeholder="Tutor-Notiz (intern)..."
-                              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden"
                             />
                           </div>
                         </div>
                       ) : (
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">
                               Korrektur per E-Mail
                             </span>
                             {edit.feedback && (
-                              <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                              <span className="text-[10px] text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
                                 Kommentar hinterlegt
                               </span>
                             )}
                           </div>
 
-                          <div className="rounded-xl border border-sky-100 bg-sky-50/50 p-2.5 flex items-center justify-between gap-3">
-                            <div className="text-xs text-sky-900">
+                          <div className="rounded-xl border border-sky-100 dark:border-sky-900/60 bg-sky-50/50 dark:bg-sky-950/30 p-2.5 flex items-center justify-between gap-3">
+                            <div className="text-xs text-sky-900 dark:text-sky-200">
                               {sub.feedback_mail_url ? (
                                 <span>Feedback direkt per ILIAS-Mail an die/den Studierende(n) senden.</span>
                               ) : (
-                                <span className="text-slate-500">Kein Mail-Link für diese Abgabe hinterlegt.</span>
+                                <span className="text-slate-500 dark:text-slate-400">Kein Mail-Link für diese Abgabe hinterlegt.</span>
                               )}
                             </div>
                             {sub.feedback_mail_url && (
@@ -2039,7 +2039,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               value={edit.notice}
                               onChange={(e) => handleNoticeChange(sub.member_id, e.target.value)}
                               placeholder="Tutor-Notiz (intern)..."
-                              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden"
                             />
                           </div>
                         </div>
@@ -2057,7 +2057,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               ? 'bg-emerald-600'
                               : edit.isDirty
                               ? 'bg-indigo-600 hover:bg-indigo-700'
-                              : 'bg-slate-700 hover:bg-slate-800'
+                              : 'bg-slate-700 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 border dark:border-slate-700'
                           } disabled:opacity-50 disabled:cursor-not-allowed`}
                         >
                           {isSaving ? (
@@ -2067,7 +2067,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             </>
                           ) : isLoadingTaSubmissions ? (
                             <>
-                              <RefreshCw className="h-3.5 w-3.5 animate-spin text-slate-300" />
+                              <RefreshCw className="h-3.5 w-3.5 animate-spin text-slate-300 dark:text-slate-500" />
                               <span>Lädt...</span>
                             </>
                           ) : isSaved ? (
@@ -2083,7 +2083,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           )}
                         </button>
                         {edit.isDirty && (
-                          <span className="text-[10px] font-semibold text-amber-600">
+                          <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
                             Ungespeichert
                           </span>
                         )}

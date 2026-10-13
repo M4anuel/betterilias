@@ -219,17 +219,17 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
     >
       <div
         ref={modalRef}
-        className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150"
+        className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150 transition-colors"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/80">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4 bg-slate-50/80 dark:bg-slate-800/80">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
               <SlidersHorizontal className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900">Reihenfolge der Abschnitte & Blöcke</h2>
-              <p className="text-[11px] text-slate-500">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">Reihenfolge der Abschnitte & Blöcke</h2>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Passe die Anordnung der Vorlesungsblöcke nach deinen Wünschen an
               </p>
             </div>
@@ -237,7 +237,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition cursor-pointer"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
             title="Schliessen"
           >
             <X className="h-4 w-4" />
@@ -262,28 +262,28 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
                   key={blockId}
                   className={`flex items-center justify-between p-3 rounded-2xl border transition shadow-2xs ${
                     isHidden
-                      ? 'border-slate-200/50 bg-slate-50/60 opacity-60'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
+                      ? 'border-slate-200/50 dark:border-slate-800/50 bg-slate-50/60 dark:bg-slate-900/60 opacity-60'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0 pr-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-[11px] font-bold text-slate-600 font-mono shrink-0">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono shrink-0">
                       {idx + 1}
                     </span>
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-50 shrink-0">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800 shrink-0">
                       {meta.icon}
                     </div>
                     <div className="min-w-0 truncate">
                       <div className="flex items-center gap-1.5">
                         <span
                           className={`text-xs font-bold block truncate leading-tight ${
-                            isHidden ? 'line-through text-slate-400' : 'text-slate-800'
+                            isHidden ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-200'
                           }`}
                         >
                           {meta.label}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-400 block truncate">{meta.desc}</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block truncate">{meta.desc}</span>
                     </div>
                   </div>
 
@@ -295,8 +295,8 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
                       onClick={() => onToggleHideBlock(blockId)}
                       className={`p-1.5 rounded-lg transition cursor-pointer ${
                         isHidden
-                          ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/50'
-                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                          ? 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
                       title={isHidden ? 'Block einblenden' : 'Block ausblenden'}
                     >
@@ -308,7 +308,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
                       type="button"
                       onClick={() => moveUp(idx)}
                       disabled={isFirst}
-                      className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-20 disabled:cursor-not-allowed transition cursor-pointer"
+                      className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition cursor-pointer"
                       title="Nach oben verschieben"
                     >
                       <ChevronUp className="h-4 w-4" />
@@ -319,7 +319,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
                       type="button"
                       onClick={() => moveDown(idx)}
                       disabled={isLast}
-                      className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-20 disabled:cursor-not-allowed transition cursor-pointer"
+                      className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition cursor-pointer"
                       title="Nach unten verschieben"
                     >
                       <ChevronDown className="h-4 w-4" />
@@ -331,16 +331,16 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
           </div>
 
           {/* Special Feature: "Alle Dateien" Sammelblock Toggle */}
-          <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-3.5 flex items-center justify-between gap-3">
+          <div className="rounded-2xl border border-amber-200/80 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/30 p-3.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700 shrink-0">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 shrink-0">
                 <Files className="h-4 w-4" />
               </div>
               <div>
-                <span className="text-xs font-bold text-amber-950 block">
+                <span className="text-xs font-bold text-amber-950 dark:text-amber-100 block">
                   Sammelblock &quot;Alle Dateien&quot;
                 </span>
-                <span className="text-[10px] text-amber-800/80 block">
+                <span className="text-[10px] text-amber-800/80 dark:text-amber-300/80 block">
                   Erstellt eine zusätzliche Übersicht aller Dateien dieses Kurses
                 </span>
               </div>
@@ -352,7 +352,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs ${
                 showAllFilesBlock
                   ? 'bg-amber-600 text-white'
-                  : 'bg-white border border-amber-300 text-amber-800 hover:bg-amber-100'
+                  : 'bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-slate-700'
               }`}
             >
               {showAllFilesBlock ? 'Aktiv' : 'Hinzufügen'}
@@ -361,11 +361,11 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-slate-100 bg-slate-50 px-6 py-3.5 flex items-center justify-between gap-3">
+        <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-3.5 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onResetToDefault}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition cursor-pointer"
             title="Auf die originale ILIAS-Reihenfolge der Dozierenden zurücksetzen"
           >
             <RotateCcw className="h-3.5 w-3.5" />
@@ -375,7 +375,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 dark:bg-slate-100 px-4 py-2 text-xs font-bold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 transition cursor-pointer shadow-xs"
           >
             <Check className="h-3.5 w-3.5" />
             <span>Fertig</span>

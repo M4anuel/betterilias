@@ -108,24 +108,24 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl border border-slate-100 flex flex-col animate-in zoom-in-95 duration-150"
+        className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col animate-in zoom-in-95 duration-150 transition-colors"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4.5 bg-slate-50/50">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4.5 bg-slate-50/50 dark:bg-slate-800/60">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 shadow-2xs">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shadow-2xs">
               <SlidersHorizontal className="h-4.5 w-4.5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Filter- & Anzeige-Einstellungen</h2>
-              <p className="text-xs text-slate-500">Konfiguration für Sortierung, Schnellfilter & Kursansicht</p>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Filter- & Anzeige-Einstellungen</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Konfiguration für Sortierung, Schnellfilter & Kursansicht</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -136,8 +136,8 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
           {/* Section 1: Sortierung */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Sortierung der Abgaben</h3>
-              <span className="text-[11px] text-slate-400">Reihenfolge & Kriterium</span>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Sortierung der Abgaben</h3>
+              <span className="text-[11px] text-slate-400 dark:text-slate-500">Reihenfolge & Kriterium</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -146,11 +146,11 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                 onClick={() => onSetSortField('time')}
                 className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border text-xs font-semibold transition cursor-pointer ${
                   sortField === 'time'
-                    ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 ring-2 ring-indigo-500/20'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 ring-2 ring-indigo-500/20 dark:border-indigo-500 dark:bg-indigo-950/60 dark:text-indigo-200'
+                    : 'border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                 }`}
               >
-                <Clock className={`h-4 w-4 ${sortField === 'time' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                <Clock className={`h-4 w-4 ${sortField === 'time' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
                 <span>Abgabezeit</span>
               </button>
 
@@ -159,11 +159,11 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                 onClick={() => onSetSortField('name')}
                 className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border text-xs font-semibold transition cursor-pointer ${
                   sortField === 'name'
-                    ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 ring-2 ring-indigo-500/20'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 ring-2 ring-indigo-500/20 dark:border-indigo-500 dark:bg-indigo-950/60 dark:text-indigo-200'
+                    : 'border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                 }`}
               >
-                <User className={`h-4 w-4 ${sortField === 'name' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                <User className={`h-4 w-4 ${sortField === 'name' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
                 <span>Name</span>
               </button>
 
@@ -172,11 +172,11 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                 onClick={() => onSetSortField('status')}
                 className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border text-xs font-semibold transition cursor-pointer ${
                   sortField === 'status'
-                    ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 ring-2 ring-indigo-500/20'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 ring-2 ring-indigo-500/20 dark:border-indigo-500 dark:bg-indigo-950/60 dark:text-indigo-200'
+                    : 'border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                 }`}
               >
-                <CheckCircle2 className={`h-4 w-4 ${sortField === 'status' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                <CheckCircle2 className={`h-4 w-4 ${sortField === 'status' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
                 <span>Status</span>
               </button>
 
@@ -185,26 +185,26 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                 onClick={() => onSetSortField('mark')}
                 className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border text-xs font-semibold transition cursor-pointer ${
                   sortField === 'mark'
-                    ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 ring-2 ring-indigo-500/20'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 ring-2 ring-indigo-500/20 dark:border-indigo-500 dark:bg-indigo-950/60 dark:text-indigo-200'
+                    : 'border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                 }`}
               >
-                <Award className={`h-4 w-4 ${sortField === 'mark' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                <Award className={`h-4 w-4 ${sortField === 'mark' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
                 <span>Note / Punkte</span>
               </button>
             </div>
 
             {/* Sort Direction Toggle */}
             <div className="flex items-center gap-2 pt-1">
-              <span className="text-xs text-slate-500">Richtung:</span>
-              <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs">
+              <span className="text-xs text-slate-500 dark:text-slate-400">Richtung:</span>
+              <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 text-xs">
                 <button
                   type="button"
                   onClick={() => onSetSortOrder('asc')}
                   className={`flex items-center gap-1 rounded-lg px-2.5 py-1 font-semibold transition cursor-pointer ${
                     sortOrder === 'asc'
-                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
                   <ArrowUp className="h-3.5 w-3.5" />
@@ -215,8 +215,8 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                   onClick={() => onSetSortOrder('desc')}
                   className={`flex items-center gap-1 rounded-lg px-2.5 py-1 font-semibold transition cursor-pointer ${
                     sortOrder === 'desc'
-                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
                   <ArrowDown className="h-3.5 w-3.5" />
@@ -226,20 +226,20 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
             </div>
           </div>
 
-          <hr className="border-slate-100" />
+          <hr className="border-slate-100 dark:border-slate-800" />
 
           {/* Section 2: Kurs-Präferenzen (Noten & Korrektur-Modus) */}
           <div className="space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Korrekturansicht im Kurs</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Korrekturansicht im Kurs</h3>
 
             {/* Noten / Punkte Toggle */}
-            <div className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50">
+            <div className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <Award className="h-4 w-4 text-amber-600" />
-                  <span className="text-xs font-bold text-slate-900">Noten- / Punktefeld im Überblick anzeigen</span>
+                  <Award className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Noten- / Punktefeld im Überblick anzeigen</span>
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   Ermöglicht das direkte Eintragen von Noten in der Abgabenliste, statt erst das Detailfenster zu öffnen.
                 </p>
               </div>
@@ -247,7 +247,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                 type="button"
                 onClick={onToggleShowMarksInOverview}
                 className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
-                  showMarksInOverview ? 'bg-amber-600' : 'bg-slate-300'
+                  showMarksInOverview ? 'bg-amber-600' : 'bg-slate-300 dark:bg-slate-700'
                 }`}
               >
                 <span
@@ -259,10 +259,10 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
             </div>
 
             {/* Standard-Korrektur-Art */}
-            <div className="space-y-2 p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50">
+            <div className="space-y-2 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
               <div className="space-y-0.5">
-                <span className="text-xs font-bold text-slate-900">Standard-Korrekturart im Überblick</span>
-                <p className="text-[11px] text-slate-500">
+                <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Standard-Korrekturart im Überblick</span>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   Wählen Sie, welches Rückmelde-Element direkt in den Karten der Abgabenliste angezeigt werden soll.
                 </p>
               </div>
@@ -273,11 +273,11 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                   onClick={() => onSetEvalMode('statement')}
                   className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-semibold transition cursor-pointer ${
                     evalModeInOverview === 'statement'
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-bold'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-bold dark:border-indigo-500 dark:bg-indigo-950/60 dark:text-indigo-200'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                   }`}
                 >
-                  <FileText className="h-3.5 w-3.5 text-indigo-600" />
+                  <FileText className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                   <span>Kommentar</span>
                 </button>
 
@@ -286,11 +286,11 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                   onClick={() => onSetEvalMode('file')}
                   className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-semibold transition cursor-pointer ${
                     evalModeInOverview === 'file'
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-bold'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-bold dark:border-indigo-500 dark:bg-indigo-950/60 dark:text-indigo-200'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                   }`}
                 >
-                  <Upload className="h-3.5 w-3.5 text-indigo-600" />
+                  <Upload className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                   <span>Datei</span>
                 </button>
 
@@ -299,31 +299,31 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                   onClick={() => onSetEvalMode('email')}
                   className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-semibold transition cursor-pointer ${
                     evalModeInOverview === 'email'
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-bold'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-bold dark:border-indigo-500 dark:bg-indigo-950/60 dark:text-indigo-200'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                   }`}
                 >
-                  <Mail className="h-3.5 w-3.5 text-indigo-600" />
+                  <Mail className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                   <span>E-Mail</span>
                 </button>
               </div>
             </div>
           </div>
 
-          <hr className="border-slate-100" />
+          <hr className="border-slate-100 dark:border-slate-800" />
 
           {/* Section 3: Quick-Filter verwalten */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Quick-Filter verwalten</h3>
-                <p className="text-[11px] text-slate-500">Schnellzugriff auf häufig genutzte Filterkombinationen</p>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Quick-Filter verwalten</h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Schnellzugriff auf häufig genutzte Filterkombinationen</p>
               </div>
               {!isAddingFilter && (
                 <button
                   type="button"
                   onClick={() => setIsAddingFilter(true)}
-                  className="flex items-center gap-1 rounded-xl bg-slate-900 text-white px-2.5 py-1 text-xs font-semibold hover:bg-slate-800 transition shadow-2xs cursor-pointer"
+                  className="flex items-center gap-1 rounded-xl bg-slate-900 dark:bg-slate-800 text-white px-2.5 py-1 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-700 transition shadow-2xs cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Neu</span>
@@ -334,7 +334,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
             {/* List of existing quick filters */}
             <div className="space-y-2">
               {quickFilters.length === 0 ? (
-                <div className="p-4 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+                <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400 dark:text-slate-500">
                   Keine Quickfilter definiert.
                 </div>
               ) : (
@@ -356,13 +356,13 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                   return (
                     <div
                       key={qf.id}
-                      className="flex items-center justify-between p-2.5 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50/50 transition shadow-2xs"
+                      className="flex items-center justify-between p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 hover:bg-slate-50/50 dark:hover:bg-slate-800 transition shadow-2xs"
                     >
                       <div className="flex items-center gap-2.5">
                         <div className={`h-3 w-3 rounded-full ${colorDef.bg}`} />
                         <div>
-                          <span className="text-xs font-bold text-slate-900">{qf.label}</span>
-                          <span className="text-[10px] text-slate-400 block">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{qf.label}</span>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
                             {subText} • {gradeText}
                           </span>
                         </div>
@@ -371,7 +371,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                       <button
                         type="button"
                         onClick={() => onDeleteQuickFilter(qf.id)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                         title="Quickfilter entfernen"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -384,36 +384,36 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
 
             {/* Add New QuickFilter Sub-Form */}
             {isAddingFilter && (
-              <form onSubmit={handleCreateFilter} className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/30 space-y-3 animate-in fade-in">
+              <form onSubmit={handleCreateFilter} className="p-4 rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/30 dark:bg-indigo-950/30 space-y-3 animate-in fade-in">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                    <Tag className="h-3.5 w-3.5 text-indigo-600" />
+                  <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                    <Tag className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                     <span>Neuen Quick-Filter anlegen</span>
                   </span>
                   <button
                     type="button"
                     onClick={() => setIsAddingFilter(false)}
-                    className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xs cursor-pointer"
                   >
                     Abbrechen
                   </button>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Name des Filters:</label>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">Name des Filters:</label>
                   <input
                     type="text"
                     required
                     placeholder="z.B. Offen & Dringend"
                     value={newFilterName}
                     onChange={(e) => setNewFilterName(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden"
                   />
                 </div>
 
                 {/* Color Palette */}
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Farbe:</label>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">Farbe:</label>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {COLOR_OPTIONS.map((c) => (
                       <button
@@ -421,7 +421,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                         type="button"
                         onClick={() => setNewFilterColor(c.key)}
                         className={`h-6 w-6 rounded-full ${c.bg} flex items-center justify-center transition cursor-pointer ${
-                          newFilterColor === c.key ? 'ring-2 ring-offset-2 ring-slate-800' : 'opacity-80 hover:opacity-100'
+                          newFilterColor === c.key ? 'ring-2 ring-offset-2 ring-slate-800 dark:ring-offset-slate-900 dark:ring-slate-300' : 'opacity-80 hover:opacity-100'
                         }`}
                         title={c.label}
                       >
@@ -433,15 +433,15 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
 
                 {/* Submission Target */}
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Abgabe-Status:</label>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">Abgabe-Status:</label>
                   <div className="grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
                       onClick={() => setNewFilterSub('all')}
                       className={`p-1.5 rounded-lg border text-[11px] font-semibold transition cursor-pointer ${
                         newFilterSub === 'all'
-                          ? 'border-indigo-600 bg-white text-indigo-900 font-bold'
-                          : 'border-slate-200 bg-slate-50 text-slate-600'
+                          ? 'border-indigo-600 bg-white dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 font-bold'
+                          : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400'
                       }`}
                     >
                       Alle
@@ -451,8 +451,8 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                       onClick={() => setNewFilterSub('submitted')}
                       className={`p-1.5 rounded-lg border text-[11px] font-semibold transition cursor-pointer ${
                         newFilterSub === 'submitted'
-                          ? 'border-indigo-600 bg-white text-indigo-900 font-bold'
-                          : 'border-slate-200 bg-slate-50 text-slate-600'
+                          ? 'border-indigo-600 bg-white dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 font-bold'
+                          : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400'
                       }`}
                     >
                       Eingereicht
@@ -462,8 +462,8 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                       onClick={() => setNewFilterSub('not_submitted')}
                       className={`p-1.5 rounded-lg border text-[11px] font-semibold transition cursor-pointer ${
                         newFilterSub === 'not_submitted'
-                          ? 'border-indigo-600 bg-white text-indigo-900 font-bold'
-                          : 'border-slate-200 bg-slate-50 text-slate-600'
+                          ? 'border-indigo-600 bg-white dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 font-bold'
+                          : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400'
                       }`}
                     >
                       Nicht eingereicht
@@ -473,7 +473,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
 
                 {/* Grade Status Target */}
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Bewertungs-Status:</label>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">Bewertungs-Status:</label>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {[
                       { key: 'not_graded', label: 'Offen' },
@@ -486,8 +486,8 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                         onClick={() => toggleGradeSelection(g.key)}
                         className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition cursor-pointer ${
                           newFilterGrades.includes(g.key)
-                            ? 'border-indigo-600 bg-white text-indigo-900 font-bold'
-                            : 'border-slate-200 bg-slate-50 text-slate-500'
+                            ? 'border-indigo-600 bg-white dark:bg-slate-800 text-indigo-900 dark:text-indigo-200 font-bold'
+                            : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400'
                         }`}
                       >
                         {g.label}
@@ -510,11 +510,11 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="border-t border-slate-100 px-6 py-4 bg-slate-50 flex justify-end">
+        <div className="border-t border-slate-100 dark:border-slate-800 px-6 py-4 bg-slate-50 dark:bg-slate-800/60 flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-slate-900 text-white px-4 py-2 text-xs font-bold hover:bg-slate-800 transition shadow-2xs cursor-pointer"
+            className="rounded-xl bg-slate-900 dark:bg-slate-800 text-white px-4 py-2 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-700 transition shadow-2xs cursor-pointer"
           >
             Fertig
           </button>

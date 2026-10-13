@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:is(.dark, .dark *));
 
 :root {
   --brand-better: #033683;
@@ -66,6 +66,50 @@
   }
   .ilias-rich-content a:hover {
     color: var(--accent-hover);
+  }
+
+  /* Dark mode overrides for ILIAS HTML and math */
+  .dark .ilias-rich-content {
+    color: var(--color-slate-200);
+  }
+  .dark .ilias-rich-content [style*="color: rgb(0, 0, 0)"],
+  .dark .ilias-rich-content [style*="color: #000"],
+  .dark .ilias-rich-content [style*="color: black"],
+  .dark .ilias-rich-content [style*="color:#000000"],
+  .dark .ilias-rich-content font[color="#000000"],
+  .dark .ilias-rich-content font[color="black"],
+  .dark .ilias-rich-content [style*="color: rgb(34, 34, 34)"],
+  .dark .ilias-rich-content [style*="color: rgb(51, 51, 51)"],
+  .dark .ilias-rich-content [style*="color: #333"],
+  .dark .ilias-rich-content [style*="color: #222"] {
+    color: var(--color-slate-200) !important;
+  }
+  .dark .ilias-rich-content [style*="background-color: rgb(255, 255, 255)"],
+  .dark .ilias-rich-content [style*="background-color: #fff"],
+  .dark .ilias-rich-content [style*="background-color: white"],
+  .dark .ilias-rich-content [style*="background-color:#ffffff"],
+  .dark .ilias-rich-content [style*="background: rgb(255, 255, 255)"],
+  .dark .ilias-rich-content [style*="background: #fff"],
+  .dark .ilias-rich-content [style*="background: white"],
+  .dark .ilias-rich-content [style*="background:#ffffff"] {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+  .dark .ilias-rich-content table,
+  .dark .ilias-rich-content th,
+  .dark .ilias-rich-content td {
+    border-color: var(--color-slate-700);
+    background-color: transparent !important;
+  }
+
+  /* MathJax & MathML dark mode */
+  .dark mjx-container,
+  .dark .MathJax,
+  .dark math,
+  .dark mjx-container svg,
+  .dark .MathJax svg {
+    color: var(--color-slate-100) !important;
+    fill: var(--color-slate-100) !important;
   }
 }
 
