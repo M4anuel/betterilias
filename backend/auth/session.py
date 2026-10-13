@@ -136,10 +136,12 @@ class SessionManager:
         return count
 
     def get_http_client(self) -> httpx.AsyncClient:
-        """Construct an authenticated httpx.AsyncClient with stored cookies."""
+        """Construct an authenticated httpx.AsyncClient with stored cookies and matching User-Agent."""
         cookies = self.load_cookies()
+        metadata = self.load_metadata()
+        ua = metadata.get("user_agent") or settings.user_agent
         headers = {
-            "User-Agent": settings.user_agent,
+            "User-Agent": ua,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "de-CH,de;q=0.9,en-US;q=0.8,en;q=0.7",
             "Referer": settings.ilias_base_url,
@@ -158,22 +160,22 @@ class SessionManager:
         Returns (is_valid, user_or_message).
         """
         if not self.has_cookies():
-            return False, "No session cookies found. Please log in."
+            return False, "Keine Sitzungs-Cookies gefunden. Bitte zuerst auf ilias.unibe.ch anmelden."
 
         test_url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilPersonalDesktopGUI"
         async with self.get_http_client() as client:
             try:
                 response = await client.get(test_url)
                 if response.status_code in (401, 403):
-                    return False, f"HTTP {response.status_code} Unauthorized"
+                    return False, f"HTTP {response.status_code} Nicht autorisiert"
                 if response.status_code != 200:
-                    return False, f"Unexpected response status {response.status_code}"
+                    return False, f"Unerwarteter Server-Status {response.status_code}"
 
-                # Check if redirected to login page or switch edu-id
+                # 1. Check if redirected to login page or switch edu-id
                 final_url = str(response.url).lower()
                 login_tokens = ["login.php", "wayf", "eduid", "aai", "shibboleth", "cmd=force_login", "shib_login"]
                 if any(token in final_url for token in login_tokens):
-                    return False, "Session expired or redirected to login"
+                    return False, "Sitzung abgelaufen oder Weiterleitung zum Login"
 
                 text_lower = response.text.lower()
                 if (
@@ -182,32 +184,21 @@ class SessionManager:
                     or "login.php?target=" in text_lower
                     or "shib_login.php" in text_lower
                 ):
-                    return False, "Session expired: login prompt detected"
-
-                unauth_phrases = [
-                    "kein zugriffsrecht",
-                    "sitzung abgelaufen",
-                    "ihre sitzung ist abgelaufen",
-                    "sie sind nicht angemeldet",
-                    "session expired",
-                    "you are not logged in",
-                ]
-                if any(phrase in text_lower for phrase in unauth_phrases):
-                    return False, "Session expired: unauthorized page content"
+                    return False, "Sitzung abgelaufen: Login-Aufforderung erkannt"
 
                 soup = BeautifulSoup(response.text, "html.parser")
                 
-                # Check for login forms or error prompts
+                # 2. Check for login forms or startup screen
                 if soup.find("input", {"name": "username"}) and soup.find("input", {"name": "password"}):
-                    return False, "Session expired: login form detected"
+                    return False, "Sitzung abgelaufen: Login-Formular angezeigt"
 
                 if soup.find(id="ilStartupSection") or soup.find(class_="ilStartupSection") or soup.find(id="ilStartupFrame"):
-                    return False, "Session expired: startup screen detected"
+                    return False, "Sitzung abgelaufen: Startbildschirm angezeigt"
 
-                # Check for indicators of an authenticated ILIAS session
-                # 1. User avatar / profile button
-                # 2. Main menu / navigation
-                # 3. Personal desktop container
+                # 3. Check for positive indicators of an authenticated ILIAS session
+                # - User avatar / profile button
+                # - Main menu / navigation
+                # - Personal desktop container
                 user_name = None
                 user_elem = (
                     soup.select_one(".il-maincontrols-metabar a.il-user-avatar")
@@ -228,13 +219,28 @@ class SessionManager:
                 )
 
                 if user_elem or desktop_present:
-                    return True, user_name or "Authenticated"
+                    return True, user_name or "Angemeldet"
 
-                return False, "Could not verify ILIAS dashboard page structure"
+                # 4. If neither user avatar nor desktop is present, verify unauthorized reason
+                og_title = soup.find("meta", property="og:title")
+                og_title_content = og_title.get("content", "").lower() if og_title else ""
+
+                unauth_phrases = [
+                    "kein zugriffsrecht",
+                    "sitzung abgelaufen",
+                    "ihre sitzung ist abgelaufen",
+                    "sie sind nicht angemeldet",
+                    "session expired",
+                    "you are not logged in",
+                ]
+                if "kein zugriffsrecht" in og_title_content or any(phrase in text_lower for phrase in unauth_phrases):
+                    return False, "Sitzung auf ilias.unibe.ch ist abgelaufen oder nicht angemeldet. Bitte logge dich im Browser auf ilias.unibe.ch ein."
+
+                return False, "ILIAS Dashboard-Struktur konnte nicht verifiziert werden."
 
             except Exception as e:
                 logger.error(f"Error verifying ILIAS session: {e}")
-                return False, f"Verification failed: {str(e)}"
+                return False, f"Verifizierung fehlgeschlagen: {str(e)}"
 
 
 # Default singleton instance

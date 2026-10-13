@@ -23,6 +23,7 @@ class ExtensionSyncInput(BaseModel):
     cookies: Dict[str, str] = Field(..., description="Cookies dictionary from ILIAS")
     session_id: Optional[str] = Field(None, description="Existing session ID to refresh or update")
     source: Optional[str] = Field("chrome_extension", description="Sync source identifier")
+    user_agent: Optional[str] = Field(None, description="Browser User-Agent header from extension client")
 
 class ExtensionSyncResponse(BaseModel):
     success: bool

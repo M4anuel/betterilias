@@ -43,24 +43,35 @@ async def sync_extension_cookies(
             detail="PHPSESSID cookie is missing from the submitted payload."
         )
 
+    # Ensure ilClientId is set (Uni Bern requires ilias3_unibe client identifier)
+    from backend.config import settings
+    if "ilClientId" not in cookies:
+        cookies["ilClientId"] = settings.ilias_client_id
+
     # Determine or generate session_id
     session_id = payload.session_id or (manager.session_id if manager.session_id != "default" else None)
     if not session_id:
         session_id = SessionManager.generate_session_id()
 
+    metadata: Dict[str, Any] = {
+        "source": payload.source or "extension",
+    }
+    if payload.user_agent:
+        metadata["user_agent"] = payload.user_agent
+
     target_manager = SessionManager(session_id=session_id)
     target_manager.save_cookies(
         cookies,
-        metadata={"source": payload.source or "chrome_extension"}
+        metadata=metadata
     )
 
     # Verify session against Uni Bern ILIAS
     is_valid, user_or_msg = await target_manager.verify_session()
 
     if is_valid:
-        metadata = target_manager.load_metadata()
-        metadata["user_name"] = user_or_msg
-        target_manager.save_metadata(metadata)
+        meta = target_manager.load_metadata()
+        meta["user_name"] = user_or_msg
+        target_manager.save_metadata(meta)
 
     return ExtensionSyncResponse(
         success=True,

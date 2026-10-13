@@ -22,8 +22,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const getServerUrl = () => (serverUrlInput.value || 'http://localhost:8000').replace(/\/+$/, '');
   const getFrontendUrl = () => (frontendUrlInput.value || 'http://localhost:5173').replace(/\/+$/, '');
 
-  function showFeedback(text, type = 'success') {
-    feedbackBox.textContent = text;
+  function showFeedback(text, type = 'success', isHtml = false) {
+    if (isHtml) {
+      feedbackBox.innerHTML = text;
+    } else {
+      feedbackBox.textContent = text;
+    }
     feedbackBox.className = `feedback visible ${type}`;
   }
 
@@ -32,44 +36,69 @@ document.addEventListener('DOMContentLoaded', async () => {
     feedbackBox.textContent = '';
   }
 
-  // Helper to fetch cookies reliably across Firefox (TCP / First-Party Isolation) and Chromium
+  // Fetch all cookies for ILIAS via multiple strategies (URL, Domain, FPI)
   async function fetchAllIliasCookies() {
-    let cookies = [];
-    try {
-      cookies = await browserAPI.cookies.getAll({ domain: 'ilias.unibe.ch', firstPartyDomain: null });
-    } catch {
-      try {
-        cookies = await browserAPI.cookies.getAll({ domain: 'ilias.unibe.ch' });
-      } catch {
-        cookies = await browserAPI.cookies.getAll({ url: 'https://ilias.unibe.ch/' });
+    const cookieMap = new Map();
+    const addList = (list) => {
+      if (Array.isArray(list)) {
+        for (const c of list) {
+          if (c && c.name && c.value) {
+            cookieMap.set(c.name, c.value);
+          }
+        }
       }
+    };
+
+    // 1. Query by full URL (captures host-only & path-specific cookies)
+    try {
+      const urlCookies = await browserAPI.cookies.getAll({ url: 'https://ilias.unibe.ch/' });
+      addList(urlCookies);
+    } catch (_) {}
+
+    // 2. Query by domain (captures wildcard domain cookies)
+    try {
+      const domainCookies = await browserAPI.cookies.getAll({ domain: 'ilias.unibe.ch' });
+      addList(domainCookies);
+    } catch (_) {}
+
+    // 3. Firefox with firstPartyDomain (Total Cookie Protection / State Partitioning)
+    try {
+      const fpiCookies = await browserAPI.cookies.getAll({ domain: 'ilias.unibe.ch', firstPartyDomain: null });
+      addList(fpiCookies);
+    } catch (_) {}
+
+    // Ensure ilClientId is present (Uni Bern client)
+    if (!cookieMap.has('ilClientId')) {
+      cookieMap.set('ilClientId', 'ilias3_unibe');
     }
 
-    if (!cookies || cookies.length === 0) {
-      try {
-        cookies = await browserAPI.cookies.getAll({ url: 'https://ilias.unibe.ch/' });
-      } catch {}
-    }
-
-    return cookies || [];
+    return Object.fromEntries(cookieMap);
   }
 
   // 1. Check ILIAS cookies in browser
   async function checkIliasCookies() {
     try {
-      const cookies = await fetchAllIliasCookies();
-      const phpSess = cookies.find((c) => c.name === 'PHPSESSID');
+      const cookiesDict = await fetchAllIliasCookies();
+      const hasPhpSess = Boolean(cookiesDict['PHPSESSID']);
+      const hasShibSession = Object.keys(cookiesDict).some((k) => k.startsWith('_shibsession_'));
 
-      if (phpSess && phpSess.value) {
+      if (hasPhpSess && hasShibSession) {
         iliasBadge.textContent = 'Bereit';
         iliasBadge.className = 'status-badge badge-success';
-        iliasSub.textContent = `PHPSESSID vorhanden (${cookies.length} Cookies gefunden).`;
+        iliasSub.innerHTML = 'Aktive SWITCH edu-ID Sitzung gefunden.';
         syncBtn.disabled = false;
-        return cookies;
+        return cookiesDict;
+      } else if (hasPhpSess) {
+        // PHPSESSID exists but no Shibboleth SSO token (might be guest or expired)
+        iliasBadge.textContent = 'Nicht verifiziert';
+        iliasBadge.className = 'status-badge badge-warning';
+        iliasSub.innerHTML = 'Gast-Sitzung oder abgelaufen. Bitte auf <a href="https://ilias.unibe.ch" target="_blank" style="color:var(--accent);text-decoration:underline;">ilias.unibe.ch</a> mit SWITCH edu-ID einloggen.';
+        syncBtn.disabled = false;
+        return cookiesDict;
       } else {
         iliasBadge.textContent = 'Nicht angemeldet';
         iliasBadge.className = 'status-badge badge-danger';
-        iliasSub.innerHTML = 'Keine aktive Sitzung auf <b>ilias.unibe.ch</b> gefunden. Bitte logge dich zuerst ein.';
+        iliasSub.innerHTML = 'Keine Sitzung gefunden. Bitte logge dich zuerst auf <a href="https://ilias.unibe.ch" target="_blank" style="color:var(--accent);text-decoration:underline;">ilias.unibe.ch</a> ein.';
         syncBtn.disabled = true;
         return null;
       }
@@ -90,29 +119,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncBtn.textContent = 'Synchronisiere...';
 
     try {
-      const cookiesList = await fetchAllIliasCookies();
-      const cookiesDict = {};
-      for (const c of cookiesList) {
-        cookiesDict[c.name] = c.value;
-      }
+      const cookiesDict = await fetchAllIliasCookies();
 
       if (!cookiesDict['PHPSESSID']) {
-        throw new Error('Kein PHPSESSID Cookie gefunden. Bitte zuerst bei ILIAS (ilias.unibe.ch) anmelden.');
+        throw new Error('Kein PHPSESSID Cookie gefunden. Bitte zuerst bei ILIAS (ilias.unibe.ch) einloggen.');
       }
 
       const storedData = await browserAPI.storage.local.get(['sessionId']);
+      const isFirefox = typeof browser !== 'undefined';
       const payload = {
         cookies: cookiesDict,
         session_id: storedData.sessionId || null,
-        source: 'firefox_extension'
+        source: isFirefox ? 'firefox_extension' : 'chrome_extension',
+        user_agent: navigator.userAgent
       };
 
       const serverUrl = getServerUrl();
-      const res = await fetch(`${serverUrl}/api/auth/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      let res;
+      try {
+        res = await fetch(`${serverUrl}/api/auth/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (networkErr) {
+        throw new Error(`Verbindung zum Backend fehlgeschlagen (${networkErr.message}). Läuft das Backend auf ${serverUrl}?`);
+      }
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -121,7 +153,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const data = await res.json();
       if (!data.success || !data.authenticated) {
-        throw new Error(data.message || 'Sitzung konnte auf ILIAS nicht verifiziert werden.');
+        const msg = data.message || 'Sitzung konnte auf ILIAS nicht verifiziert werden.';
+        showFeedback(
+          `❌ ${msg}<br/><a href="https://ilias.unibe.ch" target="_blank" style="color:var(--accent);text-decoration:underline;font-weight:600;display:inline-block;margin-top:6px;">👉 Jetzt auf ilias.unibe.ch einloggen</a>`,
+          'error',
+          true
+        );
+        return;
       }
 
       // Save sessionId in storage
@@ -129,6 +167,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const userName = data.user_name || 'Benutzer';
       showFeedback(`✅ Erfolgreich synchronisiert als "${userName}"!`, 'success');
+
+      // Update badge to verified
+      iliasBadge.textContent = 'Synchronisiert';
+      iliasBadge.className = 'status-badge badge-success';
+      iliasSub.textContent = `Angemeldet als ${userName}`;
 
       // Notify any active BetterIlias tabs
       const tabs = await browserAPI.tabs.query({});
@@ -173,4 +216,3 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(hideFeedback, 2000);
   });
 });
-
