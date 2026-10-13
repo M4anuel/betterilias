@@ -4,6 +4,7 @@ import {
   ExerciseSubmissionsResponse,
   ExerciseInfoResponse,
   StudentAssignmentDetail,
+  SemesterScreenResponse,
 } from '../types';
 
 export type ContentSectionId =
@@ -259,6 +260,34 @@ export const cache = {
     }
   },
 
+  // --- Semester Courses Cache ---
+  getCachedSemester(semId: string): SemesterScreenResponse | null {
+    try {
+      const raw = localStorage.getItem(`ilias_semester_cache_${semId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedSemester(semId: string, data: SemesterScreenResponse) {
+    try {
+      const existing = this.getCachedSemester(semId);
+      const existingCount = existing?.courses?.length || 0;
+      const incomingCount = data?.courses?.length || 0;
+
+      // GUARD: Never overwrite populated cache with empty response!
+      if (existingCount > 0 && incomingCount === 0) {
+        console.warn(`Prevented overwriting populated semester cache for ${semId} with empty data`);
+        return;
+      }
+
+      localStorage.setItem(`ilias_semester_cache_${semId}`, JSON.stringify(data));
+    } catch (e) {
+      console.warn('Storage quota exceeded for semester cache', e);
+    }
+  },
+
   // --- Course Materials Cache (Instant Serving) ---
   getCachedMaterials(refId: string): CourseMaterialsResponse | null {
     try {
@@ -271,6 +300,26 @@ export const cache = {
 
   setCachedMaterials(refId: string, data: CourseMaterialsResponse) {
     try {
+      const existing = this.getCachedMaterials(refId);
+      const incomingCount =
+        (data?.items?.length || 0) +
+        (data?.sections?.length || 0) +
+        (data?.sessions?.length || 0) +
+        (data?.blocks?.length || 0);
+      const existingCount =
+        (existing?.items?.length || 0) +
+        (existing?.sections?.length || 0) +
+        (existing?.sessions?.length || 0) +
+        (existing?.blocks?.length || 0);
+
+      // GUARD: Never overwrite populated cache with empty response!
+      if (existingCount > 0 && incomingCount === 0) {
+        console.warn(
+          `Prevented overwriting populated course materials cache for ${refId} with empty data`
+        );
+        return;
+      }
+
       localStorage.setItem(MATERIALS_CACHE_PREFIX + refId, JSON.stringify(data));
     } catch (e) {
       console.warn('Storage quota exceeded for course materials cache', e);
@@ -289,6 +338,18 @@ export const cache = {
 
   setCachedPodcasts(refId: string, data: any) {
     try {
+      const existing = this.getCachedPodcasts(refId);
+      const incomingCount = (data?.episodes?.length || 0) + (data?.clips?.length || 0);
+      const existingCount = (existing?.episodes?.length || 0) + (existing?.clips?.length || 0);
+
+      // GUARD: Never overwrite populated cache with empty response!
+      if (existingCount > 0 && incomingCount === 0) {
+        console.warn(
+          `Prevented overwriting populated podcast cache for ${refId} with empty data`
+        );
+        return;
+      }
+
       localStorage.setItem('ilias_podcast_cache_' + refId, JSON.stringify(data));
     } catch (e) {
       console.warn('Storage quota exceeded for podcast cache', e);
@@ -360,6 +421,31 @@ export const cache = {
     // 2. Fetch fresh data in background
     try {
       const freshData = await fetcher();
+
+      // Guard against overwriting populated cache with empty data
+      const isIncomingEmpty =
+        Array.isArray(freshData)
+          ? freshData.length === 0
+          : freshData && typeof freshData === 'object'
+          ? (Array.isArray((freshData as any).courses) && (freshData as any).courses.length === 0) ||
+            (Array.isArray((freshData as any).items) && (freshData as any).items.length === 0)
+          : false;
+
+      const isCachedEmpty =
+        !cachedData ||
+        (Array.isArray(cachedData)
+          ? cachedData.length === 0
+          : cachedData && typeof cachedData === 'object'
+          ? (Array.isArray((cachedData as any).courses) && (cachedData as any).courses.length === 0) ||
+            (Array.isArray((cachedData as any).items) && (cachedData as any).items.length === 0)
+          : false);
+
+      if (isIncomingEmpty && !isCachedEmpty) {
+        console.warn(`fetchWithSWR: Ignored empty fresh data for ${cacheKey} to preserve cache`);
+        onFresh(cachedData!, false);
+        return;
+      }
+
       const freshJson = JSON.stringify(freshData);
       const cachedJson = cachedData ? JSON.stringify(cachedData) : null;
       const hasChanged = freshJson !== cachedJson;

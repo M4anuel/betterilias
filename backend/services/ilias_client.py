@@ -62,15 +62,64 @@ class IliasClient:
             raise SessionExpiredError("No active ILIAS session found. Please log in.")
 
     def _check_response_for_session_loss(self, response: httpx.Response, requested_url: str):
-        """Detect if ILIAS redirected to a login page instead of the expected target."""
-        final_url = str(response.url).lower()
-        if any(token in final_url for token in ["login.php", "wayf", "eduid", "aai", "shibboleth"]):
+        """Detect if ILIAS redirected to a login page, expired session, or unauthorized error."""
+        # 1. HTTP 401 Unauthorized or 403 Forbidden
+        if response.status_code in (401, 403):
             raise SessionExpiredError(
-                f"Session expired or unauthorized. Redirected to login page from {requested_url}."
+                f"HTTP {response.status_code} Unauthorized for {requested_url}"
             )
-        # Check for HTML login form in response
-        if "<input" in response.text and "name=\"username\"" in response.text and "name=\"password\"" in response.text:
+
+        # 2. Redirect to login or IDP endpoints
+        final_url = str(response.url).lower()
+        login_url_tokens = [
+            "login.php",
+            "wayf",
+            "eduid",
+            "aai",
+            "shibboleth",
+            "cmd=force_login",
+            "shib_login",
+        ]
+        if any(token in final_url for token in login_url_tokens):
+            raise SessionExpiredError(
+                f"Session expired or unauthorized. Redirected to login ({response.url}) from {requested_url}."
+            )
+
+        # 3. HTML text & link markers
+        text_lower = response.text.lower()
+
+        # Explicit force_login command or login prompt target in HTML
+        if (
+            "cmd=force_login" in text_lower
+            or "login.php?client_id=" in text_lower
+            or "login.php?target=" in text_lower
+            or "shib_login.php" in text_lower
+        ):
+            raise SessionExpiredError(
+                f"Session expired: ILIAS login prompt detected for {requested_url}."
+            )
+
+        # System error phrases for lack of permission / expired session
+        unauth_phrases = [
+            "kein zugriffsrecht",
+            "sitzung abgelaufen",
+            "ihre sitzung ist abgelaufen",
+            "sie sind nicht angemeldet",
+            "session expired",
+            "your session has expired",
+            "you are not logged in",
+        ]
+        for phrase in unauth_phrases:
+            if phrase in text_lower:
+                raise SessionExpiredError(
+                    f"Session expired or unauthorized: '{phrase}' detected in response for {requested_url}."
+                )
+
+        # Check for HTML login form or startup section
+        if "<input" in response.text and 'name="username"' in response.text and 'name="password"' in response.text:
             raise SessionExpiredError("Session expired: ILIAS login form encountered.")
+        if "ilstartupsection" in text_lower or "ilstartupframe" in text_lower:
+            raise SessionExpiredError("Session expired: ILIAS startup screen encountered.")
 
     async def get_auth_status(self) -> AuthStatus:
         """Check current authentication status."""

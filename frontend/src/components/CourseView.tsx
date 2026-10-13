@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Search,
   CheckCircle,
+  AlertCircle,
   Layers,
   ArrowLeft,
   ArrowRight,
@@ -397,7 +398,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
             // Small 40ms yield to stay light on browser & backend
             await new Promise((res) => setTimeout(res, 40));
-          } catch (e) {
+          } catch (e: any) {
             console.warn(`Could not preload subfolder ${folder.ref_id}`, e);
             if (isMounted) {
               stats[folder.ref_id] = {
@@ -408,6 +409,15 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 isEmpty: false,
               };
               setFolderStats({ ...stats });
+            }
+            const errMsg = String(e?.message || '');
+            if (
+              errMsg.includes('SESSION_EXPIRED') ||
+              errMsg.includes('401') ||
+              errMsg.toLowerCase().includes('session expired') ||
+              errMsg.toLowerCase().includes('unauthorized')
+            ) {
+              break;
             }
           }
         }
@@ -590,10 +600,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
     );
   }
 
-  const isInsideSubfolder = materialsData.container_ref_id !== courseRefId;
-  const sections = materialsData.sections || [];
-  const richTextBlocks = materialsData.rich_text_blocks || [];
-  const sessions = materialsData.sessions || [];
+  const isInsideSubfolder = !!materialsData && materialsData.container_ref_id !== courseRefId;
+  const sections = materialsData?.sections || [];
+  const richTextBlocks = materialsData?.rich_text_blocks || [];
+  const sessions = materialsData?.sessions || [];
   const hasDistinctSections =
     sections.length > 1 || (sections.length === 1 && sections[0].id !== 'general' && sections[0].groups.length > 1);
 
@@ -607,7 +617,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
     );
   };
 
-  const filteredFlatItems = materialsData.items.filter(matchesSearch);
+  const filteredFlatItems = (materialsData?.items || []).filter(matchesSearch);
 
   // Comprehensive repository search across current view + all subfolders
   const searchResults: CourseSearchResult[] = [];
@@ -1424,10 +1434,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
       {/* Top Header with Breadcrumbs & Sync Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <CompactBreadcrumbs
-          rawBreadcrumbs={materialsData.breadcrumbs || []}
+          rawBreadcrumbs={materialsData?.breadcrumbs || []}
           courseNickname={courseNickname}
           courseRefId={courseRefId}
-          currentFolderRefId={materialsData.container_ref_id || ''}
+          currentFolderRefId={materialsData?.container_ref_id || ''}
           onNavigateHome={onNavigateHome}
           onNavigateCourse={onNavigateCourseRoot}
           onNavigateFolder={onNavigateFolder}
@@ -1472,11 +1482,11 @@ export const CourseView: React.FC<CourseViewProps> = ({
               </button>
             )}
             <h1 className="text-xl font-bold text-slate-900 leading-tight">
-              {materialsData.title || courseNickname}
+              {materialsData?.title || courseNickname}
             </h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            {(materialsData.items?.length || 0)} {((materialsData.items?.length || 0) === 1 ? 'Material' : 'Materialien')} verfügbar
+            {(materialsData?.items?.length || 0)} {((materialsData?.items?.length || 0) === 1 ? 'Material' : 'Materialien')} verfügbar
           </p>
         </div>
 
@@ -1636,8 +1646,38 @@ export const CourseView: React.FC<CourseViewProps> = ({
           ) : (
             /* NORMAL COURSE VIEW (Customizable Course Blocks) */
             (() => {
+              // 1. Uncached error state
+              if (!materialsData && loadError) {
+                return (
+                  <div className="flex h-56 flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50/50 p-6 text-center">
+                    <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
+                    <p className="text-sm font-bold text-red-900">Fehler beim Abrufen der Vorlesungsinhalte</p>
+                    <p className="text-xs text-red-700 mt-1 max-w-md">{loadError}</p>
+                    <button
+                      type="button"
+                      onClick={onManualRefresh}
+                      className="mt-4 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-red-700 transition cursor-pointer"
+                    >
+                      Erneut versuchen
+                    </button>
+                  </div>
+                );
+              }
+
+              // 2. Uncached loading state (in-flight request)
+              if (!materialsData || (isRevalidating && orderedBlocksToRender.length === 0)) {
+                return (
+                  <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center animate-in fade-in duration-150">
+                    <div className="h-8 w-8 animate-spin rounded-full border-3 border-red-600 border-t-transparent mb-3" />
+                    <p className="text-sm font-bold text-slate-800">Lade Vorlesungsinhalte...</p>
+                    <p className="text-xs text-slate-400 mt-1">Materialien werden von ILIAS abgerufen</p>
+                  </div>
+                );
+              }
+
               const rendered = orderedBlocksToRender.map(renderBlock).filter(Boolean);
 
+              // 3. Request completed and confirmed empty
               if (rendered.length === 0) {
                 return (
                   <div className="flex h-44 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white text-center p-6">

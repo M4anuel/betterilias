@@ -89,19 +89,45 @@ class SessionManager:
         async with self.get_http_client() as client:
             try:
                 response = await client.get(test_url)
+                if response.status_code in (401, 403):
+                    return False, f"HTTP {response.status_code} Unauthorized"
                 if response.status_code != 200:
                     return False, f"Unexpected response status {response.status_code}"
 
                 # Check if redirected to login page or switch edu-id
                 final_url = str(response.url).lower()
-                if "login.php" in final_url or "eduid" in final_url or "wayf" in final_url:
+                login_tokens = ["login.php", "wayf", "eduid", "aai", "shibboleth", "cmd=force_login", "shib_login"]
+                if any(token in final_url for token in login_tokens):
                     return False, "Session expired or redirected to login"
+
+                text_lower = response.text.lower()
+                if (
+                    "cmd=force_login" in text_lower
+                    or "login.php?client_id=" in text_lower
+                    or "login.php?target=" in text_lower
+                    or "shib_login.php" in text_lower
+                ):
+                    return False, "Session expired: login prompt detected"
+
+                unauth_phrases = [
+                    "kein zugriffsrecht",
+                    "sitzung abgelaufen",
+                    "ihre sitzung ist abgelaufen",
+                    "sie sind nicht angemeldet",
+                    "session expired",
+                    "you are not logged in",
+                ]
+                if any(phrase in text_lower for phrase in unauth_phrases):
+                    return False, "Session expired: unauthorized page content"
 
                 soup = BeautifulSoup(response.text, "html.parser")
                 
                 # Check for login forms or error prompts
                 if soup.find("input", {"name": "username"}) and soup.find("input", {"name": "password"}):
                     return False, "Session expired: login form detected"
+
+                if soup.find(id="ilStartupSection") or soup.find(class_="ilStartupSection") or soup.find(id="ilStartupFrame"):
+                    return False, "Session expired: startup screen detected"
 
                 # Check for indicators of an authenticated ILIAS session
                 # 1. User avatar / profile button
@@ -113,6 +139,7 @@ class SessionManager:
                     or soup.select_one("#il_mbt_usr")
                     or soup.select_one(".ilTopTitle")
                     or soup.select_one("span.il-avatar-initials")
+                    or soup.select_one("a.il-user-avatar")
                 )
                 if user_elem:
                     user_name = user_elem.get_text(strip=True) or user_elem.get("title")
@@ -122,10 +149,10 @@ class SessionManager:
                     or soup.select_one("#il_mbt_pdesk")
                     or soup.select_one("#ilTab")
                     or soup.find(id="mainspace")
-                    or "ilPersonalDesktopGUI" in response.text
+                    or soup.select_one(".il-item-group")
                 )
 
-                if desktop_present:
+                if user_elem or desktop_present:
                     return True, user_name or "Authenticated"
 
                 return False, "Could not verify ILIAS dashboard page structure"

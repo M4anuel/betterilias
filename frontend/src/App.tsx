@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { AlertCircle, LogIn } from 'lucide-react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SemesterView } from './components/SemesterView';
@@ -24,13 +25,7 @@ export const App: React.FC = () => {
   // --- Semester & Courses State ---
   const [semesterData, setSemesterData] = useState<SemesterScreenResponse | null>(() => {
     const sem = cache.getSelectedSemester();
-    const raw = localStorage.getItem(`ilias_semester_cache_${sem}`);
-    if (raw) {
-      try {
-        return JSON.parse(raw);
-      } catch {}
-    }
-    return null;
+    return cache.getCachedSemester(sem);
   });
   const [isLoadingSemester, setIsLoadingSemester] = useState(false);
   const [selectedSemester, setSelectedSemester] = useState<string>(() =>
@@ -79,32 +74,37 @@ export const App: React.FC = () => {
   const loadSemesters = useCallback(async (semId: string) => {
     const reqId = ++semesterRequestSeq.current;
     setIsLoadingSemester(true);
-    const cacheKey = `ilias_semester_cache_${semId}`;
 
     // 1. Immediately read cache or clear stale semester data
-    let cached: SemesterScreenResponse | null = null;
-    try {
-      const raw = localStorage.getItem(cacheKey);
-      if (raw) cached = JSON.parse(raw);
-    } catch {}
-
-    if (reqId === semesterRequestSeq.current) {
+    const cached = cache.getCachedSemester(semId);
+    if (reqId === semesterRequestSeq.current && cached) {
       setSemesterData(cached);
     }
 
     // 2. Fetch fresh semester data
     try {
       const fresh = await api.getSemesters(semId);
-      try {
-        localStorage.setItem(cacheKey, JSON.stringify(fresh));
-      } catch {}
+      const freshCount = fresh?.courses?.length || 0;
+      const cachedCount = cached?.courses?.length || 0;
 
-      if (reqId === semesterRequestSeq.current) {
-        setSemesterData(fresh);
+      // Guard: if fresh returned empty courses but we have cached courses, preserve cache!
+      if (freshCount > 0 || cachedCount === 0) {
+        cache.setCachedSemester(semId, fresh);
+        if (reqId === semesterRequestSeq.current) {
+          setSemesterData(fresh);
+        }
+      } else {
+        console.warn(`Preserving cached courses for ${semId} because fresh response returned empty`);
+        if (reqId === semesterRequestSeq.current && cached) {
+          setSemesterData(cached);
+        }
       }
     } catch (err) {
       if (reqId === semesterRequestSeq.current) {
         console.error('Error fetching semester data', err);
+        if (cached) {
+          setSemesterData(cached);
+        }
       }
     } finally {
       if (reqId === semesterRequestSeq.current) {
@@ -140,6 +140,26 @@ export const App: React.FC = () => {
       setIsRevalidatingMaterials(true);
       try {
         const fresh = await api.getMaterials(refId);
+
+        const incomingCount =
+          (fresh?.items?.length || 0) +
+          (fresh?.sections?.length || 0) +
+          (fresh?.sessions?.length || 0) +
+          (fresh?.blocks?.length || 0);
+        const cachedCount =
+          (cached?.items?.length || 0) +
+          (cached?.sections?.length || 0) +
+          (cached?.sessions?.length || 0) +
+          (cached?.blocks?.length || 0);
+
+        // Guard: if fresh returned empty materials but cache has content, preserve cached content!
+        if (incomingCount === 0 && cachedCount > 0) {
+          console.warn(`Preserving cached materials for ${refId} because fresh response was empty`);
+          if (reqId === materialsRequestSeq.current && activeContainerRef.current === refId && cached) {
+            setMaterialsData(cached);
+          }
+          return;
+        }
 
         // Always cache fresh result so subsequent loads are instant
         cache.setCachedMaterials(refId, fresh);
@@ -216,6 +236,9 @@ export const App: React.FC = () => {
       } catch (err: any) {
         if (reqId === materialsRequestSeq.current && activeContainerRef.current === refId) {
           console.error(`Error revalidating materials for ${refId}`, err);
+          if (cached) {
+            setMaterialsData(cached);
+          }
           setLoadMaterialsError(err?.message || 'Fehler beim Abrufen der Vorlesungsinhalte');
         }
       } finally {
@@ -352,6 +375,24 @@ export const App: React.FC = () => {
 
         {/* Center Content Area */}
         <main className="flex-1 overflow-y-auto bg-slate-50/50">
+          {authStatus && !authStatus.authenticated && (
+            <div className="flex items-center justify-between border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-sm">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600" />
+                <span>
+                  <strong>Sitzung abgelaufen:</strong> Du bist aktuell nicht bei ILIAS angemeldet. Gespeicherte Inhalte werden aus dem Cache angezeigt.
+                </span>
+              </div>
+              <button
+                onClick={handleTriggerLogin}
+                disabled={isLoggingIn}
+                className="ml-3 inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 transition disabled:opacity-50"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                <span>{isLoggingIn ? 'Öffne Browser...' : 'Jetzt anmelden'}</span>
+              </button>
+            </div>
+          )}
           {selectedCourseId && currentContainerId ? (
             <CourseView
               key={`${selectedCourseId}_${currentContainerId}`}
