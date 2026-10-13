@@ -13,6 +13,10 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
   onClose,
   onSuccessSync,
 }) => {
+  const isFirefoxDetected = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent);
+  const [selectedBrowser, setSelectedBrowser] = useState<'chrome' | 'firefox'>(
+    isFirefoxDetected ? 'firefox' : 'chrome'
+  );
   const [copied, setCopied] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [phpsessid, setPhpsessid] = useState('');
@@ -21,10 +25,12 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
 
   if (!isOpen) return null;
 
-  const extensionGithubUrl = 'https://github.com/M4anuel/betterilias/tree/main/extension';
+  const chromeGithubUrl = 'https://github.com/M4anuel/betterilias/tree/main/extension';
+  const firefoxGithubUrl = 'https://github.com/M4anuel/betterilias/tree/main/extension-firefox';
+  const currentGithubUrl = selectedBrowser === 'firefox' ? firefoxGithubUrl : chromeGithubUrl;
 
   const handleCopyUrl = () => {
-    navigator.clipboard.writeText(extensionGithubUrl);
+    navigator.clipboard.writeText(currentGithubUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -75,57 +81,136 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
         {/* Content */}
         <div className="p-6 space-y-4">
           <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-            Da wir die Anmeldung direkt im Browser abwickeln (ohne Server-Passwortweitergabe), verbindet die kleine Browser-Erweiterung deine bestehende ILIAS-Sitzung sicher mit BetterIlias:
+            Da wir die Anmeldung direkt im Browser abwickeln (ohne Server-Passwortweitergabe), verbindet die kleine Browser-Erweiterung deine bestehende ILIAS-Sitzung sicher mit BetterIlias. Wähle deinen Browser:
           </p>
+
+          {/* Browser Selector Tabs */}
+          <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+            <button
+              type="button"
+              onClick={() => setSelectedBrowser('chrome')}
+              className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition cursor-pointer ${
+                selectedBrowser === 'chrome'
+                  ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+              }`}
+            >
+              Chrome / Edge / Brave
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedBrowser('firefox')}
+              className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition cursor-pointer ${
+                selectedBrowser === 'firefox'
+                  ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+              }`}
+            >
+              Mozilla Firefox
+            </button>
+          </div>
 
           {/* Steps */}
           <div className="space-y-2.5">
-            <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0AACA5] font-bold text-white text-[11px]">
-                1
-              </span>
-              <div>
-                <p className="font-semibold text-slate-900 dark:text-white">Erweiterungsverwaltung öffnen</p>
-                <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
-                  Öffne in Chrome <code className="rounded bg-slate-200 px-1 py-0.5 font-mono text-[10px] dark:bg-slate-700">chrome://extensions</code> und aktiviere oben rechts den <strong>Entwicklermodus</strong>.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0AACA5] font-bold text-white text-[11px]">
-                2
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-slate-900 dark:text-white">Erweiterung von GitHub laden</p>
-                <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5 mb-2">
-                  Lade den Ordner <code className="font-mono text-[10px] rounded bg-slate-200 px-1 py-0.5 dark:bg-slate-700">extension/</code> von GitHub herunter oder clone das Repository:
-                </p>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-2.5 dark:border-slate-700 dark:bg-slate-900">
-                  <a
-                    href={extensionGithubUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 text-xs font-semibold text-[#0AACA5] hover:underline truncate"
-                    title="Erweiterung auf GitHub öffnen"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">github.com/M4anuel/betterilias/.../extension</span>
-                  </a>
-                  <button
-                    type="button"
-                    onClick={handleCopyUrl}
-                    className="flex items-center justify-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition shrink-0 cursor-pointer"
-                  >
-                    {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-slate-400" />}
-                    <span>{copied ? 'Kopiert!' : 'Link kopieren'}</span>
-                  </button>
+            {selectedBrowser === 'chrome' ? (
+              <>
+                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0AACA5] font-bold text-white text-[11px]">
+                    1
+                  </span>
+                  <div>
+                    <p className="font-semibold text-slate-900 dark:text-white">Erweiterungsverwaltung öffnen</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
+                      Öffne in Chrome <code className="rounded bg-slate-200 px-1 py-0.5 font-mono text-[10px] dark:bg-slate-700">chrome://extensions</code> (oder <code className="rounded bg-slate-200 px-1 py-0.5 font-mono text-[10px] dark:bg-slate-700">edge://extensions</code>) und aktiviere oben rechts den <strong>Entwicklermodus</strong>.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-2">
-                  Klicke anschliessend in Chrome auf <strong>„Entpackte Erweiterung laden“</strong> und wähle den heruntergeladenen <code className="font-mono text-[10px]">extension/</code>-Ordner aus.
-                </p>
-              </div>
-            </div>
+
+                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0AACA5] font-bold text-white text-[11px]">
+                    2
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-900 dark:text-white">Chrome-Erweiterung von GitHub laden</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5 mb-2">
+                      Lade den Ordner <code className="font-mono text-[10px] rounded bg-slate-200 px-1 py-0.5 dark:bg-slate-700">extension/</code> von GitHub herunter oder clone das Repository:
+                    </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-2.5 dark:border-slate-700 dark:bg-slate-900">
+                      <a
+                        href={chromeGithubUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1.5 text-xs font-semibold text-[#0AACA5] hover:underline truncate"
+                        title="Erweiterung auf GitHub öffnen"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">github.com/M4anuel/betterilias/.../extension</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={handleCopyUrl}
+                        className="flex items-center justify-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition shrink-0 cursor-pointer"
+                      >
+                        {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-slate-400" />}
+                        <span>{copied ? 'Kopiert!' : 'Link kopieren'}</span>
+                      </button>
+                    </div>
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-2">
+                      Klicke anschliessend in Chrome auf <strong>„Entpackte Erweiterung laden“</strong> und wähle den heruntergeladenen <code className="font-mono text-[10px]">extension/</code>-Ordner aus.
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0AACA5] font-bold text-white text-[11px]">
+                    1
+                  </span>
+                  <div>
+                    <p className="font-semibold text-slate-900 dark:text-white">Firefox Add-on-Debugging öffnen</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
+                      Öffne in Firefox <code className="rounded bg-slate-200 px-1 py-0.5 font-mono text-[10px] dark:bg-slate-700">about:debugging#/runtime/this-firefox</code> in der Adressleiste (oder Menü ☰ &gt; Weitere Werkzeuge &gt; Entwickler-Werkzeuge &gt; Dieses Firefox).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0AACA5] font-bold text-white text-[11px]">
+                    2
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-900 dark:text-white">Firefox-Erweiterung von GitHub laden</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5 mb-2">
+                      Lade den Ordner <code className="font-mono text-[10px] rounded bg-slate-200 px-1 py-0.5 dark:bg-slate-700">extension-firefox/</code> von GitHub herunter oder clone das Repository:
+                    </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-2.5 dark:border-slate-700 dark:bg-slate-900">
+                      <a
+                        href={firefoxGithubUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1.5 text-xs font-semibold text-[#0AACA5] hover:underline truncate"
+                        title="Firefox-Erweiterung auf GitHub öffnen"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">github.com/M4anuel/betterilias/.../extension-firefox</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={handleCopyUrl}
+                        className="flex items-center justify-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition shrink-0 cursor-pointer"
+                      >
+                        {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-slate-400" />}
+                        <span>{copied ? 'Kopiert!' : 'Link kopieren'}</span>
+                      </button>
+                    </div>
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-2">
+                      Klicke in Firefox auf <strong>„Temporäres Add-on laden...“</strong> und wähle die Datei <code className="font-mono text-[10px]">extension-firefox/manifest.json</code> aus.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0AACA5] font-bold text-white text-[11px]">
@@ -188,7 +273,7 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
             <a
-              href={extensionGithubUrl}
+              href={currentGithubUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"

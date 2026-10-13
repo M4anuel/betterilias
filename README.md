@@ -7,7 +7,7 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
 ## 🚀 Key Features
 
 * **Authentication & Multi-Tenant Session Sync:**
-  * **BetterIlias Companion Extension (Manifest V3):** 1-click session cookie synchronization (`PHPSESSID`, `ilClientId`) directly from the Uni Bern ILIAS portal (`ilias.unibe.ch`) to the backend via `POST /api/auth/sync`. Supports light and dark mode out-of-the-box.
+  * **BetterIlias Companion Extension (Manifest V3):** 1-click session cookie synchronization (`PHPSESSID`, `ilClientId`) directly from the Uni Bern ILIAS portal (`ilias.unibe.ch`) to the backend via `POST /api/auth/sync`. Supports light and dark mode out-of-the-box. Available for both **Google Chrome / Chromium** (`extension/`) and **Mozilla Firefox** (`extension-firefox/`).
   * **Multi-Tenant Architecture:** Isolated session storage keyed by `session_id`, forwarded seamlessly via `X-Session-ID` request headers, cookies, or query parameters. Allows multiple users/students to access a shared host independently.
   * **Interactive Browser Fallback:** Headed Playwright Chromium login assistant (`python login.py` or `POST /api/auth/login-browser`) handling SWITCH edu-ID 2FA/MFA.
   * **High-Speed Async Requests:** Non-blocking HTTP client via `httpx` with automatic session validation and retry logic.
@@ -76,9 +76,9 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
   * **Build Tool:** Vite
   * **Styling:** Tailwind CSS v4
   * **Icons:** Lucide React
-* **Chrome Extension (`extension/`):**
-  * **Manifest Version:** Manifest V3
-  * **Features:** 1-Click cookie synchronization, multi-tenant session support, light & dark theme
+* **Browser Extensions:**
+  * **Chrome Extension (`extension/`):** Manifest V3, 1-Click cookie synchronization, multi-tenant session support, light & dark theme.
+  * **Firefox Extension (`extension-firefox/`):** Manifest V3 Gecko WebExtension, 1-Click cookie synchronization, multi-tenant session support, light & dark theme.
 
 ---
 
@@ -115,11 +115,20 @@ python -m venv venv
 There are two ways to authenticate your session:
 
 ##### Option A: BetterIlias Companion Extension (Recommended)
-1. Open Chrome and go to `chrome://extensions/`.
+
+**For Google Chrome, Microsoft Edge, Brave:**
+1. Open Chrome and navigate to `chrome://extensions/`.
 2. Enable **"Developer mode"** in the top right corner.
 3. Click **"Load unpacked"** and select the [`extension/`](file:///c:/Users/manue/OneDrive/Dokumente/_Uni/IliasAlternative/extension) directory (or download it from GitHub).
 4. Log into [ILIAS Uni Bern](https://ilias.unibe.ch) as usual.
-5. Click the **BetterIlias Companion** extension icon and click **"Sitzung jetzt synchronisieren"**.
+5. Click the **BetterIlias Companion** extension icon and click **"Sitzung mit BetterIlias synchronisieren"**.
+
+**For Mozilla Firefox:**
+1. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
+2. Click **"Load Temporary Add-on..."** (oder *„Temporäres Add-on laden...“*).
+3. Select the `manifest.json` file inside the [`extension-firefox/`](file:///c:/Users/manue/OneDrive/Dokumente/_Uni/IliasAlternative/extension-firefox) directory (or download it from GitHub).
+4. Log into [ILIAS Uni Bern](https://ilias.unibe.ch) as usual.
+5. Click the **BetterIlias Companion** extension icon and click **"Sitzung mit BetterIlias synchronisieren"**.
 
 ##### Option B: Interactive Browser Login Assistant
 ```bash

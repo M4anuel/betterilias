@@ -2,6 +2,9 @@
 
 Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzung (via SWITCH edu-ID) mit nur einem Klick sicher an BetterIlias zu übermitteln.
 
+> [!NOTE]
+> Nutzt du Mozilla Firefox? Die dedizierte Firefox-Erweiterung findest du im Ordner [`extension-firefox/`](../extension-firefox).
+
 ---
 
 ## 🚀 Installation in Chrome / Edge / Brave
