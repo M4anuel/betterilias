@@ -99,7 +99,35 @@ class IliasClient:
                 f"Session expired: ILIAS login prompt detected for {requested_url}."
             )
 
-        # System error phrases for lack of permission / expired session
+        # Check for HTML login form or startup section
+        if "<input" in response.text and 'name="username"' in response.text and 'name="password"' in response.text:
+            raise SessionExpiredError("Session expired: ILIAS login form encountered.")
+        if "ilstartupsection" in text_lower or "ilstartupframe" in text_lower:
+            raise SessionExpiredError("Session expired: ILIAS startup screen encountered.")
+
+        # 4. Check for positive indicators of an authenticated ILIAS session FIRST
+        soup = BeautifulSoup(response.text, "html.parser")
+        has_auth_indicator = bool(
+            soup.select_one(".il-maincontrols-metabar a.il-user-avatar")
+            or soup.select_one("#il_mbt_usr")
+            or soup.select_one(".ilTopTitle")
+            or soup.select_one("span.il-avatar-initials")
+            or soup.select_one("a.il-user-avatar")
+            or soup.select_one(".il-view-content")
+            or soup.select_one("#il_mbt_pdesk")
+            or soup.select_one("#ilTab")
+            or soup.find(id="mainspace")
+            or soup.select_one(".il-item-group")
+        )
+
+        if has_auth_indicator:
+            # User is authenticated! Do not treat course badges / archived notices as session loss.
+            return
+
+        # 5. If no auth indicator exists, check for explicit error page markers
+        og_title = soup.find("meta", property="og:title")
+        og_title_content = og_title.get("content", "").lower() if og_title else ""
+
         unauth_phrases = [
             "kein zugriffsrecht",
             "sitzung abgelaufen",
@@ -109,17 +137,10 @@ class IliasClient:
             "your session has expired",
             "you are not logged in",
         ]
-        for phrase in unauth_phrases:
-            if phrase in text_lower:
-                raise SessionExpiredError(
-                    f"Session expired or unauthorized: '{phrase}' detected in response for {requested_url}."
-                )
-
-        # Check for HTML login form or startup section
-        if "<input" in response.text and 'name="username"' in response.text and 'name="password"' in response.text:
-            raise SessionExpiredError("Session expired: ILIAS login form encountered.")
-        if "ilstartupsection" in text_lower or "ilstartupframe" in text_lower:
-            raise SessionExpiredError("Session expired: ILIAS startup screen encountered.")
+        if "kein zugriffsrecht" in og_title_content or any(phrase in text_lower for phrase in unauth_phrases):
+            raise SessionExpiredError(
+                f"Session expired or unauthorized detected for {requested_url}."
+            )
 
     async def get_auth_status(self) -> AuthStatus:
         """Check current authentication status."""
