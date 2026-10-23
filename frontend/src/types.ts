@@ -323,10 +323,80 @@ export interface ExerciseOverviewResponse {
   title: string;
   breadcrumbs: BreadcrumbItem[];
   submissions_and_grades_url?: string;
+  edit_assignments_url?: string;
   has_ta_access?: boolean;
   active_mode?: string;
   assignments: AssignmentItem[];
   fetched_at: string;
+}
+
+export interface TAAssignmentListItem {
+  ass_id: string;
+  title: string;
+  order_val: number;
+  type_name: string;
+  type_id: number;
+  start_time?: string | null;
+  deadline?: string | null;
+  mandatory: boolean;
+  instruction_files_count: number;
+  has_work_instructions: boolean;
+  edit_url?: string | null;
+}
+
+export interface TAAssignmentListResponse {
+  exercise_ref_id: string;
+  assignments: TAAssignmentListItem[];
+  form_action_url?: string | null;
+  rtoken?: string | null;
+  fetched_at: string;
+}
+
+export interface AssignmentOrderUpdateRequest {
+  orders: Record<string, number>;
+}
+
+export interface TAInstructionFileItem {
+  file_id: string;
+  filename: string;
+  file_size?: string | null;
+  download_url?: string | null;
+}
+
+export interface TAAssignmentDetailResponse {
+  ass_id?: string | null;
+  exercise_ref_id: string;
+  title: string;
+  type_id: number;
+  type_name: string;
+  mandatory: boolean;
+  instruction_html: string;
+  start_time?: string | null;
+  deadline_mode: number;
+  deadline?: string | null;
+  has_grace_period: boolean;
+  deadline2?: string | null;
+  max_file_enabled: boolean;
+  max_file?: number | null;
+  instruction_files: TAInstructionFileItem[];
+  form_action?: string | null;
+  rtoken?: string | null;
+  fetched_at: string;
+}
+
+export interface SaveTAAssignmentRequest {
+  ass_id?: string | null;
+  title: string;
+  type_id: number;
+  mandatory: boolean;
+  instruction_html: string;
+  start_time?: string | null;
+  deadline_mode: number;
+  deadline?: string | null;
+  has_grace_period: boolean;
+  deadline2?: string | null;
+  max_file_enabled: boolean;
+  max_file?: number | null;
 }
 
 export interface FeedbackFileItem {

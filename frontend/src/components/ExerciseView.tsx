@@ -24,6 +24,7 @@ import {
   Shield,
   Upload,
   MoreVertical,
+  Edit3,
 } from 'lucide-react';
 import {
   AssignmentItem,
@@ -39,6 +40,8 @@ import { StudentAssignmentModal } from './StudentAssignmentModal';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { TAFilterSettingsModal } from './TAFilterSettingsModal';
 import { NotificationToast, ChangeNotification } from './NotificationToast';
+import { TAExerciseManagementView } from './TAExerciseManagementView';
+import { TAExerciseEditorView } from './TAExerciseEditorView';
 
 interface ExerciseViewProps {
   exerciseRefId: string;
@@ -59,6 +62,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 }) => {
   // Top Navigation Tab: 'assignments' | 'info' | 'ta_grading'
   const [activeTab, setActiveTab] = useState<'assignments' | 'info' | 'ta_grading'>('assignments');
+  const [taManagementMode, setTaManagementMode] = useState<'none' | 'list' | 'editor'>('none');
+  const [editingTaAssId, setEditingTaAssId] = useState<string | null>(null);
+  const [editingTaTypeId, setEditingTaTypeId] = useState<number>(1);
 
   // Overview data (Cached with SWR)
   const [overviewData, setOverviewData] = useState<ExerciseOverviewResponse | null>(() => {
@@ -1144,7 +1150,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
             <button
               type="button"
-              onClick={() => setActiveTab('info')}
+              onClick={() => {
+                setActiveTab('info');
+                setTaManagementMode('none');
+              }}
               className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
                 activeTab === 'info'
                   ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
@@ -1159,7 +1168,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             {overviewData?.has_ta_access && (
               <button
                 type="button"
-                onClick={() => setActiveTab('ta_grading')}
+                onClick={() => {
+                  setActiveTab('ta_grading');
+                  setTaManagementMode('none');
+                }}
                 className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
                   activeTab === 'ta_grading'
                     ? 'bg-indigo-600 text-white shadow-xs'
@@ -1177,7 +1189,37 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       {/* ========================================================
           TAB 1: ASSIGNMENTS LIST (Default view for students & tutors)
           ======================================================== */}
-      {activeTab === 'assignments' && (
+      {activeTab === 'assignments' && taManagementMode === 'list' && (
+        <TAExerciseManagementView
+          exerciseRefId={exerciseRefId}
+          exerciseTitle={overviewData?.title}
+          onBack={() => {
+            setTaManagementMode('none');
+            loadOverview();
+          }}
+          onEditAssignment={(assId, typeId) => {
+            setEditingTaAssId(assId);
+            setEditingTaTypeId(typeId || 1);
+            setTaManagementMode('editor');
+          }}
+        />
+      )}
+
+      {activeTab === 'assignments' && taManagementMode === 'editor' && (
+        <TAExerciseEditorView
+          exerciseRefId={exerciseRefId}
+          assId={editingTaAssId}
+          initialTypeId={editingTaTypeId}
+          onBack={() => setTaManagementMode('list')}
+          onSaved={(savedAssId) => {
+            loadOverview();
+            setEditingTaAssId(savedAssId);
+            setTaManagementMode('list');
+          }}
+        />
+      )}
+
+      {activeTab === 'assignments' && taManagementMode === 'none' && (
         <div className="space-y-6">
           {/* Filter Bar & Search */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
@@ -1233,16 +1275,31 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               </button>
             </div>
 
-            {/* Search */}
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
-              <input
-                type="text"
-                placeholder="Übungsblatt suchen..."
-                value={assignmentSearchQuery}
-                onChange={(e) => setAssignmentSearchQuery(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden transition"
-              />
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {/* Search */}
+              <div className="relative flex-1 sm:w-64">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Übungsblatt suchen..."
+                  value={assignmentSearchQuery}
+                  onChange={(e) => setAssignmentSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden transition"
+                />
+              </div>
+
+              {/* TA Exercise Management Button */}
+              {overviewData?.has_ta_access && (
+                <button
+                  type="button"
+                  onClick={() => setTaManagementMode('list')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 font-bold text-xs transition cursor-pointer shrink-0 shadow-2xs"
+                  title="Übungen verwalten & bearbeiten (Tutor)"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  <span>Übungen verwalten</span>
+                </button>
+              )}
             </div>
           </div>
 

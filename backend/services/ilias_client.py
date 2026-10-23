@@ -28,6 +28,12 @@ from backend.schemas import (
     FeedbackFilesResponse,
     TeamCandidatesResponse,
     TeamMemberInfo,
+    TAAssignmentDetailResponse,
+    TAAssignmentListItem,
+    TAAssignmentListResponse,
+    TAInstructionFileItem,
+    AssignmentOrderUpdateRequest,
+    SaveTAAssignmentRequest,
 )
 from backend.scrapers import (
     extract_grading_form,
@@ -49,6 +55,9 @@ from backend.scrapers import (
     parse_team_management_screen,
     ParsedTeamManagementScreen,
     verify_grading_success,
+    parse_ta_assignments_list,
+    parse_ta_assignment_form,
+    parse_instruction_files,
 )
 
 logger = logging.getLogger("ilias.service")
@@ -64,6 +73,31 @@ class IliasClient:
 
     # Class-level cache of course participants per exercise_ref_id for enriching team member names
     _course_user_cache: Dict[str, List[CourseUserCandidate]] = {}
+    # Class-level cache of exercise cmdNode prefix per ref_id
+    _exercise_cmd_nodes: Dict[str, str] = {}
+
+    def _get_exercise_base_node(self, ref_id: str) -> str:
+        """Returns the cached ILIAS cmdNode prefix for an exercise ref_id, defaulting to 'dc:o5'."""
+        return self._exercise_cmd_nodes.get(ref_id, "dc:o5")
+
+    def _cache_exercise_cmd_nodes_from_html(self, ref_id: str, html: str, url: Optional[str] = None):
+        """Scrapes and caches the cmdNode prefix for an exercise from its page HTML or URL."""
+        if url:
+            m = re.search(r'''cmdNode=([^&"']+).*?cmdClass=ilObjExerciseGUI''', url)
+            if m:
+                self._exercise_cmd_nodes[ref_id] = m.group(1)
+                return
+        m_show = re.search(r'''cmdNode=([^&"']+).*?cmdClass=ilObjExerciseGUI.*?cmd=showOverview''', html)
+        if m_show:
+            self._exercise_cmd_nodes[ref_id] = m_show.group(1)
+            return
+        m_obj = re.search(r'''cmdNode=([^&"']+).*?cmdClass=ilObjExerciseGUI''', html)
+        if m_obj:
+            self._exercise_cmd_nodes[ref_id] = m_obj.group(1)
+            return
+        m_eh = re.search(r'''baseClass=ilexercisehandlergui.*?cmdNode=([^:&"']+:[^:&"']+)''', html)
+        if m_eh:
+            self._exercise_cmd_nodes[ref_id] = m_eh.group(1)
 
     def __init__(self, manager: Optional[SessionManager] = None):
         self.session_manager = manager or session_manager
@@ -378,21 +412,31 @@ class IliasClient:
     async def get_exercise_overview(self, ref_id: str, mode: str = "all") -> ExerciseOverviewResponse:
         """Fetch and parse exercise overview and sub-assignments (showOverview) with mode=all by default."""
         self._ensure_authenticated()
+        base_node = self._get_exercise_base_node(ref_id)
         url = (
             f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5&cmdClass=ilObjExerciseGUI&cmd=showOverview&ref_id={ref_id}&mode={mode}&from_overview=1"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}&cmdClass=ilObjExerciseGUI&cmd=showOverview&ref_id={ref_id}&mode={mode}&from_overview=1"
         )
         async with self.session_manager.get_http_client() as client:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
+            # If default node failed or showed nothing, attempt canonical resolution via goto.php
+            if resp.status_code != 200 or ("showOverview" not in resp.text and "ilObjExerciseGUI" not in resp.text):
+                goto_url = f"{settings.ilias_base_url}/goto.php?target=exc_{ref_id}"
+                goto_resp = await client.get(goto_url)
+                if goto_resp.status_code == 200:
+                    resp = goto_resp
+                    url = str(goto_resp.url)
+            self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
             return parse_exercise_overview(resp.text, exercise_ref_id=ref_id)
 
     async def get_exercise_info(self, ref_id: str) -> ExerciseInfoResponse:
         """Fetch and parse exercise info screen (showSummary)."""
         self._ensure_authenticated()
+        base_node = self._get_exercise_base_node(ref_id)
         url = (
             f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:ft&cmdClass=ilinfoscreengui&cmd=showSummary&ref_id={ref_id}"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:ft&cmdClass=ilinfoscreengui&cmd=showSummary&ref_id={ref_id}"
         )
         async with self.session_manager.get_http_client() as client:
             resp = await client.get(url)
@@ -402,20 +446,22 @@ class IliasClient:
     async def get_student_assignment_detail(self, ref_id: str, ass_id: str) -> StudentAssignmentDetail:
         """Fetch and parse the student assignment presentation screen, team details, and submitted files screen."""
         self._ensure_authenticated()
+        base_node = self._get_exercise_base_node(ref_id)
         url = (
             f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n&cmdClass=ilAssignmentPresentationGUI&ref_id={ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:5n&cmdClass=ilAssignmentPresentationGUI&ref_id={ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
         )
         async with self.session_manager.get_http_client() as client:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
+            self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
             detail = parse_student_assignment_detail(resp.text, exercise_ref_id=ref_id, ass_id=ass_id)
 
             # Enrich team_member_details with ILIAS user IDs from submissionScreenTeam if a team exists
             if detail.manage_team_url or detail.team_members:
                 team_url = detail.manage_team_url or (
                     f"{settings.ilias_base_url}/ilias.php?"
-                    f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4&cmdClass=ilExSubmissionTeamGUI&cmd=submissionScreenTeam"
+                    f"baseClass=ilexercisehandlergui&cmdNode={base_node}:5n:d2:d4&cmdClass=ilExSubmissionTeamGUI&cmd=submissionScreenTeam"
                     f"&ref_id={ref_id}&ass_id={ass_id}"
                 )
                 try:
@@ -444,9 +490,9 @@ class IliasClient:
                             m.is_self = True
 
             # Check if there is an active submissionScreen with direct download links
-            sub_url = (
+            sub_url = detail.submission_screen_url or (
                 f"{settings.ilias_base_url}/ilias.php?"
-                f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=submissionScreen"
+                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=submissionScreen"
                 f"&ref_id={ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
             )
             try:
@@ -481,25 +527,35 @@ class IliasClient:
         5. Verify and return the refreshed assignment details.
         """
         self._ensure_authenticated()
+        base_node = self._get_exercise_base_node(exercise_ref_id)
         async with self.session_manager.get_http_client() as client:
             # 1. Fetch the upload form page to dynamically extract endpoints & fields
             upload_form_url = (
                 f"{settings.ilias_base_url}/ilias.php?"
-                f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=uploadForm"
+                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=uploadForm"
                 f"&ref_id={exercise_ref_id}&ass_id={ass_id}&from_overview=1"
             )
+            if exercise_ref_id not in self._exercise_cmd_nodes:
+                try:
+                    pres_detail = await self.get_student_assignment_detail(exercise_ref_id, ass_id)
+                    if pres_detail.upload_form_url:
+                        upload_form_url = pres_detail.upload_form_url
+                    base_node = self._get_exercise_base_node(exercise_ref_id)
+                except Exception as pe:
+                    logger.debug(f"Could not pre-fetch presentation detail: {pe}")
+
             form_resp = await client.get(upload_form_url)
             self._check_response_for_session_loss(form_resp, upload_form_url)
 
-            # Default fallback parameters
+            # Default fallback parameters with dynamic base_node
             repo_upload_url = (
                 f"{settings.ilias_base_url}/ilias.php?"
-                f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1:yt&cmdClass=ilRepoStandardUploadHandlerGUI&cmd=upload"
+                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:5n:d2:d1:yt&cmdClass=ilRepoStandardUploadHandlerGUI&cmd=upload"
                 f"&ref_id={exercise_ref_id}&ass_id={ass_id}&from_overview=1"
             )
             form_action = (
                 f"{settings.ilias_base_url}/ilias.php?"
-                f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=addUpload"
+                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=addUpload"
                 f"&ref_id={exercise_ref_id}&ass_id={ass_id}&from_overview=1"
             )
             input_name = "form/input_0/input_1"
@@ -576,9 +632,10 @@ class IliasClient:
         4. Re-fetch and return updated student assignment details.
         """
         self._ensure_authenticated()
+        base_node = self._get_exercise_base_node(exercise_ref_id)
         sub_url = (
             f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=submissionScreen"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=submissionScreen"
             f"&ref_id={exercise_ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
         )
         async with self.session_manager.get_http_client() as client:
@@ -1294,6 +1351,235 @@ class IliasClient:
 
         return await self.get_submission_feedback_files(exercise_ref_id, member_id, ass_id)
 
+
+
+    # ---------------------------------------------------------
+    # TA Exercise Editor & Assignment Management
+    # ---------------------------------------------------------
+    async def get_ta_assignments_list(self, ref_id: str) -> TAAssignmentListResponse:
+        """
+        Fetch and parse the TA assignments editor list (ilExAssignmentEditorGUI&cmd=listAssignments).
+        """
+        self._ensure_authenticated()
+        base_node = self._get_exercise_base_node(ref_id)
+        url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=listAssignments"
+            f"&ref_id={ref_id}&mode=all&from_overview=1"
+        )
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.get(url)
+            self._check_response_for_session_loss(resp, url)
+            self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
+            return parse_ta_assignments_list(resp.text, exercise_ref_id=ref_id)
+
+    async def update_ta_assignment_order(
+        self, ref_id: str, orders: Dict[str, int]
+    ) -> TAAssignmentListResponse:
+        """
+        Save updated presentation orders for assignments via cmd[saveAssignmentOrder].
+        """
+        self._ensure_authenticated()
+        current = await self.get_ta_assignments_list(ref_id)
+        base_node = self._get_exercise_base_node(ref_id)
+        action_url = current.form_action_url or (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=post"
+            f"&ref_id={ref_id}&mode=all&from_overview=1"
+        )
+        if current.rtoken and "rtoken=" not in action_url:
+            action_url = f"{action_url}&rtoken={current.rtoken}"
+
+        payload = {"cmd[saveAssignmentOrder]": "Save Order"}
+        for ass_id, ord_val in orders.items():
+            payload[f"order[{ass_id}]"] = str(ord_val)
+
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.post(action_url, data=payload)
+            self._check_response_for_session_loss(resp, action_url)
+            return parse_ta_assignments_list(resp.text, exercise_ref_id=ref_id)
+
+    async def get_ta_assignment_detail(
+        self, ref_id: str, ass_id: Optional[str] = None, type_id: int = 1
+    ) -> TAAssignmentDetailResponse:
+        """
+        Fetch assignment details form (editAssignment or addAssignment).
+        """
+        self._ensure_authenticated()
+        base_node = self._get_exercise_base_node(ref_id)
+        if ass_id:
+            url = (
+                f"{settings.ilias_base_url}/ilias.php?"
+                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=editAssignment"
+                f"&ref_id={ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
+            )
+        else:
+            url = (
+                f"{settings.ilias_base_url}/ilias.php?"
+                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=addAssignment"
+                f"&ref_id={ref_id}&ass_type={type_id}&mode=all&from_overview=1"
+            )
+
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.get(url)
+            self._check_response_for_session_loss(resp, url)
+            self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
+            detail = parse_ta_assignment_form(resp.text, exercise_ref_id=ref_id, ass_id=ass_id)
+            if ass_id:
+                try:
+                    files = await self.get_ta_instruction_files(ref_id, ass_id)
+                    detail.instruction_files = files
+                except Exception as fe:
+                    logger.debug(f"Could not load instruction files for {ass_id}: {fe}")
+            return detail
+
+    async def save_ta_assignment(
+        self, ref_id: str, data: SaveTAAssignmentRequest
+    ) -> TAAssignmentDetailResponse:
+        """
+        Create or update an exercise assignment.
+        """
+        self._ensure_authenticated()
+        existing = await self.get_ta_assignment_detail(
+            ref_id, ass_id=data.ass_id, type_id=data.type_id
+        )
+        base_node = self._get_exercise_base_node(ref_id)
+
+        action_url = existing.form_action or (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=post"
+            f"&ref_id={ref_id}&mode=all&from_overview=1&ass_type={data.type_id}"
+        )
+        if existing.rtoken and "rtoken=" not in action_url:
+            action_url = f"{action_url}&rtoken={existing.rtoken}"
+        if data.ass_id and "ass_id=" not in action_url:
+            action_url = f"{action_url}&ass_id={data.ass_id}"
+
+        payload: Dict[str, str] = {
+            "title": data.title,
+            "type": str(data.type_id),
+            "instruction": data.instruction_html,
+            "deadline_mode": str(data.deadline_mode),
+            "cmd[saveAssignment]": "Save",
+        }
+        if data.mandatory:
+            payload["mandatory"] = "1"
+        if data.start_time:
+            payload["start_time"] = data.start_time
+        if data.deadline:
+            payload["deadline"] = data.deadline
+        if data.has_grace_period and data.deadline2:
+            payload["deadline2"] = data.deadline2
+        if data.max_file_enabled and data.max_file is not None:
+            payload["max_file_tgl"] = "1"
+            payload["max_file"] = str(data.max_file)
+
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.post(action_url, data=payload)
+            self._check_response_for_session_loss(resp, action_url)
+            saved = parse_ta_assignment_form(resp.text, exercise_ref_id=ref_id, ass_id=data.ass_id)
+            if data.ass_id:
+                try:
+                    files = await self.get_ta_instruction_files(ref_id, data.ass_id)
+                    saved.instruction_files = files
+                except Exception as fe:
+                    logger.debug(f"Could not load instruction files for {data.ass_id}: {fe}")
+            return saved
+
+    async def delete_ta_assignment(self, ref_id: str, ass_id: str) -> bool:
+        """
+        Delete an assignment using cmd[confirmAssignmentsDeletion] and cmd[deleteAssignments].
+        """
+        self._ensure_authenticated()
+        current = await self.get_ta_assignments_list(ref_id)
+        base_node = self._get_exercise_base_node(ref_id)
+
+        post_url = current.form_action_url or (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=post"
+            f"&ref_id={ref_id}&from_overview=1"
+        )
+        if current.rtoken and "rtoken=" not in post_url:
+            post_url = f"{post_url}&rtoken={current.rtoken}"
+
+        async with self.session_manager.get_http_client() as client:
+            # 1. Confirm dialog
+            conf_resp = await client.post(
+                post_url, data={"id[]": ass_id, "cmd[confirmAssignmentsDeletion]": "Delete"}
+            )
+            self._check_response_for_session_loss(conf_resp, post_url)
+
+            # 2. Final deletion
+            del_resp = await client.post(
+                post_url, data={"id[]": ass_id, "cmd[deleteAssignments]": "Delete"}
+            )
+            self._check_response_for_session_loss(del_resp, post_url)
+            return del_resp.status_code == 200
+
+    async def get_ta_instruction_files(
+        self, ref_id: str, ass_id: str
+    ) -> List[TAInstructionFileItem]:
+        """
+        Fetch list of uploaded instruction files for an assignment.
+        """
+        self._ensure_authenticated()
+        base_node = self._get_exercise_base_node(ref_id)
+        url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs:z6&cmdClass=ilResourceCollectionGUI&cmd=index"
+            f"&ref_id={ref_id}&ass_id={ass_id}&from_overview=1"
+        )
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.get(url)
+            self._check_response_for_session_loss(resp, url)
+            return parse_instruction_files(resp.text, base_url=settings.ilias_base_url)
+
+    async def upload_instruction_file(
+        self,
+        ref_id: str,
+        ass_id: str,
+        filename: str,
+        file_bytes: bytes,
+        content_type: str = "application/octet-stream",
+    ) -> List[TAInstructionFileItem]:
+        """
+        Upload an instruction file to an assignment (ilResourceCollectionGUI&cmd=postUpload).
+        """
+        self._ensure_authenticated()
+        base_node = self._get_exercise_base_node(ref_id)
+        upload_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs:z6&cmdClass=ilResourceCollectionGUI&cmd=postUpload"
+            f"&ref_id={ref_id}&ass_id={ass_id}&from_overview=1"
+        )
+        files = {
+            "form/input_0[]": (filename, file_bytes, content_type),
+            "form/input_0": (filename, file_bytes, content_type),
+            "files[]": (filename, file_bytes, content_type),
+            "file": (filename, file_bytes, content_type),
+        }
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.post(upload_url, files=files)
+            self._check_response_for_session_loss(resp, upload_url)
+        return await self.get_ta_instruction_files(ref_id, ass_id)
+
+    async def delete_instruction_file(
+        self, ref_id: str, ass_id: str, file_id: str
+    ) -> bool:
+        """
+        Delete an instruction file from an assignment (ilResourceCollectionGUI&cmd=remove).
+        """
+        self._ensure_authenticated()
+        base_node = self._get_exercise_base_node(ref_id)
+        url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs:z6&cmdClass=ilResourceCollectionGUI&cmd=remove"
+            f"&ref_id={ref_id}&ass_id={ass_id}&from_overview=1"
+        )
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.post(url, data={"interruptive_items[]": file_id, "cmd": "Delete"})
+            self._check_response_for_session_loss(resp, url)
+            return resp.status_code == 200
 
 # Default singleton instance
 ilias_client = IliasClient()

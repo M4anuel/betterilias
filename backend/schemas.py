@@ -305,6 +305,8 @@ class StudentAssignmentDetail(BaseModel):
     create_team_url: Optional[str] = None
     manage_team_url: Optional[str] = None
     delete_team_url: Optional[str] = None
+    upload_form_url: Optional[str] = None
+    submission_screen_url: Optional[str] = None
     submitted_files: List[SubmissionFile] = Field(default_factory=list)
     last_submission: Optional[str] = None
     submission_status: str = "not_submitted"
@@ -318,10 +320,77 @@ class ExerciseOverviewResponse(BaseModel):
     title: str
     breadcrumbs: List[BreadcrumbItem] = Field(default_factory=list)
     submissions_and_grades_url: Optional[str] = None
+    edit_assignments_url: Optional[str] = None
     has_ta_access: bool = False
     active_mode: str = "all"
     assignments: List[AssignmentItem] = Field(default_factory=list)
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# ---------------------------------------------------------
+# TA Exercise Management Schemas
+# ---------------------------------------------------------
+class TAAssignmentListItem(BaseModel):
+    ass_id: str
+    title: str
+    order_val: int = 0
+    type_name: str = "File"
+    type_id: int = 1
+    start_time: Optional[str] = None
+    deadline: Optional[str] = None
+    mandatory: bool = True
+    instruction_files_count: int = 0
+    has_work_instructions: bool = False
+    edit_url: Optional[str] = None
+
+class TAAssignmentListResponse(BaseModel):
+    exercise_ref_id: str
+    assignments: List[TAAssignmentListItem] = Field(default_factory=list)
+    form_action_url: Optional[str] = None
+    rtoken: Optional[str] = None
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class AssignmentOrderUpdateRequest(BaseModel):
+    orders: Dict[str, int]
+
+class TAInstructionFileItem(BaseModel):
+    file_id: str
+    filename: str
+    file_size: Optional[str] = None
+    download_url: Optional[str] = None
+
+class TAAssignmentDetailResponse(BaseModel):
+    ass_id: Optional[str] = None
+    exercise_ref_id: str
+    title: str = ""
+    type_id: int = 1
+    type_name: str = "File"
+    mandatory: bool = True
+    instruction_html: str = ""
+    start_time: Optional[str] = None
+    deadline_mode: int = 1  # 0: no deadline, 1: ending date
+    deadline: Optional[str] = None
+    has_grace_period: bool = False
+    deadline2: Optional[str] = None
+    max_file_enabled: bool = False
+    max_file: Optional[int] = None
+    instruction_files: List[TAInstructionFileItem] = Field(default_factory=list)
+    form_action: Optional[str] = None
+    rtoken: Optional[str] = None
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SaveTAAssignmentRequest(BaseModel):
+    ass_id: Optional[str] = None
+    title: str
+    type_id: int = 1
+    mandatory: bool = True
+    instruction_html: str = ""
+    start_time: Optional[str] = None
+    deadline_mode: int = 1
+    deadline: Optional[str] = None
+    has_grace_period: bool = False
+    deadline2: Optional[str] = None
+    max_file_enabled: bool = False
+    max_file: Optional[int] = None
 
 class ExerciseInfoSection(BaseModel):
     title: str

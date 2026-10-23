@@ -1,3 +1,8 @@
+from backend.scrapers.exercise_editor import (
+    parse_ta_assignments_list,
+    parse_ta_assignment_form,
+    parse_instruction_files,
+)
 from backend.scrapers.dashboard import parse_dashboard
 from backend.scrapers.dumper import ScrapingParsingError, dump_failed_html, list_failed_dumps, get_dump_content
 from backend.scrapers.forms import (
@@ -46,6 +51,9 @@ __all__ = [
     "parse_remove_team_confirmation_screen",
     "ParsedTeamConfirmRemoveScreen",
     "parse_feedback_files",
+    "parse_ta_assignments_list",
+    "parse_ta_assignment_form",
+    "parse_instruction_files",
     "parse_semester_courses",
     "extract_grading_form",
     "extract_feedback_modal_form",
