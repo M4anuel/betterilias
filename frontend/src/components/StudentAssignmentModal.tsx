@@ -43,6 +43,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
   const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
 
   // Team Management State
@@ -360,27 +361,69 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
           /no team|kein team/i.test(detail.team_status_text)))
   );
 
-  const handleUploadStudentFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const uploadStudentFiles = async (files: FileList | File[]) => {
+    const fileList = Array.from(files);
+    if (fileList.length === 0 || isUploading) return;
 
     setIsUploading(true);
     setUploadSuccessMessage(null);
     try {
-      const updated = await api.uploadStudentAssignmentFile(exerciseRefId, assId, file);
-      setDetail(updated);
-      cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
-      if (updated.submitted_files && updated.submitted_files.length > 0) {
-        setUploadSuccessMessage(`"${file.name}" erfolgreich eingereicht.`);
-      } else {
-        alert('Die Datei wurde übertragen, aber ILIAS hat sie noch nicht in der Übersicht gelistet. Bitte in Kürze erneut prüfen.');
+      let lastUpdated: StudentAssignmentDetail | null = null;
+      for (const file of fileList) {
+        lastUpdated = await api.uploadStudentAssignmentFile(exerciseRefId, assId, file);
       }
-      setTimeout(() => setUploadSuccessMessage(null), 4000);
+      if (lastUpdated) {
+        setDetail(lastUpdated);
+        cache.setCachedStudentAssignment(exerciseRefId, assId, lastUpdated);
+        if (lastUpdated.submitted_files && lastUpdated.submitted_files.length > 0) {
+          setUploadSuccessMessage(
+            fileList.length === 1
+              ? `"${fileList[0].name}" erfolgreich eingereicht.`
+              : `${fileList.length} Dateien erfolgreich eingereicht.`
+          );
+        } else {
+          alert('Die Datei wurde übertragen, aber ILIAS hat sie noch nicht in der Übersicht gelistet. Bitte in Kürze erneut prüfen.');
+        }
+        setTimeout(() => setUploadSuccessMessage(null), 4000);
+      }
     } catch (err: any) {
       alert(`Fehler beim Hochladen der Abgabe: ${err.message}`);
     } finally {
       setIsUploading(false);
-      e.target.value = '';
+    }
+  };
+
+  const handleUploadStudentFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      await uploadStudentFiles(e.target.files);
+    }
+    e.target.value = '';
+  };
+
+  const handleDragOverSubmission = (e: React.DragEvent<HTMLDivElement>) => {
+    if (detail?.is_ended || canCreateTeam || isUploading) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDraggingFile) {
+      setIsDraggingFile(true);
+    }
+  };
+
+  const handleDragLeaveSubmission = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDraggingFile(false);
+    }
+  };
+
+  const handleDropSubmission = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    if (detail?.is_ended || canCreateTeam || isUploading) return;
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await uploadStudentFiles(e.dataTransfer.files);
     }
   };
 
@@ -925,23 +968,41 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
               </div>
 
               {/* Submission Status & Uploaded Files */}
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-3">
+              <div
+                onDragOver={handleDragOverSubmission}
+                onDragLeave={handleDragLeaveSubmission}
+                onDrop={handleDropSubmission}
+                className={`rounded-2xl border p-5 shadow-2xs space-y-3 transition-all ${
+                  isDraggingFile
+                    ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50/40 dark:bg-indigo-950/30 ring-2 ring-indigo-500/20'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
+                }`}
+              >
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       Eigene Einreichung
                     </h3>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        detail.submitted_files && detail.submitted_files.length > 0
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                      }`}
-                    >
-                      {detail.submitted_files && detail.submitted_files.length > 0
-                        ? 'Abgegeben'
-                        : detail.submission_status || 'Keine Abgabe'}
-                    </span>
+                    {detail.submitted_files && detail.submitted_files.length > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                        <span>Abgegeben</span>
+                      </span>
+                    ) : detail.submission_status === 'late' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800">
+                        <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                        <span>Verspätet eingereicht</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200/80 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+                        <Clock className="h-3 w-3 text-slate-400 dark:text-slate-500" />
+                        <span>
+                          {detail.submission_status && detail.submission_status !== 'not_submitted'
+                            ? detail.submission_status
+                            : 'Noch keine Abgabe'}
+                        </span>
+                      </span>
+                    )}
                   </div>
 
                   {/* Upload Submission Button */}
@@ -963,6 +1024,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                       <input
                         id={`student-upload-${assId}`}
                         type="file"
+                        multiple
                         className="hidden"
                         disabled={isUploading}
                         onChange={handleUploadStudentFile}
@@ -979,7 +1041,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                 )}
 
                 {detail.submitted_files && detail.submitted_files.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {detail.last_submission && (
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                         Letzte Einreichung: {detail.last_submission}
@@ -1036,18 +1098,72 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         );
                       })}
                     </div>
+
+                    {!detail.is_ended && !canCreateTeam && (
+                      <label
+                        htmlFor={`student-upload-${assId}`}
+                        className={`flex items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-2.5 text-xs transition cursor-pointer ${
+                          isDraggingFile
+                            ? 'border-indigo-500 bg-indigo-50/80 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold'
+                            : 'border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 hover:text-indigo-600 dark:hover:text-indigo-300'
+                        }`}
+                      >
+                        <Upload className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          {isDraggingFile
+                            ? 'Datei hier loslassen zum Hochladen...'
+                            : 'Weitere Datei per Drag & Drop hierher ziehen oder klicken zum Hinzufügen'}
+                        </span>
+                      </label>
+                    )}
                   </div>
+                ) : !detail.is_ended && !canCreateTeam ? (
+                  <label
+                    htmlFor={`student-upload-${assId}`}
+                    className={`group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition cursor-pointer ${
+                      isDraggingFile
+                        ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50/70 dark:bg-indigo-950/40'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20'
+                    }`}
+                  >
+                    <div
+                      className={`mb-2.5 flex h-11 w-11 items-center justify-center rounded-2xl transition ${
+                        isDraggingFile
+                          ? 'bg-indigo-600 text-white scale-105 shadow-xs'
+                          : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/60'
+                      }`}
+                    >
+                      {isUploading ? (
+                        <RefreshCw className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Upload className="h-5 w-5" />
+                      )}
+                    </div>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      {isUploading
+                        ? 'Abgabe wird zu ILIAS hochgeladen...'
+                        : isDraggingFile
+                        ? 'Datei jetzt loslassen, um sie einzureichen'
+                        : 'Datei per Drag & Drop hierher ziehen oder klicken'}
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                      Noch keine Dateien eingereicht • Direkter Upload nach ILIAS
+                    </p>
+                  </label>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-6 text-center text-xs text-slate-400 dark:text-slate-500 space-y-1">
-                    <p className="font-semibold text-slate-600 dark:text-slate-300">
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/30 p-6 text-center space-y-1.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
+                      {canCreateTeam ? <Users className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                    </div>
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                       {canCreateTeam
                         ? 'Bitte erstelle zuerst ein Team, um eine Datei einzureichen'
-                        : 'Noch keine Dateien eingereicht'}
+                        : 'Keine Dateien für diese Aufgabe eingereicht'}
                     </p>
                     <p className="text-[11px] text-slate-400 dark:text-slate-500">
                       {canCreateTeam
                         ? 'Für diese Gruppenaufgabe ist vor dem Datei-Upload ein Team erforderlich.'
-                        : 'Nutzen Sie den Button oben rechts, um Ihre Ausarbeitung einzureichen.'}
+                        : 'Die Bearbeitungsfrist für diese Aufgabe ist abgelaufen.'}
                     </p>
                   </div>
                 )}

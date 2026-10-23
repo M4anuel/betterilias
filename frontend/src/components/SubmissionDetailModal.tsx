@@ -76,6 +76,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
   const [feedbackFiles, setFeedbackFiles] = useState<FeedbackFileItem[]>([]);
   const [isLoadingFeedbackFiles, setIsLoadingFeedbackFiles] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isDraggingFeedbackFile, setIsDraggingFeedbackFile] = useState(false);
   const [uploadSuccessMsg, setUploadSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,9 +92,8 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
     }
   }, [exerciseRefId, submission.member_id, submission.evaluation_by_file_url, assId]);
 
-  const handleUploadFeedbackFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !exerciseRefId) return;
+  const uploadFeedbackFileDirect = async (file: File) => {
+    if (!file || !exerciseRefId || isUploadingFile) return;
 
     setIsUploadingFile(true);
     setUploadSuccessMsg(null);
@@ -106,7 +106,24 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
       alert(`Fehler beim Hochladen: ${err.message}`);
     } finally {
       setIsUploadingFile(false);
-      e.target.value = '';
+    }
+  };
+
+  const handleUploadFeedbackFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await uploadFeedbackFileDirect(file);
+    }
+    e.target.value = '';
+  };
+
+  const handleFeedbackDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFeedbackFile(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      await uploadFeedbackFileDirect(file);
     }
   };
 
@@ -489,7 +506,26 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
 
           {/* Feedback / Evaluation Files Section */}
           {submission.evaluation_by_file_url && (
-            <div className="space-y-2">
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!isDraggingFeedbackFile) setIsDraggingFeedbackFile(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setIsDraggingFeedbackFile(false);
+                }
+              }}
+              onDrop={handleFeedbackDrop}
+              className={`space-y-2 rounded-2xl p-3 -m-3 transition ${
+                isDraggingFeedbackFile
+                  ? 'bg-indigo-50/70 dark:bg-indigo-950/40 ring-2 ring-indigo-500/30'
+                  : ''
+              }`}
+            >
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   Korrektur-Dateien (Evaluation Files)
@@ -570,9 +606,21 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-3 text-center text-xs text-slate-400 dark:text-slate-500">
-                  Noch keine Korrekturdatei für diese(n) Studierende(n) hochgeladen.
-                </div>
+                <label
+                  htmlFor={`modal-upload-${submission.member_id}`}
+                  className={`flex flex-col items-center justify-center rounded-xl border border-dashed p-4 text-center text-xs transition cursor-pointer ${
+                    isDraggingFeedbackFile
+                      ? 'border-indigo-500 bg-indigo-50/80 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold'
+                      : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-600 dark:hover:text-indigo-300'
+                  }`}
+                >
+                  <Upload className="h-4 w-4 mb-1 opacity-70" />
+                  <span>
+                    {isDraggingFeedbackFile
+                      ? 'Korrekturdatei hier loslassen zum Hochladen...'
+                      : 'Korrekturdatei per Drag & Drop hierher ziehen oder klicken zum Hochladen'}
+                  </span>
+                </label>
               )}
             </div>
           )}

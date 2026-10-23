@@ -99,6 +99,7 @@ class PodcastEpisode(BaseModel):
     location: Optional[str] = None
     stream_url: Optional[str] = None
     status: str = "available"  # "available" (recorded) or "scheduled" (future / upcoming)
+    last_watched_seconds: Optional[float] = None
 
 class PodcastSeriesResponse(BaseModel):
     ref_id: str

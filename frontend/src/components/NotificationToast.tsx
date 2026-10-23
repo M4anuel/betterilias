@@ -63,15 +63,15 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
   const getIcon = (type: string) => {
     switch (type) {
       case 'file':
-        return <FileText className="h-4 w-4 text-teal-400" />;
+        return <FileText className="h-4 w-4 text-teal-600 dark:text-teal-400" />;
       case 'podcast':
-        return <Radio className="h-4 w-4 text-sky-400" />;
+        return <Radio className="h-4 w-4 text-sky-600 dark:text-sky-400" />;
       case 'session':
-        return <Calendar className="h-4 w-4 text-emerald-400" />;
+        return <Calendar className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
       case 'log':
-        return <Activity className="h-4 w-4 text-amber-400" />;
+        return <Activity className="h-4 w-4 text-amber-600 dark:text-amber-400" />;
       default:
-        return <Sparkles className="h-4 w-4 text-teal-400" />;
+        return <Sparkles className="h-4 w-4 text-teal-600 dark:text-teal-400" />;
     }
   };
 
@@ -79,23 +79,23 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
     <div
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
-      className="fixed bottom-6 right-6 z-50 w-80 sm:w-96 rounded-2xl bg-slate-900/95 text-white shadow-2xl border border-slate-700/80 backdrop-blur-md overflow-hidden transition animate-in slide-in-from-bottom-5 duration-200"
+      className="fixed bottom-6 right-6 z-50 w-80 sm:w-96 rounded-2xl bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white shadow-2xl border border-slate-200/90 dark:border-slate-700/80 backdrop-blur-md overflow-hidden transition-colors animate-in slide-in-from-bottom-5 duration-200"
       role="alert"
     >
       {/* Toast Content */}
       <div className="p-4 space-y-2.5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400 shrink-0">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-transparent shrink-0">
               <Bell className="h-4 w-4" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-slate-100">
+              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
                 {isMultiple
                   ? `${count} neue Aktualisierungen gefunden`
                   : 'Aktualisierung gefunden'}
               </h4>
-              <p className="text-[11px] text-slate-400">Gerade mit ILIAS synchronisiert</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">Gerade mit ILIAS synchronisiert</p>
             </div>
           </div>
 
@@ -104,7 +104,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
               <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="rounded-lg p-1 text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                className="rounded-lg p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                 title={isExpanded ? 'Details einklappen' : 'Details aufklappen'}
               >
                 {isExpanded ? (
@@ -118,7 +118,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
             <button
               type="button"
               onClick={onDismiss}
-              className="rounded-lg p-1 text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              className="rounded-lg p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
               title="Schliessen"
             >
               <X className="h-4 w-4" />
@@ -128,14 +128,14 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
 
         {/* Single notification view */}
         {!isMultiple && (
-          <div className="flex items-start gap-2 rounded-xl bg-slate-800/70 p-2.5 border border-slate-700/50">
+          <div className="flex items-start gap-2 rounded-xl bg-slate-50/90 dark:bg-slate-800/70 p-2.5 border border-slate-200/80 dark:border-slate-700/50">
             <div className="mt-0.5 shrink-0">{getIcon(notifications[0].type)}</div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-200 line-clamp-2">
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-2">
                 {notifications[0].title}
               </p>
               {notifications[0].subtitle && (
-                <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                   {notifications[0].subtitle}
                 </p>
               )}
@@ -145,19 +145,19 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
 
         {/* Multiple notifications view - Fold-out list */}
         {isMultiple && isExpanded && (
-          <div className="max-h-56 overflow-y-auto space-y-1.5 pt-1 pr-1 border-t border-slate-800 animate-in fade-in duration-150">
+          <div className="max-h-56 overflow-y-auto space-y-1.5 pt-1 pr-1 border-t border-slate-100 dark:border-slate-800 animate-in fade-in duration-150">
             {notifications.map((n) => (
               <div
                 key={n.id}
-                className="flex items-start gap-2 rounded-lg bg-slate-800/60 p-2 border border-slate-700/40"
+                className="flex items-start gap-2 rounded-lg bg-slate-50/80 dark:bg-slate-800/60 p-2 border border-slate-200/70 dark:border-slate-700/40"
               >
                 <div className="mt-0.5 shrink-0">{getIcon(n.type)}</div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-slate-200 line-clamp-1">
+                  <p className="text-xs font-medium text-slate-800 dark:text-slate-200 line-clamp-1">
                     {n.title}
                   </p>
                   {n.subtitle && (
-                    <p className="text-[10px] text-slate-400 truncate">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                       {n.subtitle}
                     </p>
                   )}
@@ -169,13 +169,12 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
       </div>
 
       {/* Auto-dismiss progress countdown line */}
-      <div className="h-1 w-full bg-slate-800">
+      <div className="h-1 w-full bg-slate-100 dark:bg-slate-800">
         <div
-          className="h-full bg-blue-500 transition-all duration-100 ease-linear"
+          className="h-full bg-blue-600 dark:bg-blue-500 transition-all duration-100 ease-linear"
           style={{ width: `${progress}%` }}
         />
       </div>
     </div>
   );
 };
-

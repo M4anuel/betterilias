@@ -1,6 +1,7 @@
+import json
 import re
 import urllib.parse
-from typing import List, Optional
+from typing import Dict, List, Optional
 from bs4 import BeautifulSoup
 
 from backend.config import settings
@@ -8,14 +9,44 @@ from backend.schemas import PodcastEpisode, PodcastSeriesResponse
 from backend.scrapers.dumper import safe_parser
 
 
+def extract_paella_timestamps_from_cookie(preferences_cookie: Optional[str]) -> Dict[str, float]:
+    """
+    Parse Opencast Paella Player v8 `preferences` cookie if present.
+    Paella stores per-episode playback progress under:
+      {"global": {...}, "videos": {"<eid>": {"lastKnownTime": 123.45}}}
+    """
+    if not preferences_cookie:
+        return {}
+    timestamps: Dict[str, float] = {}
+    for candidate in (preferences_cookie, urllib.parse.unquote(preferences_cookie)):
+        try:
+            data = json.loads(candidate)
+            if isinstance(data, dict) and isinstance(data.get("videos"), dict):
+                for eid, prefs in data["videos"].items():
+                    if isinstance(prefs, dict) and "lastKnownTime" in prefs:
+                        val = float(prefs["lastKnownTime"])
+                        if val > 0:
+                            timestamps[str(eid)] = round(val, 1)
+                if timestamps:
+                    return timestamps
+        except Exception:
+            continue
+    return timestamps
+
+
 @safe_parser(context_name="podcast_series")
-def parse_podcast_series(html_content: str, ref_id: str) -> PodcastSeriesResponse:
+def parse_podcast_series(
+    html_content: str,
+    ref_id: str,
+    preferences_cookie: Optional[str] = None,
+) -> PodcastSeriesResponse:
     """
     Parse an ILIAS Opencast / Mediacast series page (xoctEventGUI).
     Extracts recorded episodes and scheduled upcoming sessions,
     with recorded episodes prioritized first.
     """
     soup = BeautifulSoup(html_content, "lxml")
+    paella_timestamps = extract_paella_timestamps_from_cookie(preferences_cookie)
 
     # Series Title
     title_elem = (
@@ -93,6 +124,7 @@ def parse_podcast_series(html_content: str, ref_id: str) -> PodcastSeriesRespons
                 location=ep_loc,
                 stream_url=stream_url,
                 status=status,
+                last_watched_seconds=paella_timestamps.get(eid),
             )
         )
         seen_identifiers.add(ep_title)
@@ -112,4 +144,3 @@ def parse_podcast_series(html_content: str, ref_id: str) -> PodcastSeriesRespons
         pages_available=pages_available,
         episodes=sorted_episodes,
     )
-

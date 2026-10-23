@@ -245,6 +245,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const lastRevalidatedAssKeyRef = useRef<string | null>(null);
   const [localNotifications, setLocalNotifications] = useState<ChangeNotification[]>([]);
   const [uploadingMemberId, setUploadingMemberId] = useState<string | null>(null);
+  const [draggingMemberId, setDraggingMemberId] = useState<string | null>(null);
   const [fileUploadSuccessId, setFileUploadSuccessId] = useState<string | null>(null);
 
 
@@ -575,13 +576,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     [exerciseRefId, loadTaSubmissions]
   );
 
-  const handleUploadFeedbackFile = async (
-    memberId: string,
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
+  const uploadMemberFeedbackFile = async (memberId: string, file: File) => {
     if (!file) return;
-
     setUploadingMemberId(memberId);
     try {
       await api.uploadFeedbackFile(exerciseRefId, memberId, file, selectedTaAssId || undefined);
@@ -591,8 +587,18 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       alert(`Fehler beim Hochladen der Korrekturdatei: ${err.message}`);
     } finally {
       setUploadingMemberId(null);
-      e.target.value = '';
     }
+  };
+
+  const handleUploadFeedbackFile = async (
+    memberId: string,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await uploadMemberFeedbackFile(memberId, file);
+    }
+    e.target.value = '';
   };
 
   useEffect(() => {
@@ -1315,12 +1321,17 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         {assignment.status && (
                           <span
                             className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                              assignment.status.toLowerCase().includes('passed')
+                              assignment.status.toLowerCase().includes('passed') ||
+                              assignment.status.toLowerCase().includes('bestanden')
                                 ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                             }`}
                           >
-                            {assignment.status}
+                            {assignment.status === 'not_submitted'
+                              ? 'Noch keine Abgabe'
+                              : assignment.status === 'not_graded'
+                              ? 'Nicht bewertet'
+                              : assignment.status}
                           </span>
                         )}
                       </div>
@@ -1920,15 +1931,48 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             )}
                           </div>
 
-                          <div className="rounded-xl border border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/30 p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div
+                            onDragOver={(e) => {
+                              if (!sub.evaluation_by_file_url) return;
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (draggingMemberId !== sub.member_id) setDraggingMemberId(sub.member_id);
+                            }}
+                            onDragLeave={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                                setDraggingMemberId((prev) => (prev === sub.member_id ? null : prev));
+                              }
+                            }}
+                            onDrop={async (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDraggingMemberId(null);
+                              if (!sub.evaluation_by_file_url) return;
+                              const file = e.dataTransfer.files?.[0];
+                              if (file) {
+                                await uploadMemberFeedbackFile(sub.member_id, file);
+                              }
+                            }}
+                            className={`rounded-xl border p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition ${
+                              draggingMemberId === sub.member_id
+                                ? 'border-indigo-500 border-dashed bg-indigo-100/70 dark:bg-indigo-950/60 ring-2 ring-indigo-500/20'
+                                : 'border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/30'
+                            }`}
+                          >
                             <div className="text-xs text-indigo-900 dark:text-indigo-200">
                               {fileUploadSuccessId === sub.member_id ? (
                                 <span className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
                                   <Check className="h-3.5 w-3.5" />
                                   <span>Korrekturdatei erfolgreich hochgeladen!</span>
                                 </span>
+                              ) : draggingMemberId === sub.member_id ? (
+                                <span className="font-semibold text-indigo-700 dark:text-indigo-300">
+                                  Datei hier loslassen zum Hochladen...
+                                </span>
                               ) : sub.evaluation_by_file_url ? (
-                                <span>Korrekturdatei für diese Abgabe in ILIAS hochladen oder verwalten.</span>
+                                <span>Korrekturdatei per Drag & Drop hierher ziehen oder Button nutzen.</span>
                               ) : (
                                 <span className="text-slate-500 dark:text-slate-400">Keine separate Datei-Rückmeldung in ILIAS konfiguriert.</span>
                               )}

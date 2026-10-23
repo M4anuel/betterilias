@@ -12,10 +12,61 @@ import {
   CheckCircle2,
   Clock,
   Search,
+  Bookmark,
+  Check,
+  Trash2,
 } from 'lucide-react';
 import { PodcastEpisode, PodcastSeriesResponse } from '../types';
 import { api } from '../lib/api';
 import { cache } from '../lib/cache';
+
+const PODCAST_TIMESTAMPS_STORAGE_KEY = 'betterilias_podcast_timestamps';
+
+export function formatPlaybackTimestamp(totalSeconds?: number | null): string | null {
+  if (totalSeconds === undefined || totalSeconds === null || isNaN(totalSeconds) || totalSeconds <= 0) {
+    return null;
+  }
+  const sec = Math.floor(totalSeconds);
+  const hours = Math.floor(sec / 3600);
+  const minutes = Math.floor((sec % 3600) / 60);
+  const seconds = sec % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (hours > 0) {
+    return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${minutes}:${pad(seconds)}`;
+}
+
+export function parsePlaybackTimestampInput(input: string): number | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (/^\d+$/.test(trimmed)) {
+    const val = parseInt(trimmed, 10);
+    return val > 0 ? val * 60 : null; // Plain number = minutes
+  }
+  const parts = trimmed.split(':').map((p) => p.trim());
+  if (parts.some((p) => !/^\d+$/.test(p))) return null;
+  if (parts.length === 2) {
+    const [m, s] = parts.map((p) => parseInt(p, 10));
+    return m * 60 + s;
+  }
+  if (parts.length === 3) {
+    const [h, m, s] = parts.map((p) => parseInt(p, 10));
+    return h * 3600 + m * 60 + s;
+  }
+  return null;
+}
+
+function loadSavedPodcastTimestamps(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(PODCAST_TIMESTAMPS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
 
 interface PodcastModalProps {
   refId: string;
@@ -31,12 +82,56 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
   onNewPodcastFound,
 }) => {
   const [loading, setLoading] = useState(true);
-  const [isRevalidating, setIsRevalidating] = useState(false);
+  const [, setIsRevalidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [series, setSeries] = useState<PodcastSeriesResponse | null>(null);
   const [filter, setFilter] = useState<'available' | 'scheduled' | 'all'>('available');
   const [search, setSearch] = useState('');
+  const [savedTimestamps, setSavedTimestamps] = useState<Record<string, number>>(() =>
+    loadSavedPodcastTimestamps()
+  );
+  const [editingEpisodeId, setEditingEpisodeId] = useState<string | null>(null);
+  const [timestampInput, setTimestampInput] = useState<string>('');
   const backdropMouseDownRef = useRef(false);
+
+  const saveEpisodeTimestamp = (episodeId: string, seconds: number | null) => {
+    setSavedTimestamps((prev) => {
+      const next = { ...prev };
+      if (seconds && seconds > 0) {
+        next[episodeId] = Math.round(seconds);
+      } else {
+        delete next[episodeId];
+      }
+      try {
+        localStorage.setItem(PODCAST_TIMESTAMPS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Ignore storage quota errors
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const handleSyncEvent = (e: Event) => {
+      const custom = e as CustomEvent<{ timestamps?: Record<string, number> }>;
+      if (custom.detail?.timestamps) {
+        setSavedTimestamps((prev) => ({ ...prev, ...custom.detail.timestamps }));
+      } else {
+        setSavedTimestamps(loadSavedPodcastTimestamps());
+      }
+    };
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === PODCAST_TIMESTAMPS_STORAGE_KEY) {
+        setSavedTimestamps(loadSavedPodcastTimestamps());
+      }
+    };
+    document.addEventListener('BETTERILIAS_PODCAST_TIMESTAMPS_SYNCED', handleSyncEvent);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      document.removeEventListener('BETTERILIAS_PODCAST_TIMESTAMPS_SYNCED', handleSyncEvent);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
 
   const fetchPodcasts = async () => {
     // 1. Check cache for 0ms instant display
@@ -59,7 +154,26 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
     // 2. Background revalidation
     try {
       const freshData = await api.getPodcasts(refId);
-      
+
+      // Merge any Paella `lastKnownTime` timestamps returned from ILIAS cookies
+      const cookieTimestamps: Record<string, number> = {};
+      for (const ep of freshData.episodes) {
+        if (ep.last_watched_seconds && ep.last_watched_seconds > 0) {
+          cookieTimestamps[ep.id] = Math.round(ep.last_watched_seconds);
+        }
+      }
+      if (Object.keys(cookieTimestamps).length > 0) {
+        setSavedTimestamps((prev) => {
+          const merged = { ...prev, ...cookieTimestamps };
+          try {
+            localStorage.setItem(PODCAST_TIMESTAMPS_STORAGE_KEY, JSON.stringify(merged));
+          } catch {
+            // Ignore storage errors
+          }
+          return merged;
+        });
+      }
+
       // Change detection: compare cached vs fresh
       if (cached && onNewPodcastFound) {
         const cachedIds = new Set(cached.episodes.map((e: PodcastEpisode) => e.id));
@@ -92,11 +206,17 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (editingEpisodeId) {
+          setEditingEpisodeId(null);
+        } else {
+          onClose();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, editingEpisodeId]);
 
   const episodes = series?.episodes || [];
   const filteredEpisodes = episodes.filter((ep) => {
@@ -263,6 +383,9 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
             !error &&
             filteredEpisodes.map((ep) => {
               const isRecorded = ep.status === 'available';
+              const watchedSec = savedTimestamps[ep.id] ?? ep.last_watched_seconds;
+              const formattedTimestamp = formatPlaybackTimestamp(watchedSec);
+              const isEditingThis = editingEpisodeId === ep.id;
 
               return (
                 <div
@@ -293,6 +416,21 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                           {ep.date}
                         </span>
                       )}
+
+                      {isRecorded && formattedTimestamp && !isEditingThis && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingEpisodeId(ep.id);
+                            setTimestampInput(formattedTimestamp);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/70 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60 transition cursor-pointer"
+                          title="Gespeicherter Wiedergabe-Zeitstempel (klicken zum Bearbeiten)"
+                        >
+                          <Bookmark className="h-2.5 w-2.5 fill-amber-500 text-amber-600 dark:text-amber-400" />
+                          <span>Bei {formattedTimestamp} gestoppt</span>
+                        </button>
+                      )}
                     </div>
 
                     <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug">
@@ -315,19 +453,107 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                         )}
                       </div>
                     )}
+
+                    {/* Inline timestamp editor */}
+                    {isRecorded && isEditingThis && (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!timestampInput.trim()) {
+                            saveEpisodeTimestamp(ep.id, null);
+                            setEditingEpisodeId(null);
+                            return;
+                          }
+                          const parsedSec = parsePlaybackTimestampInput(timestampInput);
+                          if (parsedSec !== null) {
+                            saveEpisodeTimestamp(ep.id, parsedSec);
+                            setEditingEpisodeId(null);
+                          }
+                        }}
+                        className="flex items-center gap-1.5 pt-1 flex-wrap"
+                      >
+                        <input
+                          type="text"
+                          value={timestampInput}
+                          onChange={(e) => setTimestampInput(e.target.value)}
+                          placeholder="z.B. 42:15 oder 1:15:00"
+                          autoFocus
+                          className="w-36 rounded-lg border border-sky-300 dark:border-sky-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-sky-500"
+                        />
+                        <button
+                          type="submit"
+                          className="inline-flex items-center gap-1 rounded-lg bg-sky-600 hover:bg-sky-700 px-2.5 py-1 text-[11px] font-bold text-white transition cursor-pointer"
+                          title="Zeitstempel speichern"
+                        >
+                          <Check className="h-3 w-3" />
+                          <span>Speichern</span>
+                        </button>
+                        {formattedTimestamp && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              saveEpisodeTimestamp(ep.id, null);
+                              setEditingEpisodeId(null);
+                            }}
+                            className="inline-flex items-center justify-center rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 p-1 text-rose-600 dark:text-rose-400 hover:bg-rose-100 transition cursor-pointer"
+                            title="Zeitstempel löschen"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setEditingEpisodeId(null)}
+                          className="text-[11px] font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-1.5 cursor-pointer"
+                        >
+                          Abbrechen
+                        </button>
+                      </form>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                     {isRecorded && ep.stream_url ? (
-                      <a
-                        href={ep.stream_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs"
-                      >
-                        <Play className="h-3.5 w-3.5 fill-white" />
-                        <span>Streamen</span>
-                      </a>
+                      <>
+                        {!isEditingThis && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingEpisodeId(ep.id);
+                              setTimestampInput(formattedTimestamp || '');
+                            }}
+                            className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition cursor-pointer ${
+                              formattedTimestamp
+                                ? 'border-amber-200 dark:border-amber-800/70 bg-amber-50/70 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+                                : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            }`}
+                            title={
+                              formattedTimestamp
+                                ? `Gespeicherten Zeitstempel (${formattedTimestamp}) bearbeiten`
+                                : 'Zeitstempel merken, wo du aufgehört hast'
+                            }
+                          >
+                            <Bookmark className="h-3.5 w-3.5" />
+                            <span className="hidden md:inline">
+                              {formattedTimestamp ? formattedTimestamp : 'Zeit merken'}
+                            </span>
+                          </button>
+                        )}
+                        <a
+                          href={ep.stream_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs"
+                          title={
+                            formattedTimestamp
+                              ? `In ILIAS fortsetzen (zuletzt bei ${formattedTimestamp})`
+                              : 'Aufnahme im ILIAS Opencast Player starten'
+                          }
+                        >
+                          <Play className="h-3.5 w-3.5 fill-white" />
+                          <span>{formattedTimestamp ? `Weiter (${formattedTimestamp})` : 'Streamen'}</span>
+                        </a>
+                      </>
                     ) : (
                       <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 px-2">
                         Wird aufgezeichnet
@@ -362,4 +588,3 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
     </div>
   );
 };
-
