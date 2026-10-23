@@ -25,6 +25,9 @@ def test_repository_and_contextual_semester_navigation():
         ('1', 'Repository'), ('10', 'Faculty'), ('11', 'Subject'), ('12', 'FS2020'), ('13', 'Vorlesung'),
     ]]
     visited_semesters = []
+    held_repository = set()
+    pending_repository = {}
+    failed_repository = set()
 
     def item(ref, title, kind='cat', accessible=True):
         return dict(ref_id=ref, title=title, item_type=kind, accessible=accessible,
@@ -50,6 +53,12 @@ def test_repository_and_contextual_semester_navigation():
             body = dict(active_semester=semester, available_semesters=[], courses=[], grouped_by_category={})
         elif path.startswith('/api/repository/'):
             ref = path.rsplit('/', 1)[1]
+            if ref in held_repository:
+                pending_repository[ref] = route
+                return
+            if ref in failed_repository:
+                route.fulfill(status=503, content_type='application/json', body=json.dumps(dict(detail='Temporarily unavailable')))
+                return
             title, items, breadcrumbs = nodes[ref]
             body = dict(container_ref_id=ref, title=title, items=items, breadcrumbs=breadcrumbs)
         elif path.endswith('/materials'):
@@ -116,6 +125,49 @@ def test_repository_and_contextual_semester_navigation():
             playwright.expect(page.get_by_role('heading', name='Subject', exact=True)).to_be_visible()
             page.reload()
             playwright.expect(page.get_by_role('heading', name='Subject', exact=True)).to_be_visible()
+
+            # An uncached child already has a title and a usable path from its parent.
+            page.evaluate('localStorage.clear()')
+            page.goto(base + '/?repository=1')
+            held_repository.add('10')
+            with page.expect_request('**/api/repository/10'):
+                page.get_by_role('button', name='Faculty', exact=True).click()
+            path = page.get_by_role('navigation', name='Magazin-Pfad', exact=True)
+            playwright.expect(page.get_by_role('heading', name='Faculty', exact=True)).to_be_visible()
+            playwright.expect(path.get_by_role('button', name='Faculty', exact=True)).to_be_visible()
+            playwright.expect(page.get_by_role('heading', name='Magazin', exact=True)).to_have_count(0)
+            # Navigate away while the child is pending; its late response must not replace the root.
+            path.get_by_role('button', name='Magazin öffnen', exact=True).click()
+            held_repository.remove('10')
+            respond(pending_repository.pop('10'))
+            playwright.expect(page.get_by_role('heading', name='Repository', exact=True)).to_be_visible()
+            page.get_by_role('button', name='Faculty', exact=True).click()
+            playwright.expect(page.get_by_role('button', name='Subject', exact=True)).to_be_visible()
+
+            # A failed background refresh keeps the cached listing, heading and breadcrumbs.
+            failed_repository.add('10')
+            page.get_by_role('button', name='Magazin aktualisieren', exact=True).click()
+            playwright.expect(page.get_by_role('alert')).to_contain_text('Temporarily unavailable')
+            playwright.expect(page.get_by_role('button', name='Subject', exact=True)).to_be_visible()
+            playwright.expect(path.get_by_role('button', name='Faculty', exact=True)).to_be_visible()
+            page.reload()
+            playwright.expect(page.get_by_role('alert')).to_be_visible()
+            playwright.expect(page.get_by_role('heading', name='Faculty', exact=True)).to_be_visible()
+            playwright.expect(page.get_by_role('button', name='Subject', exact=True)).to_be_visible()
+            failed_repository.clear()
+
+            # Course ancestors also supply context before that repository page has been fetched.
+            page.evaluate('localStorage.clear()')
+            page.goto(base + '/?course=42')
+            breadcrumb.get_by_role('button', name='Vollständigen Pfad anzeigen').click()
+            held_repository.add('11')
+            with page.expect_request('**/api/repository/11'):
+                breadcrumb.get_by_role('button', name='Subject', exact=True).click()
+            playwright.expect(page.get_by_role('heading', name='Subject', exact=True)).to_be_visible()
+            playwright.expect(path.get_by_role('button', name='Faculty', exact=True)).to_be_visible()
+            held_repository.remove('11')
+            respond(pending_repository.pop('11'))
+            playwright.expect(page.get_by_role('button', name='FS2020', exact=True)).to_be_visible()
             assert not errors
             browser.close()
     finally:

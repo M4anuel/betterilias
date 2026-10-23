@@ -5,6 +5,9 @@ import {
   ExerciseInfoResponse,
   StudentAssignmentDetail,
   SemesterScreenResponse,
+  BreadcrumbItem,
+  RepositoryLocation,
+  RepositoryResponse,
 } from '../types';
 
 export type ContentSectionId =
@@ -314,6 +317,60 @@ export const cache = {
       localStorage.setItem(`ilias_semester_cache_${semId}`, JSON.stringify(data));
     } catch (e) {
       console.warn('Storage quota exceeded for semester cache', e);
+    }
+  },
+
+  // --- Repository pages and paths known before their contents are loaded ---
+  getCachedRepository(refId: string): RepositoryResponse | null {
+    try {
+      const raw = localStorage.getItem(`ilias_repository_${this.getSessionId() || 'default'}_${refId}`);
+      const data = raw ? JSON.parse(raw) : null;
+      return data?.container_ref_id === refId && Array.isArray(data.items) ? data : null;
+    } catch {
+      return null;
+    }
+  },
+
+  getRepositoryLocation(refId: string): RepositoryLocation | null {
+    const page = this.getCachedRepository(refId);
+    if (page) return page;
+    try {
+      const raw = localStorage.getItem(`ilias_repository_path_${this.getSessionId() || 'default'}_${refId}`);
+      const location = raw ? JSON.parse(raw) : null;
+      if (location?.container_ref_id === refId && Array.isArray(location.breadcrumbs)) return location;
+    } catch { /* Navigation also works when storage is unavailable. */ }
+    return refId === '1' ? { container_ref_id: '1', title: 'Repository', breadcrumbs: [] } : null;
+  },
+
+  rememberRepositoryPath(breadcrumbs: BreadcrumbItem[]) {
+    try {
+      const scope = this.getSessionId() || 'default';
+      breadcrumbs.forEach((crumb, index) => {
+        if (!crumb.ref_id) return;
+        const location: RepositoryLocation = {
+          container_ref_id: crumb.ref_id, title: crumb.title,
+          breadcrumbs: breadcrumbs.slice(0, index + 1),
+        };
+        localStorage.setItem(`ilias_repository_path_${scope}_${crumb.ref_id}`, JSON.stringify(location));
+      });
+    } catch (e) {
+      console.warn('Could not cache repository path', e);
+    }
+  },
+
+  setCachedRepository(data: RepositoryResponse) {
+    // Some ILIAS pages include the current node in the path; others omit it.
+    const currentIndex = data.breadcrumbs.findIndex((b) => b.ref_id === data.container_ref_id);
+    const ancestors = currentIndex < 0 ? data.breadcrumbs : data.breadcrumbs.slice(0, currentIndex);
+    const path = [...ancestors, { ref_id: data.container_ref_id, title: data.title }];
+    this.rememberRepositoryPath(path);
+    data.items.filter((item) => ['cat', 'fold', 'grp'].includes(item.item_type)).forEach((item) => {
+      this.rememberRepositoryPath([...path, { ref_id: item.ref_id, title: item.title }]);
+    });
+    try {
+      localStorage.setItem(`ilias_repository_${this.getSessionId() || 'default'}_${data.container_ref_id}`, JSON.stringify(data));
+    } catch (e) {
+      console.warn('Could not cache repository page', e);
     }
   },
 

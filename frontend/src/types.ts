@@ -143,6 +143,8 @@ export interface RepositoryResponse {
   items: (MaterialItem & { accessible: boolean })[];
 }
 
+export type RepositoryLocation = Pick<RepositoryResponse, 'container_ref_id' | 'title' | 'breadcrumbs'>;
+
 export interface SemesterItem {
   id: string;
   name: string;

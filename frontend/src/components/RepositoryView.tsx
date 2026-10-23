@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronRight, Folder, GraduationCap, Home, Lock, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
+import { cache } from '../lib/cache';
 import { RepositoryResponse } from '../types';
 
 interface Props {
@@ -10,18 +11,26 @@ interface Props {
 }
 
 export const RepositoryView: React.FC<Props> = ({ refId, onNavigate, onOpenCourse }) => {
-  const [data, setData] = useState<RepositoryResponse | null>(null);
+  const [data, setData] = useState<RepositoryResponse | null>(() => cache.getCachedRepository(refId));
+  const [location] = useState(() => cache.getRepositoryLocation(refId));
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(true);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
-    setData(null);
     setError(null);
-    api.getRepository(refId).then((next) => { if (active) setData(next); })
-      .catch((err) => { if (active) setError(err.message); });
+    setIsRefreshing(true);
+    api.getRepository(refId).then((next) => {
+      if (active) {
+        cache.setCachedRepository(next);
+        setData(next);
+      }
+    }).catch((err) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setIsRefreshing(false); });
     return () => { active = false; };
   }, [refId, revision]);
-  const crumbs = data?.breadcrumbs.filter((b) => b.ref_id !== '1') || [];
+  const crumbs = (data?.breadcrumbs || location?.breadcrumbs || []).filter((b) => b.ref_id !== '1');
+  const title = data?.title || location?.title;
   return <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
     <nav aria-label="Magazin-Pfad" className="flex items-center flex-wrap gap-2 text-xs text-slate-600 dark:text-slate-300">
       <button type="button" onClick={() => onNavigate('1')} aria-label="Magazin öffnen"><Home className="h-4 w-4" /></button>
@@ -32,11 +41,11 @@ export const RepositoryView: React.FC<Props> = ({ refId, onNavigate, onOpenCours
       </React.Fragment>)}
     </nav>
     <div className="flex items-center justify-between gap-4">
-      <h1 className="text-2xl font-bold">{data?.title || 'Magazin'}</h1>
-      <button type="button" onClick={() => setRevision((v) => v + 1)} aria-label="Magazin aktualisieren" className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800"><RefreshCw className="h-4 w-4" /></button>
+      <h1 className="text-2xl font-bold">{title || <span aria-label="Titel wird geladen" className="block h-8 w-48 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />}</h1>
+      <button type="button" onClick={() => setRevision((v) => v + 1)} disabled={isRefreshing} aria-label="Magazin aktualisieren" className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800"><RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} /></button>
     </div>
-    {error ? <div role="alert" className="text-red-600">{error} <button type="button" onClick={() => setRevision((v) => v + 1)} className="underline">Erneut versuchen</button></div>
-      : !data ? <p role="status">Magazin wird geladen…</p>
+    {error && <div role="alert" className="text-red-600">{error} <button type="button" onClick={() => setRevision((v) => v + 1)} className="underline">Erneut versuchen</button></div>}
+    {!data ? !error && <p role="status">Inhalte werden geladen…</p>
       : data.items.length === 0 ? <p className="text-slate-500">Keine sichtbaren Einträge vorhanden.</p>
       : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {data.items.map((item) => {

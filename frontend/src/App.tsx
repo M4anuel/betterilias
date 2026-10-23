@@ -467,6 +467,7 @@ export const App: React.FC = () => {
 
   const handleNavigateRepository = useCallback((refId: string) => {
     if (repositoryId === refId) return;
+    cache.rememberRepositoryPath(materialsData?.breadcrumbs || []);
     materialsRequestSeq.current++;
     activeContainerRef.current = null;
     setRepositoryId(refId);
@@ -481,7 +482,7 @@ export const App: React.FC = () => {
       repositoryId: refId,
     };
     window.history.pushState(nextState, '', stateToUrl(nextState));
-  }, [repositoryId, selectedSemester]);
+  }, [repositoryId, selectedSemester, materialsData]);
 
   // --- Exercise View Handler ---
   const handleSelectExercise = useCallback(
@@ -788,7 +789,7 @@ export const App: React.FC = () => {
             </div>
           )}
           {repositoryId ? (
-            <RepositoryView refId={repositoryId} onNavigate={handleNavigateRepository} onOpenCourse={handleSelectCourse} />
+            <RepositoryView key={repositoryId} refId={repositoryId} onNavigate={handleNavigateRepository} onOpenCourse={handleSelectCourse} />
           ) : selectedCourseId && currentContainerId ? (
             <CourseView
               key={`${selectedCourseId}_${currentContainerId}`}
