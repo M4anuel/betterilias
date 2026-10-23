@@ -16,6 +16,12 @@ import {
   RepositoryResponse,
   MembershipAction, MembershipFormResponse, MembershipResult,
   TeamCandidatesResponse,
+  TAAssignmentListItem,
+  TAAssignmentListResponse,
+  AssignmentOrderUpdateRequest,
+  TAInstructionFileItem,
+  TAAssignmentDetailResponse,
+  SaveTAAssignmentRequest,
 } from '../types';
 import { cache } from './cache';
 
@@ -424,5 +430,100 @@ export const api = {
     if (sessionId) params.set('session_id', sessionId);
     const qs = params.toString() ? `?${params.toString()}` : '';
     return `${API_BASE}/materials/${encodeURIComponent(refId)}/download${qs}`;
-  }
+  },
+
+  // ---------------------------------------------------------
+  // TA Exercise Editor Methods
+  // ---------------------------------------------------------
+  async getTAAssignments(exerciseId: string): Promise<TAAssignmentListResponse> {
+    const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignments`);
+    if (!res.ok) throw new Error('Übungsliste konnte nicht geladen werden');
+    return res.json();
+  },
+
+  async updateTAAssignmentOrder(
+    exerciseId: string,
+    orders: Record<string, number>
+  ): Promise<TAAssignmentListResponse> {
+    const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignments/order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orders }),
+    });
+    if (!res.ok) throw new Error('Reihenfolge konnte nicht gespeichert werden');
+    return res.json();
+  },
+
+  async getTAAssignmentDetail(
+    exerciseId: string,
+    assId?: string | null,
+    typeId: number = 1
+  ): Promise<TAAssignmentDetailResponse> {
+    const params = new URLSearchParams();
+    if (assId) params.append('ass_id', assId);
+    params.append('type_id', String(typeId));
+    const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignment-detail?${params.toString()}`);
+    if (!res.ok) throw new Error('Übungsdetails konnten nicht geladen werden');
+    return res.json();
+  },
+
+  async saveTAAssignment(
+    exerciseId: string,
+    data: SaveTAAssignmentRequest
+  ): Promise<TAAssignmentDetailResponse> {
+    const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignment-detail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Übung konnte nicht gespeichert werden');
+    return res.json();
+  },
+
+  async deleteTAAssignment(
+    exerciseId: string,
+    assId: string
+  ): Promise<{ success: boolean; ass_id: string }> {
+    const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignments/${assId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Übung konnte nicht gelöscht werden');
+    return res.json();
+  },
+
+  async getTAInstructionFiles(
+    exerciseId: string,
+    assId: string
+  ): Promise<TAInstructionFileItem[]> {
+    const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignments/${assId}/instruction-files`);
+    if (!res.ok) throw new Error('Anweisungsdateien konnten nicht geladen werden');
+    return res.json();
+  },
+
+  async uploadTAInstructionFile(
+    exerciseId: string,
+    assId: string,
+    file: File
+  ): Promise<TAInstructionFileItem[]> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignments/${assId}/instruction-files`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) throw new Error('Anweisungsdatei konnte nicht hochgeladen werden');
+    return res.json();
+  },
+
+  async deleteTAInstructionFile(
+    exerciseId: string,
+    assId: string,
+    fileId: string
+  ): Promise<{ success: boolean; file_id: string }> {
+    const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignments/${assId}/instruction-files/${fileId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Anweisungsdatei konnte nicht gelöscht werden');
+    return res.json();
+  },
 };

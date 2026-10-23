@@ -462,6 +462,8 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
     create_team_url = None
     manage_team_url = None
     delete_team_url = None
+    upload_form_url = None
+    submission_screen_url = None
     submitted_files: List[SubmissionFile] = []
     last_submission = None
     submission_status = "not_submitted"
@@ -623,6 +625,16 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
             if stmt_lines:
                 evaluation_statement = "\n".join(stmt_lines)
 
+    # Scan all links/buttons for direct upload or submission screen actions
+    for el in soup.find_all(["a", "button"]):
+        raw_act = el.get("href") or el.get("data-action") or ""
+        if "ilExSubmissionFileGUI" in raw_act:
+            full_act = urllib.parse.urljoin(settings.ilias_base_url, raw_act)
+            if "cmd=uploadForm" in raw_act:
+                upload_form_url = full_act
+            elif "cmd=submissionScreen" in raw_act:
+                submission_screen_url = full_act
+
     return StudentAssignmentDetail(
         exercise_ref_id=exercise_ref_id,
         ass_id=ass_id,
@@ -639,6 +651,8 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
         create_team_url=create_team_url,
         manage_team_url=manage_team_url,
         delete_team_url=delete_team_url,
+        upload_form_url=upload_form_url,
+        submission_screen_url=submission_screen_url,
         submitted_files=submitted_files,
         last_submission=last_submission,
         submission_status=submission_status,
@@ -1031,6 +1045,14 @@ def parse_exercise_overview(html_content: str, exercise_ref_id: str) -> Exercise
     if ta_a and ta_a.has_attr("href"):
         ta_link = urllib.parse.urljoin(settings.ilias_base_url, ta_a["href"])
 
+    # Extract TA "Edit" / "Bearbeiten" assignments link
+    edit_assignments_url = None
+    edit_a = soup.find("a", string=re.compile(r"^\s*(Edit|Bearbeiten)\s*$", re.IGNORECASE)) or soup.find(
+        "a", href=lambda h: bool(h and "ilExAssignmentEditorGUI" in h and "listAssignments" in h)
+    )
+    if edit_a and edit_a.has_attr("href"):
+        edit_assignments_url = urllib.parse.urljoin(settings.ilias_base_url, edit_a["href"])
+
     # Extract active mode if viewcontrol is present
     active_mode = "all"
     mode_group = soup.select_one(".il-viewcontrol-mode")
@@ -1117,7 +1139,8 @@ def parse_exercise_overview(html_content: str, exercise_ref_id: str) -> Exercise
         title=exercise_title,
         breadcrumbs=breadcrumbs,
         submissions_and_grades_url=ta_link,
-        has_ta_access=bool(ta_link),
+        edit_assignments_url=edit_assignments_url,
+        has_ta_access=bool(ta_link or edit_assignments_url),
         active_mode=active_mode,
         assignments=assignments,
     )

@@ -12,6 +12,12 @@ from backend.schemas import (
     StudentAssignmentDetail,
     FeedbackFilesResponse,
     TeamCandidatesResponse,
+    TAAssignmentDetailResponse,
+    TAAssignmentListItem,
+    TAAssignmentListResponse,
+    TAInstructionFileItem,
+    AssignmentOrderUpdateRequest,
+    SaveTAAssignmentRequest,
 )
 from backend.services.ilias_client import IliasClient
 
@@ -233,3 +239,122 @@ async def upload_feedback_file(
     )
 
 
+
+# ---------------------------------------------------------
+# TA Exercise Editor Routes
+# ---------------------------------------------------------
+@router.get("/{exercise_id}/ta/assignments", response_model=TAAssignmentListResponse)
+async def get_ta_assignments(
+    exercise_id: str,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Fetch TA assignment list with ordering, dates, submission type, and mandatory status.
+    """
+    return await client.get_ta_assignments_list(ref_id=exercise_id)
+
+
+@router.post("/{exercise_id}/ta/assignments/order", response_model=TAAssignmentListResponse)
+async def update_ta_assignment_order(
+    exercise_id: str,
+    req: AssignmentOrderUpdateRequest,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Update the presentation order for assignments.
+    """
+    return await client.update_ta_assignment_order(ref_id=exercise_id, orders=req.orders)
+
+
+@router.get("/{exercise_id}/ta/assignment-detail", response_model=TAAssignmentDetailResponse)
+async def get_ta_assignment_detail(
+    exercise_id: str,
+    ass_id: Optional[str] = Query(None, description="Optional assignment ID. Omit to fetch creation form."),
+    type_id: int = Query(1, description="Submission type ID (1=file, 4=team, etc.)"),
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Fetch assignment editor form and attached instruction files.
+    """
+    return await client.get_ta_assignment_detail(ref_id=exercise_id, ass_id=ass_id, type_id=type_id)
+
+
+@router.post("/{exercise_id}/ta/assignment-detail", response_model=TAAssignmentDetailResponse)
+async def save_ta_assignment(
+    exercise_id: str,
+    req: SaveTAAssignmentRequest,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Create or edit an assignment.
+    """
+    return await client.save_ta_assignment(ref_id=exercise_id, data=req)
+
+
+@router.delete("/{exercise_id}/ta/assignments/{ass_id}")
+async def delete_ta_assignment(
+    exercise_id: str,
+    ass_id: str,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Delete an assignment.
+    """
+    success = await client.delete_ta_assignment(ref_id=exercise_id, ass_id=ass_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to delete assignment on ILIAS."
+        )
+    return {"success": True, "ass_id": ass_id}
+
+
+@router.get("/{exercise_id}/ta/assignments/{ass_id}/instruction-files")
+async def get_ta_instruction_files(
+    exercise_id: str,
+    ass_id: str,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Fetch instruction files attached to an assignment.
+    """
+    return await client.get_ta_instruction_files(ref_id=exercise_id, ass_id=ass_id)
+
+
+@router.post("/{exercise_id}/ta/assignments/{ass_id}/instruction-files")
+async def upload_ta_instruction_file(
+    exercise_id: str,
+    ass_id: str,
+    file: UploadFile = File(...),
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Upload an instruction file to an assignment.
+    """
+    content = await file.read()
+    return await client.upload_instruction_file(
+        ref_id=exercise_id,
+        ass_id=ass_id,
+        filename=file.filename or "instruction_file",
+        file_bytes=content,
+        content_type=file.content_type or "application/octet-stream",
+    )
+
+
+@router.delete("/{exercise_id}/ta/assignments/{ass_id}/instruction-files/{file_id}")
+async def delete_ta_instruction_file(
+    exercise_id: str,
+    ass_id: str,
+    file_id: str,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Delete an instruction file from an assignment.
+    """
+    success = await client.delete_instruction_file(ref_id=exercise_id, ass_id=ass_id, file_id=file_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to delete instruction file."
+        )
+    return {"success": True, "file_id": file_id}
