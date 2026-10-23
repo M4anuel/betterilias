@@ -156,6 +156,21 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       return;
     }
 
+    if (deadlineMode === 0 && !deadline.trim()) {
+      setError('Bitte wählen Sie ein Abgabedatum aus oder stellen Sie den Modus auf "Kein Abgabetermin".');
+      return;
+    }
+
+    if (startTime && deadlineMode === 0 && deadline.trim() && startTime > deadline) {
+      setError('Die Startzeit darf nicht nach dem Abgabetermin liegen.');
+      return;
+    }
+
+    if (hasGracePeriod && deadlineMode === 0 && deadline2.trim() && deadline.trim() && deadline2 < deadline) {
+      setError('Die Nachfrist darf nicht vor dem regulären Abgabetermin liegen.');
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
     setSuccessMsg(null);

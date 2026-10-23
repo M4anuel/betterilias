@@ -48,6 +48,9 @@ def test_parse_ta_assignment_form():
     assert parsed.exercise_ref_id == "2978156"
     assert parsed.type_id == 1
     assert parsed.rtoken is not None
+    assert "ilfilehash" in parsed.hidden_inputs
+    assert "rmd_submit_template_id" not in parsed.hidden_inputs
+    assert "fb_date" not in parsed.hidden_inputs
 
 
 def test_parse_instruction_files():

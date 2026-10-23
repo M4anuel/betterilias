@@ -1585,7 +1585,7 @@ class IliasClient:
         if data.ass_id and "ass_id=" not in action_url:
             action_url = f"{action_url}&ass_id={data.ass_id}"
 
-        # Initialize payload with hidden/default inputs from form (e.g. ilfilehash, type, rmd_*, fb_date)
+        # Initialize payload with genuine hidden inputs from form (e.g. ilfilehash, type)
         payload: Dict[str, str] = {}
         for k, v in existing.hidden_inputs.items():
             payload[k] = v
@@ -1600,25 +1600,32 @@ class IliasClient:
         else:
             payload.pop("mandatory", None)
 
-        if data.start_time:
-            payload["start_time"] = data.start_time
+        if data.start_time and data.start_time.strip():
+            payload["start_time"] = data.start_time.strip()
+        else:
+            payload.pop("start_time", None)
 
         # In ILIAS:
         # deadline_mode = "0" -> Fixed Date (deadline enabled)
         # deadline_mode = "-1" -> No Deadline
-        if data.deadline and data.deadline.strip() and data.deadline_mode != -1:
+        if data.deadline_mode != -1 and data.deadline and data.deadline.strip():
             payload["deadline_mode"] = "0"
             payload["deadline"] = data.deadline.strip()
+            if data.has_grace_period and data.deadline2 and data.deadline2.strip():
+                payload["deadline2"] = data.deadline2.strip()
+            else:
+                payload.pop("deadline2", None)
         else:
             payload["deadline_mode"] = "-1"
-            payload["deadline"] = ""
-
-        if data.has_grace_period and data.deadline2 and data.deadline2.strip():
-            payload["deadline2"] = data.deadline2.strip()
+            payload.pop("deadline", None)
+            payload.pop("deadline2", None)
 
         if data.max_file_enabled and data.max_file is not None:
             payload["max_file_tgl"] = "1"
             payload["max_file"] = str(data.max_file)
+        else:
+            payload.pop("max_file_tgl", None)
+            payload.pop("max_file", None)
 
         async with self.session_manager.get_http_client() as client:
             resp = await client.post(action_url, data=payload)
@@ -1637,6 +1644,18 @@ class IliasClient:
                 for hidden in real_alert.select(".ilAccHeadingHidden"):
                     hidden.decompose()
                 err_msg = " ".join(real_alert.get_text().split()).strip()
+
+                # Also collect any specific input field error messages
+                field_errors = []
+                for fe in soup_resp.select(".has-error, .help-block.alert, .help-block, .il-form-input-error"):
+                    if fe.find_parent("dialog") or fe.find_parent(class_=re.compile(r"modal", re.I)):
+                        continue
+                    txt = " ".join(fe.get_text().split()).strip()
+                    if txt and txt not in field_errors and txt not in err_msg:
+                        field_errors.append(txt)
+                if field_errors:
+                    err_msg += f" (Felder: {'; '.join(field_errors)})"
+
                 if err_msg:
                     logger.error(f"Failed to save assignment in ILIAS: {err_msg}")
                     raise ValueError(f"ILIAS Fehler: {err_msg}")

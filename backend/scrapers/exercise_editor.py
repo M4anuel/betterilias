@@ -205,10 +205,6 @@ def parse_ta_assignment_form(
             if n:
                 hidden_inputs[n] = v
 
-        for rad in form.find_all("input", type="radio"):
-            if rad.has_attr("checked") and rad.get("name"):
-                hidden_inputs[rad["name"]] = rad.get("value", "")
-
     # 1. Title
     title = ""
     title_inp = soup.find("input", attrs={"name": "title"})
