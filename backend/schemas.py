@@ -241,6 +241,42 @@ class GradeSubmissionResponse(BaseModel):
     status: Optional[str] = None
     feedback: Optional[str] = None
 
+
+class TeamMemberInfo(BaseModel):
+    user_id: Optional[str] = None
+    login: str
+    name: Optional[str] = None
+    is_self: bool = False
+
+
+class CourseUserCandidate(BaseModel):
+    user_id: str
+    login: str
+    firstname: str = ""
+    lastname: str = ""
+    full_name: str = ""
+    in_team: bool = False
+    is_self: bool = False
+
+
+class TeamCandidatesResponse(BaseModel):
+    exercise_ref_id: str
+    ass_id: str
+    current_user_id: Optional[str] = None
+    team_members: List[TeamMemberInfo] = Field(default_factory=list)
+    candidates: List[CourseUserCandidate] = Field(default_factory=list)
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class AddTeamMembersRequest(BaseModel):
+    user_ids: List[str] = Field(default_factory=list)
+    user_logins: List[str] = Field(default_factory=list)
+
+
+class RemoveTeamMembersRequest(BaseModel):
+    member_ids: List[str] = Field(default_factory=list)
+
+
 class StudentAssignmentDetail(BaseModel):
     exercise_ref_id: str
     ass_id: str
@@ -252,9 +288,11 @@ class StudentAssignmentDetail(BaseModel):
     is_ended: bool = False
     exercise_files: List[SubmissionFile] = Field(default_factory=list)
     team_members: List[str] = Field(default_factory=list)
+    team_member_details: List[TeamMemberInfo] = Field(default_factory=list)
     team_status_text: Optional[str] = None
     create_team_url: Optional[str] = None
     manage_team_url: Optional[str] = None
+    delete_team_url: Optional[str] = None
     submitted_files: List[SubmissionFile] = Field(default_factory=list)
     last_submission: Optional[str] = None
     submission_status: str = "not_submitted"

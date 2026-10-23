@@ -120,7 +120,12 @@ async def test_session_manager_verify_session_expired():
 
     is_valid, msg = await manager.verify_session()
     assert is_valid is False
-    assert "login prompt detected" in msg or "unauthorized" in msg or "expired" in msg
+    assert (
+        "login prompt detected" in msg.lower()
+        or "unauthorized" in msg.lower()
+        or "expired" in msg.lower()
+        or "abgelaufen" in msg.lower()
+    )
 
 
 @pytest.mark.asyncio

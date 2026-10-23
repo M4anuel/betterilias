@@ -771,3 +771,184 @@ async def test_real_unibe_grading_flow_with_feedback_and_notice():
 
 
 
+
+
+def test_real_unibe_team_management_html_dumps():
+    """Verify all 8 HTML dumps in htmlfromilias/TeamManagement/ parse accurately."""
+    from backend.scrapers.submissions import (
+        parse_student_assignment_detail,
+        parse_team_management_screen,
+        parse_course_users_list_screen,
+        parse_remove_team_confirmation_screen,
+    )
+
+    tm_dir = Path("htmlfromilias/TeamManagement")
+    if not tm_dir.exists():
+        pytest.skip("htmlfromilias/TeamManagement directory not found")
+
+    # 1. mainpage_default.html (before team creation)
+    default_html = (tm_dir / "mainpage_default.html").read_text(encoding="utf-8", errors="replace")
+    d0 = parse_student_assignment_detail(default_html, exercise_ref_id="3803739", ass_id="53189")
+    assert "Analysieren von Fehlern" in d0.title
+    assert d0.create_team_url is not None
+    assert "cmd=createTeam" in d0.create_team_url
+    assert d0.manage_team_url is None
+    assert d0.delete_team_url is None
+    assert len(d0.team_members) == 0
+
+    # 2. mainpage_after_team_created.html (1 member in team)
+    created_html = (tm_dir / "mainpage_after_team_created.html").read_text(encoding="utf-8", errors="replace")
+    d1 = parse_student_assignment_detail(created_html, exercise_ref_id="3803739", ass_id="53189")
+    assert d1.create_team_url is None
+    assert d1.manage_team_url is not None
+    assert "cmd=submissionScreenTeam" in d1.manage_team_url
+    assert d1.delete_team_url is not None
+    assert "cmd=confirmDeleteTeam" in d1.delete_team_url
+    assert d1.team_members == ["m.fluckiger2"]
+    assert len(d1.team_member_details) == 1
+    assert d1.team_member_details[0].login == "m.fluckiger2"
+    assert d1.team_member_details[0].is_self is True
+
+    # 3. mainpage_manage_team_pressed.html (Team management screen with 1 member)
+    manage1_html = (tm_dir / "mainpage_manage_team_pressed.html").read_text(encoding="utf-8", errors="replace")
+    tm1 = parse_team_management_screen(manage1_html)
+    assert tm1.list_users_url is not None
+    assert "cmd=listUsers" in tm1.list_users_url
+    assert tm1.add_autocomplete_action is not None
+    assert tm1.remove_form_action is not None
+    assert len(tm1.members) == 1
+    assert tm1.members[0].user_id == "3216297"
+    assert tm1.members[0].login == "m.fluckiger2"
+
+    # 4. manage_team_add_users_from_current_course_pressed.html (Course participants list)
+    users_html = (tm_dir / "manage_team_add_users_from_current_course_pressed.html").read_text(encoding="utf-8", errors="replace")
+    ul = parse_course_users_list_screen(users_html)
+    assert ul.current_user_id == "3216297"
+    assert ul.has_next_page is True
+    assert ul.max_rows_url is not None
+    assert "_trows=800" in ul.max_rows_url
+    assert len(ul.candidates) == 40
+    cand_fluckiger = next((c for c in ul.candidates if c.user_id == "3216297"), None)
+    assert cand_fluckiger is not None
+    assert cand_fluckiger.login == "m.fluckiger2"
+    assert "Flückiger" in cand_fluckiger.full_name
+
+    # 5. manage_team_one_user_added.html (2 members in team)
+    manage2_html = (tm_dir / "manage_team_one_user_added.html").read_text(encoding="utf-8", errors="replace")
+    tm2 = parse_team_management_screen(manage2_html)
+    assert len(tm2.members) == 2
+    member_ids = [m.user_id for m in tm2.members]
+    assert "3216297" in member_ids
+    assert "4533140" in member_ids
+
+    # 6. manage_team_remove_teammate_dialog.html (Confirmation screen for removing member)
+    confirm_rm_html = (tm_dir / "manage_team_remove_teammate_dialog.html").read_text(encoding="utf-8", errors="replace")
+    rm_parsed = parse_remove_team_confirmation_screen(confirm_rm_html)
+    assert rm_parsed.action_url is not None
+    assert rm_parsed.confirm_cmd_name == "cmd[removeTeamMember]"
+    assert rm_parsed.member_ids == ["4533140"]
+
+    # 7. manage_team_removed_user_confirmation_possibly unhelpful.html (Back to 1 member)
+    removed_html = (tm_dir / "manage_team_removed_user_confirmation_possibly unhelpful.html").read_text(encoding="utf-8", errors="replace")
+    tm3 = parse_team_management_screen(removed_html)
+    assert len(tm3.members) == 1
+    assert tm3.members[0].user_id == "3216297"
+
+    # 8. manage_team_page_after_pressing_delete_team_on_main_page_while_having_more_than_1_teammember.html
+    err_html = (tm_dir / "manage_team_page_after_pressing_delete_team_on_main_page_while_having_more_than_1_teammember.html").read_text(encoding="utf-8", errors="replace")
+    tm_err = parse_team_management_screen(err_html)
+    assert tm_err.alert_error is not None
+    assert "at least 1 team member" in tm_err.alert_error.lower()
+
+
+@pytest.mark.asyncio
+async def test_delete_student_team_removes_other_members_first():
+    """
+    Verify ILIAS constraint handling: deleting a team with >1 member first removes
+    all other members (leaving only self) and then deletes the team.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+    from backend.services.ilias_client import IliasClient
+
+    tm_dir = Path("htmlfromilias/TeamManagement")
+    if not tm_dir.exists():
+        pytest.skip("htmlfromilias/TeamManagement directory not found")
+
+    created_html = (tm_dir / "mainpage_after_team_created.html").read_text(encoding="utf-8", errors="replace")
+    manage2_html = (tm_dir / "manage_team_one_user_added.html").read_text(encoding="utf-8", errors="replace")
+    users_html = (tm_dir / "manage_team_add_users_from_current_course_pressed.html").read_text(encoding="utf-8", errors="replace")
+    confirm_rm_html = (tm_dir / "manage_team_remove_teammate_dialog.html").read_text(encoding="utf-8", errors="replace")
+    default_html = (tm_dir / "mainpage_default.html").read_text(encoding="utf-8", errors="replace")
+
+    confirm_delete_team_html = """
+    <div id="il_center_col">
+      <form action="ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd:df&cmdClass=ilExSubmissionTeamGUI&cmd=post&ref_id=3803739&ass_id=53189" method="post">
+        <input type="hidden" name="rtoken" value="rtoken_del_team" />
+        <input type="submit" name="cmd[deleteTeam]" value="Confirm" />
+      </form>
+    </div>
+    """
+
+    mock_manager = MagicMock()
+    mock_manager.has_cookies.return_value = True
+    client = IliasClient(manager=mock_manager)
+
+    state = {"teammate_removed": False, "team_deleted": False}
+    post_calls = []
+
+    async def mock_get(url, **kwargs):
+        u = str(url)
+        resp = MagicMock()
+        resp.status_code = 200
+        if "cmd=listUsers" in u or "cmd=storedUserList" in u:
+            resp.text = users_html
+        elif "cmd=submissionScreenTeam" in u:
+            resp.text = created_html if state["teammate_removed"] else manage2_html
+        elif "cmd=confirmDeleteTeam" in u:
+            resp.text = confirm_delete_team_html
+        else:
+            if state["team_deleted"]:
+                resp.text = default_html
+            else:
+                resp.text = created_html
+        return resp
+
+    async def mock_post(url, data=None, **kwargs):
+        post_calls.append((str(url), data))
+        resp = MagicMock()
+        resp.status_code = 200
+        flat_keys = []
+        if isinstance(data, dict):
+            flat_keys = list(data.keys())
+        elif isinstance(data, list):
+            flat_keys = [k for k, _ in data]
+
+        if "cmd[confirmRemoveTeamMember]" in flat_keys:
+            resp.text = confirm_rm_html
+        elif "cmd[removeTeamMember]" in flat_keys:
+            state["teammate_removed"] = True
+            resp.text = created_html
+        elif "cmd[deleteTeam]" in flat_keys:
+            state["team_deleted"] = True
+            resp.text = default_html
+        else:
+            resp.text = default_html
+        return resp
+
+    mock_http_client = AsyncMock()
+    mock_http_client.get = AsyncMock(side_effect=mock_get)
+    mock_http_client.post = AsyncMock(side_effect=mock_post)
+
+    class MockContextManager:
+        async def __aenter__(self):
+            return mock_http_client
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    mock_manager.get_http_client.return_value = MockContextManager()
+
+    detail = await client.delete_student_team(exercise_ref_id="3803739", ass_id="53189")
+    assert state["teammate_removed"] is True
+    assert state["team_deleted"] is True
+    assert detail.create_team_url is not None
+    assert len(detail.team_members) == 0

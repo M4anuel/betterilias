@@ -27,11 +27,21 @@ def test_health_check():
 
 
 def test_auth_status_endpoint():
-    with patch("backend.services.ilias_client.session_manager.has_cookies", return_value=False):
+    from unittest.mock import MagicMock
+    from backend.api.deps import get_session_manager
+    from backend.auth.session import SessionManager
+    from backend.main import app
+
+    dummy = SessionManager(session_id="test_unauth")
+    dummy.has_cookies = MagicMock(return_value=False)
+    app.dependency_overrides[get_session_manager] = lambda: dummy
+    try:
         response = client.get("/api/auth/status")
         assert response.status_code == 200
         data = response.json()
         assert data["authenticated"] is False
+    finally:
+        app.dependency_overrides.pop(get_session_manager, None)
 
 
 def test_manual_cookies_endpoint(tmp_path, monkeypatch):
@@ -47,15 +57,23 @@ def test_manual_cookies_endpoint(tmp_path, monkeypatch):
     assert response.json()["success"] is True
 
 
-def test_logout_endpoint(tmp_path, monkeypatch):
-    from backend.config import settings
-    test_cookie_file = tmp_path / "cookies.json"
-    test_cookie_file.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(settings, "session_cookie_file", str(test_cookie_file))
+def test_logout_endpoint(tmp_path):
+    from backend.api.deps import get_session_manager
+    from backend.auth.session import SessionManager
+    from backend.main import app
 
-    response = client.post("/api/auth/logout")
-    assert response.status_code == 200
-    assert not test_cookie_file.exists()
+    test_cookie_file = tmp_path / "cookies.json"
+    test_cookie_file.write_text('{"PHPSESSID": "xyz"}', encoding="utf-8")
+
+    test_manager = SessionManager(session_id="test_logout", cookie_file=test_cookie_file)
+
+    app.dependency_overrides[get_session_manager] = lambda: test_manager
+    try:
+        response = client.post("/api/auth/logout")
+        assert response.status_code == 200
+        assert not test_cookie_file.exists()
+    finally:
+        app.dependency_overrides.pop(get_session_manager, None)
 
 
 def test_login_browser_endpoint_success():
@@ -418,3 +436,89 @@ def test_extension_sync_endpoint(tmp_path, monkeypatch):
 
 
 
+
+def test_team_management_api_endpoints():
+    from backend.schemas import (
+        StudentAssignmentDetail,
+        TeamCandidatesResponse,
+        CourseUserCandidate,
+        TeamMemberInfo,
+    )
+
+    mock_detail = StudentAssignmentDetail(
+        exercise_ref_id="3803739",
+        ass_id="53189",
+        title="Übung 3",
+        team_members=["[m.fluckiger2]"],
+        team_member_details=[
+            TeamMemberInfo(user_id="3216297", login="m.fluckiger2", name="Manuel Flückiger", is_self=True)
+        ],
+    )
+    mock_candidates = TeamCandidatesResponse(
+        exercise_ref_id="3803739",
+        ass_id="53189",
+        current_user_id="3216297",
+        team_members=mock_detail.team_member_details,
+        candidates=[
+            CourseUserCandidate(
+                user_id="4533140",
+                login="m.mustermann1",
+                firstname="Max",
+                lastname="Mustermann",
+                full_name="Max Mustermann",
+                in_team=False,
+                is_self=False,
+            )
+        ],
+    )
+
+    with patch(
+        "backend.api.routes.exercises.IliasClient.create_student_team",
+        new_callable=AsyncMock,
+        return_value=mock_detail,
+    ):
+        res = client.post("/api/exercises/3803739/assignment/53189/team/create")
+        assert res.status_code == 200
+        assert res.json()["team_members"] == ["[m.fluckiger2]"]
+
+    with patch(
+        "backend.api.routes.exercises.IliasClient.get_team_candidates",
+        new_callable=AsyncMock,
+        return_value=mock_candidates,
+    ):
+        res = client.get("/api/exercises/3803739/assignment/53189/team/candidates")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["current_user_id"] == "3216297"
+        assert len(data["candidates"]) == 1
+        assert data["candidates"][0]["login"] == "m.mustermann1"
+
+    with patch(
+        "backend.api.routes.exercises.IliasClient.add_student_team_members",
+        new_callable=AsyncMock,
+        return_value=mock_detail,
+    ):
+        res = client.post(
+            "/api/exercises/3803739/assignment/53189/team/add",
+            json={"user_ids": ["4533140"], "user_logins": []},
+        )
+        assert res.status_code == 200
+
+    with patch(
+        "backend.api.routes.exercises.IliasClient.remove_student_team_members",
+        new_callable=AsyncMock,
+        return_value=mock_detail,
+    ):
+        res = client.post(
+            "/api/exercises/3803739/assignment/53189/team/remove",
+            json={"member_ids": ["4533140"]},
+        )
+        assert res.status_code == 200
+
+    with patch(
+        "backend.api.routes.exercises.IliasClient.delete_student_team",
+        new_callable=AsyncMock,
+        return_value=mock_detail,
+    ):
+        res = client.delete("/api/exercises/3803739/assignment/53189/team")
+        assert res.status_code == 200

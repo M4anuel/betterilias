@@ -2,13 +2,16 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form
 from backend.api.deps import get_ilias_client
 from backend.schemas import (
+    AddTeamMembersRequest,
     ExerciseInfoResponse,
     ExerciseOverviewResponse,
     ExerciseSubmissionsResponse,
     GradeSubmissionRequest,
     GradeSubmissionResponse,
+    RemoveTeamMembersRequest,
     StudentAssignmentDetail,
     FeedbackFilesResponse,
+    TeamCandidatesResponse,
 )
 from backend.services.ilias_client import IliasClient
 
@@ -97,6 +100,78 @@ async def delete_assignment_submission_file(
         ass_id=ass_id,
         delivered_id=delivered_id,
     )
+
+
+@router.post("/{exercise_id}/assignment/{ass_id}/team/create", response_model=StudentAssignmentDetail)
+async def create_student_team(
+    exercise_id: str,
+    ass_id: str,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Create a student team for an exercise assignment in ILIAS and return the updated assignment details.
+    """
+    return await client.create_student_team(exercise_ref_id=exercise_id, ass_id=ass_id)
+
+
+@router.get("/{exercise_id}/assignment/{ass_id}/team/candidates", response_model=TeamCandidatesResponse)
+async def get_student_team_candidates(
+    exercise_id: str,
+    ass_id: str,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Fetch current team members and the searchable list of course participants for team management.
+    """
+    return await client.get_team_candidates(exercise_ref_id=exercise_id, ass_id=ass_id)
+
+
+@router.post("/{exercise_id}/assignment/{ass_id}/team/add", response_model=StudentAssignmentDetail)
+async def add_student_team_members(
+    exercise_id: str,
+    ass_id: str,
+    payload: AddTeamMembersRequest,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Add one or more course participants to the student's team by user_id or user_login.
+    """
+    return await client.add_student_team_members(
+        exercise_ref_id=exercise_id,
+        ass_id=ass_id,
+        user_ids=payload.user_ids,
+        user_logins=payload.user_logins,
+    )
+
+
+@router.post("/{exercise_id}/assignment/{ass_id}/team/remove", response_model=StudentAssignmentDetail)
+async def remove_student_team_members(
+    exercise_id: str,
+    ass_id: str,
+    payload: RemoveTeamMembersRequest,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Remove one or more members from the student's team.
+    """
+    return await client.remove_student_team_members(
+        exercise_ref_id=exercise_id,
+        ass_id=ass_id,
+        member_ids=payload.member_ids,
+    )
+
+
+@router.delete("/{exercise_id}/assignment/{ass_id}/team", response_model=StudentAssignmentDetail)
+async def delete_student_team(
+    exercise_id: str,
+    ass_id: str,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Delete the student's entire team. Automatically removes any other team members first
+    to satisfy ILIAS's single-member team deletion constraint.
+    """
+    return await client.delete_student_team(exercise_ref_id=exercise_id, ass_id=ass_id)
 
 
 

@@ -18,6 +18,12 @@ from backend.scrapers.submissions import (
     parse_student_submitted_files_screen,
     parse_student_upload_form,
     StudentUploadFormInfo,
+    parse_team_management_screen,
+    ParsedTeamManagementScreen,
+    parse_course_users_list_screen,
+    ParsedCourseUserListScreen,
+    parse_remove_team_confirmation_screen,
+    ParsedTeamConfirmRemoveScreen,
 )
 from backend.scrapers.feedback_files import parse_feedback_files
 
@@ -33,6 +39,12 @@ __all__ = [
     "parse_student_submitted_files_screen",
     "parse_student_upload_form",
     "StudentUploadFormInfo",
+    "parse_team_management_screen",
+    "ParsedTeamManagementScreen",
+    "parse_course_users_list_screen",
+    "ParsedCourseUserListScreen",
+    "parse_remove_team_confirmation_screen",
+    "ParsedTeamConfirmRemoveScreen",
     "parse_feedback_files",
     "parse_semester_courses",
     "extract_grading_form",

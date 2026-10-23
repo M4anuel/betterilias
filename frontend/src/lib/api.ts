@@ -13,6 +13,7 @@ import {
   StudentAssignmentDetail,
   FeedbackFilesResponse,
   MaterialItem,
+  TeamCandidatesResponse,
 } from '../types';
 import { cache } from './cache';
 
@@ -231,6 +232,90 @@ export const api = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || 'Failed to delete submission file');
+    }
+    return res.json();
+  },
+
+  async createStudentTeam(
+    exerciseId: string,
+    assId: string
+  ): Promise<StudentAssignmentDetail> {
+    const res = await sessionFetch(
+      `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignment/${encodeURIComponent(assId)}/team/create`,
+      { method: 'POST' }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Fehler beim Erstellen des Teams');
+    }
+    return res.json();
+  },
+
+  async getTeamCandidates(
+    exerciseId: string,
+    assId: string
+  ): Promise<TeamCandidatesResponse> {
+    const res = await sessionFetch(
+      `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignment/${encodeURIComponent(assId)}/team/candidates`
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Fehler beim Laden der Kursteilnehmenden');
+    }
+    return res.json();
+  },
+
+  async addStudentTeamMembers(
+    exerciseId: string,
+    assId: string,
+    payload: { user_ids?: string[]; user_logins?: string[] }
+  ): Promise<StudentAssignmentDetail> {
+    const res = await sessionFetch(
+      `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignment/${encodeURIComponent(assId)}/team/add`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Fehler beim Hinzufügen von Teammitgliedern');
+    }
+    return res.json();
+  },
+
+  async removeStudentTeamMembers(
+    exerciseId: string,
+    assId: string,
+    memberIds: string[]
+  ): Promise<StudentAssignmentDetail> {
+    const res = await sessionFetch(
+      `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignment/${encodeURIComponent(assId)}/team/remove`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_ids: memberIds }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Fehler beim Entfernen von Teammitgliedern');
+    }
+    return res.json();
+  },
+
+  async deleteStudentTeam(
+    exerciseId: string,
+    assId: string
+  ): Promise<StudentAssignmentDetail> {
+    const res = await sessionFetch(
+      `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignment/${encodeURIComponent(assId)}/team`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Fehler beim Löschen des Teams');
     }
     return res.json();
   },

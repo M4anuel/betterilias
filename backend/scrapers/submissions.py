@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from backend.config import settings
 from backend.schemas import (
     AssignmentItem,
+    CourseUserCandidate,
     ExerciseInfo,
     ExerciseInfoResponse,
     ExerciseInfoSection,
@@ -15,6 +16,7 @@ from backend.schemas import (
     StudentAssignmentDetail,
     SubmissionFile,
     SubmissionItem,
+    TeamMemberInfo,
 )
 from backend.scrapers.dashboard import _extract_ref_id_from_url
 from backend.scrapers.dumper import safe_parser
@@ -435,15 +437,18 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
     """
     soup = BeautifulSoup(html_content, "lxml")
 
-    # Title
+    # Title: prefer primary assignment panel title over generic exercise container header ("Übungen")
+    primary_panel_title = soup.select_one(".panel-primary > .panel-heading .panel-title, .panel-primary .panel-title")
     title_el = (
-        soup.select_one("h1.ilHeader, h1.il-item-title, h1:not(.modal-title)")
+        primary_panel_title
+        or soup.select_one("h1.ilHeader, h1.il-item-title, h1:not(.modal-title)")
         or soup.select_one(".panel-title")
         or soup.select_one(".ilTopTitle")
     )
     title = _clean_text(title_el) or f"Assignment {ass_id}"
 
-    panels = soup.find_all("div", class_="panel")
+    sub_panels = soup.select("div.panel.panel-sub")
+    panels = sub_panels if sub_panels else soup.find_all("div", class_="panel")
 
     instructions = None
     start_time = None
@@ -452,9 +457,11 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
     is_ended = False
     exercise_files: List[SubmissionFile] = []
     team_members: List[str] = []
+    team_member_details: List[TeamMemberInfo] = []
     team_status_text = None
     create_team_url = None
     manage_team_url = None
+    delete_team_url = None
     submitted_files: List[SubmissionFile] = []
     last_submission = None
     submission_status = "not_submitted"
@@ -469,22 +476,50 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
 
         # 1. Schedule & Instructions
         if any(w in p_title for w in ["instruction", "arbeitsanweisung", "terminplan", "schedule"]):
-            for line in body.get_text(separator="\n").split("\n"):
-                line = line.strip()
-                if any(w in line.lower() for w in ["startzeit", "start time"]) and ":" in line:
-                    start_time = line.split(":", 1)[1].strip()
-                elif any(w in line.lower() for w in ["ended on", "abgabetermin"]) and ":" in line:
-                    ended_on = line.split(":", 1)[1].strip()
-                elif any(w in line.lower() for w in ["remaining", "verbleibende"]) and ":" in line:
-                    time_remaining = line.split(":", 1)[1].strip()
+            # First check structured .caption blocks inside .il-card (collapses multi-line values cleanly)
+            for cap in body.select(".caption"):
+                cap_line = _clean_text(cap)
+                if ":" not in cap_line:
+                    continue
+                low = cap_line.lower()
+                val = cap_line.split(":", 1)[1].strip()
+                if any(w in low for w in ["startzeit", "start time"]) and val:
+                    start_time = val
+                elif any(w in low for w in ["ended on", "edit until", "abgabetermin", "abgabe bis", "bearbeiten bis"]) and val:
+                    ended_on = val
+                elif any(w in low for w in ["remaining", "verbleibende"]) and val:
+                    time_remaining = val
+
+            raw_lines = [l.strip() for l in body.get_text(separator="\n").split("\n") if l.strip()]
+            for idx, line in enumerate(raw_lines):
+                low = line.lower()
+                if ":" in line:
+                    val = line.split(":", 1)[1].strip()
+                    if not val and idx + 1 < len(raw_lines) and ":" not in raw_lines[idx + 1]:
+                        val = raw_lines[idx + 1].strip()
+                    if any(w in low for w in ["startzeit", "start time"]) and val and not start_time:
+                        start_time = val
+                    elif any(w in low for w in ["ended on", "edit until", "abgabetermin", "abgabe bis", "bearbeiten bis"]) and val and not ended_on:
+                        ended_on = val
+                    elif any(w in low for w in ["remaining", "verbleibende"]) and val and not time_remaining:
+                        time_remaining = val
 
             body_text = body.get_text()
             if "time is up" in body_text.lower() or "abgelaufen" in body_text.lower():
                 is_ended = True
                 time_remaining = "Time is up"
 
-            inst_p = body.select_one(".ilAssignmentInstructions, p")
-            if inst_p:
+            inst_p = body.select_one(".ilAssignmentInstructions")
+            if not inst_p:
+                col8 = body.select_one(".col-sm-8")
+                if col8 and _clean_text(col8):
+                    inst_p = col8
+                else:
+                    for cand_p in body.find_all("p"):
+                        if not cand_p.find_parent(class_="il-card"):
+                            inst_p = cand_p
+                            break
+            if inst_p and _clean_text(inst_p):
                 instructions = _clean_text(inst_p)
 
         # 2. Files (Prompt materials provided by lecturer)
@@ -510,19 +545,38 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
 
         # 3. Team Information
         elif "team" in p_title:
-            manage_a = p.find("a", string=re.compile(r"(manage|verwalten)", re.I))
-            if manage_a and manage_a.get("href"):
-                manage_team_url = urllib.parse.urljoin(settings.ilias_base_url, manage_a["href"])
-
-            create_a = p.find("a", string=re.compile(r"(create|erstellen)", re.I))
-            if create_a and create_a.get("href"):
-                create_team_url = urllib.parse.urljoin(settings.ilias_base_url, create_a["href"])
+            for el in p.find_all(["a", "button"]):
+                el_txt = _clean_text(el)
+                raw_target = el.get("href") or el.get("data-action")
+                if not raw_target:
+                    continue
+                full_target = urllib.parse.urljoin(settings.ilias_base_url, raw_target)
+                if re.search(r"(manage|verwalten)", el_txt, re.I) or "submissionScreenTeam" in raw_target:
+                    manage_team_url = full_target
+                elif re.search(r"(create|erstellen)", el_txt, re.I) or "createTeam" in raw_target:
+                    create_team_url = full_target
+                elif re.search(r"(delete|löschen)", el_txt, re.I) or "confirmDeleteTeam" in raw_target:
+                    delete_team_url = full_target
 
             text = body.get_text(separator=" ")
             members_match = re.findall(r"\[([^\]]+)\]", text)
             if members_match:
                 team_members = members_match
-            elif "keinem team" in text.lower():
+                for m in re.finditer(r"(?:([^;\[\n\r]+?)\s*)?\[([^\]]+)\]", text):
+                    raw_prefix = (m.group(1) or "").strip()
+                    login_val = m.group(2).strip()
+                    for lbl in ["Team Members", "Team-Mitglieder", "Teammitglieder", "Team"]:
+                        if raw_prefix.lower().startswith(lbl.lower()):
+                            raw_prefix = raw_prefix[len(lbl):].strip()
+                    member_name = raw_prefix if raw_prefix else None
+                    team_member_details.append(
+                        TeamMemberInfo(
+                            login=login_val,
+                            name=member_name,
+                            is_self=(len(members_match) == 1),
+                        )
+                    )
+            elif "keinem team" in text.lower() or "not assigned to a team" in text.lower():
                 team_status_text = "Sie gehören noch keinem Team an."
 
         # 4. Student Submission
@@ -542,7 +596,7 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
                     )
                     submission_status = "submitted"
 
-            if last_submission and last_submission != "Bisher keine Abgabe":
+            if last_submission and last_submission not in ["Bisher keine Abgabe", "No submission yet.", "-"]:
                 submission_status = "submitted"
 
         # 5. Tutor Feedback & Evaluation
@@ -580,15 +634,303 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
         is_ended=is_ended,
         exercise_files=exercise_files,
         team_members=team_members,
+        team_member_details=team_member_details,
         team_status_text=team_status_text,
         create_team_url=create_team_url,
         manage_team_url=manage_team_url,
+        delete_team_url=delete_team_url,
         submitted_files=submitted_files,
         last_submission=last_submission,
         submission_status=submission_status,
         evaluation_statement=evaluation_statement,
         passed_status=passed_status,
         mark=mark,
+    )
+
+
+class ParsedTeamManagementScreen(BaseModel):
+    members: List[TeamMemberInfo] = Field(default_factory=list)
+    remove_form_action: Optional[str] = None
+    remove_hidden_fields: Dict[str, str] = Field(default_factory=dict)
+    add_autocomplete_action: Optional[str] = None
+    list_users_url: Optional[str] = None
+    avatar_abbrev: Optional[str] = None
+    alert_error: Optional[str] = None
+
+
+@safe_parser(context_name="team_management_screen")
+def parse_team_management_screen(
+    html_content: str, base_url: str = settings.ilias_base_url
+) -> ParsedTeamManagementScreen:
+    """
+    Parses the ILIAS Team Management page (ilExSubmissionTeamGUI&cmd=submissionScreenTeam).
+    Extracts current team members with their ILIAS user IDs (checkbox id[]),
+    form action URLs for removing members and adding users from the course,
+    and identifies the current user via avatar initials or single-member heuristics.
+    """
+    soup = BeautifulSoup(html_content, "lxml")
+
+    # Extract avatar abbreviation if present (e.g., "MF" for m.fluckiger2)
+    abbrev_el = soup.select_one(".il-avatar .abbreviation")
+    avatar_abbrev = _clean_text(abbrev_el).upper() if abbrev_el else None
+
+    # Check for failure alert
+    alert_el = soup.select_one(".alert-danger, .ilFailureMessage")
+    alert_error = _clean_text(alert_el) if alert_el else None
+
+    # 1. Toolbar form (ilRepositorySearchGUI) & "Add Users From Current Course" button
+    add_autocomplete_action = None
+    list_users_url = None
+
+    toolbar_form = soup.find("form", id="ilToolbar") or soup.find(
+        "form", action=lambda a: bool(a and "ilRepositorySearchGUI" in a)
+    )
+    if toolbar_form and toolbar_form.get("action"):
+        add_autocomplete_action = urllib.parse.urljoin(base_url, toolbar_form["action"])
+
+    for btn in soup.find_all(["button", "a"]):
+        raw_act = btn.get("data-action") or btn.get("href") or ""
+        if "ilRepositorySearchGUI" in raw_act and "cmd=listUsers" in raw_act:
+            list_users_url = urllib.parse.urljoin(base_url, raw_act)
+            break
+
+    if not list_users_url and add_autocomplete_action:
+        # Derive listUsers URL from toolbar form action
+        derived = re.sub(r"cmd=[^&]+", "cmd=listUsers", add_autocomplete_action)
+        derived = re.sub(r"&rtoken=[^&]+", "", derived)
+        list_users_url = derived
+
+    # 2. Team members table form (ilExSubmissionTeamGUI)
+    remove_form_action = None
+    remove_hidden_fields: Dict[str, str] = {}
+    members: List[TeamMemberInfo] = []
+
+    team_form = soup.find(
+        "form", action=lambda a: bool(a and "ilExSubmissionTeamGUI" in a and "cmd=post" in a)
+    )
+    if team_form:
+        if team_form.get("action"):
+            remove_form_action = urllib.parse.urljoin(base_url, team_form["action"])
+        for inp in team_form.find_all("input", type="hidden"):
+            name = inp.get("name")
+            if name and name != "id[]":
+                remove_hidden_fields[name] = inp.get("value", "")
+
+        table = team_form.select_one("table.table-striped") or soup.select_one("table.table-striped") or team_form.select_one("table")
+    else:
+        table = soup.select_one("table.table-striped") or soup.select_one("table")
+
+    if table:
+        for tr in table.select("tbody tr"):
+            cb = tr.find("input", {"name": "id[]"})
+            user_id = cb.get("value") if cb else None
+            cells = tr.find_all("td")
+            if not cells:
+                continue
+            name_cell_text = _clean_text(cells[-1])
+            if not name_cell_text or "keine" in name_cell_text.lower() or "empty" in name_cell_text.lower():
+                continue
+
+            m_login = re.search(r"\[([^\]]+)\]", name_cell_text)
+            if m_login:
+                login = m_login.group(1).strip()
+                prefix = name_cell_text[: m_login.start()].strip()
+                full_name = prefix if prefix else None
+            else:
+                login = name_cell_text
+                full_name = None
+
+            members.append(
+                TeamMemberInfo(
+                    user_id=user_id,
+                    login=login,
+                    name=full_name,
+                    is_self=False,
+                )
+            )
+
+    # Identify self among members
+    if len(members) == 1:
+        members[0].is_self = True
+    elif len(members) > 1 and avatar_abbrev and len(avatar_abbrev) == 2:
+        for m in members:
+            # Check login pattern e.g. "m.fluckiger2" -> "MF"
+            parts = re.split(r"[._\-]", m.login)
+            if len(parts) >= 2 and parts[0] and parts[1]:
+                initials = (parts[0][0] + parts[1][0]).upper()
+                if initials == avatar_abbrev:
+                    m.is_self = True
+                    break
+            if m.name:
+                name_parts = [p for p in m.name.split() if p]
+                if len(name_parts) >= 2:
+                    initials = (name_parts[0][0] + name_parts[-1][0]).upper()
+                    if initials == avatar_abbrev:
+                        m.is_self = True
+                        break
+
+    return ParsedTeamManagementScreen(
+        members=members,
+        remove_form_action=remove_form_action,
+        remove_hidden_fields=remove_hidden_fields,
+        add_autocomplete_action=add_autocomplete_action,
+        list_users_url=list_users_url,
+        avatar_abbrev=avatar_abbrev,
+        alert_error=alert_error,
+    )
+
+
+class ParsedCourseUserListScreen(BaseModel):
+    current_user_id: Optional[str] = None
+    add_user_form_action: Optional[str] = None
+    hidden_fields: Dict[str, str] = Field(default_factory=dict)
+    max_rows_url: Optional[str] = None
+    has_next_page: bool = False
+    candidates: List[CourseUserCandidate] = Field(default_factory=list)
+
+
+@safe_parser(context_name="course_users_list_screen")
+def parse_course_users_list_screen(
+    html_content: str, base_url: str = settings.ilias_base_url
+) -> ParsedCourseUserListScreen:
+    """
+    Parses the ILIAS Repository Search course user list page (ilRepositorySearchGUI&cmd=listUsers / storedUserList).
+    Extracts current_user_id from rep_search_<uid>_table_nav, pagination max_rows_url (_trows=800),
+    form action for cmd[addUser], and all listed course participants.
+    """
+    soup = BeautifulSoup(html_content, "lxml")
+
+    current_user_id = None
+    m_uid = re.search(r"rep_search_(\d+)_(?:table_nav|trows)|tblfsh?rep_search_(\d+)", html_content)
+    if m_uid:
+        current_user_id = m_uid.group(1) or m_uid.group(2)
+
+    form = soup.find(
+        "form", action=lambda a: bool(a and "ilRepositorySearchGUI" in a and "cmd=post" in a)
+    )
+    add_user_form_action = None
+    hidden_fields: Dict[str, str] = {}
+    if form:
+        if form.get("action"):
+            add_user_form_action = urllib.parse.urljoin(base_url, form["action"])
+        for inp in form.find_all("input", type="hidden"):
+            name = inp.get("name")
+            if name and name != "user[]":
+                hidden_fields[name] = inp.get("value", "")
+
+    # Check if there is pagination ("Next" / "Weiter") and a "_trows=800" link
+    has_next_page = False
+    max_rows_url = None
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        txt = _clean_text(a).lower()
+        if "storeduserlist" in href.lower():
+            if txt in ["next", "weiter", ">", "»"]:
+                has_next_page = True
+            if "trows=800" in href:
+                max_rows_url = urllib.parse.urljoin(base_url, href)
+
+    # Parse candidate rows from table.table-striped
+    candidates: List[CourseUserCandidate] = []
+    table = (form.select_one("table.table-striped") if form else None) or soup.select_one("table.table-striped")
+    if table:
+        # Determine column indices from thead (note: checkbox column can be <td> inside <thead>)
+        thead_tr = table.select_one("thead tr")
+        headers = [_clean_text(cell).lower() for cell in thead_tr.find_all(["th", "td"])] if thead_tr else []
+        last_idx, first_idx, login_idx = 1, 2, 3
+        for idx, h in enumerate(headers):
+            if any(k in h for k in ["last name", "nachname"]):
+                last_idx = idx
+            elif any(k in h for k in ["first name", "vorname"]):
+                first_idx = idx
+            elif any(k in h for k in ["login", "benutzername", "account"]):
+                login_idx = idx
+
+        for tr in table.select("tbody tr"):
+            cb = tr.find("input", {"name": "user[]"})
+            if not cb or not cb.get("value"):
+                continue
+            uid = cb["value"].strip()
+            tds = tr.find_all("td")
+            lastname = _clean_text(tds[last_idx]) if len(tds) > last_idx else ""
+            firstname = _clean_text(tds[first_idx]) if len(tds) > first_idx else ""
+            login = _clean_text(tds[login_idx]) if len(tds) > login_idx else ""
+
+            full_name = f"{firstname} {lastname}".strip()
+            candidates.append(
+                CourseUserCandidate(
+                    user_id=uid,
+                    login=login,
+                    firstname=firstname,
+                    lastname=lastname,
+                    full_name=full_name,
+                    in_team=False,
+                    is_self=bool(current_user_id and uid == current_user_id),
+                )
+            )
+
+    return ParsedCourseUserListScreen(
+        current_user_id=current_user_id,
+        add_user_form_action=add_user_form_action,
+        hidden_fields=hidden_fields,
+        max_rows_url=max_rows_url,
+        has_next_page=has_next_page,
+        candidates=candidates,
+    )
+
+
+class ParsedTeamConfirmRemoveScreen(BaseModel):
+    action_url: Optional[str] = None
+    member_ids: List[str] = Field(default_factory=list)
+    hidden_fields: Dict[str, str] = Field(default_factory=dict)
+    confirm_cmd_name: str = "cmd[removeTeamMember]"
+    confirm_cmd_value: str = "Remove"
+
+
+@safe_parser(context_name="remove_team_confirmation_screen")
+def parse_remove_team_confirmation_screen(
+    html_content: str, base_url: str = settings.ilias_base_url
+) -> ParsedTeamConfirmRemoveScreen:
+    """
+    Parses the ILIAS confirmation dialog when removing team members or deleting a team
+    (e.g. manage_team_remove_teammate_dialog.html).
+    """
+    soup = BeautifulSoup(html_content, "lxml")
+
+    form = soup.find(
+        "form", action=lambda a: bool(a and "ilExSubmissionTeamGUI" in a and "cmd=post" in a)
+    )
+    if not form:
+        return ParsedTeamConfirmRemoveScreen()
+
+    action_url = urllib.parse.urljoin(base_url, form["action"]) if form.get("action") else None
+    member_ids: List[str] = []
+    hidden_fields: Dict[str, str] = {}
+
+    for inp in form.find_all("input", type="hidden"):
+        name = inp.get("name")
+        val = inp.get("value", "")
+        if name == "id[]":
+            if val and val not in member_ids:
+                member_ids.append(val)
+        elif name:
+            hidden_fields[name] = val
+
+    confirm_cmd_name = "cmd[removeTeamMember]"
+    confirm_cmd_value = "Remove"
+    for sub in form.find_all("input", type="submit"):
+        name = sub.get("name", "")
+        if name and "cancel" not in name.lower() and "submissionscreenteam" not in name.lower():
+            confirm_cmd_name = name
+            confirm_cmd_value = sub.get("value", "Remove")
+            break
+
+    return ParsedTeamConfirmRemoveScreen(
+        action_url=action_url,
+        member_ids=member_ids,
+        hidden_fields=hidden_fields,
+        confirm_cmd_name=confirm_cmd_name,
+        confirm_cmd_value=confirm_cmd_value,
     )
 
 

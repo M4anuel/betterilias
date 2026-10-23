@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   X,
   FileText,
@@ -8,14 +8,17 @@ import {
   Clock,
   Calendar,
   Users,
-  ExternalLink,
   Award,
   RefreshCw,
   PlusCircle,
   Upload,
   Trash2,
+  UserPlus,
+  UserMinus,
+  Search,
+  Check,
 } from 'lucide-react';
-import { StudentAssignmentDetail } from '../types';
+import { CourseUserCandidate, StudentAssignmentDetail, TeamMemberInfo } from '../types';
 import { api } from '../lib/api';
 import { cache } from '../lib/cache';
 
@@ -41,6 +44,321 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
+
+  // Team Management State
+  const [isCreatingTeam, setIsCreatingTeam] = useState<boolean>(false);
+  const [isDeletingTeam, setIsDeletingTeam] = useState<boolean>(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState<boolean>(false);
+  const [candidates, setCandidates] = useState<CourseUserCandidate[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState<boolean>(false);
+  const [candidateSearchQuery, setCandidateSearchQuery] = useState<string>('');
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<Set<string>>(new Set());
+  const [manualUserLogin, setManualUserLogin] = useState<string>('');
+  const [isAddingMembers, setIsAddingMembers] = useState<boolean>(false);
+  const [addingSingleUserId, setAddingSingleUserId] = useState<string | null>(null);
+  const [teamFeedbackMessage, setTeamFeedbackMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  const showTeamFeedback = (type: 'success' | 'error', text: string) => {
+    setTeamFeedbackMessage({ type, text });
+    if (type === 'success') {
+      setTimeout(() => {
+        setTeamFeedbackMessage((prev) => (prev?.text === text ? null : prev));
+      }, 4500);
+    }
+  };
+
+  const loadCandidates = async (force = false) => {
+    if (candidates.length > 0 && !force) return;
+    setIsLoadingCandidates(true);
+    try {
+      const res = await api.getTeamCandidates(exerciseRefId, assId);
+      setCandidates(res.candidates || []);
+      if (res.current_user_id) {
+        setCurrentUserId(res.current_user_id);
+      }
+    } catch (err: any) {
+      showTeamFeedback('error', `Kurs-Teilnehmerliste konnte nicht geladen werden: ${err.message}`);
+    } finally {
+      setIsLoadingCandidates(false);
+    }
+  };
+
+  const handleToggleAddMemberPanel = () => {
+    const nextOpen = !isAddMemberOpen;
+    setIsAddMemberOpen(nextOpen);
+    if (nextOpen && candidates.length === 0) {
+      loadCandidates();
+    }
+  };
+
+  const handleCreateTeam = async () => {
+    setIsCreatingTeam(true);
+    setTeamFeedbackMessage(null);
+    try {
+      const updated = await api.createStudentTeam(exerciseRefId, assId);
+      setDetail(updated);
+      cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
+      showTeamFeedback('success', 'Team erfolgreich erstellt! Du kannst jetzt Mitglieder aus dem Kurs hinzufügen.');
+      setIsAddMemberOpen(true);
+      loadCandidates(true);
+    } catch (err: any) {
+      showTeamFeedback('error', `Team konnte nicht erstellt werden: ${err.message}`);
+    } finally {
+      setIsCreatingTeam(false);
+    }
+  };
+
+  const handleAddSingleCandidate = async (candidate: CourseUserCandidate) => {
+    setAddingSingleUserId(candidate.user_id);
+    setTeamFeedbackMessage(null);
+    try {
+      const updated = await api.addStudentTeamMembers(exerciseRefId, assId, {
+        user_ids: [candidate.user_id],
+      });
+      setDetail(updated);
+      cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
+      setSelectedCandidateIds((prev) => {
+        const next = new Set(prev);
+        next.delete(candidate.user_id);
+        return next;
+      });
+      showTeamFeedback('success', `${candidate.full_name} (${candidate.login}) wurde zum Team hinzugefügt.`);
+    } catch (err: any) {
+      showTeamFeedback('error', `Mitglied konnte nicht hinzugefügt werden: ${err.message}`);
+    } finally {
+      setAddingSingleUserId(null);
+    }
+  };
+
+  const handleAddSelectedCandidates = async () => {
+    const ids = Array.from(selectedCandidateIds);
+    if (ids.length === 0) return;
+
+    setIsAddingMembers(true);
+    setTeamFeedbackMessage(null);
+    try {
+      const updated = await api.addStudentTeamMembers(exerciseRefId, assId, {
+        user_ids: ids,
+      });
+      setDetail(updated);
+      cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
+      setSelectedCandidateIds(new Set());
+      showTeamFeedback('success', `${ids.length} ${ids.length === 1 ? 'Person wurde' : 'Personen wurden'} zum Team hinzugefügt.`);
+    } catch (err: any) {
+      showTeamFeedback('error', `Mitglieder konnten nicht hinzugefügt werden: ${err.message}`);
+    } finally {
+      setIsAddingMembers(false);
+    }
+  };
+
+  const handleAddManualLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleaned = manualUserLogin.trim().replace(/^\[|\]$/g, '');
+    if (!cleaned) return;
+
+    setIsAddingMembers(true);
+    setTeamFeedbackMessage(null);
+    try {
+      const updated = await api.addStudentTeamMembers(exerciseRefId, assId, {
+        user_logins: [cleaned],
+      });
+      setDetail(updated);
+      cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
+      setManualUserLogin('');
+      showTeamFeedback('success', `"${cleaned}" wurde zum Team hinzugefügt.`);
+    } catch (err: any) {
+      showTeamFeedback('error', `Benutzer "${cleaned}" konnte nicht hinzugefügt werden: ${err.message}`);
+    } finally {
+      setIsAddingMembers(false);
+    }
+  };
+
+  const handleRemoveTeamMember = async (member: TeamMemberInfo) => {
+    if (!member.user_id) {
+      showTeamFeedback('error', 'Benutzer-ID für dieses Teammitglied nicht verfügbar. Bitte lade die Ansicht neu.');
+      return;
+    }
+    const label = member.name || member.login || member.user_id;
+    if (!window.confirm(`Möchtest du "${label}" wirklich aus dem Team entfernen?`)) {
+      return;
+    }
+
+    setRemovingMemberId(member.user_id);
+    setTeamFeedbackMessage(null);
+    try {
+      const updated = await api.removeStudentTeamMembers(exerciseRefId, assId, [member.user_id]);
+      setDetail(updated);
+      cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
+      showTeamFeedback('success', `"${label}" wurde aus dem Team entfernt.`);
+    } catch (err: any) {
+      showTeamFeedback('error', `Mitglied konnte nicht entfernt werden: ${err.message}`);
+    } finally {
+      setRemovingMemberId(null);
+    }
+  };
+
+  const handleDeleteTeam = async () => {
+    const memberCount = resolvedTeamMembers.length;
+    const confirmMsg =
+      memberCount > 1
+        ? `Möchtest du das gesamte Team (${memberCount} Mitglieder) wirklich auflösen?\n\nHinweis: Da ILIAS ein Team erst löschen lässt, wenn nur noch 1 Person darin ist, entfernt BetterIlias zuerst automatisch alle anderen Teammitglieder und löst danach das Team auf.`
+        : 'Möchtest du dein Team wirklich auflösen?';
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    setIsDeletingTeam(true);
+    setTeamFeedbackMessage(null);
+    try {
+      const updated = await api.deleteStudentTeam(exerciseRefId, assId);
+      setDetail(updated);
+      cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
+      setIsAddMemberOpen(false);
+      setSelectedCandidateIds(new Set());
+      showTeamFeedback('success', 'Das Team wurde erfolgreich aufgelöst.');
+    } catch (err: any) {
+      showTeamFeedback('error', `Team konnte nicht aufgelöst werden: ${err.message}`);
+    } finally {
+      setIsDeletingTeam(false);
+    }
+  };
+
+  const toggleCandidateSelection = (userId: string) => {
+    setSelectedCandidateIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
+
+  // Resolve and enrich team members with loaded candidates directory
+  const resolvedTeamMembers: TeamMemberInfo[] = useMemo(() => {
+    if (!detail) return [];
+    const candidateById = new Map<string, CourseUserCandidate>();
+    const candidateByLogin = new Map<string, CourseUserCandidate>();
+    for (const c of candidates) {
+      if (c.user_id) candidateById.set(c.user_id, c);
+      if (c.login) candidateByLogin.set(c.login.toLowerCase(), c);
+    }
+
+    let baseList: TeamMemberInfo[] = [];
+    if (detail.team_member_details && detail.team_member_details.length > 0) {
+      baseList = detail.team_member_details;
+    } else if (detail.team_members && detail.team_members.length > 0) {
+      baseList = detail.team_members.map((raw) => {
+        const bracketMatch = raw.match(/\[([^\]]+)\]/);
+        const login = bracketMatch ? bracketMatch[1].trim() : raw.trim().replace(/^\[|\]$/g, '');
+        return {
+          user_id: undefined,
+          login,
+          name: undefined,
+          is_self: detail.team_members.length === 1,
+        };
+      });
+    }
+
+    return baseList.map((m) => {
+      const matched: CourseUserCandidate | undefined =
+        (m.user_id ? candidateById.get(m.user_id) : undefined) ||
+        (m.login ? candidateByLogin.get(m.login.toLowerCase()) : undefined);
+      const fullName = m.name || matched?.full_name || undefined;
+      const userId = m.user_id || matched?.user_id || undefined;
+      const login = m.login || matched?.login || '';
+      const isSelf =
+        m.is_self ||
+        Boolean(currentUserId && userId === currentUserId) ||
+        baseList.length === 1;
+      return {
+        ...m,
+        user_id: userId,
+        login,
+        name: fullName,
+        is_self: isSelf,
+      };
+    });
+  }, [detail, candidates, currentUserId]);
+
+  const existingMemberUserIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const m of resolvedTeamMembers) {
+      if (m.user_id) s.add(m.user_id);
+    }
+    return s;
+  }, [resolvedTeamMembers]);
+
+  const existingMemberLogins = useMemo(() => {
+    const s = new Set<string>();
+    for (const m of resolvedTeamMembers) {
+      if (m.login) s.add(m.login.toLowerCase());
+    }
+    return s;
+  }, [resolvedTeamMembers]);
+
+  const filteredCandidates = useMemo(() => {
+    const q = candidateSearchQuery.trim().toLowerCase();
+    const matching = q
+      ? candidates.filter(
+          (c) =>
+            c.full_name.toLowerCase().includes(q) ||
+            c.login.toLowerCase().includes(q) ||
+            c.lastname.toLowerCase().includes(q) ||
+            c.firstname.toLowerCase().includes(q)
+        )
+      : [...candidates];
+
+    return matching.sort((a, b) => {
+      const aChecked =
+        selectedCandidateIds.has(a.user_id) ||
+        existingMemberUserIds.has(a.user_id) ||
+        (Boolean(a.login) && existingMemberLogins.has(a.login.toLowerCase()));
+      const bChecked =
+        selectedCandidateIds.has(b.user_id) ||
+        existingMemberUserIds.has(b.user_id) ||
+        (Boolean(b.login) && existingMemberLogins.has(b.login.toLowerCase()));
+
+      if (aChecked !== bChecked) {
+        return aChecked ? -1 : 1;
+      }
+      const aSelected = selectedCandidateIds.has(a.user_id);
+      const bSelected = selectedCandidateIds.has(b.user_id);
+      if (aSelected !== bSelected) {
+        return aSelected ? -1 : 1;
+      }
+      return 0;
+    });
+  }, [
+    candidates,
+    candidateSearchQuery,
+    selectedCandidateIds,
+    existingMemberUserIds,
+    existingMemberLogins,
+  ]);
+
+  const hasTeam = Boolean(
+    detail &&
+      (resolvedTeamMembers.length > 0 ||
+        detail.manage_team_url ||
+        detail.delete_team_url)
+  );
+
+  const canCreateTeam = Boolean(
+    detail &&
+      !hasTeam &&
+      !detail.is_ended &&
+      (detail.create_team_url ||
+        (detail.team_status_text &&
+          /no team|kein team/i.test(detail.team_status_text)))
+  );
 
   const handleUploadStudentFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -272,43 +590,337 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                 </div>
               )}
 
-              {/* Team Information & Team Creation */}
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2">
+              {/* Team Management & Gruppenmitglieder */}
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-3.5">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                    <span>Team & Gruppenmitglieder</span>
-                  </h3>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      Team & Gruppenmitglieder
+                    </h3>
+                    {hasTeam && (
+                      <span className="rounded-full bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800">
+                        {resolvedTeamMembers.length}{' '}
+                        {resolvedTeamMembers.length === 1 ? 'Mitglied' : 'Mitglieder'}
+                      </span>
+                    )}
+                  </div>
 
-                  {detail.create_team_url && (
-                    <a
-                      href={detail.create_team_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition border border-indigo-200 dark:border-indigo-800"
-                    >
-                      <PlusCircle className="h-3.5 w-3.5" />
-                      <span>Team erstellen (ILIAS)</span>
-                    </a>
-                  )}
+                  {/* Team Action Buttons */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {canCreateTeam && (
+                      <button
+                        type="button"
+                        onClick={handleCreateTeam}
+                        disabled={isCreatingTeam}
+                        className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-60"
+                      >
+                        {isCreatingTeam ? (
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <PlusCircle className="h-3.5 w-3.5" />
+                        )}
+                        <span>{isCreatingTeam ? 'Wird erstellt...' : 'Team erstellen'}</span>
+                      </button>
+                    )}
+
+                    {hasTeam && !detail.is_ended && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleToggleAddMemberPanel}
+                          className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer border ${
+                            isAddMemberOpen
+                              ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                              : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
+                          }`}
+                        >
+                          <UserPlus className="h-3.5 w-3.5" />
+                          <span>
+                            {isAddMemberOpen ? 'Suche schließen' : 'Mitglieder hinzufügen'}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleDeleteTeam}
+                          disabled={isDeletingTeam}
+                          className="flex items-center gap-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 px-3 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition border border-rose-200 dark:border-rose-800/80 cursor-pointer disabled:opacity-60"
+                          title="Team vollständig auflösen"
+                        >
+                          {isDeletingTeam ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                          <span>
+                            {isDeletingTeam
+                              ? resolvedTeamMembers.length > 1
+                                ? 'Entferne Mitglieder & löse auf...'
+                                : 'Wird aufgelöst...'
+                              : 'Team auflösen'}
+                          </span>
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
 
-                {detail.team_members && detail.team_members.length > 0 ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {detail.team_members.map((member, idx) => (
-                      <span
-                        key={idx}
-                        className="rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 text-xs font-medium text-indigo-800 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 flex items-center gap-1"
-                      >
-                        <Users className="h-3 w-3 text-indigo-500 dark:text-indigo-400" />
-                        <span>{member}</span>
-                      </span>
-                    ))}
+                {/* Team Feedback Banner */}
+                {teamFeedbackMessage && (
+                  <div
+                    className={`p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 animate-in fade-in ${
+                      teamFeedbackMessage.type === 'success'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+                        : 'bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {teamFeedbackMessage.type === 'success' ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                      )}
+                      <span>{teamFeedbackMessage.text}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setTeamFeedbackMessage(null)}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Current Team Members List */}
+                {resolvedTeamMembers.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {resolvedTeamMembers.map((member, idx) => {
+                      const isRemoving =
+                        Boolean(member.user_id) && removingMemberId === member.user_id;
+                      const canRemoveThisMember =
+                        !detail.is_ended &&
+                        Boolean(member.user_id) &&
+                        resolvedTeamMembers.length > 1 &&
+                        !member.is_self;
+
+                      return (
+                        <div
+                          key={member.user_id || member.login || idx}
+                          className="flex items-center justify-between rounded-xl border border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/30 px-3 py-2 text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0 pr-2">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/70 text-indigo-700 dark:text-indigo-300 font-bold text-[11px] shrink-0">
+                              {(member.name || member.login || 'T')
+                                .replace(/^\[/, '')
+                                .charAt(0)
+                                .toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                                  {member.name || member.login}
+                                </span>
+                                {member.is_self && (
+                                  <span className="rounded-md bg-indigo-600/10 dark:bg-indigo-400/15 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 shrink-0">
+                                    Du
+                                  </span>
+                                )}
+                              </div>
+                              {member.login && member.name && (
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono block truncate">
+                                  [{member.login}]
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {canRemoveThisMember && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTeamMember(member)}
+                              disabled={isRemoving || isDeletingTeam}
+                              className="flex items-center gap-1 rounded-lg bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-900/60 px-2 py-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition shrink-0 cursor-pointer disabled:opacity-50"
+                              title="Aus dem Team entfernen"
+                            >
+                              {isRemoving ? (
+                                <RefreshCw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <UserMinus className="h-3 w-3" />
+                              )}
+                              <span>Entfernen</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-400 dark:text-slate-500">
-                    {detail.team_status_text || 'Kein Team zugeordnet oder Einzelabgabe.'}
-                  </p>
+                  <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {detail.team_status_text || 'Noch keinem Team zugeordnet.'}
+                      </p>
+                      {canCreateTeam && (
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                          Erstelle ein Team, um gemeinsam mit anderen Kursmitgliedern abzugeben.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Searchable Course Participant Picker */}
+                {isAddMemberOpen && hasTeam && !detail.is_ended && (
+                  <div className="mt-3 rounded-2xl border border-indigo-200/80 dark:border-indigo-900/70 bg-slate-50/70 dark:bg-slate-800/40 p-4 space-y-3 animate-in fade-in duration-150">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                          Kursmitglieder suchen & zum Team hinzufügen
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Wähle Studierende aus dem aktuellen Kurs aus oder gib ihren ILIAS-Benutzernamen ein.
+                        </p>
+                      </div>
+                      {selectedCandidateIds.size > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleAddSelectedCandidates}
+                          disabled={isAddingMembers}
+                          className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-60 shrink-0"
+                        >
+                          {isAddingMembers ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <UserPlus className="h-3.5 w-3.5" />
+                          )}
+                          <span>Ausgewählte hinzufügen ({selectedCandidateIds.size})</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="relative">
+                      <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="search"
+                        value={candidateSearchQuery}
+                        onChange={(e) => setCandidateSearchQuery(e.target.value)}
+                        placeholder="Nach Vorname, Nachname oder ILIAS-Login suchen..."
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-9 pr-3 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500"
+                      />
+                    </div>
+
+                    {/* Candidates List */}
+                    {isLoadingCandidates ? (
+                      <div className="flex items-center justify-center gap-2 py-8 text-xs text-slate-500 dark:text-slate-400">
+                        <RefreshCw className="h-4 w-4 animate-spin text-indigo-600" />
+                        <span>Lade Kursteilnehmer aus ILIAS...</span>
+                      </div>
+                    ) : filteredCandidates.length > 0 ? (
+                      <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
+                        {filteredCandidates.map((candidate) => {
+                          const isAlreadyMember =
+                            existingMemberUserIds.has(candidate.user_id) ||
+                            (Boolean(candidate.login) &&
+                              existingMemberLogins.has(candidate.login.toLowerCase()));
+                          const isSelected = selectedCandidateIds.has(candidate.user_id);
+                          const isAddingThis = addingSingleUserId === candidate.user_id;
+
+                          return (
+                            <div
+                              key={candidate.user_id}
+                              onClick={() => {
+                                if (!isAlreadyMember && !isAddingThis) {
+                                  toggleCandidateSelection(candidate.user_id);
+                                }
+                              }}
+                              className={`flex items-center justify-between px-3 py-2 text-xs transition ${
+                                isAlreadyMember
+                                  ? 'bg-slate-50/80 dark:bg-slate-800/40 opacity-75'
+                                  : isSelected
+                                  ? 'bg-indigo-50/70 dark:bg-indigo-950/50 cursor-pointer'
+                                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected || isAlreadyMember}
+                                  disabled={isAlreadyMember || isAddingThis}
+                                  onChange={() => toggleCandidateSelection(candidate.user_id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:cursor-default"
+                                />
+                                <div className="min-w-0">
+                                  <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                                    {candidate.full_name}
+                                  </span>
+                                  {candidate.login && (
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono block truncate">
+                                      [{candidate.login}]
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="shrink-0">
+                                {isAlreadyMember ? (
+                                  <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                                    <Check className="h-3 w-3" />
+                                    <span>Im Team</span>
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddSingleCandidate(candidate);
+                                    }}
+                                    disabled={isAddingThis || isAddingMembers}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 hover:bg-indigo-600 hover:text-white text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+                                  >
+                                    {isAddingThis ? (
+                                      <RefreshCw className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <UserPlus className="h-3 w-3" />
+                                    )}
+                                    <span>Hinzufügen</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-4 text-center text-xs text-slate-400 dark:text-slate-500">
+                        Keine passenden Kursteilnehmer für „{candidateSearchQuery}“ gefunden.
+                      </div>
+                    )}
+
+                    {/* Direct Login Input Fallback */}
+                    <form
+                      onSubmit={handleAddManualLogin}
+                      className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1 border-t border-slate-200/70 dark:border-slate-700/60"
+                    >
+                      <input
+                        type="text"
+                        value={manualUserLogin}
+                        onChange={(e) => setManualUserLogin(e.target.value)}
+                        placeholder="Oder direkt per ILIAS-Login hinzufügen (z. B. m.mustermann1)..."
+                        className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!manualUserLogin.trim() || isAddingMembers}
+                        className="rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white px-3 py-1.5 text-xs font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
+                      >
+                        Per Login hinzufügen
+                      </button>
+                    </form>
+                  </div>
                 )}
               </div>
 
@@ -333,7 +945,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                   </div>
 
                   {/* Upload Submission Button */}
-                  {!detail.is_ended && (
+                  {!detail.is_ended && !canCreateTeam && (
                     <div>
                       <label
                         htmlFor={`student-upload-${assId}`}
@@ -427,8 +1039,16 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                   </div>
                 ) : (
                   <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-6 text-center text-xs text-slate-400 dark:text-slate-500 space-y-1">
-                    <p className="font-semibold text-slate-600 dark:text-slate-300">Noch keine Dateien eingereicht</p>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500">Nutzen Sie den Button oben rechts, um Ihre Ausarbeitung einzureichen.</p>
+                    <p className="font-semibold text-slate-600 dark:text-slate-300">
+                      {canCreateTeam
+                        ? 'Bitte erstelle zuerst ein Team, um eine Datei einzureichen'
+                        : 'Noch keine Dateien eingereicht'}
+                    </p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {canCreateTeam
+                        ? 'Für diese Gruppenaufgabe ist vor dem Datei-Upload ein Team erforderlich.'
+                        : 'Nutzen Sie den Button oben rechts, um Ihre Ausarbeitung einzureichen.'}
+                    </p>
                   </div>
                 )}
               </div>
@@ -505,4 +1125,3 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
     </div>
   );
 };
-

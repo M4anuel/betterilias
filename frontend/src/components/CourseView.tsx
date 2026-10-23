@@ -243,11 +243,37 @@ export const CourseView: React.FC<CourseViewProps> = ({
   };
 
   const countFolderItems = (res: CourseMaterialsResponse) => {
-    const files = (res.items || []).filter((i) => i.item_type !== 'fold').length;
-    const folders = (res.items || []).filter((i) => i.item_type === 'fold').length;
-    const sectionItems = (res.sections || []).flatMap((s) => s.groups.flatMap((g) => g.items)).length;
-    const total = files + folders + sectionItems;
-    return { files: files + sectionItems, folders, total };
+    const seen = new Set<string>();
+    let files = 0;
+    let folders = 0;
+
+    const processItem = (item: MaterialItem) => {
+      const id = item?.ref_id || item?.url || item?.title;
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      if (item.item_type === 'fold') {
+        folders++;
+      } else {
+        files++;
+      }
+    };
+
+    for (const item of res.items || []) {
+      processItem(item);
+    }
+    for (const sec of res.sections || []) {
+      for (const grp of sec.groups || []) {
+        for (const item of grp.items || []) {
+          processItem(item);
+        }
+      }
+      for (const item of sec.items || []) {
+        processItem(item);
+      }
+    }
+
+    const total = files + folders;
+    return { files, folders, total };
   };
 
   // Trigger MathJax typesetting whenever materialsData changes
@@ -940,7 +966,9 @@ export const CourseView: React.FC<CourseViewProps> = ({
                   </span>
                 ) : (
                   <span className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
-                    {stat.files > 0
+                    {stat.files > 0 && stat.folders > 0
+                      ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}, ${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`
+                      : stat.files > 0
                       ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}`
                       : `${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`}
                   </span>
@@ -1336,7 +1364,9 @@ export const CourseView: React.FC<CourseViewProps> = ({
                           </span>
                         ) : (
                           <span className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 font-semibold text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
-                            {stat.files > 0
+                            {stat.files > 0 && stat.folders > 0
+                              ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}, ${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`
+                              : stat.files > 0
                               ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}`
                               : `${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`}
                           </span>

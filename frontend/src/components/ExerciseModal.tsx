@@ -855,16 +855,22 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                         <Users className="h-4 w-4 text-indigo-600" />
                         <span>Team</span>
                       </h3>
-                      {studentDetail.manage_team_url && (
-                        <a
-                          href={studentDetail.manage_team_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                      {studentDetail.team_members.length > 0 && selectedAssId && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!window.confirm('Möchtest du das Team wirklich auflösen?')) return;
+                            try {
+                              const updated = await api.deleteStudentTeam(exerciseRefId, selectedAssId);
+                              setStudentDetail(updated);
+                            } catch (err: any) {
+                              alert(err.message || 'Fehler beim Auflösen des Teams');
+                            }
+                          }}
+                          className="text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer"
                         >
-                          <span>Team verwalten</span>
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
+                          <span>Team auflösen</span>
+                        </button>
                       )}
                     </div>
 
@@ -882,15 +888,21 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                     ) : (
                       <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500 flex items-center justify-between">
                         <span>{studentDetail.team_status_text || 'Sie gehören noch keinem Team an.'}</span>
-                        {studentDetail.create_team_url && (
-                          <a
-                            href={studentDetail.create_team_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 shadow-2xs"
+                        {studentDetail.create_team_url && selectedAssId && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const updated = await api.createStudentTeam(exerciseRefId, selectedAssId);
+                                setStudentDetail(updated);
+                              } catch (err: any) {
+                                alert(err.message || 'Fehler beim Erstellen des Teams');
+                              }
+                            }}
+                            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 shadow-2xs cursor-pointer"
                           >
                             Team erstellen
-                          </a>
+                          </button>
                         )}
                       </div>
                     )}

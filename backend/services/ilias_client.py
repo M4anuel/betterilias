@@ -12,6 +12,7 @@ from backend.schemas import (
     AuthStatus,
     CourseLogsResponse,
     CourseMaterialsResponse,
+    CourseUserCandidate,
     DashboardResponse,
     ExerciseOverviewResponse,
     ExerciseSubmissionsResponse,
@@ -23,22 +24,28 @@ from backend.schemas import (
     SemesterScreenResponse,
     StudentAssignmentDetail,
     FeedbackFilesResponse,
+    TeamCandidatesResponse,
+    TeamMemberInfo,
 )
 from backend.scrapers import (
     extract_grading_form,
     extract_feedback_modal_form,
     parse_course_logs,
     parse_course_materials,
+    parse_course_users_list_screen,
     parse_dashboard,
     parse_exercise_info,
     parse_exercise_overview,
     parse_exercise_submissions,
     parse_feedback_files,
     parse_podcast_series,
+    parse_remove_team_confirmation_screen,
     parse_semester_courses,
     parse_student_assignment_detail,
     parse_student_submitted_files_screen,
     parse_student_upload_form,
+    parse_team_management_screen,
+    ParsedTeamManagementScreen,
     verify_grading_success,
 )
 
@@ -52,6 +59,9 @@ class SessionExpiredError(Exception):
 
 class IliasClient:
     """High-level async client for interacting with Uni Bern ILIAS."""
+
+    # Class-level cache of course participants per exercise_ref_id for enriching team member names
+    _course_user_cache: Dict[str, List[CourseUserCandidate]] = {}
 
     def __init__(self, manager: Optional[SessionManager] = None):
         self.session_manager = manager or session_manager
@@ -379,7 +389,7 @@ class IliasClient:
             return parse_exercise_info(resp.text, ref_id=ref_id)
 
     async def get_student_assignment_detail(self, ref_id: str, ass_id: str) -> StudentAssignmentDetail:
-        """Fetch and parse the student assignment presentation screen and submitted files screen."""
+        """Fetch and parse the student assignment presentation screen, team details, and submitted files screen."""
         self._ensure_authenticated()
         url = (
             f"{settings.ilias_base_url}/ilias.php?"
@@ -389,6 +399,38 @@ class IliasClient:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
             detail = parse_student_assignment_detail(resp.text, exercise_ref_id=ref_id, ass_id=ass_id)
+
+            # Enrich team_member_details with ILIAS user IDs from submissionScreenTeam if a team exists
+            if detail.manage_team_url or detail.team_members:
+                team_url = detail.manage_team_url or (
+                    f"{settings.ilias_base_url}/ilias.php?"
+                    f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4&cmdClass=ilExSubmissionTeamGUI&cmd=submissionScreenTeam"
+                    f"&ref_id={ref_id}&ass_id={ass_id}"
+                )
+                try:
+                    team_resp = await client.get(team_url)
+                    if team_resp.status_code == 200:
+                        team_screen = parse_team_management_screen(team_resp.text, base_url=settings.ilias_base_url)
+                        if team_screen.members:
+                            detail.team_member_details = team_screen.members
+                            detail.team_members = [m.login for m in team_screen.members]
+                except Exception as te:
+                    logger.debug(f"Could not fetch team management screen for {ref_id}/{ass_id}: {te}")
+
+            # Enrich member full names from cached course user directory if available
+            cached_candidates = self._course_user_cache.get(ref_id)
+            if cached_candidates and detail.team_member_details:
+                by_uid = {c.user_id: c for c in cached_candidates if c.user_id}
+                by_login = {c.login.lower(): c for c in cached_candidates if c.login}
+                for m in detail.team_member_details:
+                    cand = (by_uid.get(m.user_id) if m.user_id else None) or by_login.get(m.login.lower())
+                    if cand:
+                        if not m.name and cand.full_name:
+                            m.name = cand.full_name
+                        if not m.user_id and cand.user_id:
+                            m.user_id = cand.user_id
+                        if cand.is_self:
+                            m.is_self = True
 
             # Check if there is an active submissionScreen with direct download links
             sub_url = (
@@ -590,6 +632,394 @@ class IliasClient:
                     "cmd[deleteDelivered]": "Delete",
                 }
                 await client.post(form_action, data=direct_data)
+
+        return await self.get_student_assignment_detail(exercise_ref_id, ass_id)
+
+    async def create_student_team(
+        self, exercise_ref_id: str, ass_id: str
+    ) -> StudentAssignmentDetail:
+        """
+        Creates a student team for an exercise assignment in ILIAS (cmd=createTeam).
+        Resolves the dynamic create_team_url from the assignment presentation page or uses the standard fallback,
+        executes the team creation request, and returns the updated StudentAssignmentDetail.
+        """
+        self._ensure_authenticated()
+        pres_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n&cmdClass=ilAssignmentPresentationGUI"
+            f"&ref_id={exercise_ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
+        )
+        default_create_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4&cmdClass=ilExSubmissionTeamGUI"
+            f"&cmd=createTeam&ref_id={exercise_ref_id}&ass_id={ass_id}"
+        )
+        async with self.session_manager.get_http_client() as client:
+            create_url = default_create_url
+            try:
+                pres_resp = await client.get(pres_url)
+                self._check_response_for_session_loss(pres_resp, pres_url)
+                pres_detail = parse_student_assignment_detail(
+                    pres_resp.text, exercise_ref_id=exercise_ref_id, ass_id=ass_id
+                )
+                if pres_detail.create_team_url:
+                    create_url = pres_detail.create_team_url
+            except SessionExpiredError:
+                raise
+            except Exception as e:
+                logger.debug(f"Using fallback createTeam URL: {e}")
+
+            logger.info(f"Creating student team via {create_url}")
+            create_resp = await client.get(create_url)
+            self._check_response_for_session_loss(create_resp, create_url)
+
+        return await self.get_student_assignment_detail(exercise_ref_id, ass_id)
+
+    async def get_team_candidates(
+        self, exercise_ref_id: str, ass_id: str
+    ) -> TeamCandidatesResponse:
+        """
+        Fetches the current team members and the full list of course participants (candidates)
+        from ilRepositorySearchGUI&cmd=listUsers (expanding up to 800 rows via _trows=800).
+        """
+        self._ensure_authenticated()
+        team_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4&cmdClass=ilExSubmissionTeamGUI"
+            f"&cmd=submissionScreenTeam&ref_id={exercise_ref_id}&ass_id={ass_id}"
+        )
+        async with self.session_manager.get_http_client() as client:
+            team_resp = await client.get(team_url)
+            self._check_response_for_session_loss(team_resp, team_url)
+            team_screen = parse_team_management_screen(team_resp.text, base_url=settings.ilias_base_url)
+
+            list_users_url = team_screen.list_users_url or (
+                f"{settings.ilias_base_url}/ilias.php?"
+                f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4:z0&cmdClass=ilRepositorySearchGUI"
+                f"&cmd=listUsers&ref_id={exercise_ref_id}&ass_id={ass_id}"
+            )
+
+            list_resp = await client.get(list_users_url)
+            self._check_response_for_session_loss(list_resp, list_users_url)
+            course_screen = parse_course_users_list_screen(list_resp.text, base_url=settings.ilias_base_url)
+
+            # If there are more than 40 participants, expand table to 800 rows to get full course directory
+            if course_screen.has_next_page and course_screen.max_rows_url:
+                try:
+                    full_resp = await client.get(course_screen.max_rows_url)
+                    if full_resp.status_code == 200:
+                        expanded_screen = parse_course_users_list_screen(
+                            full_resp.text, base_url=settings.ilias_base_url
+                        )
+                        if expanded_screen.candidates:
+                            course_screen = expanded_screen
+                except Exception as e:
+                    logger.warning(f"Failed to expand course user list to 800 rows: {e}")
+
+            current_uid = course_screen.current_user_id
+            team_uids = {m.user_id for m in team_screen.members if m.user_id}
+            team_logins = {m.login.lower() for m in team_screen.members if m.login}
+
+            by_uid: Dict[str, CourseUserCandidate] = {}
+            by_login: Dict[str, CourseUserCandidate] = {}
+
+            for cand in course_screen.candidates:
+                if (cand.user_id and cand.user_id in team_uids) or (
+                    cand.login and cand.login.lower() in team_logins
+                ):
+                    cand.in_team = True
+                if current_uid and cand.user_id == current_uid:
+                    cand.is_self = True
+                if cand.user_id:
+                    by_uid[cand.user_id] = cand
+                if cand.login:
+                    by_login[cand.login.lower()] = cand
+
+            # Enrich team members with full names and self status from course directory
+            for m in team_screen.members:
+                matched = (by_uid.get(m.user_id) if m.user_id else None) or by_login.get(m.login.lower())
+                if matched:
+                    if not m.name and matched.full_name:
+                        m.name = matched.full_name
+                    if not m.user_id and matched.user_id:
+                        m.user_id = matched.user_id
+                    if matched.is_self:
+                        m.is_self = True
+                elif current_uid and m.user_id == current_uid:
+                    m.is_self = True
+
+            # Cache course candidates for this exercise
+            if course_screen.candidates:
+                self._course_user_cache[exercise_ref_id] = course_screen.candidates
+
+            return TeamCandidatesResponse(
+                exercise_ref_id=exercise_ref_id,
+                ass_id=ass_id,
+                current_user_id=current_uid,
+                team_members=team_screen.members,
+                candidates=course_screen.candidates,
+            )
+
+    async def add_student_team_members(
+        self,
+        exercise_ref_id: str,
+        ass_id: str,
+        user_ids: Optional[List[str]] = None,
+        user_logins: Optional[List[str]] = None,
+    ) -> StudentAssignmentDetail:
+        """
+        Adds one or more course participants to the student's team:
+        - By user_ids: submits user[] + cmd[addUser] to ilRepositorySearchGUI&cmd=post.
+        - By user_logins: submits user_login + cmd[addUserFromAutoComplete] to toolbar form.
+        Returns the refreshed StudentAssignmentDetail.
+        """
+        self._ensure_authenticated()
+        user_ids = [str(u).strip() for u in (user_ids or []) if str(u).strip()]
+        user_logins = [str(l).strip("[] ") for l in (user_logins or []) if str(l).strip("[] ")]
+
+        team_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4&cmdClass=ilExSubmissionTeamGUI"
+            f"&cmd=submissionScreenTeam&ref_id={exercise_ref_id}&ass_id={ass_id}"
+        )
+        async with self.session_manager.get_http_client() as client:
+            team_resp = await client.get(team_url)
+            self._check_response_for_session_loss(team_resp, team_url)
+            team_screen = parse_team_management_screen(team_resp.text, base_url=settings.ilias_base_url)
+
+            # 1. Add by numeric ILIAS user_ids via ilRepositorySearchGUI course user list form
+            if user_ids:
+                list_users_url = team_screen.list_users_url or (
+                    f"{settings.ilias_base_url}/ilias.php?"
+                    f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4:z0&cmdClass=ilRepositorySearchGUI"
+                    f"&cmd=listUsers&ref_id={exercise_ref_id}&ass_id={ass_id}"
+                )
+                list_resp = await client.get(list_users_url)
+                self._check_response_for_session_loss(list_resp, list_users_url)
+                course_screen = parse_course_users_list_screen(
+                    list_resp.text, base_url=settings.ilias_base_url
+                )
+
+                # If course has >40 members and any requested user_id is not on page 1, expand to 800 rows
+                visible_uids = {c.user_id for c in course_screen.candidates}
+                if (
+                    course_screen.has_next_page
+                    and course_screen.max_rows_url
+                    and not all(uid in visible_uids for uid in user_ids)
+                ):
+                    full_resp = await client.get(course_screen.max_rows_url)
+                    if full_resp.status_code == 200:
+                        course_screen = parse_course_users_list_screen(
+                            full_resp.text, base_url=settings.ilias_base_url
+                        )
+
+                if course_screen.candidates:
+                    self._course_user_cache[exercise_ref_id] = course_screen.candidates
+
+                action_url = course_screen.add_user_form_action or team_screen.add_autocomplete_action
+                if action_url:
+                    post_data: Dict[str, Any] = dict(course_screen.hidden_fields)
+                    post_data["user[]"] = user_ids
+                    post_data["cmd[addUser]"] = "Add"
+                    logger.info(f"Adding team members {user_ids} via {action_url}")
+                    add_resp = await client.post(action_url, data=post_data)
+                    self._check_response_for_session_loss(add_resp, action_url)
+
+            # 2. Add by user_login via toolbar form (cmd[addUserFromAutoComplete])
+            if user_logins:
+                auto_action = team_screen.add_autocomplete_action or (
+                    f"{settings.ilias_base_url}/ilias.php?"
+                    f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4:z0&cmdClass=ilRepositorySearchGUI"
+                    f"&cmd=post&ref_id={exercise_ref_id}&ass_id={ass_id}"
+                )
+                for login_str in user_logins:
+                    post_data = {
+                        "user_login": login_str,
+                        "cmd[addUserFromAutoComplete]": "Add",
+                    }
+                    logger.info(f"Adding team member by login '{login_str}' via {auto_action}")
+                    login_resp = await client.post(auto_action, data=post_data)
+                    self._check_response_for_session_loss(login_resp, auto_action)
+
+        return await self.get_student_assignment_detail(exercise_ref_id, ass_id)
+
+    async def _remove_team_member_ids_in_session(
+        self,
+        client: httpx.AsyncClient,
+        exercise_ref_id: str,
+        ass_id: str,
+        member_ids: List[str],
+        team_screen: Optional[ParsedTeamManagementScreen] = None,
+    ) -> None:
+        """
+        Internal helper to execute ILIAS's 2-step team member removal flow:
+        1. POST id[] + cmd[confirmRemoveTeamMember] = 'Remove' to submissionScreenTeam table form.
+        2. Parse confirmation dialog and POST id[] + cmd[removeTeamMember] = 'Remove'.
+        """
+        team_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4&cmdClass=ilExSubmissionTeamGUI"
+            f"&cmd=submissionScreenTeam&ref_id={exercise_ref_id}&ass_id={ass_id}"
+        )
+        if team_screen is None:
+            team_resp = await client.get(team_url)
+            self._check_response_for_session_loss(team_resp, team_url)
+            team_screen = parse_team_management_screen(team_resp.text, base_url=settings.ilias_base_url)
+
+        # Resolve any login strings to numeric ILIAS user_ids
+        login_to_uid = {m.login.lower(): m.user_id for m in team_screen.members if m.user_id and m.login}
+        resolved_ids: List[str] = []
+        for raw_id in member_ids:
+            clean = str(raw_id).strip("[] ")
+            if clean in login_to_uid.values():
+                resolved_ids.append(clean)
+            elif clean.lower() in login_to_uid and login_to_uid[clean.lower()]:
+                resolved_ids.append(str(login_to_uid[clean.lower()]))
+            elif clean.isdigit():
+                resolved_ids.append(clean)
+
+        if not resolved_ids:
+            return
+
+        form_action = team_screen.remove_form_action or (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4&cmdClass=ilExSubmissionTeamGUI"
+            f"&cmd=post&fallbackCmd=submissionScreenTeam&ref_id={exercise_ref_id}&ass_id={ass_id}"
+        )
+        step1_data: Dict[str, Any] = dict(team_screen.remove_hidden_fields)
+        step1_data["id[]"] = resolved_ids
+        step1_data["cmd[confirmRemoveTeamMember]"] = "Remove"
+
+        logger.info(f"Submitting confirmRemoveTeamMember for {resolved_ids} to {form_action}")
+        step1_resp = await client.post(form_action, data=step1_data)
+        self._check_response_for_session_loss(step1_resp, form_action)
+
+        confirm_screen = parse_remove_team_confirmation_screen(
+            step1_resp.text, base_url=settings.ilias_base_url
+        )
+        step2_action = confirm_screen.action_url or form_action
+        step2_data: Dict[str, Any] = dict(confirm_screen.hidden_fields)
+        step2_data["id[]"] = confirm_screen.member_ids or resolved_ids
+        step2_data[confirm_screen.confirm_cmd_name] = confirm_screen.confirm_cmd_value
+
+        logger.info(f"Submitting final {confirm_screen.confirm_cmd_name} for {step2_data['id[]']} to {step2_action}")
+        step2_resp = await client.post(step2_action, data=step2_data)
+        self._check_response_for_session_loss(step2_resp, step2_action)
+
+    async def remove_student_team_members(
+        self, exercise_ref_id: str, ass_id: str, member_ids: List[str]
+    ) -> StudentAssignmentDetail:
+        """
+        Removes one or more members from the student's team and returns the updated assignment detail.
+        """
+        self._ensure_authenticated()
+        async with self.session_manager.get_http_client() as client:
+            await self._remove_team_member_ids_in_session(
+                client=client,
+                exercise_ref_id=exercise_ref_id,
+                ass_id=ass_id,
+                member_ids=member_ids,
+            )
+        return await self.get_student_assignment_detail(exercise_ref_id, ass_id)
+
+    async def delete_student_team(
+        self, exercise_ref_id: str, ass_id: str
+    ) -> StudentAssignmentDetail:
+        """
+        Deletes the student's entire team for an exercise assignment.
+        Handles ILIAS's constraint where a team cannot be deleted while it has >1 member:
+        1. Inspects submissionScreenTeam to get all current team members.
+        2. If >1 member exists, identifies the current logged-in user (self) and first removes
+           all other members via confirmRemoveTeamMember -> removeTeamMember.
+        3. Once only the current user remains, triggers confirmDeleteTeam and confirms deletion.
+        4. Returns the refreshed StudentAssignmentDetail.
+        """
+        self._ensure_authenticated()
+        team_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4&cmdClass=ilExSubmissionTeamGUI"
+            f"&cmd=submissionScreenTeam&ref_id={exercise_ref_id}&ass_id={ass_id}"
+        )
+        confirm_delete_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d4&cmdClass=ilExSubmissionTeamGUI"
+            f"&cmd=confirmDeleteTeam&ref_id={exercise_ref_id}&ass_id={ass_id}"
+        )
+        async with self.session_manager.get_http_client() as client:
+            team_resp = await client.get(team_url)
+            self._check_response_for_session_loss(team_resp, team_url)
+            team_screen = parse_team_management_screen(team_resp.text, base_url=settings.ilias_base_url)
+
+            # Step 1: If >1 member in team, remove all members except self first
+            if len(team_screen.members) > 1:
+                self_uid = next((m.user_id for m in team_screen.members if m.is_self and m.user_id), None)
+
+                # Check cached course users for self_uid if not yet resolved
+                if not self_uid and exercise_ref_id in self._course_user_cache:
+                    self_uid = next(
+                        (c.user_id for c in self._course_user_cache[exercise_ref_id] if c.is_self),
+                        None,
+                    )
+
+                # If still unknown, fetch listUsers once to get rep_search_<current_user_id>
+                if not self_uid and team_screen.list_users_url:
+                    try:
+                        lu_resp = await client.get(team_screen.list_users_url)
+                        if lu_resp.status_code == 200:
+                            lu_screen = parse_course_users_list_screen(
+                                lu_resp.text, base_url=settings.ilias_base_url
+                            )
+                            self_uid = lu_screen.current_user_id
+                    except Exception as e:
+                        logger.debug(f"Could not resolve self_uid from listUsers: {e}")
+
+                all_uids = [m.user_id for m in team_screen.members if m.user_id]
+                if self_uid and self_uid in all_uids:
+                    other_uids = [uid for uid in all_uids if uid != self_uid]
+                else:
+                    # Fallback: keep first member, remove the rest
+                    other_uids = all_uids[1:]
+
+                if other_uids:
+                    logger.info(
+                        f"Team has {len(all_uids)} members; removing teammates {other_uids} before deleting team"
+                    )
+                    await self._remove_team_member_ids_in_session(
+                        client=client,
+                        exercise_ref_id=exercise_ref_id,
+                        ass_id=ass_id,
+                        member_ids=other_uids,
+                        team_screen=team_screen,
+                    )
+
+            # Step 2: Now only 1 member remains — call confirmDeleteTeam and submit confirmation
+            del_resp = await client.get(confirm_delete_url)
+            self._check_response_for_session_loss(del_resp, confirm_delete_url)
+            confirm_screen = parse_remove_team_confirmation_screen(
+                del_resp.text, base_url=settings.ilias_base_url
+            )
+
+            if confirm_screen.action_url:
+                post_data: Dict[str, Any] = dict(confirm_screen.hidden_fields)
+                if confirm_screen.member_ids:
+                    post_data["id[]"] = confirm_screen.member_ids
+                post_data[confirm_screen.confirm_cmd_name] = confirm_screen.confirm_cmd_value
+                logger.info(f"Confirming team deletion via {confirm_screen.action_url}")
+                final_resp = await client.post(confirm_screen.action_url, data=post_data)
+                self._check_response_for_session_loss(final_resp, confirm_screen.action_url)
+            else:
+                # Fallback: check if 1 member is still on submissionScreenTeam and remove them via table form
+                rem_resp = await client.get(team_url)
+                rem_screen = parse_team_management_screen(rem_resp.text, base_url=settings.ilias_base_url)
+                rem_uids = [m.user_id for m in rem_screen.members if m.user_id]
+                if rem_uids:
+                    await self._remove_team_member_ids_in_session(
+                        client=client,
+                        exercise_ref_id=exercise_ref_id,
+                        ass_id=ass_id,
+                        member_ids=rem_uids,
+                        team_screen=rem_screen,
+                    )
 
         return await self.get_student_assignment_detail(exercise_ref_id, ass_id)
 

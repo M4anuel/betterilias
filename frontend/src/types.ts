@@ -245,6 +245,32 @@ export interface GradeSubmissionResponse {
   feedback?: string;
 }
 
+export interface TeamMemberInfo {
+  user_id?: string;
+  login: string;
+  name?: string;
+  is_self?: boolean;
+}
+
+export interface CourseUserCandidate {
+  user_id: string;
+  login: string;
+  firstname: string;
+  lastname: string;
+  full_name: string;
+  in_team?: boolean;
+  is_self?: boolean;
+}
+
+export interface TeamCandidatesResponse {
+  exercise_ref_id: string;
+  ass_id: string;
+  current_user_id?: string;
+  team_members: TeamMemberInfo[];
+  candidates: CourseUserCandidate[];
+  fetched_at: string;
+}
+
 export interface StudentAssignmentDetail {
   exercise_ref_id: string;
   ass_id: string;
@@ -256,9 +282,11 @@ export interface StudentAssignmentDetail {
   is_ended: boolean;
   exercise_files: SubmissionFile[];
   team_members: string[];
+  team_member_details?: TeamMemberInfo[];
   team_status_text?: string;
   create_team_url?: string;
   manage_team_url?: string;
+  delete_team_url?: string;
   submitted_files: SubmissionFile[];
   last_submission?: string;
   submission_status: string;
