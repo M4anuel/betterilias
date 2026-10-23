@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit3, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import { Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library } from 'lucide-react';
 import { CourseItem } from '../types';
 import { cache } from '../lib/cache';
 import { CourseIcon } from './CourseIcon';
@@ -9,6 +9,8 @@ interface SidebarProps {
   selectedCourseId: string | null;
   onSelectCourse: (refId: string) => void;
   onSelectSemesterOverview: () => void;
+  onSelectRepository: () => void;
+  isRepositorySelected: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onOpenNicknameModal: () => void;
@@ -20,6 +22,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   selectedCourseId,
   onSelectCourse,
   onSelectSemesterOverview,
+  onSelectRepository,
+  isRepositorySelected,
   isCollapsed,
   onToggleCollapse,
   onOpenNicknameModal,
@@ -52,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <nav className="flex-1 overflow-y-auto p-2 space-y-1">
         {/* Semester / Overview Button */}
         {(() => {
-          const isSemesterSelected = selectedCourseId === null;
+          const isSemesterSelected = selectedCourseId === null && !isRepositorySelected;
           return (
             <button
               onClick={onSelectSemesterOverview}
@@ -90,6 +94,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           );
         })()}
+
+        <button type="button" onClick={onSelectRepository} title="Magazin"
+          aria-current={isRepositorySelected ? 'page' : undefined}
+          style={isRepositorySelected ? { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' } : undefined}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+          <Library className="h-4 w-4 shrink-0" />
+          {!isCollapsed && <span>Magazin</span>}
+        </button>
 
         <div className="pt-2 pb-1">
           <div className="h-px bg-slate-100 dark:bg-slate-800" />

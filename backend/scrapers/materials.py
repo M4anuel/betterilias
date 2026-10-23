@@ -933,6 +933,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
     return CourseMaterialsResponse(
         container_ref_id=container_ref_id,
         title=container_title,
+        is_enrolled=True if soup.select_one('a[href*="cmd=unsubscribe"], button[data-action*="cmd=unsubscribe"]') else None,
         breadcrumbs=breadcrumbs,
         items=items,
         sections=sections,

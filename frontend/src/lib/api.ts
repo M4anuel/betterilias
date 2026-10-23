@@ -13,6 +13,7 @@ import {
   StudentAssignmentDetail,
   FeedbackFilesResponse,
   MaterialItem,
+  RepositoryResponse,
   TeamCandidatesResponse,
 } from '../types';
 import { cache } from './cache';
@@ -42,6 +43,14 @@ async function sessionFetch(input: string, init?: RequestInit): Promise<Response
 }
 
 export const api = {
+  async getRepository(refId: string): Promise<RepositoryResponse> {
+    const res = await sessionFetch(`${API_BASE}/repository/${encodeURIComponent(refId)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Magazin konnte nicht geladen werden');
+    }
+    return res.json();
+  },
   async getAuthStatus(): Promise<AuthStatus> {
     const res = await sessionFetch(`${API_BASE}/auth/status`);
     if (!res.ok) throw new Error('Failed to fetch auth status');

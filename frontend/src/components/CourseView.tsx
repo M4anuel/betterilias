@@ -91,6 +91,8 @@ interface CourseViewProps {
   materialsData: CourseMaterialsResponse | null;
   onNavigateFolder: (folderRefId: string) => void;
   onNavigateHome: () => void;
+  onNavigateRepository: (refId: string) => void;
+  onNavigateSemester?: (semester: string) => void;
   onNavigateCourseRoot: (courseRefId: string) => void;
   isRevalidating: boolean;
   onManualRefresh: () => void;
@@ -106,6 +108,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
   materialsData,
   onNavigateFolder,
   onNavigateHome,
+  onNavigateRepository,
+  onNavigateSemester,
   onNavigateCourseRoot,
   isRevalidating,
   onManualRefresh,
@@ -1487,6 +1491,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
           courseRefId={courseRefId}
           currentFolderRefId={materialsData?.container_ref_id || ''}
           onNavigateHome={onNavigateHome}
+          onNavigateRepository={onNavigateRepository}
+          onNavigateSemester={onNavigateSemester}
           onNavigateCourse={onNavigateCourseRoot}
           onNavigateFolder={onNavigateFolder}
         />
