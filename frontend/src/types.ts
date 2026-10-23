@@ -75,7 +75,6 @@ export interface PodcastEpisode {
   location?: string;
   stream_url?: string;
   status: string; // 'available' | 'scheduled'
-  last_watched_seconds?: number;
 }
 
 export interface PodcastSeriesResponse {

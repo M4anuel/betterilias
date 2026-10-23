@@ -164,36 +164,3 @@ def test_extract_grading_form_real_dump():
     assert len(form_data.hidden_fields) >= 5
 
 
-
-def test_podcast_paella_timestamp_parsing():
-    import json
-    import urllib.parse
-    from backend.scrapers.podcasts import extract_paella_timestamps_from_cookie, parse_podcast_series
-
-    prefs_obj = {
-        "global": {},
-        "videos": {
-            "4c78d1ee-9294-4a57-b31b-be553b407bb5": {"lastKnownTime": 2535.4},
-            "dc5ca089-6762-4bf5-933d-2771b95f5b93": {"lastKnownTime": 0},
-        },
-    }
-    encoded_cookie = urllib.parse.quote(json.dumps(prefs_obj))
-    extracted = extract_paella_timestamps_from_cookie(encoded_cookie)
-    assert extracted == {"4c78d1ee-9294-4a57-b31b-be553b407bb5": 2535.4}
-
-    sample_podcast_html = """
-    <html><body>
-      <h1 class="il-page-content-header">Content: Podcast HS2026: Mensch-Maschine-Schnittstelle</h1>
-      <section class="c-entity__container">
-        <div class="c-entity__primary-identifier">Mensch-Maschine-Schnittstelle - 23.09.2026</div>
-        <div class="c-entity__status">
-          <a href="ilias.php?baseClass=ilobjplugindispatchgui&amp;cmdClass=xoctPlayerGUI&amp;cmd=streamVideo&amp;ref_id=3753762&amp;eid=4c78d1ee-9294-4a57-b31b-be553b407bb5">Play</a>
-        </div>
-        <div class="c-entity__main-details">Date 23. Sep 2026, 14:13 Presenter Max Mustermann Location 001</div>
-      </section>
-    </body></html>
-    """
-    parsed = parse_podcast_series(sample_podcast_html, ref_id="3753762", preferences_cookie=encoded_cookie)
-    assert len(parsed.episodes) == 1
-    assert parsed.episodes[0].id == "4c78d1ee-9294-4a57-b31b-be553b407bb5"
-    assert parsed.episodes[0].last_watched_seconds == 2535.4

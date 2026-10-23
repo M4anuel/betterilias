@@ -31,7 +31,6 @@
   "content_scripts": [
     {
       "matches": [
-        "https://ilias.unibe.ch/*",
         "http://localhost:5173/*",
         "http://127.0.0.1:5173/*"
       ],
