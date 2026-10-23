@@ -1,5 +1,8 @@
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form
+
+logger = logging.getLogger(__name__)
 from backend.api.deps import get_ilias_client
 from backend.schemas import (
     AddTeamMembersRequest,
@@ -288,7 +291,20 @@ async def save_ta_assignment(
     """
     Create or edit an assignment.
     """
-    return await client.save_ta_assignment(ref_id=exercise_id, data=req)
+    try:
+        return await client.save_ta_assignment(ref_id=exercise_id, data=req)
+    except ValueError as e:
+        logger.error(f"Validation error saving assignment in exercise {exercise_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.exception(f"Unexpected error saving assignment in exercise {exercise_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save assignment: {str(e)}",
+        )
 
 
 @router.delete("/{exercise_id}/ta/assignments/{ass_id}")

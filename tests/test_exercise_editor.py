@@ -86,3 +86,16 @@ def test_api_ta_assignments():
         assert len(data["assignments"]) == 1
         assert data["assignments"][0]["title"] == "Test Assignment 1"
 
+
+
+def test_api_save_ta_assignment_handles_error():
+    client = TestClient(app)
+    with patch("backend.api.routes.exercises.IliasClient.save_ta_assignment", new_callable=AsyncMock) as m:
+        m.side_effect = ValueError("ILIAS Fehler: Invalid deadline")
+        resp = client.post("/api/exercises/2978156/ta/assignment-detail", json={
+            "title": "Exercise 1",
+            "type_id": 1,
+            "mandatory": True,
+        })
+        assert resp.status_code == 400
+        assert "Invalid deadline" in resp.json()["detail"]

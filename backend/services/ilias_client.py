@@ -1624,13 +1624,22 @@ class IliasClient:
             resp = await client.post(action_url, data=payload)
             self._check_response_for_session_loss(resp, action_url)
 
-            # Check if ILIAS returned an error alert
+            # Check if ILIAS returned an actual error alert (ignoring modal dialog templates)
             soup_resp = BeautifulSoup(resp.text, "lxml")
-            alert_el = soup_resp.select_one(".alert-danger, .ilFailureMessage")
-            if alert_el:
-                err_msg = _clean_text(alert_el)
-                logger.error(f"Failed to save assignment in ILIAS: {err_msg}")
-                raise ValueError(f"ILIAS Fehler: {err_msg}")
+            real_alert = None
+            for alert in soup_resp.select(".ilAdminRow .alert-danger, .ilFailureMessage, .alert-danger"):
+                if alert.find_parent("dialog") or alert.find_parent(class_=re.compile(r"modal", re.I)):
+                    continue
+                real_alert = alert
+                break
+
+            if real_alert:
+                for hidden in real_alert.select(".ilAccHeadingHidden"):
+                    hidden.decompose()
+                err_msg = " ".join(real_alert.get_text().split()).strip()
+                if err_msg:
+                    logger.error(f"Failed to save assignment in ILIAS: {err_msg}")
+                    raise ValueError(f"ILIAS Fehler: {err_msg}")
 
             # Identify the assignment ID
             created_or_edited_id = data.ass_id
