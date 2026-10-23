@@ -301,10 +301,7 @@ class IliasClient:
                 resp = await client.get(fallback_repo_url)
                 self._check_response_for_session_loss(resp, fallback_repo_url)
 
-            prefs_cookie = self.session_manager.load_cookies().get("preferences") or client.cookies.get("preferences")
-            series_data = parse_podcast_series(
-                resp.text, ref_id=ref_id, preferences_cookie=prefs_cookie
-            )
+            series_data = parse_podcast_series(resp.text, ref_id=ref_id)
 
             if series_data.pages_available:
                 all_episodes = list(series_data.episodes)
@@ -315,9 +312,7 @@ class IliasClient:
                     try:
                         p_resp = await client.get(page_url)
                         self._check_response_for_session_loss(p_resp, page_url)
-                        sub_data = parse_podcast_series(
-                            p_resp.text, ref_id=ref_id, preferences_cookie=prefs_cookie
-                        )
+                        sub_data = parse_podcast_series(p_resp.text, ref_id=ref_id)
                         for ep in sub_data.episodes:
                             if ep.id not in seen_ids:
                                 all_episodes.append(ep)
