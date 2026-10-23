@@ -32,6 +32,10 @@ class ExtensionSyncResponse(BaseModel):
     user_name: Optional[str] = None
     message: str
 
+
+class MobileSessionResponse(BaseModel):
+    session_id: str
+
 # ---------------------------------------------------------
 # Dashboard & Course Schemas
 # ---------------------------------------------------------

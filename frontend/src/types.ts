@@ -4,6 +4,7 @@ export interface AuthStatus {
   cookies_present: boolean;
   message?: string;
   user_name?: string;
+  session_id?: string;
 }
 
 export interface CourseItem {
