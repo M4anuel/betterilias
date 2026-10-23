@@ -514,3 +514,4 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
     </div>
   );
 };
+

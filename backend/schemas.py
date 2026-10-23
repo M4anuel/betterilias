@@ -413,6 +413,7 @@ class TAAssignmentDetailResponse(BaseModel):
     instruction_files: List[TAInstructionFileItem] = Field(default_factory=list)
     form_action: Optional[str] = None
     rtoken: Optional[str] = None
+    hidden_inputs: Dict[str, str] = Field(default_factory=dict)
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class SaveTAAssignmentRequest(BaseModel):

@@ -20,6 +20,7 @@ import {
   ListOrdered,
   Link as LinkIcon,
   RotateCcw,
+  X,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { TAAssignmentDetailResponse, TAInstructionFileItem, SaveTAAssignmentRequest } from '../types';
@@ -39,7 +40,8 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   onBack,
   onSaved,
 }) => {
-  const [isLoading, setIsLoading] = useState(true);
+  const [currentAssId, setCurrentAssId] = useState<string | null>(assId);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -50,7 +52,8 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   const [mandatory, setMandatory] = useState(true);
   const [instructionHtml, setInstructionHtml] = useState('');
   const [startTime, setStartTime] = useState('');
-  const [deadlineMode, setDeadlineMode] = useState<number>(1);
+  // In ILIAS: 0 = Fixed Date, -1 = No Deadline
+  const [deadlineMode, setDeadlineMode] = useState<number>(0);
   const [deadline, setDeadline] = useState('');
   const [hasGracePeriod, setHasGracePeriod] = useState(false);
   const [deadline2, setDeadline2] = useState('');
@@ -59,6 +62,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
 
   // Instruction files state
   const [instructionFiles, setInstructionFiles] = useState<TAInstructionFileItem[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isDeletingFileId, setIsDeletingFileId] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -67,8 +71,19 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   // Rich Text Editor reference
   const editorRef = useRef<HTMLDivElement>(null);
 
+  // Track if initial load happened so typeId changes don't wipe user inputs
+  const loadedAssIdRef = useRef<string | null | undefined>(undefined);
+
   // Load existing assignment details
   const loadDetail = useCallback(async () => {
+    if (loadedAssIdRef.current === assId) return;
+    loadedAssIdRef.current = assId;
+
+    if (!assId) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -82,7 +97,8 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       setMandatory(data.mandatory);
       setInstructionHtml(data.instruction_html || '');
       setStartTime(data.start_time || '');
-      setDeadlineMode(data.deadline_mode ?? 1);
+      // If deadline is present or deadline_mode is 0, set to 0 (Fixed Date), otherwise -1 (No Deadline)
+      setDeadlineMode(data.deadline_mode === -1 ? -1 : 0);
       setDeadline(data.deadline || '');
       setHasGracePeriod(data.has_grace_period || false);
       setDeadline2(data.deadline2 || '');
@@ -125,6 +141,13 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
     }
   };
 
+  // Format file size helper
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   // Save assignment
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,14 +161,14 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
     setSuccessMsg(null);
 
     const payload: SaveTAAssignmentRequest = {
-      ass_id: assId,
+      ass_id: currentAssId,
       title: title.trim(),
       type_id: typeId,
       mandatory,
       instruction_html: instructionHtml,
       start_time: startTime || null,
       deadline_mode: deadlineMode,
-      deadline: deadlineMode === 1 && deadline ? deadline : null,
+      deadline: deadlineMode === 0 && deadline ? deadline : null,
       has_grace_period: hasGracePeriod,
       deadline2: hasGracePeriod && deadline2 ? deadline2 : null,
       max_file_enabled: maxFileEnabled,
@@ -154,10 +177,33 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
 
     try {
       const res = await api.saveTAAssignment(exerciseRefId, payload);
+      const newAssId = res.ass_id || currentAssId;
+      if (newAssId) {
+        setCurrentAssId(newAssId);
+      }
+
+      // If there were pending files queued during creation, upload them now!
+      if (pendingFiles.length > 0 && newAssId) {
+        setIsUploadingFile(true);
+        let updatedList = res.instruction_files || instructionFiles;
+        for (const file of pendingFiles) {
+          try {
+            updatedList = await api.uploadTAInstructionFile(exerciseRefId, newAssId, file);
+          } catch (uploadErr) {
+            console.error('Failed to upload pending file:', uploadErr);
+          }
+        }
+        setInstructionFiles(updatedList);
+        setPendingFiles([]);
+        setIsUploadingFile(false);
+      } else if (res.instruction_files) {
+        setInstructionFiles(res.instruction_files);
+      }
+
       setSuccessMsg('Übung erfolgreich gespeichert.');
       setTimeout(() => setSuccessMsg(null), 3000);
-      if (res.ass_id) {
-        onSaved(res.ass_id);
+      if (newAssId) {
+        onSaved(newAssId);
       }
     } catch (err: any) {
       setError(err?.message || 'Fehler beim Speichern der Übung');
@@ -166,21 +212,30 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
     }
   };
 
-  // Upload instruction file
+  // Upload or queue instruction files
   const handleUploadFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    if (!assId) {
-      setError('Bitte speichern Sie die Übung zuerst einmal ab, bevor Sie Dateien anhängen.');
+
+    if (!currentAssId) {
+      // Creation mode: queue the files locally to be uploaded as soon as the exercise is saved
+      const newFiles: File[] = [];
+      for (let i = 0; i < files.length; i++) {
+        newFiles.push(files[i]);
+      }
+      setPendingFiles((prev) => [...prev, ...newFiles]);
+      setSuccessMsg(`${newFiles.length} Datei(en) hinzugefügt. Sie werden beim Erstellen der Übung hochgeladen.`);
+      setTimeout(() => setSuccessMsg(null), 3000);
       return;
     }
 
+    // Existing assignment: upload immediately to ILIAS
     setIsUploadingFile(true);
     setError(null);
     try {
       let updatedList = instructionFiles;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        updatedList = await api.uploadTAInstructionFile(exerciseRefId, assId, file);
+        updatedList = await api.uploadTAInstructionFile(exerciseRefId, currentAssId, file);
       }
       setInstructionFiles(updatedList);
       setSuccessMsg('Anweisungsdatei(en) erfolgreich hochgeladen.');
@@ -192,15 +247,20 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
     }
   };
 
-  // Delete instruction file
+  // Remove a pending file before saving
+  const handleRemovePendingFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Delete an existing instruction file
   const handleDeleteFile = async (fileId: string) => {
-    if (!assId) return;
+    if (!currentAssId) return;
     if (!confirm('Möchten Sie diese Anweisungsdatei wirklich entfernen?')) return;
 
     setIsDeletingFileId(fileId);
     setError(null);
     try {
-      await api.deleteTAInstructionFile(exerciseRefId, assId, fileId);
+      await api.deleteTAInstructionFile(exerciseRefId, currentAssId, fileId);
       setInstructionFiles((prev) => prev.filter((f) => f.file_id !== fileId));
       setSuccessMsg('Datei erfolgreich gelöscht.');
       setTimeout(() => setSuccessMsg(null), 2500);
@@ -230,6 +290,8 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
     }
   };
 
+  const totalFilesCount = instructionFiles.length + pendingFiles.length;
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -246,10 +308,10 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
           </button>
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-              {assId ? `Übung bearbeiten` : `Neue Übung erstellen`}
+              {currentAssId ? `Übung bearbeiten` : `Neue Übung erstellen`}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {assId ? `ID: ${assId} • ` : ''}
+              {currentAssId ? `ID: ${currentAssId} • ` : ''}
               Konfigurieren Sie Titel, Art der Einreichung, Termine und Arbeitsanweisungen
             </p>
           </div>
@@ -274,7 +336,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
             ) : (
               <Save className="h-4 w-4" />
             )}
-            <span>{assId ? 'Änderungen speichern' : 'Übung erstellen'}</span>
+            <span>{currentAssId ? 'Änderungen speichern' : 'Übung erstellen'}</span>
           </button>
         </div>
       </div>
@@ -325,7 +387,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                 />
               </div>
 
-              {/* Art der Einreichung (Selectable!) */}
+              {/* Art der Einreichung (Selectable without wiping other keys!) */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Art der Einreichung
@@ -341,7 +403,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                   <option value={3}>Portfolio</option>
                 </select>
                 <p className="text-[11px] text-slate-400">
-                  Kann hier direkt für neue oder bearbeitete Übungen gewählt werden.
+                  Kann hier jederzeit geändert werden, ohne Ihre Eingaben zurückzusetzen.
                 </p>
               </div>
 
@@ -387,7 +449,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                 />
               </div>
 
-              {/* Deadline Mode */}
+              {/* Deadline Mode (0 = Fixed Date, -1 = No Deadline) */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Abgabetermin-Modus
@@ -397,9 +459,9 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                     <input
                       type="radio"
                       name="deadline_mode"
-                      value={0}
-                      checked={deadlineMode === 0}
-                      onChange={() => setDeadlineMode(0)}
+                      value={-1}
+                      checked={deadlineMode === -1}
+                      onChange={() => setDeadlineMode(-1)}
                       className="text-indigo-600 focus:ring-indigo-500"
                     />
                     <span>Kein Abgabetermin</span>
@@ -408,9 +470,9 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                     <input
                       type="radio"
                       name="deadline_mode"
-                      value={1}
-                      checked={deadlineMode === 1}
-                      onChange={() => setDeadlineMode(1)}
+                      value={0}
+                      checked={deadlineMode === 0}
+                      onChange={() => setDeadlineMode(0)}
                       className="text-indigo-600 focus:ring-indigo-500"
                     />
                     <span>Festes Abgabedatum</span>
@@ -419,7 +481,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               </div>
 
               {/* Deadline DateTime */}
-              {deadlineMode === 1 && (
+              {deadlineMode === 0 && (
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5 text-slate-400" />
@@ -435,7 +497,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               )}
 
               {/* Grace Period (Nachfrist) */}
-              {deadlineMode === 1 && (
+              {deadlineMode === 0 && (
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
                     <input
@@ -590,17 +652,18 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                   <span>Arbeitsanweisungs-Dateien (Anhänge für Studierende)</span>
                 </h2>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Begleitmaterialien, Vorlagen oder Aufgabenbeschreibungen direkt anheften
+                  Begleitmaterialien, Vorlagen oder Aufgabenbeschreibungen direkt anheften (bleibt auf dieser Seite!)
                 </p>
               </div>
               <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                {instructionFiles.length} {instructionFiles.length === 1 ? 'Datei' : 'Dateien'}
+                {totalFilesCount} {totalFilesCount === 1 ? 'Datei' : 'Dateien'}
               </span>
             </div>
 
-            {/* List of existing instruction files */}
-            {instructionFiles.length > 0 && (
+            {/* List of files (server-uploaded + pending creation files) */}
+            {(instructionFiles.length > 0 || pendingFiles.length > 0) && (
               <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+                {/* Existing uploaded files */}
                 {instructionFiles.map((f) => (
                   <div
                     key={f.file_id}
@@ -646,6 +709,38 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                     </div>
                   </div>
                 ))}
+
+                {/* Staged pending files (for new assignment creation) */}
+                {pendingFiles.map((pf, idx) => (
+                  <div
+                    key={`pending-${idx}`}
+                    className="flex items-center justify-between p-3 bg-amber-50/50 dark:bg-amber-950/20 text-xs"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Paperclip className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div className="truncate">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                            {pf.name}
+                          </p>
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                            Wird beim Speichern hochgeladen
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400">{formatFileSize(pf.size)}</p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePendingFile(idx)}
+                      className="p-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/40 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
+                      title="Aus Warteschlange entfernen"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -671,7 +766,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               {isUploadingFile ? (
                 <div className="flex flex-col items-center gap-2 text-indigo-600 dark:text-indigo-400">
                   <Loader2 className="h-8 w-8 animate-spin" />
-                  <p className="text-xs font-semibold">Anweisungsdatei wird hochgeladen...</p>
+                  <p className="text-xs font-semibold">Anweisungsdatei(en) werden hochgeladen...</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2 text-center">
@@ -710,7 +805,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              <span>{assId ? 'Änderungen speichern' : 'Übung erstellen'}</span>
+              <span>{currentAssId ? 'Änderungen speichern' : 'Übung erstellen'}</span>
             </button>
           </div>
         </form>

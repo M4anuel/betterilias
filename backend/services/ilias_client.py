@@ -1522,25 +1522,46 @@ class IliasClient:
                 f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=editAssignment"
                 f"&ref_id={ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
             )
-        else:
-            url = (
-                f"{settings.ilias_base_url}/ilias.php?"
-                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=addAssignment"
-                f"&ref_id={ref_id}&ass_type={type_id}&mode=all&from_overview=1"
-            )
-
-        async with self.session_manager.get_http_client() as client:
-            resp = await client.get(url)
-            self._check_response_for_session_loss(resp, url)
-            self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
-            detail = parse_ta_assignment_form(resp.text, exercise_ref_id=ref_id, ass_id=ass_id)
-            if ass_id:
+            async with self.session_manager.get_http_client() as client:
+                resp = await client.get(url)
+                self._check_response_for_session_loss(resp, url)
+                self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
+                detail = parse_ta_assignment_form(resp.text, exercise_ref_id=ref_id, ass_id=ass_id)
                 try:
                     files = await self.get_ta_instruction_files(ref_id, ass_id)
                     detail.instruction_files = files
                 except Exception as fe:
                     logger.debug(f"Could not load instruction files for {ass_id}: {fe}")
-            return detail
+                return detail
+        else:
+            # For new assignment, submit toolbar addAssignment POST to retrieve the full creation form
+            list_res = await self.get_ta_assignments_list(ref_id)
+            rtoken = list_res.rtoken
+            add_url = (
+                f"{settings.ilias_base_url}/ilias.php?"
+                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=post&fallbackCmd=addAssignment"
+                f"&ref_id={ref_id}&mode=all&from_overview=1"
+            )
+            if rtoken:
+                add_url = f"{add_url}&rtoken={rtoken}"
+            async with self.session_manager.get_http_client() as client:
+                resp = await client.post(add_url, data={"type": str(type_id), "cmd[addAssignment]": ""})
+                self._check_response_for_session_loss(resp, add_url)
+                if resp.status_code != 200 or "cmd[saveAssignment]" not in resp.text:
+                    fallback_url = (
+                        f"{settings.ilias_base_url}/ilias.php?"
+                        f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=addAssignment"
+                        f"&ref_id={ref_id}&ass_type={type_id}&mode=all&from_overview=1"
+                    )
+                    if rtoken:
+                        fallback_url = f"{fallback_url}&rtoken={rtoken}"
+                    resp = await client.get(fallback_url)
+                    self._check_response_for_session_loss(resp, fallback_url)
+
+                self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
+                detail = parse_ta_assignment_form(resp.text, exercise_ref_id=ref_id, ass_id=None)
+                detail.type_id = type_id
+                return detail
 
     async def save_ta_assignment(
         self, ref_id: str, data: SaveTAAssignmentRequest
@@ -1564,21 +1585,37 @@ class IliasClient:
         if data.ass_id and "ass_id=" not in action_url:
             action_url = f"{action_url}&ass_id={data.ass_id}"
 
-        payload: Dict[str, str] = {
-            "title": data.title,
-            "type": str(data.type_id),
-            "instruction": data.instruction_html,
-            "deadline_mode": str(data.deadline_mode),
-            "cmd[saveAssignment]": "Save",
-        }
+        # Initialize payload with hidden/default inputs from form (e.g. ilfilehash, type, rmd_*, fb_date)
+        payload: Dict[str, str] = {}
+        for k, v in existing.hidden_inputs.items():
+            payload[k] = v
+
+        payload["title"] = data.title
+        payload["type"] = str(data.type_id)
+        payload["instruction"] = data.instruction_html or ""
+        payload["cmd[saveAssignment]"] = "Save"
+
         if data.mandatory:
             payload["mandatory"] = "1"
+        else:
+            payload.pop("mandatory", None)
+
         if data.start_time:
             payload["start_time"] = data.start_time
-        if data.deadline:
-            payload["deadline"] = data.deadline
-        if data.has_grace_period and data.deadline2:
-            payload["deadline2"] = data.deadline2
+
+        # In ILIAS:
+        # deadline_mode = "0" -> Fixed Date (deadline enabled)
+        # deadline_mode = "-1" -> No Deadline
+        if data.deadline and data.deadline.strip() and data.deadline_mode != -1:
+            payload["deadline_mode"] = "0"
+            payload["deadline"] = data.deadline.strip()
+        else:
+            payload["deadline_mode"] = "-1"
+            payload["deadline"] = ""
+
+        if data.has_grace_period and data.deadline2 and data.deadline2.strip():
+            payload["deadline2"] = data.deadline2.strip()
+
         if data.max_file_enabled and data.max_file is not None:
             payload["max_file_tgl"] = "1"
             payload["max_file"] = str(data.max_file)
@@ -1586,13 +1623,38 @@ class IliasClient:
         async with self.session_manager.get_http_client() as client:
             resp = await client.post(action_url, data=payload)
             self._check_response_for_session_loss(resp, action_url)
-            saved = parse_ta_assignment_form(resp.text, exercise_ref_id=ref_id, ass_id=data.ass_id)
-            if data.ass_id:
-                try:
-                    files = await self.get_ta_instruction_files(ref_id, data.ass_id)
-                    saved.instruction_files = files
-                except Exception as fe:
-                    logger.debug(f"Could not load instruction files for {data.ass_id}: {fe}")
+
+            # Check if ILIAS returned an error alert
+            soup_resp = BeautifulSoup(resp.text, "lxml")
+            alert_el = soup_resp.select_one(".alert-danger, .ilFailureMessage")
+            if alert_el:
+                err_msg = _clean_text(alert_el)
+                logger.error(f"Failed to save assignment in ILIAS: {err_msg}")
+                raise ValueError(f"ILIAS Fehler: {err_msg}")
+
+            # Identify the assignment ID
+            created_or_edited_id = data.ass_id
+            if not created_or_edited_id:
+                # 1. Search for ass_id in response URL
+                m_ass = re.search(r"ass_id=(\d+)", str(resp.url))
+                if m_ass:
+                    created_or_edited_id = m_ass.group(1)
+                else:
+                    # 2. Check updated assignments list to find new assignment by title
+                    updated_list = await self.get_ta_assignments_list(ref_id)
+                    for item in updated_list.assignments:
+                        if item.title.strip().lower() == data.title.strip().lower():
+                            created_or_edited_id = item.ass_id
+                            break
+                    if not created_or_edited_id and updated_list.assignments:
+                        created_or_edited_id = updated_list.assignments[-1].ass_id
+
+            if created_or_edited_id:
+                return await self.get_ta_assignment_detail(
+                    ref_id, ass_id=created_or_edited_id, type_id=data.type_id
+                )
+
+            saved = parse_ta_assignment_form(resp.text, exercise_ref_id=ref_id, ass_id=created_or_edited_id)
             return saved
 
     async def delete_ta_assignment(self, ref_id: str, ass_id: str) -> bool:

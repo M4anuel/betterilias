@@ -85,3 +85,4 @@ def test_api_ta_assignments():
         data = resp.json()
         assert len(data["assignments"]) == 1
         assert data["assignments"][0]["title"] == "Test Assignment 1"
+

@@ -189,13 +189,25 @@ def parse_ta_assignment_form(
     )
     form_action = None
     rtoken = None
+    hidden_inputs: Dict[str, str] = {}
 
-    if form and form.get("action"):
-        raw_act = form["action"]
-        form_action = urllib.parse.urljoin(settings.ilias_base_url, raw_act)
-        m_tok = re.search(r"rtoken=([a-f0-9]+)", raw_act)
-        if m_tok:
-            rtoken = m_tok.group(1)
+    if form:
+        if form.get("action"):
+            raw_act = form["action"]
+            form_action = urllib.parse.urljoin(settings.ilias_base_url, raw_act)
+            m_tok = re.search(r"rtoken=([a-f0-9]+)", raw_act)
+            if m_tok:
+                rtoken = m_tok.group(1)
+
+        for inp in form.find_all("input", type="hidden"):
+            n = inp.get("name")
+            v = inp.get("value", "")
+            if n:
+                hidden_inputs[n] = v
+
+        for rad in form.find_all("input", type="radio"):
+            if rad.has_attr("checked") and rad.get("name"):
+                hidden_inputs[rad["name"]] = rad.get("value", "")
 
     # 1. Title
     title = ""
@@ -248,13 +260,14 @@ def parse_ta_assignment_form(
         start_time = st_inp["value"].strip()
 
     # 6. Deadline mode & Deadline
-    deadline_mode = 1
+    # In ILIAS: 0 = Fixed Date, -1 = No Deadline
+    deadline_mode = 0
     dm_radio = soup.find("input", attrs={"name": "deadline_mode", "checked": True})
-    if dm_radio and dm_radio.get("value"):
+    if dm_radio and dm_radio.get("value") is not None:
         try:
             deadline_mode = int(dm_radio["value"])
         except ValueError:
-            deadline_mode = 1
+            deadline_mode = 0
 
     deadline = None
     dl_inp = soup.find("input", attrs={"name": "deadline"})
@@ -300,6 +313,7 @@ def parse_ta_assignment_form(
         instruction_files=[],
         form_action=form_action,
         rtoken=rtoken,
+        hidden_inputs=hidden_inputs,
     )
 
 
@@ -374,3 +388,4 @@ def parse_instruction_files(
                 )
 
     return files
+
