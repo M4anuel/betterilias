@@ -8,6 +8,8 @@ import httpx
 
 from backend.auth.session import SessionManager, session_manager
 from backend.config import settings
+from backend.schemas import RepositoryResponse
+from backend.scrapers.repository import parse_repository
 from backend.schemas import (
     AuthStatus,
     CourseLogsResponse,
@@ -210,6 +212,15 @@ class IliasClient:
             if not parsed.active_semester:
                 parsed.active_semester = target_sem
             return parsed
+
+    async def get_repository(self, ref_id: str) -> RepositoryResponse:
+        self._ensure_authenticated()
+        url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilRepositoryGUI&ref_id={ref_id}"
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.get(url)
+            self._check_response_for_session_loss(resp, url)
+            resp.raise_for_status()
+            return parse_repository(resp.text, container_ref_id=ref_id)
 
     async def get_course_materials(self, ref_id: str) -> CourseMaterialsResponse:
         """Fetch and parse course or folder repository contents."""

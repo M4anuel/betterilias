@@ -123,6 +123,7 @@ export interface CourseLogsResponse {
 
 export interface CourseMaterialsResponse {
   container_ref_id: string;
+  is_enrolled?: boolean;
   title?: string;
   breadcrumbs: BreadcrumbItem[];
   items: MaterialItem[];
@@ -133,6 +134,13 @@ export interface CourseMaterialsResponse {
   blocks?: CourseContentBlock[];
   layout_hash?: string;
   fetched_at: string;
+}
+
+export interface RepositoryResponse {
+  container_ref_id: string;
+  title: string;
+  breadcrumbs: BreadcrumbItem[];
+  items: (MaterialItem & { accessible: boolean })[];
 }
 
 export interface SemesterItem {

@@ -1,12 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.responses import StreamingResponse
 from typing import List, Optional
 
 from backend.api.deps import get_ilias_client
 from backend.schemas import CourseLogsResponse, CourseMaterialsResponse, MaterialItem, PodcastSeriesResponse
 from backend.services.ilias_client import IliasClient
+from backend.schemas import RepositoryResponse
 
 router = APIRouter(tags=["Materials"])
+
+
+@router.get("/repository/{ref_id}", response_model=RepositoryResponse)
+async def get_repository(
+    ref_id: str = Path(pattern=r"^\d+$"),
+    client: IliasClient = Depends(get_ilias_client),
+):
+    return await client.get_repository(ref_id)
 
 
 @router.get("/courses/{course_id}/materials", response_model=CourseMaterialsResponse)

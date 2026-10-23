@@ -168,6 +168,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                   title="Anderes Semester auswählen"
                 >
                   <optgroup label="Aktuelle & Künftige Semester">
+                    {!ALL_SEMESTERS.some((s) => s.id === selectedSemester) && <option value={selectedSemester}>{selectedSemester}</option>}
                     <option value="HS2026">HS 2026 – Herbstsemester (Aktuell)</option>
                     <option value="FS2027">FS 2027 – Frühjahrssemester (Vorschau)</option>
                   </optgroup>

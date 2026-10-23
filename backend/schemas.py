@@ -144,6 +144,7 @@ class CourseLogsResponse(BaseModel):
 class CourseMaterialsResponse(BaseModel):
     container_ref_id: str
     title: Optional[str] = None
+    is_enrolled: Optional[bool] = None
     breadcrumbs: List[BreadcrumbItem] = Field(default_factory=list)
     items: List[MaterialItem] = Field(default_factory=list)
     sections: List[CourseSection] = Field(default_factory=list)
@@ -153,6 +154,17 @@ class CourseMaterialsResponse(BaseModel):
     blocks: List[CourseContentBlock] = Field(default_factory=list)
     layout_hash: Optional[str] = None
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RepositoryItem(MaterialItem):
+    accessible: bool = True
+
+
+class RepositoryResponse(BaseModel):
+    container_ref_id: str
+    title: str
+    breadcrumbs: List[BreadcrumbItem] = Field(default_factory=list)
+    items: List[RepositoryItem] = Field(default_factory=list)
 
 # ---------------------------------------------------------
 # Exercises & Submissions Schemas
