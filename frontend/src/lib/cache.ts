@@ -50,25 +50,20 @@ const EXERCISE_SUBMISSIONS_PREFIX = 'ilias_exercise_submissions_';
 const EXERCISE_INFO_PREFIX = 'ilias_exercise_info_';
 const STUDENT_ASSIGNMENT_PREFIX = 'ilias_student_assignment_';
 const SESSION_ID_KEY = 'betterilias_session_id';
+let inMemorySessionId: string | null = null;
 
 export const cache = {
   // --- Multi-Tenant Session ID ---
   getSessionId(): string | null {
     try {
-      if (typeof window !== 'undefined' && window.location.search) {
-        const urlId = new URLSearchParams(window.location.search).get('session_id');
-        if (urlId && urlId.trim()) {
-          localStorage.setItem(SESSION_ID_KEY, urlId.trim());
-          return urlId.trim();
-        }
-      }
-      return localStorage.getItem(SESSION_ID_KEY) || null;
+      return localStorage.getItem(SESSION_ID_KEY) || inMemorySessionId;
     } catch {
-      return null;
+      return inMemorySessionId;
     }
   },
 
   setSessionId(sessionId: string | null) {
+    inMemorySessionId = sessionId?.trim() || null;
     try {
       if (sessionId && sessionId.trim()) {
         localStorage.setItem(SESSION_ID_KEY, sessionId.trim());
@@ -78,6 +73,17 @@ export const cache = {
     } catch (e) {
       console.error('Failed to update session ID', e);
     }
+  },
+
+  clearSessionContent() {
+    try {
+      const prefixes = ['ilias_materials_cache_', 'ilias_semester_cache_', 'ilias_podcast_cache_',
+        EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX, EXERCISE_INFO_PREFIX, STUDENT_ASSIGNMENT_PREFIX, 'ilias_repository_'];
+      for (const key of Object.keys(localStorage)) {
+        if (prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
+      }
+      localStorage.removeItem(LAST_OPENED_KEY);
+    } catch { /* Storage can be disabled in private browsers. */ }
   },
 
   // --- Nicknames ---

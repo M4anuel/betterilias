@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Response, status
 from typing import Dict, Any
 
 from backend.api.deps import get_ilias_client, get_session_manager
@@ -9,10 +9,34 @@ from backend.schemas import (
     ManualCookiesInput,
     ExtensionSyncInput,
     ExtensionSyncResponse,
+    MobileSessionResponse,
 )
 from backend.services.ilias_client import IliasClient
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@router.post('/mobile-session', response_model=MobileSessionResponse)
+async def prepare_mobile_session(
+    response: Response,
+    client: IliasClient = Depends(get_ilias_client),
+    manager: SessionManager = Depends(get_session_manager),
+):
+    """Return a shareable key for the authenticated desktop session."""
+    response.headers['Cache-Control'] = 'no-store'
+    current = await client.get_auth_status()
+    if not current.authenticated:
+        raise HTTPException(status_code=401, detail='Bitte synchronisiere zuerst deine ILIAS-Sitzung am Desktop.')
+    session_id = manager.session_id
+    if session_id == 'default':
+        # Legacy/local desktop logins also need an explicit key on the phone.
+        cookies = manager.load_cookies()
+        if not cookies.get('PHPSESSID'):
+            raise HTTPException(status_code=409, detail='Für diese Sitzung ist kein übertragbarer ILIAS-Login vorhanden.')
+        session_id = SessionManager.generate_session_id()
+        target = SessionManager(session_id=session_id)
+        target.save_cookies(cookies, metadata=manager.load_metadata())
+    return MobileSessionResponse(session_id=session_id)
 
 
 @router.get("/status", response_model=AuthStatus)

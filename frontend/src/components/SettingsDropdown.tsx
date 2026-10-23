@@ -11,6 +11,7 @@ import {
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { theme, ThemeMode, ACCENT_PRESETS } from '../lib/theme';
+import { MobileSessionShare } from './MobileSessionShare';
 
 interface SettingsDropdownProps {
   isOpen: boolean;
@@ -92,7 +93,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 top-12 z-50 w-80 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl backdrop-blur-md transition-all dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150"
+      className="absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl backdrop-blur-md transition-all dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150"
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
@@ -205,6 +206,8 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
             />
           </div>
         </div>
+
+        <MobileSessionShare isAuthenticated={isAuthenticated} />
 
         {/* 3. Helpful Quick Links */}
         <div className="border-t border-slate-100 pt-3 dark:border-slate-800 space-y-1">

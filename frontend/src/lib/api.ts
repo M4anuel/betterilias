@@ -50,6 +50,14 @@ async function sessionFetch(input: string, init?: RequestInit): Promise<Response
 }
 
 export const api = {
+  async prepareMobileSession(): Promise<{ session_id: string }> {
+    const res = await sessionFetch(`${API_BASE}/auth/mobile-session`, { method: 'POST', cache: 'no-store' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Die mobile Verbindung konnte nicht vorbereitet werden');
+    }
+    return res.json();
+  },
   async getMembershipForm(refId: string, action: MembershipAction): Promise<MembershipFormResponse> {
     const res = await sessionFetch(`${API_BASE}/courses/${encodeURIComponent(refId)}/membership?action=${action}`);
     if (!res.ok) {
@@ -137,7 +145,9 @@ export const api = {
     try {
       await sessionFetch(`${API_BASE}/auth/logout`, { method: 'POST' });
     } finally {
-      cache.setSessionId(null);
+      // Retain the revoked key so a paired device cannot fall back to another
+      // active/default desktop session on its next request.
+      cache.clearSessionContent();
     }
   },
 

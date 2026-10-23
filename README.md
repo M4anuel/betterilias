@@ -94,6 +94,14 @@ python start.py
 
 ---
 
+### Connect a phone
+
+On the desktop, open the top-right settings menu, choose **Handy verbinden → QR-Code anzeigen**, and scan the code with the phone's camera. The phone uses the same ILIAS session without needing a browser extension. After the session expires, synchronize it again on the desktop. Logging out ends the shared session on both devices.
+
+Both devices must reach the same BetterIlias installation. For local development, run the backend with `python run.py` and start the frontend with `npm --prefix frontend run dev -- --host 0.0.0.0`. Enter the desktop's reachable LAN address, such as `http://192.168.1.20:5173`, in the QR panel. `localhost` points to the phone itself and cannot be used here. The desktop must remain running and reachable on the network; the backend can remain bound to localhost because Vite proxies `/api`.
+
+The QR code is generated locally. Its link contains the session key in the URL fragment; the app saves the key and removes it from the address bar before loading authenticated content. Only share the code with your own devices.
+
 ### Manual Setup
 
 #### 1. Setup Virtual Environment

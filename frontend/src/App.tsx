@@ -517,17 +517,8 @@ export const App: React.FC = () => {
 
   // --- Initial Mount Effect & History Priming ---
   useEffect(() => {
-    // 1. Check if session_id was passed in URL query param (e.g. from Chrome Extension)
-    const params = new URLSearchParams(window.location.search);
-    const urlSessionId = params.get('session_id');
-    if (urlSessionId) {
-      cache.setSessionId(urlSessionId);
-      params.delete('session_id');
-      const newQuery = params.toString() ? `?${params.toString()}` : '';
-      window.history.replaceState({}, '', `${window.location.pathname}${newQuery}${window.location.hash}`);
-    }
-
-    // 2. Prime History Stack
+    // Session links have already been imported before the first render.
+    // Prime History Stack
     const currentState: NavigationState = {
       repositoryId,
       semester: selectedSemester,
@@ -682,7 +673,6 @@ export const App: React.FC = () => {
       setAuthStatus({ authenticated: false, cookies_present: false });
     } catch (err: any) {
       console.error('Logout error', err);
-      cache.setSessionId(null);
       setAuthStatus({ authenticated: false, cookies_present: false });
     }
   };
