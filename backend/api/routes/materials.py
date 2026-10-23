@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.responses import StreamingResponse
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from backend.api.deps import get_ilias_client
 from backend.schemas import CourseLogsResponse, CourseMaterialsResponse, MaterialItem, PodcastSeriesResponse
 from backend.services.ilias_client import IliasClient
 from backend.schemas import RepositoryResponse
+from backend.schemas import MembershipFormResponse, MembershipRequest, MembershipResult
 
 router = APIRouter(tags=["Materials"])
 
@@ -27,6 +28,30 @@ async def get_materials(
     Fetch materials, subfolders, files, and exercises within a course or folder.
     """
     return await client.get_course_materials(ref_id=course_id)
+
+
+@router.get('/courses/{course_id}/membership', response_model=MembershipFormResponse)
+async def get_membership_form(
+    course_id: str = Path(pattern=r'^\d+$'),
+    action: Literal['join', 'leave'] = Query(...),
+    client: IliasClient = Depends(get_ilias_client),
+):
+    try:
+        return await client.get_membership_form(course_id, action)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post('/courses/{course_id}/membership', response_model=MembershipResult)
+async def change_membership(
+    request: MembershipRequest,
+    course_id: str = Path(pattern=r'^\d+$'),
+    client: IliasClient = Depends(get_ilias_client),
+):
+    try:
+        return await client.change_course_membership(course_id, request)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/courses/{course_id}/sessions/{session_id}/materials", response_model=List[MaterialItem])

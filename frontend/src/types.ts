@@ -14,6 +14,8 @@ export interface CourseItem {
   item_type: string;
   icon?: string;
   semester?: string;
+  subject?: string;
+  faculty?: string;
 }
 
 export interface DashboardResponse {
@@ -120,9 +122,30 @@ export interface CourseLogsResponse {
   fetched_at: string;
 }
 
+export interface CourseMembership {
+  is_enrolled?: boolean | null;
+  can_join: boolean;
+  can_leave: boolean;
+}
+
+export type MembershipAction = 'join' | 'leave';
+export interface MembershipFormResponse {
+  action: MembershipAction;
+  available: boolean;
+  message: string;
+  fields: { name: string; label: string; field_type: 'text' | 'password' | 'checkbox'; required: boolean; value: string }[];
+  ilias_url: string;
+}
+export interface MembershipResult {
+  success: boolean;
+  is_enrolled?: boolean | null;
+  message: string;
+}
+
 export interface CourseMaterialsResponse {
   container_ref_id: string;
   is_enrolled?: boolean;
+  membership?: CourseMembership;
   title?: string;
   breadcrumbs: BreadcrumbItem[];
   items: MaterialItem[];
@@ -139,7 +162,7 @@ export interface RepositoryResponse {
   container_ref_id: string;
   title: string;
   breadcrumbs: BreadcrumbItem[];
-  items: (MaterialItem & { accessible: boolean })[];
+  items: (MaterialItem & { accessible: boolean; membership?: CourseMembership })[];
 }
 
 export type RepositoryLocation = Pick<RepositoryResponse, 'container_ref_id' | 'title' | 'breadcrumbs'>;

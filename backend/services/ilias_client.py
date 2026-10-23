@@ -10,6 +10,9 @@ from backend.auth.session import SessionManager, session_manager
 from backend.config import settings
 from backend.schemas import RepositoryResponse
 from backend.scrapers.repository import parse_repository
+from backend.schemas import MembershipFormResponse, MembershipRequest, MembershipResult
+from backend.scrapers.membership import membership_link, parse_membership, prepare_membership_form
+from backend.scrapers.materials import _extract_breadcrumbs
 from backend.schemas import (
     AuthStatus,
     CourseLogsResponse,
@@ -232,7 +235,113 @@ class IliasClient:
         async with self.session_manager.get_http_client() as client:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
-            return parse_course_materials(resp.text, container_ref_id=ref_id)
+            parsed = parse_course_materials(resp.text, container_ref_id=ref_id)
+            # Some unjoined courses expose Join only in their parent category.
+            if not parsed.items and not parsed.membership.can_join and not parsed.membership.can_leave:
+                parent = next((b for b in reversed(parsed.breadcrumbs) if b.ref_id != ref_id and b.url and '/go/cat/' in b.url), None)
+                if parent:
+                    listing = await client.get(f"{settings.ilias_base_url}/ilias.php?baseClass=ilRepositoryGUI&ref_id={parent.ref_id}")
+                    self._check_response_for_session_loss(listing, str(listing.url))
+                    listing.raise_for_status()
+                    parsed.membership = parse_membership(BeautifulSoup(listing.text, 'lxml'), ref_id)
+                    parsed.is_enrolled = parsed.membership.is_enrolled
+            return parsed
+
+    def _validate_membership_url(self, url: str, ref_id: str):
+        base = urllib.parse.urlparse(settings.ilias_base_url)
+        target = urllib.parse.urlparse(url)
+        if (target.scheme, target.netloc) != (base.scheme, base.netloc):
+            raise ValueError('Ungültiges ILIAS-Kursziel')
+        if urllib.parse.parse_qs(target.query).get('ref_id') != [ref_id]:
+            raise ValueError('Die Kursaktion gehört nicht zum ausgewählten Kurs')
+
+    async def _prepare_course_membership(self, client, ref_id: str, action: str):
+        root_url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilRepositoryGUI&ref_id={ref_id}"
+        response = await client.get(root_url)
+        self._check_response_for_session_loss(response, root_url)
+        response.raise_for_status()
+        prepared = prepare_membership_form(response.text, ref_id, action)
+        if prepared:
+            self._validate_membership_url(prepared.url, ref_id)
+            return prepared, root_url
+        soup = BeautifulSoup(response.text, 'lxml')
+        link = membership_link(soup, ref_id, action)
+        if not link and action == 'join':
+            parent = next((b for b in reversed(_extract_breadcrumbs(soup)) if b.ref_id != ref_id and b.url and '/go/cat/' in b.url), None)
+            if parent:
+                listing_url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilRepositoryGUI&ref_id={parent.ref_id}"
+                listing = await client.get(listing_url)
+                self._check_response_for_session_loss(listing, listing_url)
+                listing.raise_for_status()
+                link = membership_link(BeautifulSoup(listing.text, 'lxml'), ref_id, action)
+        if not link:
+            raise ValueError('ILIAS bietet diese Kursaktion aktuell nicht an. Die Anmeldung wird möglicherweise über KSL verwaltet.')
+        self._validate_membership_url(link, ref_id)
+        response = await client.get(link)
+        self._check_response_for_session_loss(response, link)
+        response.raise_for_status()
+        prepared = prepare_membership_form(response.text, ref_id, action)
+        if prepared:
+            self._validate_membership_url(prepared.url, ref_id)
+        return prepared, link
+
+    async def get_membership_form(self, ref_id: str, action: str) -> MembershipFormResponse:
+        self._ensure_authenticated()
+        async with self.session_manager.get_http_client() as client:
+            prepared, source = await self._prepare_course_membership(client, ref_id, action)
+        available = bool(prepared and prepared.supported)
+        message = prepared.message if prepared else ''
+        if not available:
+            message = 'Bitte schliesse diese Kursaktion direkt in ILIAS ab.'
+        return MembershipFormResponse(
+            action=action, available=available, message=message,
+            fields=prepared.fields if available else [], ilias_url=source,
+        )
+
+    async def change_course_membership(self, ref_id: str, request: MembershipRequest) -> MembershipResult:
+        self._ensure_authenticated()
+        async with self.session_manager.get_http_client() as client:
+            # Fetch fresh form tokens and recheck that ILIAS still allows the action.
+            prepared, _ = await self._prepare_course_membership(client, ref_id, request.action)
+            if not prepared or not prepared.supported:
+                raise ValueError('Diese Kursaktion muss direkt in ILIAS abgeschlossen werden.')
+            allowed = {f.name for f in prepared.fields}
+            if set(request.values) - allowed:
+                raise ValueError('Unbekannte Felder in der Kursanmeldung')
+            payload = dict(prepared.payload)
+            for field in prepared.fields:
+                value = request.values.get(field.name, '')
+                if field.required and not value:
+                    raise ValueError(f'Bitte fülle das Feld «{field.label}» aus.')
+                if field.field_type == 'checkbox':
+                    if value:
+                        payload[field.name] = field.value
+                else:
+                    payload[field.name] = value
+            response = await client.post(prepared.url, data=payload)
+            self._check_response_for_session_loss(response, prepared.url)
+            response.raise_for_status()
+            result_soup = BeautifulSoup(response.text, 'lxml')
+            error = result_soup.select_one('.alert-danger, .il-failure, .ilFailureMessage')
+            if error:
+                raise ValueError(error.get_text(' ', strip=True))
+            success = result_soup.select_one('.alert-success, .il-success, .ilSuccessMessage')
+            # Leaving may immediately revoke read access to the course. The native
+            # success message confirms the action without another protected read.
+            if request.action == 'leave' and success is not None:
+                return MembershipResult(success=True, is_enrolled=False, message=success.get_text(' ', strip=True))
+            root_url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilRepositoryGUI&ref_id={ref_id}"
+            root = await client.get(root_url)
+            self._check_response_for_session_loss(root, root_url)
+            root.raise_for_status()
+            state = parse_membership(BeautifulSoup(root.text, 'lxml'), ref_id)
+            expected = request.action == 'join'
+            if state.is_enrolled is not expected and success is None:
+                raise ValueError('ILIAS hat die Kursaktion nicht bestätigt. Bitte prüfe den Kurs in ILIAS.')
+            return MembershipResult(
+                success=True, is_enrolled=state.is_enrolled,
+                message=success.get_text(' ', strip=True) if success else ('Kurs beigetreten.' if expected else 'Kurs verlassen.'),
+            )
 
     async def get_session_materials(
         self,

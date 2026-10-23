@@ -14,6 +14,7 @@ import {
   FeedbackFilesResponse,
   MaterialItem,
   RepositoryResponse,
+  MembershipAction, MembershipFormResponse, MembershipResult,
   TeamCandidatesResponse,
 } from '../types';
 import { cache } from './cache';
@@ -43,6 +44,25 @@ async function sessionFetch(input: string, init?: RequestInit): Promise<Response
 }
 
 export const api = {
+  async getMembershipForm(refId: string, action: MembershipAction): Promise<MembershipFormResponse> {
+    const res = await sessionFetch(`${API_BASE}/courses/${encodeURIComponent(refId)}/membership?action=${action}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Kursaktion konnte nicht geladen werden');
+    }
+    return res.json();
+  },
+
+  async changeMembership(refId: string, action: MembershipAction, values: Record<string, string>): Promise<MembershipResult> {
+    const res = await sessionFetch(`${API_BASE}/courses/${encodeURIComponent(refId)}/membership`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, values }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Kursaktion fehlgeschlagen');
+    }
+    return res.json();
+  },
   async getRepository(refId: string): Promise<RepositoryResponse> {
     const res = await sessionFetch(`${API_BASE}/repository/${encodeURIComponent(refId)}`);
     if (!res.ok) {

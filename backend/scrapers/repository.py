@@ -9,6 +9,7 @@ from backend.schemas import RepositoryItem, RepositoryResponse
 from backend.scrapers.dashboard import _extract_ref_id_from_url
 from backend.scrapers.dumper import safe_parser
 from backend.scrapers.materials import _detect_material_type, _extract_breadcrumbs
+from backend.scrapers.membership import parse_membership
 
 
 @safe_parser(context_name="repository")
@@ -53,6 +54,7 @@ def parse_repository(html_content: str, container_ref_id: str) -> RepositoryResp
                 url=urljoin(settings.ilias_base_url, href) if href else "",
                 description=description.get_text(" ", strip=True) if description else None,
                 accessible=bool(href),
+                membership=parse_membership(el, ref_id) if item_type == 'crs' else None,
             ))
     return RepositoryResponse(
         container_ref_id=container_ref_id, title=title,

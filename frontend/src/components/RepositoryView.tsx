@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronRight, Folder, GraduationCap, Home, Lock, RefreshCw } from 'lucide-react';
+import { ChevronRight, Folder, Home, Lock, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
 import { cache } from '../lib/cache';
-import { RepositoryResponse } from '../types';
+import { RepositoryResponse, MembershipAction } from '../types';
+import { CourseIcon } from './CourseIcon';
 
 interface Props {
   refId: string;
   onNavigate: (refId: string) => void;
   onOpenCourse: (refId: string) => void;
+  onManageMembership: (refId: string, title: string, action: MembershipAction) => void;
 }
 
-export const RepositoryView: React.FC<Props> = ({ refId, onNavigate, onOpenCourse }) => {
+export const RepositoryView: React.FC<Props> = ({ refId, onNavigate, onOpenCourse, onManageMembership }) => {
   const [data, setData] = useState<RepositoryResponse | null>(() => cache.getCachedRepository(refId));
   const [location] = useState(() => cache.getRepositoryLocation(refId));
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +53,7 @@ export const RepositoryView: React.FC<Props> = ({ refId, onNavigate, onOpenCours
         {data.items.map((item) => {
           const container = ['cat', 'fold', 'grp', 'crs'].includes(item.item_type);
           const content = <>
-            {!item.accessible ? <Lock className="h-5 w-5 shrink-0 text-slate-400" /> : item.item_type === 'crs' ? <GraduationCap className="h-5 w-5 shrink-0 text-teal-600" /> : <Folder className="h-5 w-5 shrink-0 text-amber-500" />}
+            {!item.accessible ? <Lock className="h-5 w-5 shrink-0 text-slate-400" /> : item.item_type === 'crs' ? <CourseIcon iconName={cache.getCourseIcon(item.ref_id, { breadcrumbs: data.breadcrumbs })} className="h-5 w-5 shrink-0 text-teal-600" /> : <Folder className="h-5 w-5 shrink-0 text-amber-500" />}
             <span className="min-w-0"><span className="block font-semibold">{item.title}</span>
               {item.description && <span className="block text-xs text-slate-500 mt-1">{item.description}</span>}
               {!item.accessible && <span className="block text-xs text-slate-500 mt-1">Inhalt nicht zugänglich</span>}
@@ -59,8 +61,16 @@ export const RepositoryView: React.FC<Props> = ({ refId, onNavigate, onOpenCours
           </>;
           const className = 'flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 text-left text-sm hover:border-teal-500 disabled:opacity-60 disabled:cursor-default';
           return container || !item.accessible
-            ? <button type="button" key={item.ref_id} disabled={!item.accessible} className={className}
-                onClick={() => item.item_type === 'crs' ? onOpenCourse(item.ref_id) : onNavigate(item.ref_id)}>{content}</button>
+            ? <div key={item.ref_id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <button type="button" disabled={!item.accessible} className={`${className} w-full !border-0`}
+                  onClick={() => item.item_type === 'crs' ? onOpenCourse(item.ref_id) : onNavigate(item.ref_id)}>{content}</button>
+                {(item.membership?.can_join || item.membership?.can_leave) && <button type="button"
+                  onClick={() => onManageMembership(item.ref_id, item.title, item.membership?.can_join ? 'join' : 'leave')}
+                  aria-label={`${item.membership?.can_join ? 'Kurs beitreten' : 'Kurs verlassen'}: ${item.title}`}
+                  className="mx-4 mb-3 text-xs font-semibold text-teal-700 dark:text-teal-300 hover:underline">
+                  {item.membership?.can_join ? 'Kurs beitreten' : 'Kurs verlassen'}
+                </button>}
+              </div>
             : <a key={item.ref_id} href={item.url} target="_blank" rel="noreferrer" className={className}>{content}<span className="sr-only">In ILIAS öffnen</span></a>;
         })}
       </div>}

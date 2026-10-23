@@ -9,6 +9,7 @@ import {
   RepositoryLocation,
   RepositoryResponse,
 } from '../types';
+import { getDefaultCourseIcon } from './courseIcons';
 
 export type ContentSectionId =
   | 'folders'
@@ -130,7 +131,7 @@ export const cache = {
   setCourseIcon(refId: string, iconName: string) {
     try {
       const current = this.getCourseIcons();
-      if (iconName && iconName !== 'BookOpen') {
+      if (iconName) {
         current[refId] = iconName;
       } else {
         delete current[refId];
@@ -141,9 +142,14 @@ export const cache = {
     }
   },
 
-  getCourseIcon(refId: string): string {
+  getDefaultCourseIcon(refId: string, context?: { subject?: string; faculty?: string; breadcrumbs?: BreadcrumbItem[] }): string {
+    const path = context?.breadcrumbs || this.getCachedMaterials(refId)?.breadcrumbs || this.getRepositoryLocation(refId)?.breadcrumbs || [];
+    return getDefaultCourseIcon([context?.subject || '', context?.faculty || '', ...path.map((b) => b.title)]);
+  },
+
+  getCourseIcon(refId: string, context?: { subject?: string; faculty?: string; breadcrumbs?: BreadcrumbItem[] }): string {
     const icons = this.getCourseIcons();
-    return icons[refId] || 'BookOpen';
+    return icons[refId] || this.getDefaultCourseIcon(refId, context);
   },
 
   // --- Selected Semester ---
@@ -364,13 +370,32 @@ export const cache = {
     const ancestors = currentIndex < 0 ? data.breadcrumbs : data.breadcrumbs.slice(0, currentIndex);
     const path = [...ancestors, { ref_id: data.container_ref_id, title: data.title }];
     this.rememberRepositoryPath(path);
-    data.items.filter((item) => ['cat', 'fold', 'grp'].includes(item.item_type)).forEach((item) => {
+    data.items.filter((item) => ['cat', 'fold', 'grp', 'crs'].includes(item.item_type)).forEach((item) => {
       this.rememberRepositoryPath([...path, { ref_id: item.ref_id, title: item.title }]);
     });
     try {
       localStorage.setItem(`ilias_repository_${this.getSessionId() || 'default'}_${data.container_ref_id}`, JSON.stringify(data));
     } catch (e) {
       console.warn('Could not cache repository page', e);
+    }
+  },
+
+  invalidateCourseMembership(refId: string) {
+    try {
+      const repositoryPrefix = `ilias_repository_${this.getSessionId() || 'default'}_`;
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith('ilias_semester_cache_')) localStorage.removeItem(key);
+        if (key.startsWith(MATERIALS_CACHE_PREFIX)) {
+          const page = JSON.parse(localStorage.getItem(key) || 'null');
+          if (page?.container_ref_id === refId || page?.breadcrumbs?.some((b: BreadcrumbItem) => b.ref_id === refId)) localStorage.removeItem(key);
+        }
+        if (key.startsWith(repositoryPrefix)) {
+          const page = JSON.parse(localStorage.getItem(key) || 'null');
+          if (page?.items?.some((item: { ref_id: string }) => item.ref_id === refId)) localStorage.removeItem(key);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not invalidate course membership caches', e);
     }
   },
 
@@ -398,8 +423,8 @@ export const cache = {
         (existing?.sessions?.length || 0) +
         (existing?.blocks?.length || 0);
 
-      // GUARD: Never overwrite populated cache with empty response!
-      if (existingCount > 0 && incomingCount === 0) {
+      // An empty scrape preserves content; an explicit loss of membership replaces it.
+      if (existingCount > 0 && incomingCount === 0 && data.is_enrolled !== false) {
         console.warn(
           `Prevented overwriting populated course materials cache for ${refId} with empty data`
         );

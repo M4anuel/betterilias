@@ -49,7 +49,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
       const name = nicknames[course.ref_id] || '';
       cache.setNickname(course.ref_id, name);
 
-      const icon = icons[course.ref_id] || 'BookOpen';
+      const icon = icons[course.ref_id] || '';
       cache.setCourseIcon(course.ref_id, icon);
     }
 
@@ -61,12 +61,10 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
     const updatedNames = { ...nicknames };
     delete updatedNames[refId];
     setNicknames(updatedNames);
-    cache.setNickname(refId, '');
 
     const updatedIcons = { ...icons };
     delete updatedIcons[refId];
     setIcons(updatedIcons);
-    cache.setCourseIcon(refId, 'BookOpen');
 
     setActivePickerRefId(null);
   };
@@ -113,9 +111,9 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
           ) : (
             courses.map((course) => {
               const currentNickname = nicknames[course.ref_id] || '';
-              const currentIcon = icons[course.ref_id] || 'BookOpen';
+              const currentIcon = icons[course.ref_id] || cache.getDefaultCourseIcon(course.ref_id, course);
               const isPickerOpen = activePickerRefId === course.ref_id;
-              const hasCustomizations = !!currentNickname || currentIcon !== 'BookOpen';
+              const hasCustomizations = !!currentNickname || !!icons[course.ref_id];
 
               return (
                 <div
@@ -187,6 +185,11 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                         Icon auswählen
                       </div>
                       <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+                        <button type="button" title="Automatisch nach Fach und Fakultät" aria-label="Automatisch nach Fach und Fakultät"
+                          onClick={() => { const next = { ...icons }; delete next[course.ref_id]; setIcons(next); setActivePickerRefId(null); }}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
                         {AVAILABLE_COURSE_ICONS.map((opt) => {
                           const isSelected = currentIcon === opt.id;
                           return (

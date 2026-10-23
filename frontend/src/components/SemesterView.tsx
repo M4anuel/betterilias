@@ -261,7 +261,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {courses.map((course) => {
                       const displayName = cache.getDisplayName(course.ref_id, course.title);
-                      const iconName = cache.getCourseIcon(course.ref_id);
+                      const iconName = cache.getCourseIcon(course.ref_id, course);
 
                       return (
                         <div
@@ -311,7 +311,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                   <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 overflow-hidden dark:border-slate-800 dark:bg-slate-900 dark:divide-slate-800">
                     {courses.map((course) => {
                       const displayName = cache.getDisplayName(course.ref_id, course.title);
-                      const iconName = cache.getCourseIcon(course.ref_id);
+                      const iconName = cache.getCourseIcon(course.ref_id, course);
 
                       return (
                         <div

@@ -54,7 +54,8 @@ def test_enrollment_requires_membership_evidence():
     enrolled = parse_course_materials('<h1>Course</h1><a href="ilias.php?cmd=unsubscribe&ref_id=42">Unsubscribe</a>', '42')
     preview = parse_course_materials('<h1>Course</h1><button data-action="ilias.php?cmd=join&ref_id=42">Join</button>', '42')
     assert enrolled.is_enrolled is True
-    assert preview.is_enrolled is None
+    assert preview.is_enrolled is False
+    assert preview.membership.can_join
 
 
 def test_repository_api_and_reference_validation():

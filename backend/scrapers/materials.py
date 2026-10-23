@@ -9,6 +9,7 @@ from backend.config import settings
 from backend.schemas import BreadcrumbItem, CourseContentBlock, CourseMaterialsResponse, MaterialItem, CourseSessionItem
 from backend.scrapers.dashboard import _extract_ref_id_from_url
 from backend.scrapers.dumper import safe_parser
+from backend.scrapers.membership import parse_membership, membership_form
 
 
 def _clean_rich_html(raw_html: str) -> str:
@@ -610,6 +611,12 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
     structured sections/accordions, and rich text with MathML.
     """
     soup = BeautifulSoup(html_content, "lxml")
+    membership = parse_membership(soup, container_ref_id)
+    # Registration is handled by our membership dialog, not embedded upstream forms.
+    for action in ('join', 'leave'):
+        form, _ = membership_form(soup, container_ref_id, action)
+        if form:
+            form.decompose()
     _clean_math_in_soup(soup)
 
     # Extract Page / Course Title
@@ -933,7 +940,8 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
     return CourseMaterialsResponse(
         container_ref_id=container_ref_id,
         title=container_title,
-        is_enrolled=True if soup.select_one('a[href*="cmd=unsubscribe"], button[data-action*="cmd=unsubscribe"]') else None,
+        is_enrolled=membership.is_enrolled,
+        membership=membership,
         breadcrumbs=breadcrumbs,
         items=items,
         sections=sections,

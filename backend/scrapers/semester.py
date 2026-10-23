@@ -106,6 +106,7 @@ def parse_semester_courses(html_content: str) -> SemesterScreenResponse:
                 url=full_url,
                 item_type="crs",
                 semester=active_semester,
+                subject=current_category,
             )
 
             courses.append(course_obj)

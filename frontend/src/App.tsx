@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar';
 import { SemesterView } from './components/SemesterView';
 import { CourseView } from './components/CourseView';
 import { RepositoryView } from './components/RepositoryView';
+import { CourseMembershipModal } from './components/CourseMembershipModal';
 import { NicknameModal } from './components/NicknameModal';
 import { ExtensionInfoModal } from './components/ExtensionInfoModal';
 import { NotificationToast, ChangeNotification } from './components/NotificationToast';
@@ -13,6 +14,7 @@ import {
   CourseItem,
   CourseMaterialsResponse,
   SemesterScreenResponse,
+  MembershipAction,
 } from './types';
 import { api } from './lib/api';
 import { cache } from './lib/cache';
@@ -70,6 +72,8 @@ export const App: React.FC = () => {
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
   const authRequestSeq = useRef(0);
   const [changeNotifications, setChangeNotifications] = useState<ChangeNotification[]>([]);
+  const [membershipDialog, setMembershipDialog] = useState<{ refId: string; title: string; action: MembershipAction } | null>(null);
+  const [membershipVersion, setMembershipVersion] = useState(0);
 
   // --- URL Search Params Initialization ---
   const initialParams = new URLSearchParams(window.location.search);
@@ -135,13 +139,13 @@ export const App: React.FC = () => {
     let active = true;
     const root = materialsData?.container_ref_id === selectedCourseId
       ? materialsData : cache.getCachedMaterials(selectedCourseId);
-    if (root?.is_enrolled) setEnrolledCourses((prev) => ({ ...prev, [selectedCourseId]: true }));
+    if (root?.is_enrolled != null) setEnrolledCourses((prev) => prev[selectedCourseId] === root.is_enrolled ? prev : ({ ...prev, [selectedCourseId]: root.is_enrolled! }));
     // A direct link to a subfolder may not have loaded its course root yet.
-    if (currentContainerId !== selectedCourseId && !root) {
+    if (currentContainerId !== selectedCourseId && !root?.membership) {
       api.getMaterials(selectedCourseId).then((data) => {
         if (active) {
           cache.setCachedMaterials(selectedCourseId, data);
-          setEnrolledCourses((prev) => ({ ...prev, [selectedCourseId]: data.is_enrolled === true }));
+          if (data.is_enrolled != null) setEnrolledCourses((prev) => ({ ...prev, [selectedCourseId]: data.is_enrolled! }));
         }
       }).catch(() => {});
     }
@@ -156,7 +160,10 @@ export const App: React.FC = () => {
   const [nicknamesVersion, setNicknamesVersion] = useState(0);
 
   // Flat list of all courses across categories
-  const allCourses: CourseItem[] = semesterData?.courses || [];
+  const allCourses: CourseItem[] = (semesterData?.courses || []).map((course) => ({
+    ...course,
+    subject: course.subject || Object.entries(semesterData?.grouped_by_category || {}).find(([, courses]) => courses.some((c) => c.ref_id === course.ref_id))?.[0],
+  }));
 
   // --- Check Auth Status ---
   const checkAuth = useCallback(async () => {
@@ -242,8 +249,8 @@ export const App: React.FC = () => {
           (cached?.sessions?.length || 0) +
           (cached?.blocks?.length || 0);
 
-        // Guard: if fresh returned empty materials but cache has content, preserve cached content!
-        if (incomingCount === 0 && cachedCount > 0) {
+        // Preserve cached contents after an empty scrape, but respect an explicit loss of membership.
+        if (incomingCount === 0 && cachedCount > 0 && fresh.is_enrolled !== false) {
           console.warn(`Preserving cached materials for ${refId} because fresh response was empty`);
           if (reqId === materialsRequestSeq.current && activeContainerRef.current === refId && cached) {
             setMaterialsData(cached);
@@ -789,17 +796,20 @@ export const App: React.FC = () => {
             </div>
           )}
           {repositoryId ? (
-            <RepositoryView key={repositoryId} refId={repositoryId} onNavigate={handleNavigateRepository} onOpenCourse={handleSelectCourse} />
+            <RepositoryView key={`${repositoryId}_${membershipVersion}`} refId={repositoryId} onNavigate={handleNavigateRepository} onOpenCourse={handleSelectCourse}
+              onManageMembership={(refId, title, action) => setMembershipDialog({ refId, title, action })} />
           ) : selectedCourseId && currentContainerId ? (
             <CourseView
               key={`${selectedCourseId}_${currentContainerId}`}
               courseRefId={selectedCourseId}
               courseNickname={currentNickname}
               materialsData={effectiveMaterialsData}
+              membership={(effectiveMaterialsData?.container_ref_id === selectedCourseId ? effectiveMaterialsData : cache.getCachedMaterials(selectedCourseId))?.membership}
+              onManageMembership={(action) => setMembershipDialog({ refId: selectedCourseId, title: currentNickname, action })}
               onNavigateFolder={handleNavigateFolder}
               onNavigateHome={handleNavigateHome}
               onNavigateRepository={handleNavigateRepository}
-              onNavigateSemester={enrolledCourses[selectedCourseId] || allCourses.some((c) => c.ref_id === selectedCourseId)
+              onNavigateSemester={(enrolledCourses[selectedCourseId] ?? allCourses.some((c) => c.ref_id === selectedCourseId))
                 ? handleSelectSemester : undefined}
               onNavigateCourseRoot={handleNavigateCourseRoot}
               activeExerciseRefId={activeExerciseRefId}
@@ -822,6 +832,34 @@ export const App: React.FC = () => {
           )}
         </main>
       </div>
+
+      {/* Voluntary course membership */}
+      {membershipDialog && <CourseMembershipModal key={`${membershipDialog.refId}_${membershipDialog.action}`} {...membershipDialog}
+        onClose={() => setMembershipDialog(null)}
+        onChanged={(result) => {
+          const refId = membershipDialog.refId;
+          cache.invalidateCourseMembership(refId);
+          setEnrolledCourses((prev) => {
+            const next = { ...prev };
+            if (result.is_enrolled != null) next[refId] = result.is_enrolled;
+            else delete next[refId];
+            return next;
+          });
+          setMembershipVersion((v) => v + 1);
+          loadSemesters(selectedSemester);
+          if (selectedCourseId === refId && activeContainerRef.current === currentContainerId) {
+            if (membershipDialog.action === 'leave' && result.is_enrolled === false) {
+              const path = materialsData?.breadcrumbs || [];
+              const courseIndex = path.findIndex((b) => b.ref_id === refId);
+              const parent = (courseIndex >= 0 ? path.slice(0, courseIndex) : path).filter((b) => b.ref_id).at(-1);
+              if (parent?.ref_id) handleNavigateRepository(parent.ref_id);
+              else handleNavigateHome();
+            } else if (currentContainerId !== refId) handleNavigateCourseRoot(refId);
+            else loadCourseMaterials(refId, true);
+          }
+          setChangeNotifications((prev) => [...prev, { id: `membership-${Date.now()}`, type: 'general', title: result.message }]);
+          setMembershipDialog(null);
+        }} />}
 
       {/* Nickname & Icon Editor Modal */}
       <NicknameModal

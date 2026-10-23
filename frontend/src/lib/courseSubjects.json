@@ -1,0 +1,208 @@
+[
+  {
+    "faculty": "Medizinische Fakult\u00e4t",
+    "icon": "Stethoscope",
+    "subjects": {
+      "Artificial Intelligence in Medicine": "BrainCircuit",
+      "Biomedical Engineering": "HeartPulse",
+      "Biomedical Sciences": "HeartPulse",
+      "Cellular and Biomedical Sciences": "Microscope",
+      "Health Sciences": "HeartPulse",
+      "Humanmedizin": "HeartPulse",
+      "Mikroskopie": "Microscope",
+      "Pharmazie Master": "Pill",
+      "Zahnmedizin": "HeartPulse",
+      "Master of Medical Education": "HeartPulse",
+      "Sex- and Gender-Specific Medicine": "HeartPulse",
+      "WB Nephrologie, Nierentransplantation": "HeartPulse",
+      "Department of Clinical Research (DCR)": "Stethoscope",
+      "Institut f\u00fcr Medizinische Lehre": "HeartPulse",
+      "Institut f\u00fcr Sozial- und Pr\u00e4ventivmedizin (ISPM)": "HeartPulse",
+      "Cardiovascular Course Program": "HeartPulse",
+      "Evaluation Habilitierende": "BarChart3",
+      "Fakult\u00e4re Kommissionen": "Stethoscope",
+      "Interdisciplinary Studies - Faculty of Medicine": "HeartPulse",
+      "Interprofessionelle Kurse": "Stethoscope",
+      "Neuroscience Lecture Series": "Brain",
+      "Precision Medicine Course Program": "HeartPulse",
+      "Public Health Sciences Course Program": "HeartPulse",
+      "Stem Cells and Regenerative Medicine Course Program": "Dna",
+      "Studienjahresunabh\u00e4ngige Kurse II": "Stethoscope",
+      "Tumor Biology Course Program": "Dna"
+    }
+  },
+  {
+    "faculty": "Philosophisch-historische Fakult\u00e4t",
+    "icon": "ScrollText",
+    "subjects": {
+      "Arch\u00e4ologie": "Mountain",
+      "Cultural Studies": "Users",
+      "Digital Humanities": "Code",
+      "Editionsphilologie": "Languages",
+      "Englische Sprachen und Literaturen": "Languages",
+      "Franz\u00f6sische Sprache und Literatur": "Languages",
+      "Gender Studies": "Users",
+      "Germanistik": "Languages",
+      "Geschichte": "ScrollText",
+      "Global Studies": "Globe",
+      "Graduate School of the Arts": "Theater",
+      "Graduate School of the Arts and Humanities": "Theater",
+      "Graduate School of the Humanities": "ScrollText",
+      "Interdisziplin\u00e4r Phil.-Hist. Fakult\u00e4t": "ScrollText",
+      "Islamwissenschaft und Neuere Orientalische Philologie": "Languages",
+      "Italienische Sprache und Literatur": "Languages",
+      "Klassische Philologie": "Languages",
+      "Kunstgeschichte": "Theater",
+      "Musikwissenschaft": "Music",
+      "Osteuropastudien": "Globe",
+      "Philosophie": "Compass",
+      "Religionskulturen": "Church",
+      "Religionswissenschaft": "Church",
+      "Research on the Arts": "Theater",
+      "Slavische Sprachen und Literaturen": "Languages",
+      "Sozialanthropologie": "Users",
+      "Soziolinguistik": "Languages",
+      "Spanische Sprache und Literaturen": "Languages",
+      "Sprachwissenschaft": "Languages",
+      "Studien zum Mittleren Osten und muslimischen Gesellschaften": "Globe",
+      "Theaterwissenschaft": "Theater",
+      "World Arts": "Theater",
+      "World Literature": "Languages"
+    }
+  },
+  {
+    "faculty": "Philosophisch-humanwissenschaftliche Fakult\u00e4t",
+    "icon": "Brain",
+    "subjects": {
+      "Erziehungswissenschaft": "GraduationCap",
+      "Interdisziplin\u00e4r Phil.-Hum. Fakult\u00e4t": "Brain",
+      "Neurowissenschaft": "Brain",
+      "Psychologie": "Brain",
+      "Sportwissenschaft": "Dumbbell"
+    }
+  },
+  {
+    "faculty": "Philosophisch-naturwissenschaftliche Fakult\u00e4t",
+    "icon": "Atom",
+    "subjects": {
+      "Biochemie": "Dna",
+      "Bioinformatik": "Code",
+      "Biologie": "Leaf",
+      "Chemie": "FlaskConical",
+      "Erdwissenschaften": "Mountain",
+      "Geographie": "Map",
+      "Informatik": "Code",
+      "Interdisziplin\u00e4r Phil.-Nat. Fakult\u00e4t": "Atom",
+      "Klimawissenschaften": "CloudSun",
+      "Mathematik": "Calculator",
+      "Molecular Life Sciences": "Dna",
+      "\u00d6kologie und Evolution": "Leaf",
+      "Pflanzenwissenschaften": "Sprout",
+      "Pharmazie": "Pill",
+      "Physik": "Atom",
+      "Precision Engineering": "Cpu",
+      "Statistik": "BarChart3",
+      "Sustainable Development": "Earth",
+      "Zellbiologie": "Microscope"
+    }
+  },
+  {
+    "faculty": "Rechtswissenschaftliche Fakult\u00e4t",
+    "icon": "Scale",
+    "subjects": {
+      "Public Management and Policy": "Landmark",
+      "Rechtswissenschaft": "Scale",
+      "Interdisziplin\u00e4r RW-Fakult\u00e4t": "Scale",
+      "World Trade Institute": "Scale",
+      "Falll\u00f6sungen Rechtswissenschaften": "Scale",
+      "Fragepool zu Immaterialg\u00fcterrecht": "Scale",
+      "Masterarbeitsthemen": "Scale"
+    }
+  },
+  {
+    "faculty": "Theologische Fakult\u00e4t",
+    "icon": "Church",
+    "subjects": {
+      "Interdisziplin\u00e4r Theol. Fakult\u00e4t": "Church",
+      "Interreligious Studies": "Church",
+      "KOPTA": "Church",
+      "Theologie": "Church"
+    }
+  },
+  {
+    "faculty": "Universit\u00e4tsleitung",
+    "icon": "Building2",
+    "subjects": {
+      "Academic English Services": "Languages",
+      "Deutsch als Fremdsprache": "Languages",
+      "Interdisziplin\u00e4r Universit\u00e4tsleitung": "Building2",
+      "KOMPASS (Zulassungskandidierende)": "GraduationCap",
+      "Koordinationsfach KSL ILIAS (Einf\u00fchrungsveranstaltung)": "Building2",
+      "Transferable Skills": "Building2",
+      "Vorbereitungsjahr Ukraine": "GraduationCap"
+    }
+  },
+  {
+    "faculty": "Vetsuisse-Fakult\u00e4t",
+    "icon": "PawPrint",
+    "subjects": {
+      "Interdisziplin\u00e4r Vetsuisse Fakult\u00e4t": "PawPrint",
+      "Veterin\u00e4rmedizin": "PawPrint",
+      "Vetsuisse VPH": "PawPrint"
+    }
+  },
+  {
+    "faculty": "Weiterbildungsstudieng\u00e4nge aus allen Fakult\u00e4ten",
+    "icon": "GraduationCap",
+    "subjects": {
+      "(Weiterbildung) Applied Statistics": "BarChart3",
+      "(Weiterbildung) Bewegungs- und Sporttherapie": "Dumbbell",
+      "(Weiterbildung) Capital Market Law": "Scale",
+      "(Weiterbildung) Criminology": "Scale",
+      "(Weiterbildung) Dance Science": "Dumbbell",
+      "(Weiterbildung) Entrepreneurship": "Briefcase",
+      "(Weiterbildung) Evaluation": "BarChart3",
+      "(Weiterbildung) Executive MBA Rochester-Bern": "Briefcase",
+      "(Weiterbildung) Extended Intelligence": "BrainCircuit",
+      "(Weiterbildung) Fach f\u00fcr Spezialprogramme KSL": "GraduationCap",
+      "(Weiterbildung) F\u00f6rderorientierte Kompetenzdiagnostik": "GraduationCap",
+      "(Weiterbildung) Forschungsmanagement": "Briefcase",
+      "(Weiterbildung) Gender, Justice, Globalisation": "Scale",
+      "(Weiterbildung) General Management f\u00fcr Verwaltungsr\u00e4te": "Briefcase",
+      "(Weiterbildung) Gesundheitspsychologie": "Brain",
+      "(Weiterbildung) ICT-Beschaffungen": "Code",
+      "(Weiterbildung) International Law and Economics": "Scale",
+      "(Weiterbildung) Management im Gesundheitswesen": "Briefcase",
+      "(Weiterbildung) Marketing": "Megaphone",
+      "(Weiterbildung) Medical Education": "HeartPulse",
+      "(Weiterbildung) Medication Safety": "Pill",
+      "(Weiterbildung) Migration und Bildung": "GraduationCap",
+      "(Weiterbildung) Nachhaltige Entwicklung": "Earth",
+      "(Weiterbildung) One Health": "HeartPulse",
+      "(Weiterbildung) Psychotherapie": "Brain",
+      "(Weiterbildung) Public Administration": "Landmark",
+      "(Weiterbildung) Religious Care": "Church",
+      "(Weiterbildung) Seelsorge und Pastoralpsychologie": "Brain",
+      "(Weiterbildung) Sleep, Consciousness and Related Disorders": "Brain",
+      "(Weiterbildung) Spiritual Care": "Church",
+      "(Weiterbildung) Sportpsychologie": "Brain",
+      "(Weiterbildung) Translation and Entrepreneurship in Medicine": "HeartPulse",
+      "(Weiterbildung) Weitere Zahnmedizin": "HeartPulse"
+    }
+  },
+  {
+    "faculty": "Wirtschafts- und Sozialwissenschaftliche Fakult\u00e4t",
+    "icon": "BarChart3",
+    "subjects": {
+      "Betriebwirtschaftslehre": "Briefcase",
+      "Digitalization and Applied Data Science": "Code",
+      "Interdisziplin\u00e4r WISO Fakult\u00e4t": "BarChart3",
+      "Kommunikations- und Medienwissenschaft": "Megaphone",
+      "Politikwissenschaft": "Landmark",
+      "Sozialwissenschaften": "Users",
+      "Soziologie": "Users",
+      "Volkswirtschaftslehre": "BarChart3",
+      "WISO Einf\u00fchrungsstudium": "BarChart3"
+    }
+  }
+]

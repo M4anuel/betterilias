@@ -26,7 +26,8 @@ import {
   Files,
   MessageSquare,
 } from 'lucide-react';
-import { CourseMaterialsResponse, MaterialItem, CourseContentBlock } from '../types';
+import { CourseMaterialsResponse, MaterialItem, CourseContentBlock, CourseMembership, MembershipAction } from '../types';
+import { CourseIcon } from './CourseIcon';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { PodcastModal } from './PodcastModal';
 import { SessionDrawer } from './SessionDrawer';
@@ -89,6 +90,8 @@ interface CourseViewProps {
   courseRefId: string;
   courseNickname: string;
   materialsData: CourseMaterialsResponse | null;
+  membership?: CourseMembership;
+  onManageMembership: (action: MembershipAction) => void;
   onNavigateFolder: (folderRefId: string) => void;
   onNavigateHome: () => void;
   onNavigateRepository: (refId: string) => void;
@@ -106,6 +109,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
   courseRefId,
   courseNickname,
   materialsData,
+  membership,
+  onManageMembership,
   onNavigateFolder,
   onNavigateHome,
   onNavigateRepository,
@@ -1536,6 +1541,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               </button>
             )}
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
+              {!isInsideSubfolder && <CourseIcon iconName={cache.getCourseIcon(courseRefId, { breadcrumbs: materialsData?.breadcrumbs })} className="inline-block h-5 w-5 mr-2" />}
               {materialsData?.title || courseNickname}
             </h1>
           </div>
@@ -1546,6 +1552,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
         {/* Search & Actions Bar */}
         <div className="flex items-center gap-2 w-full md:w-auto">
+          {membership?.can_leave && <button type="button" onClick={() => onManageMembership('leave')}
+            className="rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800">Kurs verlassen</button>}
           <button
             type="button"
             onClick={() => setIsOrderModalOpen(true)}
@@ -1570,6 +1578,12 @@ export const CourseView: React.FC<CourseViewProps> = ({
       </div>
 
       {/* Main course content */}
+      {membership?.can_join && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/30 p-4">
+        <p className="text-sm">Du bist diesem Kurs noch nicht beigetreten.</p>
+        <button type="button" onClick={() => onManageMembership('join')} className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white">Kurs beitreten</button>
+      </div>}
+      {!isInsideSubfolder && materialsData && !membership?.can_join && materialsData.items.length === 0 && !(materialsData.blocks?.length) && !(materialsData.sessions?.length) &&
+        <p className="text-sm text-slate-500">Für diesen Kurs sind keine Inhalte sichtbar. Falls die Anmeldung über KSL erfolgt, verwalte sie dort.</p>}
       <div>
         {/* Main Content Area */}
         <div className="space-y-6">

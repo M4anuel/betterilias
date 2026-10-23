@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Literal
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------
@@ -43,6 +43,8 @@ class CourseItem(BaseModel):
     item_type: str = "crs"  # crs (course), grp (group), fold (folder), etc.
     icon: Optional[str] = None
     semester: Optional[str] = None
+    subject: Optional[str] = None
+    faculty: Optional[str] = None
 
 class DashboardResponse(BaseModel):
     courses: List[CourseItem]
@@ -140,10 +142,44 @@ class CourseLogsResponse(BaseModel):
     current_page: int = 1
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class CourseMembership(BaseModel):
+    is_enrolled: Optional[bool] = None
+    can_join: bool = False
+    can_leave: bool = False
+
+
+class MembershipField(BaseModel):
+    name: str
+    label: str
+    field_type: Literal['text', 'password', 'checkbox'] = 'text'
+    required: bool = False
+    value: str = ''
+
+
+class MembershipFormResponse(BaseModel):
+    action: Literal['join', 'leave']
+    available: bool
+    message: str
+    fields: List[MembershipField] = Field(default_factory=list)
+    ilias_url: str
+
+
+class MembershipRequest(BaseModel):
+    action: Literal['join', 'leave']
+    values: Dict[str, str] = Field(default_factory=dict)
+
+
+class MembershipResult(BaseModel):
+    success: bool
+    is_enrolled: Optional[bool] = None
+    message: str
+
+
 class CourseMaterialsResponse(BaseModel):
     container_ref_id: str
     title: Optional[str] = None
     is_enrolled: Optional[bool] = None
+    membership: Optional[CourseMembership] = None
     breadcrumbs: List[BreadcrumbItem] = Field(default_factory=list)
     items: List[MaterialItem] = Field(default_factory=list)
     sections: List[CourseSection] = Field(default_factory=list)
@@ -157,6 +193,7 @@ class CourseMaterialsResponse(BaseModel):
 
 class RepositoryItem(MaterialItem):
     accessible: bool = True
+    membership: Optional[CourseMembership] = None
 
 
 class RepositoryResponse(BaseModel):

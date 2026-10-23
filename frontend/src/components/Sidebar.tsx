@@ -110,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Courses list */}
         {courses.map((course) => {
           const displayName = cache.getDisplayName(course.ref_id, course.title);
-          const iconName = cache.getCourseIcon(course.ref_id);
+          const iconName = cache.getCourseIcon(course.ref_id, course);
           const isSelected = selectedCourseId === course.ref_id;
 
           return (
