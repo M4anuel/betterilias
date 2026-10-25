@@ -19,6 +19,17 @@ async def get_repository(
     return await client.get_repository(ref_id)
 
 
+
+@router.get("/courses/video-stream-info")
+async def get_video_stream_info(
+    url: str = Query(..., description="Opencast streamVideo URL"),
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Resolve an Opencast streamVideo URL to direct MP4 stream and metadata.
+    """
+    return await client.resolve_video_stream(url)
+
 @router.get("/courses/{course_id}/materials", response_model=CourseMaterialsResponse)
 async def get_materials(
     course_id: str,

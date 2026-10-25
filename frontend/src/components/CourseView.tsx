@@ -70,16 +70,22 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
     .replace(/PageTocPH/g, '')
     .replace(/Break(?=\s*<\/|\s*$|\s*<)|\bBreak\b/g, '');
 
-  // Safeguard: Transform Opencast video containers to rich video cards to prevent recursive BetterIlias SPA loading
+  // Safeguard: Preserve pre-resolved video players, or wrap Opencast video containers
   cleaned = cleaned.replace(
     /<div\s+[^>]*class=["'][^"']*ocpc-container[^"']*["'][^>]*>[\s\S]*?<iframe\s+[^>]*src=["']([^"']*)["'][^>]*>[\s\S]*?<\/iframe>[\s\S]*?<\/div>/gi,
-    (_match, src) => {
+    (match, src) => {
+      if (match.includes('<video') || match.includes('betterilias-video-player-container')) {
+        return match;
+      }
       let targetUrl = containerRefId
         ? `https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&cmdNode=yv:oj&cmdClass=ilobjfoldergui&ref_id=${containerRefId}&item_ref_id=0`
         : 'https://ilias.unibe.ch';
-      if (src.startsWith('http')) targetUrl = src;
-      else if (src.startsWith('/')) targetUrl = `https://ilias.unibe.ch${src}`;
-      return `<div class="betterilias-video-placeholder ocpc-video-card" data-video-url="${targetUrl}"><div class="betterilias-video-inner"><div class="betterilias-video-play-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div><div class="betterilias-video-info"><span class="betterilias-video-title">Video-Tutorial auf ILIAS ansehen</span><span class="betterilias-video-desc">Opencast Vorlesungs-Player</span></div><a href="${targetUrl}" target="_blank" rel="noreferrer" class="betterilias-video-btn"><span>Video auf ILIAS öffnen</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div></div>`;
+      let fullSrc = src;
+      if (src.startsWith('http')) fullSrc = src;
+      else if (src.startsWith('/')) fullSrc = `https://ilias.unibe.ch${src}`;
+      else fullSrc = `https://ilias.unibe.ch/${src}`;
+
+      return `<div class="betterilias-video-player-container my-3" data-video-stream-url="${fullSrc}" style="max-width: 960px;"><div class="betterilias-video-placeholder ocpc-video-card" data-video-url="${fullSrc}"><div class="betterilias-video-inner"><div class="betterilias-video-play-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div><div class="betterilias-video-info"><span class="betterilias-video-title">Video laden und abspielen</span><span class="betterilias-video-desc">Opencast Vorlesungs-Player</span></div><a href="${targetUrl}" target="_blank" rel="noreferrer" class="betterilias-video-btn"><span>Auf ILIAS ansehen</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div></div></div>`;
     }
   );
 
@@ -952,12 +958,50 @@ export const CourseView: React.FC<CourseViewProps> = ({
   const handleRichContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
 
-    // Handle Opencast video placeholder clicks
-    const videoCard = target.closest<HTMLElement>('.betterilias-video-placeholder, .ocpc-video-card');
+    // Handle Opencast video placeholder clicks & in-place playback
+    const videoBtn = target.closest<HTMLElement>('.betterilias-video-btn, a[href*="ilias.unibe.ch"]');
+    if (videoBtn) {
+      // Allow default link behavior to open ILIAS
+      return;
+    }
+    const videoCard = target.closest<HTMLElement>('.betterilias-video-placeholder, .ocpc-video-card, [data-video-stream-url]');
     if (videoCard) {
-      const url = videoCard.getAttribute('data-video-url');
-      if (url) {
-        window.open(url, '_blank', 'noreferrer');
+      e.preventDefault();
+      const streamUrl = videoCard.getAttribute('data-video-stream-url') || videoCard.getAttribute('data-video-url');
+      if (streamUrl) {
+        const container = videoCard.closest<HTMLElement>('.betterilias-video-player-container') || videoCard;
+        const titleSpan = videoCard.querySelector('.betterilias-video-title');
+        if (titleSpan) titleSpan.textContent = 'Video wird geladen...';
+
+        fetch(`/api/courses/video-stream-info?url=${encodeURIComponent(streamUrl)}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && data.mp4_url) {
+              const posterAttr = data.preview_url ? `poster="${data.preview_url}"` : '';
+              const durStr = data.duration
+                ? `${Math.floor(data.duration / 60).toString().padStart(2, '0')}:${(data.duration % 60).toString().padStart(2, '0')}`
+                : '';
+              const titleText = data.title ? (durStr ? `${data.title} (${durStr})` : data.title) : 'Video-Tutorial';
+              container.innerHTML = `
+                <video controls autoplay playsinline preload="auto" ${posterAttr} class="w-full aspect-video rounded-xl bg-black shadow-md border border-slate-800">
+                  <source src="${data.mp4_url}" type="video/mp4" />
+                  Ihr Browser unterstützt das Video-Tag nicht.
+                </video>
+                <div class="betterilias-video-caption flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-2 px-1">
+                  <span class="font-medium truncate">${titleText}</span>
+                  <a href="${data.fallback_url || 'https://ilias.unibe.ch'}" target="_blank" rel="noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-500 font-semibold hover:underline shrink-0">
+                    <span>Auf ILIAS ansehen</span>
+                    <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                  </a>
+                </div>
+              `;
+            } else if (data && data.fallback_url) {
+              window.open(data.fallback_url, '_blank', 'noreferrer');
+            }
+          })
+          .catch(() => {
+            if (streamUrl) window.open(streamUrl, '_blank', 'noreferrer');
+          });
         return;
       }
     }

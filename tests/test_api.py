@@ -522,3 +522,25 @@ def test_team_management_api_endpoints():
     ):
         res = client.delete("/api/exercises/3803739/assignment/53189/team")
         assert res.status_code == 200
+
+
+def test_video_stream_info_endpoint():
+    mock_info = {
+        "mp4_url": "https://dist.opencast.unibe.ch/static/test.mp4",
+        "preview_url": "https://dist.opencast.unibe.ch/static/preview.jpg",
+        "title": "Variables in R",
+        "duration": 465,
+        "video_url": "https://ilias.unibe.ch/ilias.php?cmdClass=xoctPlayerGUI&cmd=streamVideo",
+        "fallback_url": "https://ilias.unibe.ch/ilias.php?cmdClass=xoctPlayerGUI&cmd=streamVideo",
+    }
+    with patch(
+        "backend.api.routes.materials.IliasClient.resolve_video_stream",
+        new_callable=AsyncMock,
+        return_value=mock_info,
+    ):
+        res = client.get("/api/courses/video-stream-info?url=https%3A%2F%2Filias.unibe.ch%2Ftest")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["mp4_url"] == "https://dist.opencast.unibe.ch/static/test.mp4"
+        assert data["title"] == "Variables in R"
+        assert data["duration"] == 465

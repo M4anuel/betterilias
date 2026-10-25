@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 import urllib.parse
@@ -267,7 +268,10 @@ class IliasClient:
         async with self.session_manager.get_http_client() as client:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
-            parsed = parse_course_materials(resp.text, container_ref_id=ref_id)
+            html_content = resp.text
+            if "streamVideo" in html_content or "xoctPlayerGUI" in html_content:
+                html_content = await self._resolve_opencast_videos_in_html(html_content, client, ref_id)
+            parsed = parse_course_materials(html_content, container_ref_id=ref_id)
             # Some unjoined courses expose Join only in their parent category.
             if not parsed.items and not parsed.membership.can_join and not parsed.membership.can_leave:
                 parent = next((b for b in reversed(parsed.breadcrumbs) if b.ref_id != ref_id and b.url and '/go/cat/' in b.url), None)
@@ -278,6 +282,125 @@ class IliasClient:
                     parsed.membership = parse_membership(BeautifulSoup(listing.text, 'lxml'), ref_id)
                     parsed.is_enrolled = parsed.membership.is_enrolled
             return parsed
+
+
+    async def resolve_video_stream(self, video_url: str) -> dict:
+        """Resolve an Opencast streamVideo / Paella URL to MP4 stream and metadata."""
+        self._ensure_authenticated()
+        full_url = video_url if video_url.startswith("http") else f"{settings.ilias_base_url}/{video_url.lstrip('/')}"
+        async with self.session_manager.get_http_client() as client:
+            try:
+                resp = await client.get(full_url)
+                mp4_m = re.search(r'"src":"(https?:\\/\\/[^"]+?\.mp4)"', resp.text)
+                prev_m = re.search(r'"preview":"(https?:\\/\\/[^"]+?)"', resp.text)
+                title_m = re.search(r'"title":"([^"]+)"', resp.text)
+                dur_m = re.search(r'"duration":(\d+)', resp.text)
+
+                mp4_url = mp4_m.group(1).replace(r"\/", "/") if mp4_m else None
+                preview_url = prev_m.group(1).replace(r"\/", "/") if prev_m else None
+                title = title_m.group(1) if title_m else None
+                duration = int(dur_m.group(1)) // 1000 if dur_m else None
+
+                return {
+                    "mp4_url": mp4_url,
+                    "preview_url": preview_url,
+                    "title": title,
+                    "duration": duration,
+                    "video_url": video_url,
+                    "fallback_url": full_url,
+                }
+            except Exception as e:
+                logger.warning(f"Failed to resolve video stream {video_url}: {e}")
+                return {
+                    "mp4_url": None,
+                    "preview_url": None,
+                    "title": None,
+                    "duration": None,
+                    "video_url": video_url,
+                    "fallback_url": full_url,
+                }
+
+    async def _resolve_opencast_videos_in_html(self, html_content: str, client: httpx.AsyncClient, container_ref_id: str) -> str:
+        """Pre-resolve all Opencast streamVideo iframes concurrently into native video player elements."""
+        soup = BeautifulSoup(html_content, "html.parser")
+        stream_iframes = [
+            ifr for ifr in soup.find_all("iframe")
+            if ifr.get("src") and ("streamVideo" in ifr.get("src") or "xoctPlayerGUI" in ifr.get("src"))
+        ]
+        if not stream_iframes:
+            return html_content
+
+        ilias_folder_url = (
+            f"{settings.ilias_base_url}/ilias.php?baseClass=ilrepositorygui&cmdNode=yv:oj&cmdClass=ilobjfoldergui&ref_id={container_ref_id}&item_ref_id=0"
+            if container_ref_id
+            else settings.ilias_base_url
+        )
+
+        async def fetch_video_data(ifr):
+            src = ifr.get("src")
+            full_src = src if src.startswith("http") else f"{settings.ilias_base_url}/{src.lstrip('/')}"
+            try:
+                r = await client.get(full_src)
+                mp4_m = re.search(r'"src":"(https?:\\/\\/[^"]+?\.mp4)"', r.text)
+                prev_m = re.search(r'"preview":"(https?:\\/\\/[^"]+?)"', r.text)
+                title_m = re.search(r'"title":"([^"]+)"', r.text)
+                dur_m = re.search(r'"duration":(\d+)', r.text)
+                if mp4_m:
+                    return (
+                        ifr,
+                        mp4_m.group(1).replace(r"\/", "/"),
+                        prev_m.group(1).replace(r"\/", "/") if prev_m else None,
+                        title_m.group(1) if title_m else None,
+                        int(dur_m.group(1)) // 1000 if dur_m else None,
+                    )
+            except Exception as e:
+                logger.warning(f"Error pre-resolving video {src}: {e}")
+            return (ifr, None, None, None, None)
+
+        results = await asyncio.gather(*[fetch_video_data(ifr) for ifr in stream_iframes])
+        for ifr, mp4_url, preview_url, title, duration in results:
+            target_container = ifr.parent if ifr.parent and "ocpc-container" in ifr.parent.get("class", []) else ifr
+            if mp4_url:
+                poster_attr = f'poster="{preview_url}"' if preview_url else ""
+                dur_str = f"{duration // 60:02d}:{duration % 60:02d}" if duration else ""
+                title_text = f"{title} ({dur_str})" if (title and dur_str) else (title or "Video-Tutorial")
+                player_html = f'''<div class="betterilias-video-player-container my-3" style="max-width: 960px;">
+  <video controls playsinline preload="metadata" {poster_attr} class="w-full aspect-video rounded-xl bg-black shadow-md border border-slate-800">
+    <source src="{mp4_url}" type="video/mp4" />
+    Ihr Browser unterstützt das Video-Tag nicht.
+  </video>
+  <div class="betterilias-video-caption flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-2 px-1">
+    <span class="font-medium truncate">{title_text}</span>
+    <a href="{ilias_folder_url}" target="_blank" rel="noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-500 font-semibold hover:underline shrink-0">
+      <span>Auf ILIAS ansehen</span>
+      <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+    </a>
+  </div>
+</div>'''
+                target_container.replace_with(BeautifulSoup(player_html, "html.parser").div)
+            else:
+                src = ifr.get("src", "")
+                full_src = src if src.startswith("http") else f"{settings.ilias_base_url}/{src.lstrip('/')}"
+                card_html = f'''<div class="betterilias-video-player-container my-3" data-video-stream-url="{full_src}" style="max-width: 960px;">
+  <div class="betterilias-video-placeholder ocpc-video-card" data-video-url="{full_src}">
+    <div class="betterilias-video-inner">
+      <div class="betterilias-video-play-btn">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+      </div>
+      <div class="betterilias-video-info">
+        <span class="betterilias-video-title">Video-Tutorial</span>
+        <span class="betterilias-video-desc">Opencast Vorlesungs-Player</span>
+      </div>
+      <a href="{ilias_folder_url}" target="_blank" rel="noreferrer" class="betterilias-video-btn">
+        <span>Auf ILIAS öffnen</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+      </a>
+    </div>
+  </div>
+</div>'''
+                target_container.replace_with(BeautifulSoup(card_html, "html.parser").div)
+
+        return str(soup)
 
     def _validate_membership_url(self, url: str, ref_id: str):
         base = urllib.parse.urlparse(settings.ilias_base_url)

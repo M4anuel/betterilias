@@ -44,9 +44,23 @@ def _clean_rich_html(raw_html: str, container_ref_id: str = "") -> str:
             video_title = None
             duration_str = None
 
-            if "files" in src and "ilias" in src and uni_dumps_dir.exists():
-                target_name = Path(src.replace("./", "")).name
-                for match_file in uni_dumps_dir.rglob(target_name):
+            if uni_dumps_dir.exists():
+                target_name = Path(src.replace('./', '')).name if ('files' in src or 'ilias' in src) else None
+                candidates = list(uni_dumps_dir.rglob(target_name)) if target_name else []
+                if not candidates:
+                    eid_match = re.search(r'eid=([a-f0-9\-]+)', src)
+                    if eid_match:
+                        target_eid = eid_match.group(1)
+                        for f in uni_dumps_dir.rglob('*.html'):
+                            if 'ilias' in f.name.lower():
+                                try:
+                                    f_txt = f.read_text(encoding='utf-8', errors='replace')
+                                    if target_eid in f_txt and '.mp4' in f_txt:
+                                        candidates.append(f)
+                                        break
+                                except Exception:
+                                    pass
+                for match_file in candidates:
                     try:
                         txt = match_file.read_text(encoding="utf-8", errors="replace")
                         mp4_m = re.search(r'"src":"(https?:\\/\\/[^"]+?\.mp4)"', txt)
@@ -85,22 +99,25 @@ def _clean_rich_html(raw_html: str, container_ref_id: str = "") -> str:
 </div>'''
                 ocpc.replace_with(BeautifulSoup(player_html, "html.parser").div)
             else:
-                card_html = f'''<div class="betterilias-video-placeholder ocpc-video-card" data-video-url="{ilias_page_url}">
-  <div class="betterilias-video-inner">
-    <div class="betterilias-video-play-btn">
-      <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
-    </div>
-    <div class="betterilias-video-info">
-      <span class="betterilias-video-title">Video-Tutorial auf ILIAS ansehen</span>
-      <span class="betterilias-video-desc">Opencast Vorlesungs-Player</span>
-    </div>
-    <a href="{ilias_page_url}" target="_blank" rel="noreferrer" class="betterilias-video-btn">
-      <span>Video auf ILIAS öffnen</span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-    </a>
-  </div>
-</div>'''
-                ocpc.replace_with(BeautifulSoup(card_html, "html.parser").div)
+                full_stream_src = src if src.startswith('http') else (f'https://ilias.unibe.ch/{src.lstrip("/")}' if src else ilias_page_url)
+                card_html = f'''<div class="betterilias-video-player-container my-3" data-video-stream-url="{full_stream_src}" style="max-width: 960px;">
+              <div class="betterilias-video-placeholder ocpc-video-card" data-video-url="{full_stream_src}">
+                <div class="betterilias-video-inner">
+                  <div class="betterilias-video-play-btn">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+                  </div>
+                  <div class="betterilias-video-info">
+                    <span class="betterilias-video-title">Video-Tutorial abspielen</span>
+                    <span class="betterilias-video-desc">Opencast Vorlesungs-Player</span>
+                  </div>
+                  <a href="{ilias_page_url}" target="_blank" rel="noreferrer" class="betterilias-video-btn">
+                    <span>Auf ILIAS ansehen</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                  </a>
+                </div>
+              </div>
+            </div>'''
+                ocpc.replace_with(BeautifulSoup(card_html, 'html.parser').div)
 
         # Check remaining iframes
         for ifr in soup.find_all("iframe"):
@@ -1230,4 +1247,3 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
         blocks=blocks,
         layout_hash=layout_hash,
     )
-
