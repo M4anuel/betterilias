@@ -62,6 +62,10 @@ from backend.scrapers import (
     parse_ta_assignment_form,
     parse_instruction_files,
 )
+from backend.services.semester_utils import (
+    generate_semester_list,
+    get_current_semester,
+)
 
 logger = logging.getLogger("ilias.service")
 
@@ -226,15 +230,9 @@ class IliasClient:
         """Fetch and parse courses grouped by semester (Uni Bern iliLubModsSemesterGUI)."""
         self._ensure_authenticated()
 
-        # Semesters going back to 2021 (Supports studies starting in 2022 and beyond)
-        sem_list = [
-            "FS2027", "HS2026", "FS2026", "HS2025", "FS2025",
-            "HS2024", "FS2024", "HS2023", "FS2023", "HS2022",
-            "FS2022", "HS2021"
-        ]
-        target_sem = semester or "HS2026"
-        if target_sem not in sem_list:
-            sem_list.insert(0, target_sem)
+        current_sem = get_current_semester()
+        target_sem = semester or current_sem
+        sem_list = generate_semester_list(target_sem=target_sem, current_sem=current_sem)
 
         semesters_str = "_".join(sem_list)
         url = (

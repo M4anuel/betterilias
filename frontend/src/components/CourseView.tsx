@@ -63,12 +63,37 @@ export function cleanRichContentTitle(title?: string | null): string {
     .trim();
 }
 
-export function cleanRichContentHtml(html?: string | null, blockTitle?: string | null): string {
+export function cleanRichContentHtml(html?: string | null, blockTitle?: string | null, containerRefId?: string | null): string {
   if (!html) return '';
   let cleaned = html
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/PageTocPH/g, '')
     .replace(/Break(?=\s*<\/|\s*$|\s*<)|\bBreak\b/g, '');
+
+  // Safeguard: Transform Opencast video containers to rich video cards to prevent recursive BetterIlias SPA loading
+  cleaned = cleaned.replace(
+    /<div\s+[^>]*class=["'][^"']*ocpc-container[^"']*["'][^>]*>[\s\S]*?<iframe\s+[^>]*src=["']([^"']*)["'][^>]*>[\s\S]*?<\/iframe>[\s\S]*?<\/div>/gi,
+    (_match, src) => {
+      let targetUrl = containerRefId
+        ? `https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&cmdNode=yv:oj&cmdClass=ilobjfoldergui&ref_id=${containerRefId}&item_ref_id=0`
+        : 'https://ilias.unibe.ch';
+      if (src.startsWith('http')) targetUrl = src;
+      else if (src.startsWith('/')) targetUrl = `https://ilias.unibe.ch${src}`;
+      return `<div class="betterilias-video-placeholder ocpc-video-card" data-video-url="${targetUrl}"><div class="betterilias-video-inner"><div class="betterilias-video-play-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div><div class="betterilias-video-info"><span class="betterilias-video-title">Video-Tutorial auf ILIAS ansehen</span><span class="betterilias-video-desc">Opencast Vorlesungs-Player</span></div><a href="${targetUrl}" target="_blank" rel="noreferrer" class="betterilias-video-btn"><span>Video auf ILIAS öffnen</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div></div>`;
+    }
+  );
+
+  // Safeguard: Never allow relative iframes to loop into BetterIlias router
+  cleaned = cleaned.replace(
+    /<iframe\s+[^>]*src=["'](\.[^"']+|\/[^"']*)["'][^>]*>[\s\S]*?<\/iframe>/gi,
+    (match, src) => {
+      if (src.toLowerCase().includes('.pdf')) {
+        const absSrc = src.startsWith('/') ? `https://ilias.unibe.ch${src}` : src;
+        return `<iframe class="pdf-embed" src="${absSrc}"></iframe>`;
+      }
+      return `<div class="p-4 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 text-xs"><span>Eingebetteter Inhalt (ILIAS)</span><a href="https://ilias.unibe.ch" target="_blank" rel="noreferrer" class="text-sky-600 font-bold hover:underline">In ILIAS öffnen →</a></div>`;
+    }
+  );
 
   if (blockTitle) {
     const cleanTitle = cleanRichContentTitle(blockTitle);
@@ -923,6 +948,147 @@ export const CourseView: React.FC<CourseViewProps> = ({
     return <Info className="h-4 w-4 text-indigo-500" />;
   };
 
+  // Interactive handler for ILIAS Page Editor vertical accordions (.ilc_va_cntr_VAccordCntr) and video cards
+  const handleRichContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+
+    // Handle Opencast video placeholder clicks
+    const videoCard = target.closest<HTMLElement>('.betterilias-video-placeholder, .ocpc-video-card');
+    if (videoCard) {
+      const url = videoCard.getAttribute('data-video-url');
+      if (url) {
+        window.open(url, '_blank', 'noreferrer');
+        return;
+      }
+    }
+    const toggleBtn = target.closest<HTMLElement>(
+      '.ilc_va_ihead_VAccordIHeadDezent, .ilc_va_ihead_VAccordIHeadDef, .il_VAccordionToggleDef [role="button"], .il_VAccordionToggleDef'
+    );
+    if (!toggleBtn) return;
+
+    e.preventDefault();
+    const accordionItem = toggleBtn.closest('.ilc_va_icntr_VAccordICntr');
+    if (!accordionItem) return;
+
+    const content = accordionItem.querySelector('.il_VAccordionContentDef');
+    if (!content) return;
+
+    const headBtn = accordionItem.querySelector<HTMLElement>('[role="button"]') || toggleBtn;
+    const isExpanded = headBtn.getAttribute('aria-expanded') === 'true';
+
+    headBtn.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+    if (isExpanded) {
+      content.classList.add('ilAccHideContent');
+    } else {
+      content.classList.remove('ilAccHideContent');
+    }
+  };
+
+  // Render a rich tile card for courses with tile layout (e.g. Programming with R)
+  const renderTileItemCard = (item: MaterialItem) => {
+    const isFile = item.item_type === 'file';
+    const isFolder = item.item_type === 'fold';
+    const isPodcast =
+      !isFile &&
+      (item.item_type === 'mcst' ||
+        item.url.toLowerCase().includes('xoct') ||
+        item.url.toLowerCase().includes('/go/mcst/'));
+    const isExercise =
+      !isFile &&
+      !isFolder &&
+      (item.item_type === 'exc' ||
+        item.url.toLowerCase().includes('ilexercise') ||
+        item.url.toLowerCase().includes('ilobjexercisegui') ||
+        item.url.toLowerCase().includes('/go/exc/'));
+    const downloadUrl = isFile ? api.getDownloadUrl(item.ref_id, item.download_url) : null;
+    const stat = isFolder ? folderStats[item.ref_id] : null;
+
+    const handleTileClick = () => {
+      if (isFolder) {
+        onNavigateFolder(item.ref_id);
+      } else if (isPodcast) {
+        setActivePodcast({ refId: item.ref_id, title: item.title });
+      } else if (isExercise) {
+        setActiveExerciseRefId(item.ref_id);
+      } else if (isFile && downloadUrl) {
+        window.open(downloadUrl, '_blank');
+      } else if (item.url) {
+        window.open(item.url, '_blank', 'noreferrer');
+      }
+    };
+
+    return (
+      <div
+        key={item.ref_id || item.url || item.title}
+        onClick={handleTileClick}
+        className="group flex flex-col rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-2xs hover:shadow-md hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 transition cursor-pointer select-none"
+      >
+        {/* Cover Image or Visual Header */}
+        {item.image_url ? (
+          <div className="relative aspect-16/10 w-full overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-800">
+            <img
+              src={item.image_url}
+              alt={item.title}
+              className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+          </div>
+        ) : (
+          <div className="relative aspect-16/10 w-full flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-800/80 dark:to-slate-850 border-b border-slate-100 dark:border-slate-800">
+            {getItemIcon(item)}
+          </div>
+        )}
+
+        {/* Card Content Body */}
+        <div className="p-3.5 flex flex-col justify-between flex-1 gap-2.5">
+          <div>
+            <h4
+              className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-amber-800 dark:text-slate-100 dark:group-hover:text-amber-300 transition line-clamp-2"
+              title={item.title}
+            >
+              {item.title}
+            </h4>
+            {item.description && (
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">
+                {item.description}
+              </p>
+            )}
+          </div>
+
+          {/* Footer Metadata & Action */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-1.5 truncate">
+              {getItemIcon(item)}
+              {isFolder && stat?.isMapped ? (
+                stat.isEmpty ? (
+                  <span>Leer</span>
+                ) : (
+                  <span>
+                    {stat.files > 0 && stat.folders > 0
+                      ? `${stat.files} D., ${stat.folders} O.`
+                      : stat.files > 0
+                      ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}`
+                      : `${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`}
+                  </span>
+                )
+              ) : item.file_size ? (
+                <span className="font-mono">{item.file_size}</span>
+              ) : (
+                <span className="capitalize">{item.item_type || 'Element'}</span>
+              )}
+            </div>
+
+            <span className="font-semibold text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition shrink-0">
+              {isFolder ? 'Öffnen →' : isPodcast ? 'Aufnahmen' : isExercise ? 'Übungen' : isFile ? 'Download' : 'Öffnen'}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render a single material item row
   const renderItemRow = (item: MaterialItem) => {
     const isFile = item.item_type === 'file';
@@ -954,9 +1120,20 @@ export const CourseView: React.FC<CourseViewProps> = ({
           className="flex items-center justify-between p-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition rounded-xl border border-transparent hover:border-amber-200 dark:hover:border-amber-800/60 cursor-pointer group"
         >
           <div className="flex items-center gap-3 truncate pr-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shrink-0 group-hover:scale-105 transition">
-              <Folder className="h-4 w-4 fill-amber-100 dark:fill-amber-950/60" />
-            </div>
+            {item.image_url ? (
+              <img
+                src={item.image_url}
+                alt=""
+                className="h-8 w-8 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0 group-hover:scale-105 transition"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shrink-0 group-hover:scale-105 transition">
+                <Folder className="h-4 w-4 fill-amber-100 dark:fill-amber-950/60" />
+              </div>
+            )}
             <div className="truncate">
               <span className="text-xs font-bold text-slate-800 group-hover:text-amber-800 dark:text-slate-100 dark:group-hover:text-amber-300 transition block truncate">
                 {item.title}
@@ -1120,9 +1297,20 @@ export const CourseView: React.FC<CourseViewProps> = ({
         className="flex items-center justify-between p-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition rounded-xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 gap-3"
       >
         <div className="flex items-center gap-3 truncate">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
-            {getItemIcon(item)}
-          </div>
+          {item.image_url ? (
+            <img
+              src={item.image_url}
+              alt=""
+              className="h-8 w-8 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
+              {getItemIcon(item)}
+            </div>
+          )}
           <div className="truncate">
             {isFile && downloadUrl ? (
               <a
@@ -1181,7 +1369,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
     );
   };
 
-  const renderDrawerBlock = (block: CourseContentBlock): React.ReactNode => {
+    const renderDrawerBlock = (block: CourseContentBlock): React.ReactNode => {
     const isCollapsed = !!collapsedDrawers[block.id];
     const totalCount = countTotalItemsInBlock(block);
 
@@ -1193,32 +1381,35 @@ export const CourseView: React.FC<CourseViewProps> = ({
         <button
           type="button"
           onClick={() => toggleDrawer(block.id)}
-          className="flex w-full items-center justify-between p-4 bg-slate-50/70 hover:bg-slate-100/60 dark:bg-slate-800/70 dark:hover:bg-slate-800 transition text-left select-none cursor-pointer"
+          className="flex w-full items-center justify-between p-3.5 bg-slate-50/70 hover:bg-slate-100/60 dark:bg-slate-800/70 dark:hover:bg-slate-800 transition text-left select-none cursor-pointer"
         >
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 shrink-0">
-              <Bookmark className="h-4 w-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{block.title || 'Schublade'}</h3>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                {(block.child_blocks?.length || 0)} {(block.child_blocks?.length === 1 ? 'Unterabschnitt' : 'Unterabschnitte')}
-                {totalCount > 0 ? ` • ${totalCount} ${totalCount === 1 ? 'Element' : 'Elemente'}` : ''}
-              </p>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <ChevronDown
+              className={`h-4 w-4 text-slate-500 dark:text-slate-400 transition-transform duration-200 ${
+                isCollapsed ? '-rotate-90' : 'rotate-0'
+              }`}
+            />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {block.title || 'Schublade'}
+            </h3>
           </div>
 
-          <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
-            {isCollapsed ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
+          <div className="flex items-center gap-2">
+            {totalCount > 0 && (
+              <span className="rounded-full bg-slate-200/60 dark:bg-slate-700/60 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                {totalCount}
+              </span>
+            )}
           </div>
         </button>
 
         {!isCollapsed && (
-          <div className="p-4 space-y-6 border-t border-slate-100 dark:border-slate-800">
+          <div className="p-4 space-y-4 border-t border-slate-100 dark:border-slate-800">
             {block.html_content && (
               <div
+                onClick={handleRichContentClick}
                 className="ilias-rich-content text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-sans rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3.5"
-                dangerouslySetInnerHTML={{ __html: cleanRichContentHtml(block.html_content, block.title) }}
+                dangerouslySetInnerHTML={{ __html: cleanRichContentHtml(block.html_content, block.title, materialsData?.container_ref_id || courseRefId) }}
               />
             )}
 
@@ -1229,9 +1420,15 @@ export const CourseView: React.FC<CourseViewProps> = ({
             )}
 
             {block.items && block.items.length > 0 && (
-              <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 bg-white shadow-2xs overflow-hidden dark:border-slate-800 dark:divide-slate-800 dark:bg-slate-900">
-                {block.items.map(renderItemRow)}
-              </div>
+              block.presentation === 'tiles' || block.items.some((it) => !!it.image_url) ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+                  {block.items.map(renderTileItemCard)}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 bg-white shadow-2xs overflow-hidden dark:border-slate-800 dark:divide-slate-800 dark:bg-slate-900">
+                  {block.items.map(renderItemRow)}
+                </div>
+              )
             )}
 
             {block.sessions && block.sessions.length > 0 && (
@@ -1245,13 +1442,37 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
   const renderTextBlock = (block: CourseContentBlock): React.ReactNode => {
     const cleanTitle = cleanRichContentTitle(block.title);
-    const cleanedHtml = cleanRichContentHtml(block.html_content, cleanTitle || block.title);
+    const cleanedHtml = cleanRichContentHtml(block.html_content, cleanTitle || block.title, materialsData?.container_ref_id || courseRefId);
     const cleanedPlain = (block.plain_text || '')
       .replace(/PageTocPH/g, '')
       .replace(/Break(?=\s*<\/|\s*$|\s*<)|\bBreak\b/g, '')
       .trim();
 
     if (!cleanedHtml && !cleanedPlain && !cleanTitle) return null;
+
+    // Detect section divider headings (e.g. "Informationen zur Lehrveranstaltung", "Zusätzliches Lernangebot", "Materialien")
+    const isDividerHeading =
+      (block.html_content?.includes('ilc_text_inline_Accent') ||
+        block.html_content?.includes('ilc_strong_Strong') ||
+        block.html_content?.includes('ilc_heading')) &&
+      cleanedPlain.length < 90 &&
+      !cleanedHtml.includes('<table') &&
+      !cleanedHtml.includes('<iframe') &&
+      !cleanedHtml.includes('<ul') &&
+      !cleanedHtml.includes('<ol');
+
+    if (isDividerHeading) {
+      return (
+        <div key={block.id} className="pt-6 pb-2 border-b border-slate-200/80 dark:border-slate-800">
+          <div
+            onClick={handleRichContentClick}
+            className="ilias-rich-content text-base font-bold text-[#d81e5b] dark:text-[#fb7185] tracking-tight flex items-center gap-2"
+            dangerouslySetInnerHTML={{ __html: cleanedHtml }}
+          />
+        </div>
+      );
+    }
+
     return (
       <div
         key={block.id}
@@ -1265,6 +1486,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
         )}
         {cleanedHtml && (
           <div
+            onClick={handleRichContentClick}
             className="ilias-rich-content text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-sans"
             dangerouslySetInnerHTML={{ __html: cleanedHtml }}
           />
@@ -1317,6 +1539,35 @@ export const CourseView: React.FC<CourseViewProps> = ({
   const renderItemsBlock = (block: CourseContentBlock): React.ReactNode => {
     const items = block.items || [];
     if (items.length === 0) return null;
+
+    const isTilePresentation =
+      block.presentation === 'tiles' || items.some((i) => !!i.image_url);
+
+    if (isTilePresentation) {
+      return (
+        <div key={block.id} className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Folder className="h-4 w-4 text-amber-500" />
+              <span>{block.title || 'Materialien'}</span>
+              <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                {items.length}
+              </span>
+            </h3>
+            {isScanningTree && (
+              <div className="flex items-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md font-medium">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                <span>Analysiere Unterordner...</span>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {items.map(renderTileItemCard)}
+          </div>
+        </div>
+      );
+    }
 
     // Check if all items are folders
     const allFolders = items.every((i) => i.item_type === 'fold');
@@ -1468,8 +1719,30 @@ export const CourseView: React.FC<CourseViewProps> = ({
     );
   };
 
+  const renderColumnsBlock = (block: CourseContentBlock): React.ReactNode => {
+    const colCount = block.columns || block.child_blocks?.length || 2;
+    const gridColsClass =
+      colCount === 2
+        ? 'grid-cols-1 md:grid-cols-2'
+        : colCount === 3
+        ? 'grid-cols-1 md:grid-cols-3'
+        : 'grid-cols-1 md:grid-cols-2';
+
+    return (
+      <div key={block.id} className={`grid ${gridColsClass} gap-4 items-start`}>
+        {block.child_blocks?.map((colBlock, idx) => (
+          <div key={colBlock.id || idx} className="space-y-4">
+            {colBlock.child_blocks?.map(renderBlock)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const renderBlock = (block: CourseContentBlock): React.ReactNode => {
     switch (block.block_type) {
+      case 'columns':
+        return renderColumnsBlock(block);
       case 'heading':
         return renderHeadingBlock(block);
       case 'drawer':

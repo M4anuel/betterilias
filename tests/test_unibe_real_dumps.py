@@ -7,6 +7,16 @@ from backend.scrapers.submissions import parse_exercise_overview
 
 FIXTURES_UNIBE = Path(__file__).parent / "fixtures" / "unibe"
 
+def find_html_dump(pattern: str):
+    import glob
+    matches = glob.glob(f"**/*{pattern}*.html", recursive=True)
+    if not matches:
+        alt_dir = Path(r"C:\Users\manue\OneDrive\Dokumente\_Uni\IliasAlternative\htmlfromilias")
+        if alt_dir.exists():
+            matches = [str(p) for p in alt_dir.rglob(f"*{pattern}*.html")]
+    return matches
+
+
 
 def test_real_unibe_semester_screen():
     html = (FIXTURES_UNIBE / "unibe_semester_hs2026.html").read_text(encoding="utf-8", errors="replace")
@@ -580,7 +590,7 @@ def test_real_unibe_course_content_blocks():
 
 def test_real_unibe_new_work_drawers():
     import glob
-    matches = glob.glob("**/*New Work*.html", recursive=True)
+    matches = find_html_dump("New Work")
     assert len(matches) > 0, "New Work dump not found"
 
     html = Path(matches[0]).read_text(encoding="utf-8", errors="replace")
@@ -618,7 +628,7 @@ def test_real_unibe_new_work_drawers():
 
 def test_real_unibe_valuation_items_and_files():
     import glob
-    matches = glob.glob("**/*Valuation*.html", recursive=True)
+    matches = find_html_dump("Valuation")
     val_files = [p for p in matches if "BetterIlias" not in p]
     assert len(val_files) > 0, "Valuation dump not found"
 
@@ -642,7 +652,7 @@ def test_real_unibe_valuation_items_and_files():
 
 def test_real_unibe_psychopathologie_sessions_and_expand():
     import glob
-    matches = glob.glob("**/*Psychopathologie*.html", recursive=True)
+    matches = find_html_dump("Psychopathologie")
     assert len(matches) > 0, "Psychopathologie dump not found"
 
     html = Path(matches[0]).read_text(encoding="utf-8", errors="replace")
@@ -952,3 +962,121 @@ async def test_delete_student_team_removes_other_members_first():
     assert state["team_deleted"] is True
     assert detail.create_team_url is not None
     assert len(detail.team_members) == 0
+
+
+def test_real_unibe_programming_with_r_tiles():
+    matches = find_html_dump("5860")
+    if not matches:
+        pytest.skip("Programming with R dump not found")
+
+    html = Path(matches[0]).read_text(encoding="utf-8", errors="replace")
+    res = parse_course_materials(html, "5860")
+
+    # Find Lecture Material block
+    tile_blocks = [b for b in res.blocks if b.presentation == "tiles"]
+    assert len(tile_blocks) >= 1, "Expected at least 1 block with presentation='tiles'"
+
+    lecture_block = tile_blocks[0]
+    assert "Lecture Material" in lecture_block.title
+    assert len(lecture_block.items) == 3
+
+    titles = [it.title for it in lecture_block.items]
+    assert "R-Files and Datasets" in titles
+    assert "Assignments" in titles
+    assert "Tutorials" in titles
+
+    for it in lecture_block.items:
+        assert it.item_type == "fold"
+        assert it.image_url is not None, f"Item {it.title} missing image_url"
+
+
+def test_real_unibe_tutorials_subpage():
+    matches = find_html_dump("Tutorials")
+    if not matches:
+        pytest.skip("Tutorials dump not found")
+
+    html = Path(matches[0]).read_text(encoding="utf-8", errors="replace")
+    res = parse_course_materials(html, "9999")
+
+    # Should have extracted content blocks
+    assert len(res.blocks) > 0
+
+
+def test_real_unibe_math_wiso_multicolumn():
+    matches = find_html_dump("101559")
+    if not matches:
+        pytest.skip("Math WISO dump not found")
+
+    html = Path(matches[0]).read_text(encoding="utf-8", errors="replace")
+    res = parse_course_materials(html, "101559")
+
+    # Find columns block
+    col_blocks = [b for b in res.blocks if b.block_type == "columns"]
+    assert len(col_blocks) >= 1, "Expected at least 1 multi-column block"
+
+    col_block = col_blocks[0]
+    assert col_block.columns == 2, f"Expected 2 columns, got {col_block.columns}"
+    assert len(col_block.child_blocks) == 2, f"Expected 2 child columns, got {len(col_block.child_blocks)}"
+
+    col0 = col_block.child_blocks[0]
+    col1 = col_block.child_blocks[1]
+
+    # Verify Col 0 has 4 drawers: Vorlesung, Übungsstunde, Literatur, Zeitaufwand
+    assert len(col0.child_blocks) == 4
+    col0_titles = [d.title for d in col0.child_blocks]
+    assert any("Vorlesung" in t for t in col0_titles)
+    assert any("bungsstunde" in t for t in col0_titles)
+    assert any("Literatur" in t for t in col0_titles)
+    assert any("Zeitaufwand" in t for t in col0_titles)
+
+    # Verify Col 1 has 4 drawers: Prüfung, Bewertung, Podcasts, Kontakt
+    assert len(col1.child_blocks) == 4
+    col1_titles = [d.title for d in col1.child_blocks]
+    assert any("fung" in t for t in col1_titles)
+    assert any("Bewertung" in t for t in col1_titles)
+    assert any("Podcasts" in t for t in col1_titles)
+    assert any("Kontakt" in t for t in col1_titles)
+
+    # Verify Wochenplan table wrapper
+    wochenplan = next((b for b in res.blocks if b.title == "Wochenplan"), None)
+    assert wochenplan is not None
+    assert "ilc_table_StandardTable_wrapper" in (wochenplan.html_content or "")
+
+
+def test_real_unibe_tutorials_video_placeholders():
+    matches = find_html_dump("Tutorials")
+    if not matches:
+        pytest.skip("Tutorials dump not found")
+
+    html = Path(matches[0]).read_text(encoding="utf-8", errors="replace")
+    res = parse_course_materials(html, "3452832")
+
+    # Verify that Opencast video containers are converted to video players, NOT raw relative iframes
+    first_step = res.blocks[0]
+    assert first_step.html_content is not None
+    assert ("betterilias-video-player-container" in first_step.html_content or "betterilias-video-placeholder" in first_step.html_content)
+    assert "<iframe" not in first_step.html_content
+    assert ("Auf ILIAS ansehen" in first_step.html_content or "Video auf ILIAS öffnen" in first_step.html_content)
+    assert "ref_id=3452832" in first_step.html_content
+
+
+def test_real_unibe_math_wiso_accent_divider_titles():
+    matches = find_html_dump("101559")
+    if not matches:
+        pytest.skip("Math WISO dump not found")
+
+    html = Path(matches[0]).read_text(encoding="utf-8", errors="replace")
+    res = parse_course_materials(html, "101559")
+
+    # Verify that all lecturer section divider titles are extracted as distinct blocks
+    plain_texts = [(b.plain_text or "") for b in res.blocks]
+    html_texts = [(b.html_content or "") for b in res.blocks]
+
+    assert any("Komponente des online Lernangebots" in t for t in plain_texts)
+    assert any("Informationen zur Lehrveranstaltung" in t for t in plain_texts)
+    assert any("Zusätzliches Lernangebot" in t or "Zus" in t for t in plain_texts)
+    assert any("Materialien" in t for t in plain_texts)
+
+    # Verify that accent text spans are preserved in the HTML
+    assert any("ilc_text_inline_Accent" in h and "Informationen zur Lehrveranstaltung" in h for h in html_texts)
+    assert any("ilc_text_inline_Accent" in h and "Materialien" in h for h in html_texts)

@@ -25,7 +25,13 @@ translation catalogues, and build validation are not implemented yet.
 
 ## ILIAS content and formatting
 
-- [ ] Preserve more of the original ILIAS structure and formatting where possible.
+- [x] Preserve original ILIAS structure and formatting:
+  - [x] Multi-column layouts (2-column flex rows rendered side-by-side).
+  - [x] Section divider titles and accent colors (#d81e5b / #fb7185) preserved sequentially without merging.
+  - [x] Embedded Opencast video playback directly in BetterIlias with fallback link to exact ILIAS folder.
+  - [x] Full-height PDF embed containers.
+  - [x] Responsive table wrappers and optimal reading measure (~68ch max width for prose).
+- [ ] Continue preserving custom lecturer layouts and edge cases.
 
 ## Teaching assistant tools
 

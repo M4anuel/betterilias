@@ -71,6 +71,7 @@ class MaterialItem(BaseModel):
     download_url: Optional[str] = None
     file_size: Optional[str] = None
     properties: Dict[str, str] = Field(default_factory=dict)
+    image_url: Optional[str] = None
 
 class RichTextBlock(BaseModel):
     title: Optional[str] = None
@@ -129,7 +130,8 @@ class CourseSessionItem(BaseModel):
 
 class CourseContentBlock(BaseModel):
     id: str
-    block_type: str  # 'heading' | 'drawer' | 'items' | 'text' | 'sessions' | 'all_files'
+    block_type: str  # 'heading' | 'drawer' | 'items' | 'text' | 'sessions' | 'all_files' | 'columns' | 'column'
+    presentation: Optional[str] = None  # 'tiles' | 'list'
     title: Optional[str] = None
 
     items: List[MaterialItem] = Field(default_factory=list)
@@ -138,6 +140,7 @@ class CourseContentBlock(BaseModel):
     level: Optional[int] = 3
     child_blocks: List['CourseContentBlock'] = Field(default_factory=list)
     sessions: List[CourseSessionItem] = Field(default_factory=list)
+    columns: Optional[int] = None
 
 class CourseLogsResponse(BaseModel):
     course_id: str
@@ -189,6 +192,7 @@ class CourseMaterialsResponse(BaseModel):
     sections: List[CourseSection] = Field(default_factory=list)
     rich_text_blocks: List[RichTextBlock] = Field(default_factory=list)
     sessions: List[CourseSessionItem] = Field(default_factory=list)
+    columns: Optional[int] = None
     logs: List[CourseLogItem] = Field(default_factory=list)
     blocks: List[CourseContentBlock] = Field(default_factory=list)
     layout_hash: Optional[str] = None

@@ -39,6 +39,7 @@ export interface MaterialItem {
   download_url?: string;
   file_size?: string;
   properties: Record<string, string>;
+  image_url?: string;
 }
 
 export interface RichTextBlock {
@@ -105,7 +106,8 @@ export interface CourseSessionItem {
 
 export interface CourseContentBlock {
   id: string;
-  block_type: 'heading' | 'drawer' | 'items' | 'text' | 'sessions' | 'all_files';
+  block_type: 'heading' | 'drawer' | 'items' | 'text' | 'sessions' | 'all_files' | 'columns' | 'column';
+  presentation?: 'tiles' | 'list';
   title?: string;
   items?: MaterialItem[];
   html_content?: string;
@@ -113,6 +115,7 @@ export interface CourseContentBlock {
   level?: number;
   child_blocks?: CourseContentBlock[];
   sessions?: CourseSessionItem[];
+  columns?: number;
 }
 
 export interface CourseLogsResponse {
@@ -153,6 +156,7 @@ export interface CourseMaterialsResponse {
   sections?: CourseSection[];
   rich_text_blocks?: RichTextBlock[];
   sessions?: CourseSessionItem[];
+  columns?: number;
   logs?: CourseLogItem[];
   blocks?: CourseContentBlock[];
   layout_hash?: string;

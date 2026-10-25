@@ -1,29 +1,31 @@
-import React, { useState } from 'react';
-import { User, ArrowRight, Clock, GraduationCap, Calendar, RefreshCw, LayoutGrid, List } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import {
+  User,
+  ArrowRight,
+  Clock,
+  GraduationCap,
+  Calendar,
+  RefreshCw,
+  LayoutGrid,
+  List,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { SemesterScreenResponse, CourseItem } from '../types';
 import { cache } from '../lib/cache';
 import { CourseIcon } from './CourseIcon';
+import {
+  getCurrentSemester,
+  getDefaultStartSemester,
+  generateSemesterList,
+  getSemesterOption,
+  SemesterOption,
+} from '../lib/semesterUtils';
+import { SemesterRangeModal } from './SemesterRangeModal';
 
-export interface SemesterOption {
-  id: string;
-  short: string;
-  full: string;
-}
+export type { SemesterOption } from '../lib/semesterUtils';
 
-export const ALL_SEMESTERS: SemesterOption[] = [
-  { id: 'HS2026', short: 'HS 2026', full: 'Herbstsemester 2026 (Aktuell)' },
-  { id: 'FS2026', short: 'FS 2026', full: 'Frühjahrssemester 2026' },
-  { id: 'HS2025', short: 'HS 2025', full: 'Herbstsemester 2025' },
-  { id: 'FS2025', short: 'FS 2025', full: 'Frühjahrssemester 2025' },
-  { id: 'HS2024', short: 'HS 2024', full: 'Herbstsemester 2024' },
-  { id: 'FS2024', short: 'FS 2024', full: 'Frühjahrssemester 2024' },
-  { id: 'HS2023', short: 'HS 2023', full: 'Herbstsemester 2023' },
-  { id: 'FS2023', short: 'FS 2023', full: 'Frühjahrssemester 2023' },
-  { id: 'HS2022', short: 'HS 2022', full: 'Herbstsemester 2022 (Studienbeginn)' },
-  { id: 'FS2022', short: 'FS 2022', full: 'Frühjahrssemester 2022' },
-  { id: 'HS2021', short: 'HS 2021', full: 'Herbstsemester 2021' },
-  { id: 'FS2027', short: 'FS 2027', full: 'Frühjahrssemester 2027 (Vorschau)' },
-];
+// Fallback constant for backwards compatibility
+export const ALL_SEMESTERS: SemesterOption[] = generateSemesterList().all;
 
 interface SemesterViewProps {
   semesterData: SemesterScreenResponse | null;
@@ -50,23 +52,44 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
   // View mode: 'cards' or 'list'
   const [viewMode, setViewMode] = useState<'cards' | 'list'>(() => cache.getSemesterViewMode());
 
+  // User-customized start semester (defaults to HS 5 years ago)
+  const defaultStartSem = useMemo(() => getDefaultStartSemester(), []);
+  const [customStartSemester, setCustomStartSemester] = useState<string | null>(() =>
+    cache.getSemesterStart()
+  );
+  const [isRangeModalOpen, setIsRangeModalOpen] = useState(false);
+
   const handleViewModeChange = (mode: 'cards' | 'list') => {
     setViewMode(mode);
     cache.setSemesterViewMode(mode);
   };
 
-  // Quick pills: recent semesters plus active if not already in recent
-  const defaultPillIds = ['HS2026', 'FS2026', 'HS2025', 'FS2025'];
-  const pillIds = defaultPillIds.includes(selectedSemester)
-    ? defaultPillIds
-    : [selectedSemester, ...defaultPillIds];
+  const currentSemId = useMemo(() => getCurrentSemester(), []);
+  const activeStartSem = customStartSemester || defaultStartSem;
 
-  const currentSemesterMeta =
-    ALL_SEMESTERS.find((s) => s.id === selectedSemester) || {
-      id: selectedSemester,
-      short: selectedSemester,
-      full: selectedSemester,
-    };
+  // Generate semesters down to activeStartSem
+  const { all: allSemesters, currentAndPreview, past } = useMemo(
+    () => generateSemesterList(activeStartSem, currentSemId),
+    [activeStartSem, currentSemId]
+  );
+
+  // Quick pills: recent non-preview semesters + selectedSemester
+  const pillIds = useMemo(() => {
+    const recentNonPreview = allSemesters
+      .filter((s) => !s.isPreview)
+      .slice(0, 4)
+      .map((s) => s.id);
+
+    if (recentNonPreview.includes(selectedSemester)) {
+      return recentNonPreview;
+    }
+    return [selectedSemester, ...recentNonPreview.slice(0, 3)];
+  }, [allSemesters, selectedSemester]);
+
+  // Selected semester metadata
+  const currentSemesterMeta = useMemo(() => {
+    return allSemesters.find((s) => s.id === selectedSemester) || getSemesterOption(selectedSemester);
+  }, [allSemesters, selectedSemester]);
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-200">
@@ -132,13 +155,13 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
             </p>
           </div>
 
-          {/* Combined Selection Controls: Quick Pills + Full Archive Dropdown + View Mode */}
+          {/* Controls: Quick Pills + Clean Semester Dropdown + Dialog Trigger + View Mode */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Quick Pills */}
             <div className="flex items-center gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
               {pillIds.map((semId) => {
                 const isActive = semId === selectedSemester;
-                const semMeta = ALL_SEMESTERS.find((s) => s.id === semId);
+                const semMeta = allSemesters.find((s) => s.id === semId);
                 const label = semMeta ? semMeta.short : semId;
 
                 return (
@@ -158,37 +181,52 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
               })}
             </div>
 
-            {/* Archive / Full Semester Dropdown */}
-            <div className="relative flex items-center">
+            {/* Clean Dropdown: Only semesters (No overfilled settings options) */}
+            <div className="relative flex items-center gap-1.5">
               <div className="relative">
                 <select
                   value={selectedSemester}
                   onChange={(e) => onSelectSemester(e.target.value)}
                   className="appearance-none rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-xs font-semibold text-slate-700 shadow-xs hover:border-slate-300 focus:outline-hidden transition cursor-pointer dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                  title="Anderes Semester auswählen"
+                  title="Semester auswählen"
                 >
+                  {/* Current & Preview */}
                   <optgroup label="Aktuelle & Künftige Semester">
-                    {!ALL_SEMESTERS.some((s) => s.id === selectedSemester) && <option value={selectedSemester}>{selectedSemester}</option>}
-                    <option value="HS2026">HS 2026 – Herbstsemester (Aktuell)</option>
-                    <option value="FS2027">FS 2027 – Frühjahrssemester (Vorschau)</option>
+                    {currentAndPreview.map((sem) => (
+                      <option key={sem.id} value={sem.id}>
+                        {sem.short} – {sem.full}
+                      </option>
+                    ))}
                   </optgroup>
-                  <optgroup label="Vergangene Semester (2024 – 2026)">
-                    <option value="FS2026">FS 2026 – Frühjahrssemester</option>
-                    <option value="HS2025">HS 2025 – Herbstsemester</option>
-                    <option value="FS2025">FS 2025 – Frühjahrssemester</option>
-                    <option value="HS2024">HS 2024 – Herbstsemester</option>
-                    <option value="FS2024">FS 2024 – Frühjahrssemester</option>
+
+                  {/* All Past Semesters (Unified, no useless archive split) */}
+                  <optgroup label="Vergangene Semester">
+                    {past.map((sem) => (
+                      <option key={sem.id} value={sem.id}>
+                        {sem.short} – {sem.full}
+                      </option>
+                    ))}
                   </optgroup>
-                  <optgroup label="Studienbeginn (2021 – 2023)">
-                    <option value="HS2023">HS 2023 – Herbstsemester</option>
-                    <option value="FS2023">FS 2023 – Frühjahrssemester</option>
-                    <option value="HS2022">HS 2022 – Herbstsemester (Studienbeginn)</option>
-                    <option value="FS2022">FS 2022 – Frühjahrssemester</option>
-                    <option value="HS2021">HS 2021 – Herbstsemester</option>
-                  </optgroup>
+
+                  {/* Fallback if selected is outside generated list */}
+                  {!allSemesters.some((s) => s.id === selectedSemester) && (
+                    <optgroup label="Ausgewähltes Semester">
+                      <option value={selectedSemester}>{selectedSemester}</option>
+                    </optgroup>
+                  )}
                 </select>
                 <Calendar className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               </div>
+
+              {/* Dedicated button to open the custom start year/semester dialog */}
+              <button
+                type="button"
+                onClick={() => setIsRangeModalOpen(true)}
+                className="rounded-xl border border-slate-200 bg-white p-1.5 text-slate-500 shadow-xs hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition cursor-pointer"
+                title="Studienbeginn / Startsemester anpassen"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+              </button>
             </div>
 
             {/* View Mode Toggle: Cards vs. List */}
@@ -359,7 +397,20 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Compact dialog to set custom start semester */}
+      <SemesterRangeModal
+        isOpen={isRangeModalOpen}
+        onClose={() => setIsRangeModalOpen(false)}
+        currentSemester={currentSemId}
+        customStartSemester={customStartSemester}
+        onSaveStartSemester={(newStart) => {
+          cache.setSemesterStart(newStart);
+          setCustomStartSemester(newStart);
+        }}
+      />
     </div>
   );
 };
+
 export default SemesterView;

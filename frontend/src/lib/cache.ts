@@ -10,6 +10,7 @@ import {
   RepositoryResponse,
 } from '../types';
 import { getDefaultCourseIcon } from './courseIcons';
+import { getCurrentSemester } from './semesterUtils';
 
 export type ContentSectionId =
   | 'folders'
@@ -41,6 +42,7 @@ const CONTENT_SECTION_ORDER_KEY = 'ilias_content_section_order';
 const NICKNAMES_KEY = 'ilias_course_nicknames';
 const COURSE_ICONS_KEY = 'ilias_course_icons';
 const SELECTED_SEMESTER_KEY = 'ilias_selected_semester';
+const SEMESTER_START_KEY = 'ilias_semester_start';
 const LAST_OPENED_KEY = 'ilias_last_opened_course';
 const SIDEBAR_COLLAPSED_KEY = 'ilias_sidebar_collapsed';
 const MATERIALS_CACHE_PREFIX = 'ilias_materials_cache_';
@@ -161,9 +163,32 @@ export const cache = {
   // --- Selected Semester ---
   getSelectedSemester(): string {
     try {
-      return localStorage.getItem(SELECTED_SEMESTER_KEY) || 'HS2026';
+      const stored = localStorage.getItem(SELECTED_SEMESTER_KEY);
+      if (stored) return stored;
     } catch {
-      return 'HS2026';
+      // fallback
+    }
+    return getCurrentSemester();
+  },
+
+  // --- Semester Custom Start (e.g. Studienbeginn) ---
+  getSemesterStart(): string | null {
+    try {
+      return localStorage.getItem(SEMESTER_START_KEY) || null;
+    } catch {
+      return null;
+    }
+  },
+
+  setSemesterStart(semesterId: string | null) {
+    try {
+      if (semesterId) {
+        localStorage.setItem(SEMESTER_START_KEY, semesterId);
+      } else {
+        localStorage.removeItem(SEMESTER_START_KEY);
+      }
+    } catch (e) {
+      console.error('Failed to save semester start preference', e);
     }
   },
 

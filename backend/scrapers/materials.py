@@ -1,3 +1,4 @@
+from pathlib import Path
 import copy
 import hashlib
 import re
@@ -12,14 +13,122 @@ from backend.scrapers.dumper import safe_parser
 from backend.scrapers.membership import parse_membership, membership_form
 
 
-def _clean_rich_html(raw_html: str) -> str:
-    """Strip ILIAS comment artifacts, PageTocPH markers, and phantom Break tokens."""
+def _clean_rich_html(raw_html: str, container_ref_id: str = "") -> str:
+    """Strip ILIAS comment artifacts, transform Opencast video iframes into interactive player cards, and wrap tables."""
     if not raw_html:
         return ""
     cleaned = re.sub(r'<!--[\s\S]*?-->', '', raw_html)
     cleaned = re.sub(r'PageTocPH', '', cleaned)
     cleaned = re.sub(r'Break(?=\s*</|\s*$|\s*<)|\bBreak\b', '', cleaned)
     cleaned = re.sub(r'<h[1-6][^>]*>\s*</h[1-6]>', '', cleaned)
+
+    if "<" in cleaned:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(cleaned, "html.parser")
+
+        ilias_page_url = (
+            f"https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&cmdNode=yv:oj&cmdClass=ilobjfoldergui&ref_id={container_ref_id}&item_ref_id=0"
+            if container_ref_id
+            else "https://ilias.unibe.ch"
+        )
+
+        uni_dumps_dir = Path(r"C:\Users\manue\OneDrive\Dokumente\_Uni\IliasAlternative\htmlfromilias")
+
+        # Transform Opencast video containers into rich video players or exact-link cards
+        for ocpc in soup.find_all(class_="ocpc-container"):
+            ifr = ocpc.find("iframe")
+            src = ifr.get("src", "") if ifr else ""
+
+            mp4_url = None
+            preview_url = None
+            video_title = None
+            duration_str = None
+
+            if "files" in src and "ilias" in src and uni_dumps_dir.exists():
+                target_name = Path(src.replace("./", "")).name
+                for match_file in uni_dumps_dir.rglob(target_name):
+                    try:
+                        txt = match_file.read_text(encoding="utf-8", errors="replace")
+                        mp4_m = re.search(r'"src":"(https?:\\/\\/[^"]+?\.mp4)"', txt)
+                        prev_m = re.search(r'"preview":"(https?:\\/\\/[^"]+?)"', txt)
+                        title_m = re.search(r'"title":"([^"]+)"', txt)
+                        dur_m = re.search(r'"duration":(\d+)', txt)
+
+                        if mp4_m:
+                            mp4_url = mp4_m.group(1).replace(r"\/", "/")
+                        if prev_m:
+                            preview_url = prev_m.group(1).replace(r"\/", "/")
+                        if title_m:
+                            video_title = title_m.group(1)
+                        if dur_m:
+                            dur_sec = int(dur_m.group(1)) // 1000
+                            duration_str = f"{dur_sec // 60:02d}:{dur_sec % 60:02d}"
+                        break
+                    except Exception:
+                        pass
+
+            if mp4_url:
+                poster_attr = f'poster="{preview_url}"' if preview_url else ""
+                title_text = f"{video_title} ({duration_str})" if (video_title and duration_str) else (video_title or "Video-Tutorial")
+                player_html = f'''<div class="betterilias-video-player-container my-3" style="max-width: 960px;">
+  <video controls playsinline preload="metadata" {poster_attr} class="w-full aspect-video rounded-xl bg-black shadow-md border border-slate-800">
+    <source src="{mp4_url}" type="video/mp4" />
+    Ihr Browser unterstützt das Video-Tag nicht.
+  </video>
+  <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-2 px-1">
+    <span class="font-medium truncate">{title_text}</span>
+    <a href="{ilias_page_url}" target="_blank" rel="noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-500 font-semibold hover:underline shrink-0">
+      <span>Auf ILIAS ansehen</span>
+      <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+    </a>
+  </div>
+</div>'''
+                ocpc.replace_with(BeautifulSoup(player_html, "html.parser").div)
+            else:
+                card_html = f'''<div class="betterilias-video-placeholder ocpc-video-card" data-video-url="{ilias_page_url}">
+  <div class="betterilias-video-inner">
+    <div class="betterilias-video-play-btn">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+    </div>
+    <div class="betterilias-video-info">
+      <span class="betterilias-video-title">Video-Tutorial auf ILIAS ansehen</span>
+      <span class="betterilias-video-desc">Opencast Vorlesungs-Player</span>
+    </div>
+    <a href="{ilias_page_url}" target="_blank" rel="noreferrer" class="betterilias-video-btn">
+      <span>Video auf ILIAS öffnen</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+    </a>
+  </div>
+</div>'''
+                ocpc.replace_with(BeautifulSoup(card_html, "html.parser").div)
+
+        # Check remaining iframes
+        for ifr in soup.find_all("iframe"):
+            src = ifr.get("src", "")
+            if ".pdf" in src.lower():
+                if not src.startswith("http") and src.startswith("/"):
+                    ifr["src"] = f"https://ilias.unibe.ch{src}"
+                ifr_classes = ifr.get("class", [])
+                if "pdf-embed" not in ifr_classes:
+                    ifr["class"] = ifr_classes + ["pdf-embed"]
+            elif not src.startswith("http"):
+                if src.startswith("/"):
+                    ifr["src"] = f"https://ilias.unibe.ch{src}"
+                else:
+                    fb_html = '''<div class="p-4 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 text-xs">
+  <span>Eingebetteter Inhalt (ILIAS)</span>
+  <a href="https://ilias.unibe.ch" target="_blank" rel="noreferrer" class="text-sky-600 font-bold hover:underline">In ILIAS öffnen →</a>
+</div>'''
+                    ifr.replace_with(BeautifulSoup(fb_html, "html.parser").div)
+
+        # Wrap tables in responsive scroll wrapper
+        for tbl in soup.find_all("table"):
+            if tbl.parent and "ilc_table_StandardTable_wrapper" not in tbl.parent.get("class", []):
+                wrapper = soup.new_tag("div", attrs={"class": "ilc_table_StandardTable_wrapper"})
+                tbl.wrap(wrapper)
+
+        cleaned = str(soup)
+
     return cleaned.strip()
 
 
@@ -117,19 +226,32 @@ def _clean_math_in_soup(soup: BeautifulSoup) -> None:
 
 
 def _parse_single_item(el, seen_ref_ids: set) -> Optional[MaterialItem]:
-    """Parse a single ILIAS container list item."""
+    """Parse a single ILIAS container list or tile card item."""
     # Exclude items located in sidebars, right column, news blocks, or footers
     if el.find_parent(["aside", "footer"]) or el.find_parent(id=re.compile(r"right_col|news", re.I)):
         return None
     if el.find_parent(lambda tag: bool(tag.get("id", "").startswith("block_news_") or "ilNewsForContextBlockGUI" in tag.get("class", []))):
         return None
 
+    # Priority 1: Specific title link (including tile card title links)
     title_link = (
-        el.select_one("h3 a, h4 a, .il_ContainerItemTitle a, a.il_ContainerItemTitle, .il-item-title a")
+        el.select_one(".caption.card-title a, .card-title a, .il-card-title a")
+        or el.select_one("h3 a, h4 a, .il_ContainerItemTitle a, a.il_ContainerItemTitle, .il-item-title a")
         or el.select_one("h3 button, h4 button, .il_ContainerItemTitle button, .il-item-title button")
-        or el.select_one("a[href*='ref_id'], a[href*='goto_'], a[href*='/go/']")
-        or el.select_one("button[data-action*='ref_id']")
     )
+
+    # Priority 2: Any non-action link with meaningful text
+    if not title_link:
+        for a in el.select("a[href*='ref_id'], a[href*='goto_'], a[href*='/go/'], button[data-action*='ref_id']"):
+            txt = a.get_text(strip=True)
+            if txt and not any(k in txt.lower() for k in ["download", "info", "add to favourites", "notes", "set tags"]):
+                title_link = a
+                break
+
+    # Priority 3: Fallback link
+    if not title_link:
+        title_link = el.select_one("a[href*='ref_id'], a[href*='goto_'], a[href*='/go/'], button[data-action*='ref_id']")
+
     if not title_link:
         return None
 
@@ -140,7 +262,14 @@ def _parse_single_item(el, seen_ref_ids: set) -> Optional[MaterialItem]:
 
     title = title_link.get_text(strip=True)
     if not title:
+        img_alt = el.select_one("img[alt]")
+        if img_alt and img_alt.get("alt"):
+            alt_txt = img_alt.get("alt", "").replace("Open ", "").strip()
+            if alt_txt:
+                title = alt_txt
+    if not title:
         return None
+
     if "previous sessions" in title.lower() or "previoussessions" in raw_url.lower():
         return None
 
@@ -156,10 +285,27 @@ def _parse_single_item(el, seen_ref_ids: set) -> Optional[MaterialItem]:
     desc_elem = el.select_one(".il-item-description, .il_Description, .il-card-text")
     description = desc_elem.get_text(strip=True) if desc_elem else None
 
+    # Extract custom card / tile banner image
+    img_elem = el.select_one(".il-card-image-container img, .thumbnail img.img-responsive, img.il-card-img")
+    image_url = None
+    if img_elem and img_elem.get("src"):
+        src = img_elem.get("src")
+        if "default_sess" not in src:
+            image_url = urllib.parse.urljoin(settings.ilias_base_url, src)
+
     # Extract icon & type
-    icon_elem = el.select_one("img.il-item-icon, img.il-icon, img[src*='icon_']")
+    icon_elem = el.select_one(".il-card-repository-head img, img.il-item-icon, img.il-icon, img[src*='icon_']")
     icon_src = icon_elem.get("src") if icon_elem else None
-    item_type = _detect_material_type(raw_url, " ".join(el.get("class", [])), icon_src, title)
+
+    if el.find("img", alt="Session") or (icon_src and "icon_sess" in icon_src) or "/go/sess/" in raw_url:
+        item_type = "sess"
+    elif "/go/fold/" in raw_url or (icon_src and "icon_fold" in icon_src):
+        item_type = "fold"
+    elif "/go/file/" in raw_url or (icon_src and "icon_file" in icon_src):
+        item_type = "file"
+    else:
+        item_type = _detect_material_type(raw_url, " ".join(el.get("class", [])), icon_src, title)
+
     if item_type == "sess":
         return None
 
@@ -167,9 +313,10 @@ def _parse_single_item(el, seen_ref_ids: set) -> Optional[MaterialItem]:
 
     # Detect download URL if available
     download_url = None
-    download_elem = el.select_one("a[href*='cmd=sendfile'], a[href*='cmd=download'], a[href*='download=1']")
+    download_elem = el.select_one("a[href*='cmd=sendfile'], a[href*='cmd=download'], a[href*='download=1'], button[data-action*='cmd=download']")
     if download_elem:
-        download_url = urllib.parse.urljoin(settings.ilias_base_url, download_elem.get("href", ""))
+        dl_raw = download_elem.get("href") or download_elem.get("data-action") or ""
+        download_url = urllib.parse.urljoin(settings.ilias_base_url, dl_raw)
     elif item_type == "file":
         download_url = full_url
 
@@ -198,6 +345,7 @@ def _parse_single_item(el, seen_ref_ids: set) -> Optional[MaterialItem]:
         download_url=download_url,
         file_size=file_size,
         properties=properties,
+        image_url=image_url,
     )
 
 
@@ -210,6 +358,81 @@ def _calc_layout_hash(blocks: List[CourseContentBlock]) -> str:
             tokens.append(f"  {cb.id}:{cb.title or ''}:{cb.block_type}")
     return hashlib.md5("||".join(tokens).encode("utf-8")).hexdigest()
 
+
+def _parse_column_blocks(
+    col_el, child_idx: int, col_idx: int, block_seen_ref_ids: set, container_ref_id: str = ""
+) -> List[CourseContentBlock]:
+    """Extract sequential content blocks within a single column of a multi-column row."""
+    sub_blocks: List[CourseContentBlock] = []
+
+    # 1. Accordions (Drawers) in this column
+    acc_cntrs = col_el.select("[class*='AccordCntr'], .ilc_va_cntr_AccordCntr, .ilc_va_cntr_VAccordCntr, .ilc_ha_cntr_HAccordCntr")
+    if acc_cntrs:
+        for acc in acc_cntrs:
+            icntrs = acc.select("[class*='AccordICntr'], .ilc_va_icntr_AccordICntr, .ilc_va_icntr_VAccordICntr")
+            for acc_idx, ic in enumerate(icntrs):
+                head_el = ic.select_one("[class*='AccordIHeadCap'], [class*='AccordIHead']")
+                head_title = _clean_plain_text(head_el.get_text(" ", strip=True)) if head_el else f"Abschnitt {child_idx}-{col_idx}"
+                cont_el = ic.select_one(".il_VAccordionContentDef, .ilc_va_icont_VAccordICont, [class*='AccordICont']")
+                if not cont_el:
+                    continue
+
+                acc_cards = cont_el.select(".ilContainerTileRows .il-card, .il-deck .il-card, .il-card.thumbnail")
+                is_acc_tiles = bool(acc_cards)
+                acc_item_nodes = acc_cards if acc_cards else cont_el.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item")
+                acc_items: List[MaterialItem] = []
+                for item_el in acc_item_nodes:
+                    item = _parse_single_item(item_el, block_seen_ref_ids)
+                    if item:
+                        acc_items.append(item)
+
+                clone = copy.copy(cont_el)
+                for cb in clone.select(".ilContainerBlock, .ilContainerItemsContainer, .il_ContainerListItem, .ilCLI, .dropdown, .ilFloatRight"):
+                    cb.decompose()
+                for c in clone.find_all(string=lambda s: isinstance(s, Comment)):
+                    c.extract()
+
+                rem_html = _clean_rich_html(clone.decode_contents().strip(), container_ref_id)
+                rem_text = _clean_plain_text(clone.get_text(" ", strip=True))
+                has_media = bool(clone.find_all(["img", "figure", "video", "audio", "iframe"]))
+                html_content = rem_html if (rem_text or has_media) else None
+                plain_text = rem_text if rem_text else None
+
+                slug = re.sub(r'[^a-zA-Z0-9]+', '-', head_title.lower()).strip('-')
+                drawer = CourseContentBlock(
+                    id=f"drawer-{slug or child_idx}-{child_idx}-{col_idx}-{acc_idx}",
+                    block_type="drawer",
+                    presentation="tiles" if is_acc_tiles else "list",
+                    title=head_title,
+                    html_content=html_content,
+                    plain_text=plain_text,
+                    items=acc_items,
+                    child_blocks=[],
+                )
+                sub_blocks.append(drawer)
+
+    # 2. Direct items in this column
+    col_cards = col_el.select(".ilContainerTileRows .il-card, .il-deck .il-card, .il-card.thumbnail")
+    is_col_tiles = bool(col_cards)
+    col_item_nodes = col_cards if col_cards else col_el.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item")
+    col_items: List[MaterialItem] = []
+    for item_el in col_item_nodes:
+        # Avoid items already captured in accordions
+        if item_el.find_parent(class_=re.compile(r"Accord")):
+            continue
+        item = _parse_single_item(item_el, block_seen_ref_ids)
+        if item:
+            col_items.append(item)
+    if col_items:
+        sub_blocks.append(CourseContentBlock(
+            id=f"items-col-{child_idx}-{col_idx}",
+            block_type="items",
+            presentation="tiles" if is_col_tiles else "list",
+            title="Inhalte",
+            items=col_items,
+        ))
+
+    return sub_blocks
 
 def parse_course_blocks(
     soup: BeautifulSoup,
@@ -232,8 +455,27 @@ def parse_course_blocks(
     block_seen_ref_ids = set()
     blocks: List[CourseContentBlock] = []
 
+    # Flatten composite section blocks (ilc_section_Block) that contain divider titles before accordions/grids/items
+    raw_children = []
+    for el in center.find_all(recursive=False):
+        if "ilc_section_Block" in el.get("class", []):
+            sub_els = [s for s in el.find_all(recursive=False) if s.name not in ["script", "style", "nav"]]
+            has_composite = False
+            for sub in sub_els:
+                if (
+                    sub.select("[class*='AccordCntr']")
+                    or (sub.has_attr("class") and "row-flex" in sub["class"])
+                    or sub.select(".il_ContainerListItem, .ilContainerListItem, .ilContainerTileRows, .il-deck")
+                ):
+                    has_composite = True
+                    break
+            if has_composite:
+                raw_children.extend(sub_els)
+                continue
+        raw_children.append(el)
+
     child_idx = 0
-    for child in center.find_all(recursive=False):
+    for child in raw_children:
         child_idx += 1
         if child.name in ["script", "style", "nav"]:
             continue
@@ -241,6 +483,32 @@ def parse_course_blocks(
             continue
         if "il-copg-mob-fullscreen-modal" in child.get("class", []):
             continue
+
+        # 0. Multi-column rows (e.g. 2-column layout in Einführung in die Mathematik für WISO I)
+        flex_row = child if ("row" in child.get("class", []) and "row-flex" in child.get("class", [])) else child.find(lambda t: t.name == "div" and t.has_attr("class") and "row" in t["class"] and "row-flex" in t["class"])
+        if flex_row:
+            cols = flex_row.find_all(
+                lambda t: t.name == "div" and t.has_attr("class") and any(re.match(r"col-(?:sm|md|lg|xl)-\d+", c) for c in t["class"]),
+                recursive=False
+            )
+            side_by_side = [c for c in cols if any("col-md-6" in " ".join(c["class"]) or "col-md-4" in " ".join(c["class"]) for _ in [1])]
+            if len(cols) > 1 and len(side_by_side) > 1:
+                col_blocks: List[CourseContentBlock] = []
+                for c_idx, c in enumerate(cols):
+                    sub_blocks = _parse_column_blocks(c, child_idx, c_idx, block_seen_ref_ids, container_ref_id)
+                    col_blocks.append(CourseContentBlock(
+                        id=f"col-{child_idx}-{c_idx}",
+                        block_type="column",
+                        child_blocks=sub_blocks,
+                    ))
+                if col_blocks and any(cb.child_blocks for cb in col_blocks):
+                    blocks.append(CourseContentBlock(
+                        id=f"columns-{child_idx}",
+                        block_type="columns",
+                        columns=len(cols),
+                        child_blocks=col_blocks,
+                    ))
+                    continue
 
         # 1. Section Heading: H1 / H2 headings (e.g. "Teil Organisation", "Teil Personal", "Organisation + Personal")
         is_heading = child.name in ["h1", "h2"] and (
@@ -348,9 +616,12 @@ def parse_course_blocks(
                         blocks.append(sess_block)
                         continue
 
-                    # Normal container items inside accordion
+                    # Normal container items inside accordion (list or cards)
+                    acc_cards = cont_el.select(".ilContainerTileRows .il-card, .il-deck .il-card, .il-card.thumbnail")
+                    is_acc_tiles = bool(acc_cards)
+                    acc_item_nodes = acc_cards if acc_cards else cont_el.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item")
                     acc_items: List[MaterialItem] = []
-                    for item_el in cont_el.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item"):
+                    for item_el in acc_item_nodes:
                         item = _parse_single_item(item_el, block_seen_ref_ids)
                         if item:
                             acc_items.append(item)
@@ -362,7 +633,7 @@ def parse_course_blocks(
                     for c in clone.find_all(string=lambda s: isinstance(s, Comment)):
                         c.extract()
 
-                    rem_html = _clean_rich_html(clone.decode_contents().strip())
+                    rem_html = _clean_rich_html(clone.decode_contents().strip(), container_ref_id)
                     rem_text = _clean_plain_text(clone.get_text(" ", strip=True))
                     has_media = bool(clone.find_all(["img", "figure", "video", "audio", "iframe"]))
 
@@ -373,6 +644,7 @@ def parse_course_blocks(
                     acc_drawer = CourseContentBlock(
                         id=f"drawer-{slug or child_idx}-{child_idx}-{acc_idx}",
                         block_type="drawer",
+                        presentation="tiles" if is_acc_tiles else "list",
                         title=head_title,
                         html_content=html_content,
                         plain_text=plain_text,
@@ -461,8 +733,10 @@ def parse_course_blocks(
                 blocks.append(sess_block)
                 continue
 
-        # 4. Item Groups / Container Blocks
-        items_in_child = child.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item")
+        # 4. Item Groups / Container Blocks (List or Tiles)
+        tile_cards = child.select(".ilContainerTileRows .il-card, .il-deck .il-card, .il-card.thumbnail")
+        is_tiles = bool(tile_cards) or bool(child.select(".ilContainerTileRows, .il-deck"))
+        items_in_child = tile_cards if tile_cards else child.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item")
         if items_in_child:
             hdr_elem = child.select_one("h2, h3, h4, .ilHeader, .ilBlockHeader, legend")
             raw_hdr = hdr_elem.get_text(strip=True) if hdr_elem else ""
@@ -496,6 +770,7 @@ def parse_course_blocks(
                 item_block = CourseContentBlock(
                     id=f"items-{block_slug or child_idx}-{child_idx}",
                     block_type="items",
+                    presentation="tiles" if is_tiles else "list",
                     title=group_title,
                     items=parsed_items,
                 )
@@ -505,7 +780,7 @@ def parse_course_blocks(
         # 5. Rich Text / Info Paragraphs
         is_text = ("ilc_text_block_Standard" in child.get("class", []) or child.name in ["p", "blockquote", "ul", "ol", "div", "h2", "h3", "h4", "h5"])
         if is_text:
-            inner_html = _clean_rich_html(child.decode_contents().strip())
+            inner_html = _clean_rich_html(child.decode_contents().strip(), container_ref_id)
             plain_txt = _clean_plain_text(child.get_text(" ", strip=True))
 
             if (plain_txt or inner_html) and not child.select(".ilContainerBlock, .il_ContainerListItem"):
@@ -530,7 +805,8 @@ def parse_course_blocks(
                 else:
                     snippet = f"<p>{inner_html}</p>"
 
-                if blocks and blocks[-1].block_type == "text":
+                is_accent_divider = bool(child.find(class_="ilc_text_inline_Accent")) or (plain_txt and len(plain_txt) < 80 and child.find("strong"))
+                if blocks and blocks[-1].block_type == "text" and not is_accent_divider:
                     if blocks[-1].html_content:
                         blocks[-1].html_content = (blocks[-1].html_content + "\n" + snippet).strip()
                     else:
@@ -787,7 +1063,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
             has_items = bool(child.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item, .ilContainerBlock"))
 
             if is_text and not has_items:
-                inner_html = _clean_rich_html(child.decode_contents().strip())
+                inner_html = _clean_rich_html(child.decode_contents().strip(), container_ref_id)
                 plain_txt = _clean_plain_text(child.get_text(" ", strip=True))
                 if inner_html and plain_txt:
                     if child.name in ["ul", "ol", "blockquote"]:
@@ -824,7 +1100,9 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
                     group_title = hdr_elem.get_text(strip=True) if hdr_elem else "Inhalte"
 
                     group_items: List[MaterialItem] = []
-                    for item_el in cb.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item"):
+                    cb_tiles = cb.select(".ilContainerTileRows .il-card, .il-deck .il-card, .il-card.thumbnail")
+                    cb_nodes = cb_tiles if cb_tiles else cb.select(".il_ContainerListItem, .ilContainerListItem, .il-item, .il-std-item")
+                    for item_el in cb_nodes:
                         item = _parse_single_item(item_el, seen_ref_ids)
                         if item:
                             group_items.append(item)
@@ -849,7 +1127,8 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
 
     # Strategy 2: Collect any missed container items within the main content area
     search_scope = center if center else soup.select_one("main, #ilContentContainer") or soup
-    for item_el in search_scope.select(".ilContainerListItem, .il_ContainerListItem, .il-item, .il-std-item"):
+    tile_scope_cards = search_scope.select(".ilContainerTileRows .il-card, .il-deck .il-card, .il-card.thumbnail")
+    for item_el in (tile_scope_cards if tile_scope_cards else search_scope.select(".ilContainerListItem, .il_ContainerListItem, .il-item, .il-std-item")):
         if item_el.find_parent(["aside", "footer"]) or item_el.find_parent(id=re.compile(r"right_col|news", re.I)):
             continue
         item = _parse_single_item(item_el, seen_ref_ids)

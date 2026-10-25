@@ -102,6 +102,495 @@
     background-color: transparent !important;
   }
 
+
+  /* ========================================================
+     ILIAS Page Editor Layouts (Grids, Videos, Custom Cards)
+     ======================================================== */
+  .ilias-rich-content .row,
+  .ilias-rich-content .row-flex,
+  .ilias-rich-content .row-flex-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .ilias-rich-content .col-sm-12,
+  .ilias-rich-content .col-md-12,
+  .ilias-rich-content .col-lg-12,
+  .ilias-rich-content .col-xl-12 {
+    width: 100%;
+  }
+  .ilias-rich-content .col-md-8,
+  .ilias-rich-content .col-lg-8,
+  .ilias-rich-content .col-xl-8 {
+    flex: 1 1 58%;
+    min-width: min(100%, 340px);
+  }
+  .ilias-rich-content .col-md-4,
+  .ilias-rich-content .col-lg-4,
+  .ilias-rich-content .col-xl-4 {
+    flex: 1 1 32%;
+    min-width: min(100%, 240px);
+  }
+  .ilias-rich-content .col-md-6,
+  .ilias-rich-content .col-lg-6 {
+    flex: 1 1 45%;
+    min-width: min(100%, 280px);
+  }
+
+  /* Responsive Video & Opencast Player Containers */
+  .ilias-rich-content .ocpc-container {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+  .ilias-rich-content .ocpc-iframe,
+  .ilias-rich-content iframe,
+  .ilias-rich-content video {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+
+  /* ILIAS Outer Section Box (.ilc_section_Kasten) */
+  .ilias-rich-content .ilc_section_Kasten {
+    border: 1px solid var(--color-slate-200);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    background: #ffffff;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  }
+  .dark .ilias-rich-content .ilc_section_Kasten {
+    border-color: var(--color-slate-800);
+    background: var(--color-slate-900);
+    box-shadow: none;
+  }
+
+  /* Goal Callout Card (ilc_section_EreignisLEISEunbetont) */
+  .ilias-rich-content .ilc_section_EreignisLEISEunbetont {
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 0.875rem;
+    padding: 1.125rem;
+    margin-bottom: 0.875rem;
+    color: #1e1b4b;
+  }
+  .dark .ilias-rich-content .ilc_section_EreignisLEISEunbetont {
+    background: rgba(99, 102, 241, 0.12);
+    border-color: rgba(99, 102, 241, 0.25);
+    color: #e0e7ff;
+  }
+  .ilias-rich-content .ilc_section_EreignisLEISEunbetont h3,
+  .ilias-rich-content .ilc_section_EreignisLEISEunbetont .ilc_heading3_Headline3 {
+    color: #3730a3;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.8rem;
+    margin-bottom: 0.35rem;
+  }
+  .dark .ilias-rich-content .ilc_section_EreignisLEISEunbetont h3,
+  .dark .ilias-rich-content .ilc_section_EreignisLEISEunbetont .ilc_heading3_Headline3 {
+    color: #a5b4fc;
+  }
+
+  /* Exercise / Hint Callout Card (ilc_section_HinweisLAUTunbetont) */
+  .ilias-rich-content .ilc_section_HinweisLAUTunbetont {
+    background: #f5f3ff;
+    border: 1px solid #ddd6fe;
+    border-radius: 0.875rem;
+    padding: 1.125rem;
+    margin-bottom: 0.875rem;
+    color: #2e1065;
+  }
+  .dark .ilias-rich-content .ilc_section_HinweisLAUTunbetont {
+    background: rgba(168, 85, 247, 0.12);
+    border-color: rgba(168, 85, 247, 0.25);
+    color: #f3e8ff;
+  }
+  .ilias-rich-content .ilc_section_HinweisLAUTunbetont h3,
+  .ilias-rich-content .ilc_section_HinweisLAUTunbetont .ilc_heading3_Headline3 {
+    color: #5b21b6;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.8rem;
+    margin-bottom: 0.35rem;
+  }
+  .dark .ilias-rich-content .ilc_section_HinweisLAUTunbetont h3,
+  .dark .ilias-rich-content .ilc_section_HinweisLAUTunbetont .ilc_heading3_Headline3 {
+    color: #d8b4fe;
+  }
+
+  /* ILIAS Page Editor Vertical Accordions */
+  .ilias-rich-content .ilc_va_cntr_VAccordCntr {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .ilias-rich-content .ilc_va_icntr_VAccordICntr {
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-slate-200);
+    background-color: #ffffff;
+    overflow: hidden;
+  }
+  .dark .ilias-rich-content .ilc_va_icntr_VAccordICntr {
+    border-color: var(--color-slate-800);
+    background-color: var(--color-slate-900);
+  }
+  .ilias-rich-content .il_VAccordionToggleDef {
+    cursor: pointer;
+    user-select: none;
+  }
+  .ilias-rich-content .ilc_va_ihead_VAccordIHeadDezent,
+  .ilias-rich-content .ilc_va_ihead_VAccordIHeadDef {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background-color: #f1f5f9;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #1e293b;
+    transition: background-color 0.15s ease;
+    cursor: pointer;
+  }
+  .dark .ilias-rich-content .ilc_va_ihead_VAccordIHeadDezent,
+  .dark .ilias-rich-content .ilc_va_ihead_VAccordIHeadDef {
+    background-color: var(--color-slate-800);
+    color: var(--color-slate-100);
+  }
+  .ilias-rich-content .ilc_va_ihead_VAccordIHeadDezent:hover,
+  .ilias-rich-content .ilc_va_ihead_VAccordIHeadDef:hover {
+    background-color: #e2e8f0;
+  }
+  .dark .ilias-rich-content .ilc_va_ihead_VAccordIHeadDezent:hover,
+  .dark .ilias-rich-content .ilc_va_ihead_VAccordIHeadDef:hover {
+    background-color: #334155;
+  }
+  .ilias-rich-content .ilc_va_ihead_VAccordIHeadDezent::before,
+  .ilias-rich-content .ilc_va_ihead_VAccordIHeadDef::before {
+    content: "›";
+    font-size: 1.1rem;
+    font-weight: bold;
+    line-height: 1;
+    display: inline-block;
+    transition: transform 0.2s ease;
+    transform: rotate(0deg);
+    color: #64748b;
+  }
+  .ilias-rich-content .ilc_va_ihead_VAccordIHeadDezent[aria-expanded="true"]::before,
+  .ilias-rich-content .ilc_va_ihead_VAccordIHeadDef[aria-expanded="true"]::before {
+    transform: rotate(90deg);
+  }
+  .ilias-rich-content .ilAccHideContent {
+    display: none !important;
+  }
+  .ilias-rich-content .ilc_va_icont_VAccordIContDezent,
+  .ilias-rich-content .ilc_va_icont_VAccordIContDef {
+    padding: 1.25rem;
+  }
+
+  /* Readable Typographic Line Length for Prose (60-68 characters) */
+  .ilias-rich-content p,
+  .ilias-rich-content .ilc_Paragraph:not(.ilc_heading1_Headline1):not(.ilc_heading2_Headline2):not(.ilc_heading3_Headline3),
+  .ilias-rich-content .ilc_text_block_Standard,
+  .ilias-rich-content li {
+    max-width: 68ch;
+    line-height: 1.65;
+  }
+
+  /* Reset max-width for tables, grids, and callouts so they span full available width */
+  .ilias-rich-content table,
+  .ilias-rich-content .ilc_table_StandardTable,
+  .ilias-rich-content table td p,
+  .ilias-rich-content table th p,
+  .ilias-rich-content .row,
+  .ilias-rich-content .col-sm-12,
+  .ilias-rich-content .col-md-6,
+  .ilias-rich-content .col-md-8,
+  .ilias-rich-content .col-md-4,
+  .ilias-rich-content .ilc_section_Kasten,
+  .ilias-rich-content .ilc_section_EreignisLEISEunbetont,
+  .ilias-rich-content .ilc_section_HinweisLAUTunbetont {
+    max-width: 100%;
+  }
+
+  /* Embedded PDFs: Display full document comfortably without cramped scrolling */
+  .ilias-rich-content iframe[src*=".pdf"],
+  .ilias-rich-content embed[type*="pdf"],
+  .ilias-rich-content object[type*="pdf"],
+  .ilias-rich-content .pdf-embed,
+  .ilias-rich-content iframe[src*="pdf"] {
+    width: 100% !important;
+    min-height: 85vh !important;
+    height: 900px !important;
+    border-radius: 0.875rem;
+    border: 1px solid var(--color-slate-200);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    background: #ffffff;
+  }
+  .dark .ilias-rich-content iframe[src*=".pdf"],
+  .dark .ilias-rich-content embed[type*="pdf"],
+  .dark .ilias-rich-content object[type*="pdf"],
+  .dark .ilias-rich-content .pdf-embed,
+  .dark .ilias-rich-content iframe[src*="pdf"] {
+    border-color: var(--color-slate-800);
+    background: var(--color-slate-900);
+  }
+
+  /* BetterIlias Native Video Player Container */
+  .ilias-rich-content .betterilias-video-player-container {
+    width: 100%;
+    max-width: 960px;
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .ilias-rich-content .betterilias-video-player-container video {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 0.875rem;
+    background-color: #000000;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--color-slate-800);
+    display: block;
+    outline: none;
+  }
+  .dark .ilias-rich-content .betterilias-video-player-container video {
+    border-color: rgba(30, 41, 59, 0.8);
+  }
+
+  .ilias-rich-content .betterilias-video-player-container .betterilias-video-caption {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+    margin-top: 0.5rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+  .dark .ilias-rich-content .betterilias-video-player-container .betterilias-video-caption {
+    color: var(--color-slate-400);
+  }
+
+  /* BetterIlias Opencast Video Placeholder Card */
+  .ilias-rich-content .betterilias-video-placeholder,
+  .ilias-rich-content .ocpc-video-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-width: 960px;
+    background-color: #090d16;
+    background-image: radial-gradient(circle at 50% 40%, rgba(14, 165, 233, 0.18), transparent 70%);
+    border-radius: 1rem;
+    border: 1px solid rgba(30, 41, 59, 0.8);
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .ilias-rich-content .betterilias-video-placeholder:hover,
+  .ilias-rich-content .ocpc-video-card:hover {
+    border-color: rgba(14, 165, 233, 0.5);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  }
+
+  .ilias-rich-content .betterilias-video-inner {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 1.5rem;
+    text-align: center;
+  }
+
+  .ilias-rich-content .betterilias-video-play-btn {
+    display: flex;
+    height: 4rem;
+    width: 4rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background-color: rgba(14, 165, 233, 0.9);
+    color: #ffffff;
+    box-shadow: 0 10px 15px -3px rgba(14, 165, 233, 0.4);
+    transition: transform 0.2s ease, background-color 0.2s ease;
+  }
+  .ilias-rich-content .betterilias-video-placeholder:hover .betterilias-video-play-btn {
+    transform: scale(1.1);
+    background-color: #0284c7;
+  }
+
+  .ilias-rich-content .betterilias-video-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .ilias-rich-content .betterilias-video-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #f8fafc;
+  }
+
+  .ilias-rich-content .betterilias-video-desc {
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+
+  .ilias-rich-content .betterilias-video-btn {
+    margin-top: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.625rem;
+    background-color: #0284c7;
+    color: #ffffff !important;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    transition: background-color 0.15s ease;
+  }
+  .ilias-rich-content .betterilias-video-btn:hover {
+    background-color: #0369a1;
+  }
+
+  /* ILIAS Table Styles (e.g. Wochenplan in Mathematik für WISO I) */
+  .ilias-rich-content .ilc_table_StandardTable_wrapper {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-slate-200);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    background-color: #ffffff;
+  }
+  .dark .ilias-rich-content .ilc_table_StandardTable_wrapper {
+    border-color: var(--color-slate-800);
+    background-color: var(--color-slate-900);
+    box-shadow: none;
+  }
+
+  .ilias-rich-content .ilc_table_StandardTable,
+  .ilias-rich-content table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.8125rem;
+    text-align: left;
+  }
+
+  .ilias-rich-content .ilc_table_StandardTable th,
+  .ilias-rich-content table th,
+  .ilias-rich-content .ilc_table_StandardTable tr:first-child td,
+  .ilias-rich-content table tr:first-child td {
+    background-color: #f8fafc;
+    color: #1e293b;
+    font-weight: 700;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-slate-200);
+    text-align: left;
+    white-space: nowrap;
+  }
+  .dark .ilias-rich-content .ilc_table_StandardTable th,
+  .dark .ilias-rich-content table th,
+  .dark .ilias-rich-content .ilc_table_StandardTable tr:first-child td,
+  .dark .ilias-rich-content table tr:first-child td {
+    background-color: #1e293b;
+    color: #f1f5f9;
+    border-bottom-color: var(--color-slate-700);
+  }
+
+  .ilias-rich-content .ilc_table_StandardTable td,
+  .ilias-rich-content table td {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--color-slate-100);
+    color: var(--color-slate-700);
+    vertical-align: top;
+    line-height: 1.55;
+  }
+  .dark .ilias-rich-content .ilc_table_StandardTable td,
+  .dark .ilias-rich-content table td {
+    border-bottom-color: var(--color-slate-800);
+    color: var(--color-slate-300);
+  }
+
+  .ilias-rich-content .ilc_table_StandardTable tr:last-child td,
+  .ilias-rich-content table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .ilias-rich-content .ilc_table_StandardTable tr:hover td,
+  .ilias-rich-content table tr:hover td {
+    background-color: rgba(248, 250, 252, 0.7);
+  }
+  .dark .ilias-rich-content .ilc_table_StandardTable tr:hover td,
+  .dark .ilias-rich-content table tr:hover td {
+    background-color: rgba(30, 41, 59, 0.5);
+  }
+
+  /* Block & Section Typography & ILIAS Accent Colors */
+  .ilias-rich-content .ilc_text_inline_Accent,
+  span.ilc_text_inline_Accent {
+    color: #d81e5b !important;
+    font-weight: 700;
+  }
+  .dark .ilias-rich-content .ilc_text_inline_Accent,
+  .dark span.ilc_text_inline_Accent {
+    color: #fb7185 !important;
+  }
+
+  .ilias-rich-content .ilc_text_inline_Comment,
+  span.ilc_text_inline_Comment {
+    font-size: 1.125rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #4968ad !important;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  .dark .ilias-rich-content .ilc_text_inline_Comment,
+  .dark span.ilc_text_inline_Comment {
+    color: #818cf8 !important;
+  }
+
+  .ilias-rich-content .ilc_strong_Strong,
+  strong.ilc_strong_Strong {
+    font-weight: 700;
+  }
+
+  .ilias-rich-content .ilc_em_Emph,
+  em.ilc_em_Emph {
+    font-style: italic;
+  }
+  .ilias-rich-content .ilc_heading1_Headline1 {
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+  }
+
   /* MathJax & MathML dark mode */
   .dark mjx-container,
   .dark .MathJax,
