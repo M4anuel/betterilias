@@ -13,3 +13,7 @@ The folder templates are **Default** (`dtpl_0`) and **Hidden folder** (`dtpl_5`)
 The latter does not select a column layout. File upload uses the temporary
 `ilObjFileUploadHandlerGUI` endpoint and then submits parallel title,
 description and resource-ID arrays to the fresh native form action.
+
+`created_file.html` is a minimal excerpt of a live upload confirmation dump. It
+preserves the extensionless title `downloadfile` and the action label containing
+`downloadfile.pdf`, with the new object reference normalized to `51`.

@@ -15,10 +15,13 @@ templates and selected default from each fresh form rather than assuming a layou
 The saved file form uses a two-step flow: upload the file to the live
 `ilObjFileUploadHandlerGUI` URL, then submit the returned `file_id` with the
 parallel title/description/resource-ID arrays and selected license to the fresh
-form action. Multi-file uploads are processed individually so partial successes
-remain visible. Neither creation POST is retried automatically. A fresh parent
-listing must contain a new matching object reference before success is reported;
-uncertain results stop the queue and direct the user to inspect ILIAS.
+form action. Up to three files are processed concurrently, with independent
+progress and outcomes. Neither creation POST is retried automatically. A fresh
+parent listing must contain a new matching object reference before success is
+reported. Confirmation accounts for ILIAS display titles that omit file
+extensions, using the action menu's full filename where available. Uncertain
+results direct the user to inspect the affected file in ILIAS while other
+uploads continue. License options include short German/English explanations.
 
 Implemented routes (numeric parent `ref_id`):
 
