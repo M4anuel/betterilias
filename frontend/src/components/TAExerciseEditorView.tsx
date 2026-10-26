@@ -21,6 +21,13 @@ import { api } from '../lib/api';
 import { InstructionEditor } from './InstructionEditor';
 import { TAAssignmentDetailResponse, TAInstructionFileItem, SaveTAAssignmentRequest } from '../types';
 
+type AssignmentField = 'title' | 'startTime' | 'deadline' | 'deadline2' | 'maxFile';
+const fieldIds: Record<AssignmentField, string> = {
+  title: 'assignment-title', startTime: 'assignment-start', deadline: 'assignment-deadline',
+  deadline2: 'assignment-grace-end', maxFile: 'assignment-file-limit',
+};
+const invalidFieldStyle = 'aria-invalid:border-rose-500 dark:aria-invalid:border-rose-400 aria-invalid:ring-2 aria-invalid:ring-rose-500/30';
+
 interface TAExerciseEditorViewProps {
   exerciseRefId: string;
   assId: string | null;
@@ -36,7 +43,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   onBack,
   onSaved,
 }) => {
-  useLanguage();
+  const language = useLanguage();
   const [currentAssId, setCurrentAssId] = useState<string | null>(assId);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -57,6 +64,41 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   const [deadline2, setDeadline2] = useState('');
   const [maxFileEnabled, setMaxFileEnabled] = useState(false);
   const [maxFile, setMaxFile] = useState<number | null>(null);
+  const [validationAttempted, setValidationAttempted] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<AssignmentField, string>>>({});
+  const fieldRefs = useRef<Partial<Record<AssignmentField, HTMLInputElement | null>>>({});
+
+  const validateFields = useCallback(() => {
+    const errors: Partial<Record<AssignmentField, string>> = {};
+    if (!title.trim()) errors.title = t('Bitte geben Sie einen Titel für die Übung an.');
+    else if (title.trim().length > 200) errors.title = t('editor.title_too_long');
+    if (deadlineMode === 0) {
+      if (!deadline.trim()) errors.deadline = t('Bitte wählen Sie ein Abgabedatum aus oder stellen Sie den Modus auf "Kein Abgabetermin".');
+      if (startTime && deadline && startTime > deadline) errors.startTime = t('Die Startzeit darf nicht nach dem Abgabetermin liegen.');
+      if (hasGracePeriod) {
+        if (!deadline2.trim()) errors.deadline2 = t('editor.grace_required');
+        else if (deadline && deadline2 < deadline) errors.deadline2 = t('Die Nachfrist darf nicht vor dem regulären Abgabetermin liegen.');
+      }
+    }
+    if (maxFileEnabled && (maxFile === null || !Number.isInteger(maxFile) || maxFile < 1 || maxFile > 100)) {
+      errors.maxFile = t('editor.file_limit_range');
+    }
+    return errors;
+  }, [title, deadlineMode, deadline, startTime, hasGracePeriod, deadline2, maxFileEnabled, maxFile, language]);
+
+  useEffect(() => {
+    if (validationAttempted) setFieldErrors(validateFields());
+  }, [validationAttempted, validateFields]);
+
+  const fieldAttributes = (field: AssignmentField) => ({
+    id: fieldIds[field],
+    ref: (node: HTMLInputElement | null) => { fieldRefs.current[field] = node; },
+    'aria-invalid': Boolean(fieldErrors[field]),
+    'aria-describedby': fieldErrors[field] ? `${fieldIds[field]}-error` : undefined,
+  });
+  const fieldError = (field: AssignmentField) => fieldErrors[field] && (
+    <p id={`${fieldIds[field]}-error`} role="alert" className="text-xs font-medium text-rose-700 dark:text-rose-300">{fieldErrors[field]}</p>
+  );
 
   // Instruction files state
   const [instructionFiles, setInstructionFiles] = useState<TAInstructionFileItem[]>([]);
@@ -139,23 +181,17 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   // Save assignment
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      setError(t("Bitte geben Sie einen Titel für die Übung an."));
-      return;
-    }
-
-    if (deadlineMode === 0 && !deadline.trim()) {
-      setError(t("Bitte wählen Sie ein Abgabedatum aus oder stellen Sie den Modus auf \"Kein Abgabetermin\"."));
-      return;
-    }
-
-    if (startTime && deadlineMode === 0 && deadline.trim() && startTime > deadline) {
-      setError(t("Die Startzeit darf nicht nach dem Abgabetermin liegen."));
-      return;
-    }
-
-    if (hasGracePeriod && deadlineMode === 0 && deadline2.trim() && deadline.trim() && deadline2 < deadline) {
-      setError(t("Die Nachfrist darf nicht vor dem regulären Abgabetermin liegen."));
+    if (isSaving || isUploadingFile) return;
+    setError(null);
+    setSuccessMsg(null);
+    setValidationAttempted(true);
+    const errors = validateFields();
+    setFieldErrors(errors);
+    const firstInvalid = (Object.keys(fieldIds) as AssignmentField[]).find(field => errors[field]);
+    if (firstInvalid) {
+      const input = fieldRefs.current[firstInvalid];
+      input?.focus({ preventScroll: true });
+      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
@@ -373,7 +409,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
           <p className="text-sm font-medium text-slate-500">{t("Übungsdetails werden geladen...")}</p>
         </div>
       ) : (
-        <form onSubmit={handleSave} className="space-y-6">
+        <form noValidate onSubmit={handleSave} className="space-y-6">
           {/* Section 1: Grunddaten */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-5">
             <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -384,18 +420,19 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Titel */}
               <div className="space-y-1.5 md:col-span-2">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                <label htmlFor={fieldIds.title} className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
                   <span>{t("Titel der Übung *")}</span>
                   <span className="text-[11px] text-slate-400">{t("Erforderlich")}</span>
                 </label>
-                <input
+                <input {...fieldAttributes('title')}
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder={t("z.B. Übungsblatt 01: Einführung in Algorithmen")}
                   required
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium"
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium ${invalidFieldStyle}`}
                 />
+                {fieldError('title')}
               </div>
 
               {/* Art der Einreichung (Selectable without wiping other keys!) */}
@@ -459,16 +496,17 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Startzeit */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <label htmlFor={fieldIds.startTime} className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5 text-slate-400" />
                   <span>{t("Startzeit (Ab wann bearbeitbar)")}</span>
                 </label>
-                <input
+                <input {...fieldAttributes('startTime')}
                   type="datetime-local"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium"
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium ${invalidFieldStyle}`}
                 />
+                {fieldError('startTime')}
               </div>
 
               {/* Deadline Mode (0 = Fixed Date, -1 = No Deadline) */}
@@ -509,13 +547,13 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                     <Calendar className="h-3.5 w-3.5 text-slate-400" />
                     <span>{t("Abgabetermin (Deadline)")}</span>
                   </label>
-                  <input
-                    id="assignment-deadline"
+                  <input {...fieldAttributes('deadline')}
                     type="datetime-local"
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium"
+                    className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium ${invalidFieldStyle}`}
                   />
+                  {fieldError('deadline')}
                 </div>
               )}
 
@@ -532,13 +570,16 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                     <span>{t("Nachfrist gewähren")}</span>
                   </label>
                   {hasGracePeriod && (
-                    <input
-                      type="datetime-local"
-                      value={deadline2}
-                      onChange={(e) => setDeadline2(e.target.value)}
-                      placeholder={t("Nachfrist bis...")}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium"
-                    />
+                    <div className="space-y-1.5">
+                      <input {...fieldAttributes('deadline2')} aria-label={t('editor.grace_end')} required
+                        type="datetime-local"
+                        value={deadline2}
+                        onChange={(e) => setDeadline2(e.target.value)}
+                        placeholder={t("Nachfrist bis...")}
+                        className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium ${invalidFieldStyle}`}
+                      />
+                      {fieldError('deadline2')}
+                    </div>
                   )}
                 </div>
               )}
@@ -556,17 +597,18 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                 </label>
                 {maxFileEnabled && (
                   <div className="max-w-xs">
-                    <input
+                    <input {...fieldAttributes('maxFile')} aria-label={t('editor.file_limit')} required
                       type="number"
                       min={1}
                       max={100}
                       value={maxFile ?? ''}
                       onChange={(e) =>
-                        setMaxFile(e.target.value ? parseInt(e.target.value, 10) : null)
+                        setMaxFile(e.target.value ? Number(e.target.value) : null)
                       }
                       placeholder={t("z.B. 1 oder 5")}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium"
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium ${invalidFieldStyle}`}
                     />
+                    {fieldError('maxFile')}
                   </div>
                 )}
               </div>
