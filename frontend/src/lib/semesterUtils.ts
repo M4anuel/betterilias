@@ -68,7 +68,10 @@ export function getSemesterOption(
   const isPreview = semId === previewSemId;
   return {
     id: semId,
-    short: `${parsed.term} ${parsed.year}`,
+    get short() {
+      const termShort = t(parsed.term === 'HS' ? 'semester.short_autumn' : 'semester.short_spring');
+      return `${termShort} ${parsed.year}`;
+    },
     get full() {
       const termName = t(parsed.term === 'HS' ? 'semester.autumn' : 'semester.spring');
       const suffix = isCurrent ? ` (${t('semester.current')})` : isPreview ? ` (${t('semester.preview')})` : '';

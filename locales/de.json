@@ -956,5 +956,16 @@
   "editor.link_new": "Neuem Fenster",
   "editor.link_apply": "Link übernehmen",
   "editor.link_invalid": "Geben Sie eine gültige https://-, http://- oder mailto:-URL ein.",
-  "editor.attachments_failed": "Die Aufgabe wurde gespeichert, aber einige Anhänge konnten nicht hochgeladen werden. Sie bleiben hier für einen erneuten Versuch."
+  "editor.attachments_failed": "Die Aufgabe wurde gespeichert, aber einige Anhänge konnten nicht hochgeladen werden. Sie bleiben hier für einen erneuten Versuch.",
+  "semester.short_autumn": "HS",
+  "semester.short_spring": "FS",
+  "video.view_on_ilias": "Auf ILIAS ansehen",
+  "video.open_on_ilias": "Video auf ILIAS öffnen",
+  "video.load_and_play": "Video laden und abspielen",
+  "video.loading": "Video wird geladen...",
+  "video.tutorial": "Video-Tutorial",
+  "video.opencast_player": "Opencast Vorlesungs-Player",
+  "video.unsupported": "Ihr Browser unterstützt das Video-Tag nicht.",
+  "embedded.ilias_content": "Eingebetteter Inhalt (ILIAS)",
+  "embedded.open_in_ilias": "In ILIAS öffnen →"
 }

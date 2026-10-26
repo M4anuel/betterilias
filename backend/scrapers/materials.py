@@ -84,16 +84,18 @@ def _clean_rich_html(raw_html: str, container_ref_id: str = "") -> str:
 
             if mp4_url:
                 poster_attr = f'poster="{preview_url}"' if preview_url else ""
-                title_text = f"{video_title} ({duration_str})" if (video_title and duration_str) else (video_title or "Video-Tutorial")
+                title_text = f"{video_title} ({duration_str})" if (video_title and duration_str) else (video_title or t('video.tutorial'))
+                unsupported_txt = t('video.unsupported')
+                view_txt = t('video.view_on_ilias')
                 player_html = f'''<div class="betterilias-video-player-container my-3" style="max-width: 960px;">
   <video controls playsinline preload="metadata" {poster_attr} class="w-full aspect-video rounded-xl bg-black shadow-md border border-slate-800">
     <source src="{mp4_url}" type="video/mp4" />
-    Ihr Browser unterstützt das Video-Tag nicht.
+    {unsupported_txt}
   </video>
   <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-2 px-1">
     <span class="font-medium truncate">{title_text}</span>
     <a href="{ilias_page_url}" target="_blank" rel="noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-500 font-semibold hover:underline shrink-0">
-      <span>Auf ILIAS ansehen</span>
+      <span>{view_txt}</span>
       <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
     </a>
   </div>
@@ -101,6 +103,9 @@ def _clean_rich_html(raw_html: str, container_ref_id: str = "") -> str:
                 ocpc.replace_with(BeautifulSoup(player_html, "html.parser").div)
             else:
                 full_stream_src = src if src.startswith('http') else (f'https://ilias.unibe.ch/{src.lstrip("/")}' if src else ilias_page_url)
+                load_txt = t('video.load_and_play')
+                player_desc = t('video.opencast_player')
+                view_txt = t('video.view_on_ilias')
                 card_html = f'''<div class="betterilias-video-player-container my-3" data-video-stream-url="{full_stream_src}" style="max-width: 960px;">
               <div class="betterilias-video-placeholder ocpc-video-card" data-video-url="{full_stream_src}">
                 <div class="betterilias-video-inner">
@@ -108,11 +113,11 @@ def _clean_rich_html(raw_html: str, container_ref_id: str = "") -> str:
                     <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
                   </div>
                   <div class="betterilias-video-info">
-                    <span class="betterilias-video-title">Video-Tutorial abspielen</span>
-                    <span class="betterilias-video-desc">Opencast Vorlesungs-Player</span>
+                    <span class="betterilias-video-title">{load_txt}</span>
+                    <span class="betterilias-video-desc">{player_desc}</span>
                   </div>
                   <a href="{ilias_page_url}" target="_blank" rel="noreferrer" class="betterilias-video-btn">
-                    <span>Auf ILIAS ansehen</span>
+                    <span>{view_txt}</span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                   </a>
                 </div>

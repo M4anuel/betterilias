@@ -86,7 +86,7 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
       else if (src.startsWith('/')) fullSrc = `https://ilias.unibe.ch${src}`;
       else fullSrc = `https://ilias.unibe.ch/${src}`;
 
-      return `<div class="betterilias-video-player-container my-3" data-video-stream-url="${fullSrc}" style="max-width: 960px;"><div class="betterilias-video-placeholder ocpc-video-card" data-video-url="${fullSrc}"><div class="betterilias-video-inner"><div class="betterilias-video-play-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div><div class="betterilias-video-info"><span class="betterilias-video-title">Video laden und abspielen</span><span class="betterilias-video-desc">Opencast Vorlesungs-Player</span></div><a href="${targetUrl}" target="_blank" rel="noreferrer" class="betterilias-video-btn"><span>Auf ILIAS ansehen</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div></div></div>`;
+      return `<div class="betterilias-video-player-container my-3" data-video-stream-url="${fullSrc}" style="max-width: 960px;"><div class="betterilias-video-placeholder ocpc-video-card" data-video-url="${fullSrc}"><div class="betterilias-video-inner"><div class="betterilias-video-play-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div><div class="betterilias-video-info"><span class="betterilias-video-title">${t('video.load_and_play')}</span><span class="betterilias-video-desc">${t('video.opencast_player')}</span></div><a href="${targetUrl}" target="_blank" rel="noreferrer" class="betterilias-video-btn"><span>${t('video.view_on_ilias')}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div></div></div>`;
     }
   );
 
@@ -98,7 +98,7 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
         const absSrc = src.startsWith('/') ? `https://ilias.unibe.ch${src}` : src;
         return `<iframe class="pdf-embed" src="${absSrc}"></iframe>`;
       }
-      return `<div class="p-4 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 text-xs"><span>Eingebetteter Inhalt (ILIAS)</span><a href="https://ilias.unibe.ch" target="_blank" rel="noreferrer" class="text-sky-600 font-bold hover:underline">In ILIAS öffnen →</a></div>`;
+      return `<div class="p-4 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 text-xs"><span>${t('embedded.ilias_content')}</span><a href="https://ilias.unibe.ch" target="_blank" rel="noreferrer" class="text-sky-600 font-bold hover:underline">${t('embedded.open_in_ilias')}</a></div>`;
     }
   );
 
@@ -978,7 +978,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
       if (streamUrl) {
         const container = videoCard.closest<HTMLElement>('.betterilias-video-player-container') || videoCard;
         const titleSpan = videoCard.querySelector('.betterilias-video-title');
-        if (titleSpan) titleSpan.textContent = 'Video wird geladen...';
+        if (titleSpan) titleSpan.textContent = t('video.loading');
 
         fetch(`/api/courses/video-stream-info?url=${encodeURIComponent(streamUrl)}`)
           .then((res) => res.json())
@@ -988,16 +988,16 @@ export const CourseView: React.FC<CourseViewProps> = ({
               const durStr = data.duration
                 ? `${Math.floor(data.duration / 60).toString().padStart(2, '0')}:${(data.duration % 60).toString().padStart(2, '0')}`
                 : '';
-              const titleText = data.title ? (durStr ? `${data.title} (${durStr})` : data.title) : 'Video-Tutorial';
+              const titleText = data.title ? (durStr ? `${data.title} (${durStr})` : data.title) : t('video.tutorial');
               container.innerHTML = `
                 <video controls autoplay playsinline preload="auto" ${posterAttr} class="w-full aspect-video rounded-xl bg-black shadow-md border border-slate-800">
                   <source src="${data.mp4_url}" type="video/mp4" />
-                  Ihr Browser unterstützt das Video-Tag nicht.
+                  ${t('video.unsupported')}
                 </video>
                 <div class="betterilias-video-caption flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-2 px-1">
                   <span class="font-medium truncate">${titleText}</span>
                   <a href="${data.fallback_url || 'https://ilias.unibe.ch'}" target="_blank" rel="noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-500 font-semibold hover:underline shrink-0">
-                    <span>Auf ILIAS ansehen</span>
+                    <span>${t('video.view_on_ilias')}</span>
                     <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                   </a>
                 </div>
@@ -1114,14 +1114,14 @@ export const CourseView: React.FC<CourseViewProps> = ({
               {getItemIcon(item)}
               {isFolder && stat?.isMapped ? (
                 stat.isEmpty ? (
-                  <span>Leer</span>
+                  <span>{t("Leer")}</span>
                 ) : (
                   <span>
                     {stat.files > 0 && stat.folders > 0
-                      ? `${stat.files} D., ${stat.folders} O.`
+                      ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}, ${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`
                       : stat.files > 0
-                      ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}`
-                      : `${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`}
+                      ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}`
+                      : `${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`}
                   </span>
                 )
               ) : item.file_size ? (
@@ -1608,7 +1608,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             {isScanningTree && (
               <div className="flex items-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md font-medium">
                 <RefreshCw className="h-3 w-3 animate-spin" />
-                <span>Analysiere Unterordner...</span>
+                <span>{t("Analysiere Unterordner...")}</span>
               </div>
             )}
           </div>

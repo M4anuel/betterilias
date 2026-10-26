@@ -956,5 +956,16 @@
   "editor.link_new": "New window",
   "editor.link_apply": "Apply link",
   "editor.link_invalid": "Enter a valid https://, http:// or mailto: URL.",
-  "editor.attachments_failed": "The assignment was saved, but some attachments failed. They remain here so you can retry."
+  "editor.attachments_failed": "The assignment was saved, but some attachments failed. They remain here so you can retry.",
+  "semester.short_autumn": "AS",
+  "semester.short_spring": "SS",
+  "video.view_on_ilias": "View on ILIAS",
+  "video.open_on_ilias": "Open video on ILIAS",
+  "video.load_and_play": "Load and play video",
+  "video.loading": "Loading video...",
+  "video.tutorial": "Video tutorial",
+  "video.opencast_player": "Opencast lecture player",
+  "video.unsupported": "Your browser does not support the video tag.",
+  "embedded.ilias_content": "Embedded content (ILIAS)",
+  "embedded.open_in_ilias": "Open in ILIAS →"
 }

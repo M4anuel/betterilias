@@ -94,7 +94,7 @@ export const SemesterRangeModal: React.FC<SemesterRangeModalProps> = ({
           >
             {availableChoices.map((c: SemesterOption) => (
               <option key={c.id} value={c.id}>
-                {c.short} – {c.full} {c.id === defaultStart ? '(Standard: 5 Jahre)' : ''}
+                {c.short} – {c.full} {c.id === defaultStart ? ` (${t('semester.default_range')})` : ''}
               </option>
             ))}
           </select>
