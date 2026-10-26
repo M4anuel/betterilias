@@ -9,7 +9,7 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
 * **Authentication & Multi-Tenant Session Sync:**
   * **BetterIlias Companion Extension (Manifest V3):** 1-click session cookie synchronization (`PHPSESSID`, `ilClientId`) directly from the Uni Bern ILIAS portal (`ilias.unibe.ch`) to the backend via `POST /api/auth/sync`. Supports light and dark mode out-of-the-box. Available for both **Google Chrome / Chromium** (`extension/`) and **Mozilla Firefox** (`extension-firefox/`).
   * **Multi-Tenant Architecture:** Isolated session storage keyed by `session_id`, forwarded seamlessly via `X-Session-ID` request headers, cookies, or query parameters. Allows multiple users/students to access a shared host independently.
-  * **Interactive Browser Fallback:** Headed Playwright Chromium login assistant (`python login.py` or `POST /api/auth/login-browser`) handling SWITCH edu-ID 2FA/MFA.
+  * **Local Browser Fallback:** `python login.py` handles SWITCH edu-ID 2FA/MFA for the default local session. Use extension sync for isolated user sessions; the CLI does not refresh an existing tenant session.
   * **Async Requests:** Non-blocking HTTP client via `httpx`, session validation, and explicit session-expiry handling.
 
 * **Browser History, Deep-Linking & Hardware Navigation (Mouse 4 & 5):**
@@ -179,16 +179,30 @@ There are two ways to authenticate your session:
 4. Log into [ILIAS Uni Bern](https://ilias.unibe.ch) as usual.
 5. With BetterIlias running, click the **BetterIlias Companion** extension icon and choose **"Sync session with BetterIlias"** (German: **"Sitzung mit BetterIlias synchronisieren"**).
 
-##### Option B: Interactive Browser Login Assistant
+##### Option B: Interactive Browser Login Assistant (Local Default Session Only)
+
+`login.py` remains available for local development. It writes cookies to
+`session_cookies.json`; it does not create a tenant ID or update a tenant's
+`.sessions/<session_id>.json` file. The API uses this default session when no
+explicit session ID is supplied and default cookies are available.
+
+If the app already has a session ID from extension sync or phone sharing, its
+requests continue using that tenant. Running `login.py` will not refresh that
+session; sync it again through the extension instead. For a shared installation,
+use extension sync for each user.
 
 In another terminal with the Python environment activated:
 
 ```bash
 python login.py
 ```
-* A browser window will open displaying the Uni Bern ILIAS portal.
+* A browser window will open on the machine running the backend, displaying the Uni Bern ILIAS portal.
 * Select **"Universität Bern"** and complete your SWITCH edu-ID login (including 2FA if prompted).
-* Cookies are automatically saved, and the browser closes.
+* Cookies are saved to the default local session file, and the browser closes.
+
+`POST /api/auth/login-browser` can save the captured cookies to a selected tenant
+when called with its `X-Session-Id` header. It also opens the login browser on the
+backend machine; extension sync remains the normal multi-user workflow.
 
 *(Alternatively, inject cookies via `POST /api/auth/cookies` or `POST /api/auth/sync`)*
 
@@ -218,7 +232,7 @@ Open **`http://localhost:5173`** in your browser. All API requests are proxied t
 | `GET` | `/api/auth/status` | Check if ILIAS session cookies are valid (supports tenant isolation) |
 | `POST` | `/api/auth/sync` | Synchronize session cookies from either extension to an isolated session |
 | `POST` | `/api/auth/mobile-session` | Create a session-sharing link for the phone QR workflow |
-| `POST` | `/api/auth/login-browser` | Launch headed Playwright login window |
+| `POST` | `/api/auth/login-browser` | Open login browser on the backend machine and save cookies to the request's resolved session |
 | `POST` | `/api/auth/cookies` | Set session cookies manually (`PHPSESSID`, `ilClientId`) |
 | `POST` | `/api/auth/logout` | Clear stored session cookies for the current tenant |
 
