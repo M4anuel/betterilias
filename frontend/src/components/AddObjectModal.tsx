@@ -183,13 +183,13 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
               {item.error && <p className="mt-1 text-xs text-rose-700 dark:text-rose-300">{item.error}</p>}
               {item.status === 'saving' && <progress className="w-full accent-teal-600" max={100} value={item.progress} aria-label={t('authoring.file_progress', { name: item.file.name })} />}
             </li>)}</ul>
-            <label className="block">{t('authoring.license')}<select required disabled={!licenses} aria-describedby="file-license-description" className={fieldClass} value={license} onChange={e => setLicense(e.target.value)}>
+            <label className="block">{t('authoring.license')}<select required disabled={!licenses} aria-describedby="file-license-description" className={`${fieldClass} text-sm`} value={license} onChange={e => setLicense(e.target.value)}>
               {licenses?.map(option => {
                 const info = describeFileLicense(option);
-                return <option key={option.value} value={option.value}>{info.label} — {info.description}</option>;
+                return <option key={option.value} value={option.value}>{info.label}</option>;
               })}
             </select></label>
-            {selectedLicense && <p id="file-license-description" className="text-sm text-slate-600 dark:text-slate-300">{describeFileLicense(selectedLicense).description}</p>}
+            {selectedLicense && <p id="file-license-description" className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">{describeFileLicense(selectedLicense).description}</p>}
           </>}
         </fieldset>
       </form>}

@@ -173,6 +173,8 @@ build validation, and English fallback for partial languages.
 
 ## Completed
 
+- [x] Keep license dropdown choices compact and show the selected explanation underneath in smaller, muted text.
+
 - [x] Correct upload confirmation for native extensionless file titles, process queued course files concurrently with independent outcomes, localise the file picker, explain license choices, clarify object switching, and show authoring wait hints only on the disabled submit button.
 
 - [x] Add reusable course/folder authoring permission context, a searchable bilingual 30-object creation catalogue (folder/file enabled; other types disabled), native folder creation and course file uploads. Cover native saved-page forms and browser flows in German/English and dark/light mode. Exercise creation, batch organization and navigation guards remain separate work.

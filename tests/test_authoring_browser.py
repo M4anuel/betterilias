@@ -110,7 +110,8 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
                 dict(name='fourth.pdf', mimeType='application/pdf', buffer=b'fourth'),
             ])
             playwright.expect(dialog.get_by_label(tr('authoring.license'))).to_have_value('rights')
-            playwright.expect(dialog.get_by_label(tr('authoring.license')).locator('option').first).to_contain_text(tr('authoring.license_rights'))
+            playwright.expect(dialog.get_by_label(tr('authoring.license')).locator('option').first).to_have_text(tr('authoring.rights'))
+            playwright.expect(dialog.locator('#file-license-description')).to_have_text(tr('authoring.license_rights'))
             dialog.get_by_label(tr('authoring.license')).select_option('cc')
             playwright.expect(dialog.locator('#file-license-description')).to_have_text(tr('authoring.license_by'))
             dialog.get_by_label(tr('authoring.license')).select_option('rights')
