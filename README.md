@@ -10,7 +10,7 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
   * **BetterIlias Companion Extension (Manifest V3):** 1-click session cookie synchronization (`PHPSESSID`, `ilClientId`) directly from the Uni Bern ILIAS portal (`ilias.unibe.ch`) to the backend via `POST /api/auth/sync`. Supports light and dark mode out-of-the-box. Available for both **Google Chrome / Chromium** (`extension/`) and **Mozilla Firefox** (`extension-firefox/`).
   * **Multi-Tenant Architecture:** Isolated session storage keyed by `session_id`, forwarded seamlessly via `X-Session-ID` request headers, cookies, or query parameters. Allows multiple users/students to access a shared host independently.
   * **Interactive Browser Fallback:** Headed Playwright Chromium login assistant (`python login.py` or `POST /api/auth/login-browser`) handling SWITCH edu-ID 2FA/MFA.
-  * **High-Speed Async Requests:** Non-blocking HTTP client via `httpx` with automatic session validation and retry logic.
+  * **Async Requests:** Non-blocking HTTP client via `httpx`, session validation, and explicit session-expiry handling.
 
 * **Browser History, Deep-Linking & Hardware Navigation (Mouse 4 & 5):**
   * **HTML5 History API Integration:** Instant SPA navigation using `window.history.pushState` and `popstate` for Semesters (`/?semester=HS2026`), Courses (`/?course=123`), Subfolders (`/?course=123&folder=456`), and Exercises (`/?course=123&exercise=789`).
@@ -23,20 +23,31 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
   * **Complete Dark Mode Support:** Deep dark mode theming across all screens (Semester overview, Course view, Exercise view, Submissions, Modals, Breadcrumbs, MathJax/MathML math expressions, and imported ILIAS rich HTML).
   * **Custom Accent Colors:** Choose from 6 curated accent colors (Teal, Blue, Purple, Pink, Amber, Emerald) via the top-right settings dropdown, persisted in local storage.
   * **Independent Visual Identity:** Free of Uni Bern branding and logos; uses the modern BetterIlias logo and cohesive palette.
-  * **Personalization:** Custom course nicknames, 20 selectable academic icons, clean filtered breadcrumbs, and full semester archives back to 2021.
+  * **Personalization:** Custom course nicknames, academic icons, filtered breadcrumbs, and a configurable starting semester for the course overview.
+
+* **German & English Localisation:** App settings, status messages, API errors, and both extension popups follow the selected language. Lecturer-written titles and instructions retain their original language. See [Localisation](#localisation).
 
 * **Adaptive Course Layouts & Modular Blocks:**
   * **Structure-Preserving Block Engine:** Preserves the lecturer's intended course layout (headings, drawers/accordions, podcasts, sessions, and materials).
   * **Flat, Clean Block Architecture:** Section headings render as clean visual dividers; drawers/modules remain clean top-level blocks without confusing nested accordion-in-accordion recursion.
-  * **HTML Sanitization:** Strips raw ILIAS container markup, table wrappers, and legacy action menus.
+  * **Content Extraction:** Removes unrelated ILIAS controls while preserving rich text, multi-column layouts, media, and responsive tables.
   * **Custom Block Ordering & Visibility:** Reorder blocks up and down, hide/show blocks, toggle a virtual "Alle Dateien" collector block, and automatically reset when ILIAS structure changes (layout hash detection).
   * **Dynamic Session Materials:** On-demand slide and attachment loading for closed session drawers via `expand_id` (`GET /api/courses/{course_id}/sessions/{session_id}/materials`).
   * **Native Live Voting (`xlvo`):** Automatically identifies live voting items and provides direct action links.
 
 * **Student Exercise Submissions (Hand-In Workflow):**
   * **Assignment Overview & Details:** Deadlines, work instructions, mandatory assignment rules, and tutor feedback.
-  * **File Upload & Hand-In:** Upload solution files directly from BetterILIAS (`POST /api/exercises/{exercise_id}/assignment/{ass_id}/upload`).
+  * **Formatted Instructions:** Paragraphs, emphasis, lists, and links render in assignment dialogs, including dark mode.
+  * **File Upload & Hand-In:** Follow ILIAS's native upload flow and confirm the submitted file before reporting success (`POST /api/exercises/{exercise_id}/assignment/{ass_id}/upload`).
   * **Manage & Delete Submissions:** View submitted files, direct downloads, and delete submissions (`DELETE /api/exercises/{exercise_id}/assignment/{ass_id}/submission/{delivered_id}`).
+  * **Team Uploads:** Create and manage teams and members when the assignment offers Team Upload; individual assignments omit the team panel.
+
+* **TA Assignment Management:**
+  * Create, edit, reorder, and delete assignments inside an existing ILIAS exercise, subject to your ILIAS permissions.
+  * Edit title, instructions, deadlines, grace period, mandatory status, and file limits; choose the submission type during creation. ILIAS fixes the type after creation.
+  * Format instructions with active toolbar indicators, edit HTML, and insert links with display text and window options.
+  * Attach instruction files directly, verify uploads, and retain failed queued attachments for retry.
+  * Creating new exercise containers and folders remains planned; see [TODO.md](TODO.md).
 
 * **TA Grading Automation & Correction Mode:**
   * **Participant & Submission Overview:** View student submissions, grading status, and uploaded files filtered by assignment.
@@ -49,9 +60,11 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
 * **Opencast Podcasts & Media:**
   * Traverses multi-page pagination for Uni Bern Opencast lecture recordings (`GET /api/podcasts/{ref_id}`).
   * Prioritizes streamable recorded episodes before scheduled future recordings.
+  * Resolves supported embedded Opencast recordings into native video playback, with a link back to ILIAS when needed.
+  * Synchronized presenter/slides playback, layout switching, and bandwidth-saving controls remain on the roadmap in [TODO.md](TODO.md).
 
 * **Modern React 19 Frontend:**
-  * **Zero-Latency Serving (SWR):** Instantly renders courses, podcasts, and logs from `localStorage` in 0ms while silently revalidating in the background.
+  * **Cached Rendering (SWR):** Renders cached courses, podcasts, and logs from `localStorage` while revalidating in the background.
   * **Repository-Wide Subfolder Search:** Searches across current folders and deep subfolders in real time with location breadcrumbs and filter pills.
   * **Bottom-Right Notification Toast:** Floating toast alerts user to new files, sessions, or podcasts detected during background revalidation.
 
@@ -86,11 +99,18 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
 
 ### ⚡ Quick Start (Recommended)
 
-Run both backend and frontend together with a single command:
+Prerequisites: Python 3.13+, Node.js compatible with the installed Vite version
+(currently `^20.19.0` or `>=22.12.0`), and npm. Run commands from the repository root.
+Complete the dependency setup below first, then run both backend and frontend:
 ```bash
 python start.py
 ```
 *(Or simply double-click `start.bat` on Windows)*
+
+The launcher uses a working `venv` or `.venv` when available, checks backend
+imports, and installs frontend packages if `node_modules` is missing. It does
+not create the Python environment or install backend dependencies. Open
+`http://localhost:5173`, then sync your ILIAS session using the extension.
 
 ---
 
@@ -104,21 +124,42 @@ The QR code is generated locally. Its link contains the session key in the URL f
 
 ### Manual Setup
 
-#### 1. Setup Virtual Environment
+#### 1. Install Dependencies
 
 ```bash
 # Windows PowerShell
+python -m venv venv
 .\venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m playwright install chromium
+npm --prefix frontend ci
 ```
 
-Or recreate manually:
+On Linux/macOS:
 ```bash
 python -m venv venv
-.\venv\Scripts\pip.exe install -r requirements.txt
-.\venv\Scripts\playwright.exe install chromium
+source venv/bin/activate
+python -m pip install -r requirements.txt
+python -m playwright install chromium
+npm --prefix frontend ci
 ```
 
-#### 2. Authenticate
+Chromium is used by the interactive login assistant and browser tests. Extension
+session sync does not require launching Playwright. Optional settings are listed
+in [.env.example](.env.example); create a local `.env` to override defaults.
+
+#### 2. Run the Backend API
+
+Keep the API running in its own terminal:
+
+```bash
+python run.py
+```
+* **Base URL:** `http://127.0.0.1:8000`
+* **Interactive Swagger UI:** `http://127.0.0.1:8000/docs`
+* **ReDoc:** `http://127.0.0.1:8000/redoc`
+
+#### 3. Authenticate
 
 There are two ways to authenticate your session:
 
@@ -127,18 +168,21 @@ There are two ways to authenticate your session:
 **For Google Chrome, Microsoft Edge, Brave:**
 1. Open Chrome and navigate to `chrome://extensions/`.
 2. Enable **"Developer mode"** in the top right corner.
-3. Click **"Load unpacked"** and select the [`extension/`](file:///c:/Users/manue/OneDrive/Dokumente/_Uni/IliasAlternative/extension) directory (or download it from GitHub).
+3. Click **"Load unpacked"** and select the [`extension/`](extension/) directory.
 4. Log into [ILIAS Uni Bern](https://ilias.unibe.ch) as usual.
-5. Click the **BetterIlias Companion** extension icon and click **"Sitzung mit BetterIlias synchronisieren"**.
+5. With BetterIlias running, click the **BetterIlias Companion** extension icon and choose **"Sync session with BetterIlias"** (German: **"Sitzung mit BetterIlias synchronisieren"**).
 
 **For Mozilla Firefox:**
 1. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
 2. Click **"Load Temporary Add-on..."** (oder *„Temporäres Add-on laden...“*).
-3. Select the `manifest.json` file inside the [`extension-firefox/`](file:///c:/Users/manue/OneDrive/Dokumente/_Uni/IliasAlternative/extension-firefox) directory (or download it from GitHub).
+3. Select the `manifest.json` file inside the [`extension-firefox/`](extension-firefox/) directory. Temporary add-ons must be loaded again after restarting Firefox.
 4. Log into [ILIAS Uni Bern](https://ilias.unibe.ch) as usual.
-5. Click the **BetterIlias Companion** extension icon and click **"Sitzung mit BetterIlias synchronisieren"**.
+5. With BetterIlias running, click the **BetterIlias Companion** extension icon and choose **"Sync session with BetterIlias"** (German: **"Sitzung mit BetterIlias synchronisieren"**).
 
 ##### Option B: Interactive Browser Login Assistant
+
+In another terminal with the Python environment activated:
+
 ```bash
 python login.py
 ```
@@ -147,15 +191,6 @@ python login.py
 * Cookies are automatically saved, and the browser closes.
 
 *(Alternatively, inject cookies via `POST /api/auth/cookies` or `POST /api/auth/sync`)*
-
-#### 3. Run the Backend API
-
-```bash
-python run.py
-```
-* **Base URL:** `http://127.0.0.1:8000`
-* **Interactive Swagger UI:** `http://127.0.0.1:8000/docs`
-* **ReDoc:** `http://127.0.0.1:8000/redoc`
 
 #### 4. Run the React Frontend
 
@@ -181,7 +216,8 @@ Open **`http://localhost:5173`** in your browser. All API requests are proxied t
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/auth/status` | Check if ILIAS session cookies are valid (supports tenant isolation) |
-| `POST` | `/api/auth/sync` | Synchronize session cookies from the Chrome Extension to an isolated session |
+| `POST` | `/api/auth/sync` | Synchronize session cookies from either extension to an isolated session |
+| `POST` | `/api/auth/mobile-session` | Create a session-sharing link for the phone QR workflow |
 | `POST` | `/api/auth/login-browser` | Launch headed Playwright login window |
 | `POST` | `/api/auth/cookies` | Set session cookies manually (`PHPSESSID`, `ilClientId`) |
 | `POST` | `/api/auth/logout` | Clear stored session cookies for the current tenant |
@@ -199,6 +235,9 @@ Open **`http://localhost:5173`** in your browser. All API requests are proxied t
 | `GET` | `/api/courses/{course_id}/sessions/{session_id}/materials` | Load materials for a specific session drawer dynamically (`expand_id`) |
 | `GET` | `/api/courses/{course_id}/logs` | Paginated activity history (`showNews`) with page counts |
 | `GET` | `/api/materials/{ref_id}/download` | Stream and download material file (PDF, slides, archive) |
+| `GET` | `/api/repository/{ref_id}` | Browse a repository container |
+| `GET`, `POST` | `/api/courses/{course_id}/membership` | Read and submit the native course join/leave workflow |
+| `GET` | `/api/courses/video-stream-info` | Resolve native playback information for a supported ILIAS video URL |
 
 ### Podcasts (`/api/podcasts`)
 | Method | Endpoint | Description |
@@ -213,10 +252,22 @@ Open **`http://localhost:5173`** in your browser. All API requests are proxied t
 | `GET` | `/api/exercises/{exercise_id}/assignment/{ass_id}` | Student assignment detail (instructions, submitted files, feedback) |
 | `POST` | `/api/exercises/{exercise_id}/assignment/{ass_id}/upload` | Student upload submission file to ILIAS |
 | `DELETE` | `/api/exercises/{exercise_id}/assignment/{ass_id}/submission/{delivered_id}` | Student delete submitted file from ILIAS |
+| `POST` | `/api/exercises/{exercise_id}/assignment/{ass_id}/team/create` | Create an assignment team |
+| `GET` | `/api/exercises/{exercise_id}/assignment/{ass_id}/team/candidates` | Find eligible team members |
+| `POST` | `/api/exercises/{exercise_id}/assignment/{ass_id}/team/add` | Add team members |
+| `POST` | `/api/exercises/{exercise_id}/assignment/{ass_id}/team/remove` | Remove team members |
+| `DELETE` | `/api/exercises/{exercise_id}/assignment/{ass_id}/team` | Dissolve the team |
 | `GET` | `/api/exercises/{exercise_id}/submissions` | List student submissions (TA grading view, filter by `ass_id`) |
 | `POST` | `/api/exercises/{exercise_id}/submissions/{member_id}/grade` | Submit grade, points/mark, passed status & feedback (TA write-path) |
 | `GET` | `/api/exercises/{exercise_id}/submissions/{member_id}/feedback-files` | List existing TA feedback files for a submission |
 | `POST` | `/api/exercises/{exercise_id}/submissions/{member_id}/feedback-files` | Upload TA feedback file for a submission |
+| `GET` | `/api/exercises/{exercise_id}/ta/assignments` | List assignments available to teaching assistants |
+| `POST` | `/api/exercises/{exercise_id}/ta/assignments/order` | Save assignment ordering |
+| `GET` | `/api/exercises/{exercise_id}/ta/assignment-detail` | Read assignment settings (`ass_id` for an existing assignment) |
+| `POST` | `/api/exercises/{exercise_id}/ta/assignment-detail` | Create or update an assignment |
+| `DELETE` | `/api/exercises/{exercise_id}/ta/assignments/{ass_id}` | Delete an assignment |
+| `GET`, `POST` | `/api/exercises/{exercise_id}/ta/assignments/{ass_id}/instruction-files` | List or upload assignment attachments |
+| `DELETE` | `/api/exercises/{exercise_id}/ta/assignments/{ass_id}/instruction-files/{file_id}` | Delete an assignment attachment |
 
 ### System & AI Maintenance (`/api/system`)
 | Method | Endpoint | Description |
@@ -232,13 +283,35 @@ Open **`http://localhost:5173`** in your browser. All API requests are proxied t
 
 Run the full automated test suite:
 ```bash
-pytest -v
+python -m pytest tests/ -v
 ```
 
 Run real UNIBE HTML dump parsing tests:
 ```bash
-pytest tests/test_unibe_real_dumps.py -v
+python -m pytest tests/test_unibe_real_dumps.py -v
 ```
+
+Validate the frontend and shared translations:
+
+```bash
+npm --prefix frontend run build
+npm --prefix frontend run test:i18n
+```
+
+Browser checks require a frontend build and Chromium. To include them in the
+suite on Windows PowerShell:
+
+```powershell
+$env:BETTERILIAS_BROWSER_TESTS = '1'
+python -m pytest tests/ -v
+```
+
+Set `BETTERILIAS_BROWSER_CHANNEL=chrome` to use installed Chrome instead of
+Playwright Chromium. On Linux/macOS, use
+`BETTERILIAS_BROWSER_TESTS=1 python -m pytest tests/ -v`.
+Some optional integration tests require local private HTML dumps and skip when
+those are absent. Portable parser and mock upload tests use committed fixtures
+and do not create or modify live ILIAS assignments.
 
 ---
 
@@ -247,8 +320,9 @@ pytest tests/test_unibe_real_dumps.py -v
 The app and both extension popups support German and English. Select a language
 in the app settings or the extension popup. Each saves its preference locally;
 the initial language follows the browser, with English as the fallback.
-ILIAS course titles, instructions, dates, names and other supplied content keep
-their original language. Generated course headings carry translation keys so
+ILIAS course titles, instructions, dates, and names keep their original language.
+Known ILIAS interface labels, such as deadline and grading statuses, follow the
+selected app language. Generated course headings carry translation keys so
 cached headings can switch language without changing course layout identifiers.
 
 Shared messages live in `locales/en.json` and `locales/de.json`. Keys identify
@@ -281,6 +355,6 @@ Playwright's bundled Chromium.
 When Uni Bern updates the ILIAS version and an HTML parser breaks:
 
 1. Check `GET /api/system/logs` or inspect the `logs/` directory for `failed_html_dump_[context]_[timestamp].html`.
-2. Follow **Section 3** of [`plan.md`](file:///c:/Users/manue/OneDrive/Dokumente/_Uni/IliasAlternative/plan.md) and copy the prompt template.
-3. Paste the target HTML snippet and the current parser function into Gemini to get the updated selector logic.
-4. Replace the function in `backend/scrapers/` and verify with `pytest`.
+2. Read [AGENTS.md](AGENTS.md) for contribution and verification rules; [plan.md](plan.md) contains the original maintenance workflow.
+3. Inspect the failing HTML alongside the parser in `backend/scrapers/`, preserving account/session boundaries and the native ILIAS workflow.
+4. Add a sanitised regression fixture and run the backend tests, frontend build, and localisation checks before committing.
