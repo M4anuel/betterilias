@@ -19,7 +19,7 @@ import {
   MembershipAction,
 } from './types';
 import { api } from './lib/api';
-import { cache } from './lib/cache';
+import { cache, MATERIALS_CACHE_PREFIX } from './lib/cache';
 import { theme } from './lib/theme';
 import { navigationGuard } from './lib/navigationGuard';
 
@@ -224,7 +224,7 @@ export const App: React.FC = () => {
   }, []);
 
   // --- Fetch Semester Courses with SWR and Race-Condition Protection ---
-  const loadSemesters = useCallback(async (semId: string) => {
+  const loadSemesters = useCallback(async (semId: string, forceRefresh: boolean = false) => {
     const reqId = ++semesterRequestSeq.current;
     setIsLoadingSemester(true);
 
@@ -234,7 +234,15 @@ export const App: React.FC = () => {
       setSemesterData(cached);
     }
 
-    // 2. Fetch fresh semester data
+    // 2. ILIAS Saver: If fresh within TTL and not a forced manual refresh, skip revalidation!
+    if (cached && !forceRefresh && cache.isIliasSaverFresh(`ilias_semester_cache_${semId}`)) {
+      if (reqId === semesterRequestSeq.current) {
+        setIsLoadingSemester(false);
+      }
+      return;
+    }
+
+    // 3. Fetch fresh semester data
     try {
       const fresh = await api.getSemesters(semId);
       const freshCount = fresh?.courses?.length || 0;
@@ -269,7 +277,7 @@ export const App: React.FC = () => {
 
   // --- Load Course Materials with Instant Serve + SWR Revalidation & Race-Condition Protection ---
   const loadCourseMaterials = useCallback(
-    async (refId: string, isCourseRoot: boolean = true) => {
+    async (refId: string, isCourseRoot: boolean = true, forceRefresh: boolean = false) => {
       const reqId = ++materialsRequestSeq.current;
       activeContainerRef.current = refId;
       setLoadMaterialsError(null);
@@ -280,7 +288,13 @@ export const App: React.FC = () => {
       const cached = cache.getCachedMaterials(refId);
       setMaterialsData(cached || null);
 
-      // 2. Background revalidation
+      // 2. ILIAS Saver: If fresh within TTL and not a forced manual refresh, skip revalidation!
+      if (cached && !forceRefresh && cache.isIliasSaverFresh(MATERIALS_CACHE_PREFIX + refId)) {
+        setIsRevalidatingMaterials(false);
+        return;
+      }
+
+      // 3. Background revalidation
       setIsRevalidatingMaterials(true);
       try {
         const fresh = await api.getMaterials(refId);
@@ -901,7 +915,7 @@ export const App: React.FC = () => {
               onSelectExercise={handleSelectExercise}
               onExerciseTabChange={handleExerciseTabChange}
               isRevalidating={isRevalidatingMaterials}
-              onManualRefresh={() => loadCourseMaterials(currentContainerId, false)}
+              onManualRefresh={() => loadCourseMaterials(currentContainerId, false, true)}
               onNotifyChange={(notifs) => setChangeNotifications((prev) => [...prev, ...notifs])}
               loadError={loadMaterialsError}
             />
@@ -914,6 +928,7 @@ export const App: React.FC = () => {
               lastOpenedCourseId={cache.getLastOpenedCourseId()}
               coursesList={allCourses}
               isLoading={isLoadingSemester}
+              onManualRefresh={() => loadSemesters(selectedSemester, true)}
             />
           )}
         </main>

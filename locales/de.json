@@ -1092,5 +1092,17 @@
   "Sie haben ungespeicherte Bewertungen oder Notizen. Möchten Sie die Seite wirklich verlassen?": "Sie haben ungespeicherte Bewertungen oder Notizen. Möchten Sie die Seite wirklich verlassen?",
   "Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?": "Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?",
   "Sie haben ungespeicherte Änderungen. Möchten Sie das Fenster wirklich schließen?": "Sie haben ungespeicherte Änderungen. Möchten Sie das Fenster wirklich schließen?",
-  "Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?": "Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?"
+  "Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?": "Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?",
+  "settings.saver_title": "ILIAS Saver",
+  "settings.saver_description": "Schont die ILIAS-Server und spart Daten: Bereits geladene Kurse und Materialien werden innerhalb der gewählten Zeitspanne nicht bei jedem Seitenwechsel erneut abgefragt. Sie können Inhalte jederzeit über den Aktualisieren-Button manuell neu laden.",
+  "settings.saver_ttl_label": "Cache-Gültigkeitsdauer",
+  "settings.saver_custom": "Benutzerdefiniert...",
+  "Informationen zu ILIAS Saver": "Informationen zu ILIAS Saver",
+  "ILIAS Saver aktivieren": "ILIAS Saver aktivieren",
+  "ILIAS Saver deaktivieren": "ILIAS Saver deaktivieren",
+  "Übersicht aktualisieren": "Übersicht aktualisieren",
+  "Minuten": "Minuten",
+  "Minuten (Standard)": "Minuten (Standard)",
+  "Minuten (1 Std.)": "Minuten (1 Std.)",
+  "Min.": "Min."
 }

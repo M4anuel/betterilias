@@ -1092,5 +1092,17 @@
   "Sie haben ungespeicherte Bewertungen oder Notizen. Möchten Sie die Seite wirklich verlassen?": "You have unsaved grades or feedback notes. Do you really want to leave this page?",
   "Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?": "You have unsaved changes in this evaluation. Do you really want to close?",
   "Sie haben ungespeicherte Änderungen. Möchten Sie das Fenster wirklich schließen?": "You have unsaved changes. Do you really want to close the dialog?",
-  "Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?": "An upload is currently in progress. Do you really want to cancel?"
+  "Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?": "An upload is currently in progress. Do you really want to cancel?",
+  "settings.saver_title": "ILIAS Saver",
+  "settings.saver_description": "Reduces load on ILIAS servers and saves data: Cached courses and materials are not re-fetched on every page visit while still fresh. You can always refresh manually via the refresh button.",
+  "settings.saver_ttl_label": "Cache validity duration",
+  "settings.saver_custom": "Custom...",
+  "Informationen zu ILIAS Saver": "Information about ILIAS Saver",
+  "ILIAS Saver aktivieren": "Enable ILIAS Saver",
+  "ILIAS Saver deaktivieren": "Disable ILIAS Saver",
+  "Übersicht aktualisieren": "Refresh overview",
+  "Minuten": "minutes",
+  "Minuten (Standard)": "minutes (default)",
+  "Minuten (1 Std.)": "minutes (1 hr)",
+  "Min.": "min."
 }

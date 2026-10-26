@@ -46,12 +46,15 @@ const SELECTED_SEMESTER_KEY = 'ilias_selected_semester';
 const SEMESTER_START_KEY = 'ilias_semester_start';
 const LAST_OPENED_KEY = 'ilias_last_opened_course';
 const SIDEBAR_COLLAPSED_KEY = 'ilias_sidebar_collapsed';
-const MATERIALS_CACHE_PREFIX = 'ilias_materials_cache_';
-const SEMESTER_CACHE_KEY = 'ilias_semester_cache';
-const EXERCISE_OVERVIEW_PREFIX = 'ilias_exercise_overview_';
-const EXERCISE_SUBMISSIONS_PREFIX = 'ilias_exercise_submissions_';
-const EXERCISE_INFO_PREFIX = 'ilias_exercise_info_';
-const STUDENT_ASSIGNMENT_PREFIX = 'ilias_student_assignment_';
+export const MATERIALS_CACHE_PREFIX = 'ilias_materials_cache_';
+export const SEMESTER_CACHE_PREFIX = 'ilias_semester_cache_';
+export const EXERCISE_OVERVIEW_PREFIX = 'ilias_exercise_overview_';
+export const EXERCISE_SUBMISSIONS_PREFIX = 'ilias_exercise_submissions_';
+export const EXERCISE_INFO_PREFIX = 'ilias_exercise_info_';
+export const STUDENT_ASSIGNMENT_PREFIX = 'ilias_student_assignment_';
+export const CACHE_TS_PREFIX = 'ilias_ts_';
+export const ILIAS_SAVER_ENABLED_KEY = 'betterilias_saver_enabled';
+export const ILIAS_SAVER_TTL_KEY = 'betterilias_saver_ttl';
 const SESSION_ID_KEY = 'betterilias_session_id';
 let inMemorySessionId: string | null = null;
 
@@ -80,13 +83,78 @@ export const cache = {
 
   clearSessionContent() {
     try {
-      const prefixes = ['ilias_materials_cache_', 'ilias_semester_cache_', 'ilias_podcast_cache_',
+      const prefixes = ['ilias_materials_cache_', 'ilias_semester_cache_', 'ilias_podcast_cache_', CACHE_TS_PREFIX,
         EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX, EXERCISE_INFO_PREFIX, STUDENT_ASSIGNMENT_PREFIX, 'ilias_repository_'];
       for (const key of Object.keys(localStorage)) {
         if (prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
       }
       localStorage.removeItem(LAST_OPENED_KEY);
     } catch { /* Storage can be disabled in private browsers. */ }
+  },
+
+  // --- ILIAS Saver & Cache Timestamping ---
+  getIliasSaverEnabled(): boolean {
+    try {
+      return localStorage.getItem(ILIAS_SAVER_ENABLED_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  setIliasSaverEnabled(enabled: boolean) {
+    try {
+      localStorage.setItem(ILIAS_SAVER_ENABLED_KEY, enabled ? 'true' : 'false');
+      window.dispatchEvent(new CustomEvent('betterilias-saver-changed', { detail: { enabled } }));
+    } catch (e) {
+      console.error('Failed to save ILIAS Saver setting', e);
+    }
+  },
+
+  getIliasSaverTtl(): number {
+    try {
+      const stored = localStorage.getItem(ILIAS_SAVER_TTL_KEY);
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return 5; // default 5 minutes
+  },
+
+  setIliasSaverTtl(minutes: number) {
+    try {
+      localStorage.setItem(ILIAS_SAVER_TTL_KEY, String(minutes));
+      window.dispatchEvent(new CustomEvent('betterilias-saver-changed', { detail: { ttl: minutes } }));
+    } catch (e) {
+      console.error('Failed to save ILIAS Saver TTL', e);
+    }
+  },
+
+  setCacheTimestamp(key: string, timestamp: number = Date.now()) {
+    try {
+      localStorage.setItem(`${CACHE_TS_PREFIX}${key}`, String(timestamp));
+    } catch (e) {
+      console.warn('Failed to save cache timestamp', e);
+    }
+  },
+
+  getCacheTimestamp(key: string): number | null {
+    try {
+      const raw = localStorage.getItem(`${CACHE_TS_PREFIX}${key}`);
+      return raw ? parseInt(raw, 10) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  isIliasSaverFresh(key: string): boolean {
+    if (!this.getIliasSaverEnabled()) return false;
+    const ts = this.getCacheTimestamp(key);
+    if (!ts) return false;
+    const ttlMs = this.getIliasSaverTtl() * 60 * 1000;
+    return Date.now() - ts < ttlMs;
   },
 
   // --- Nicknames ---
@@ -353,6 +421,7 @@ export const cache = {
       }
 
       localStorage.setItem(`ilias_semester_cache_${semId}`, JSON.stringify(data));
+      this.setCacheTimestamp(`ilias_semester_cache_${semId}`);
     } catch (e) {
       console.warn('Storage quota exceeded for semester cache', e);
     }
@@ -407,6 +476,7 @@ export const cache = {
     });
     try {
       localStorage.setItem(`ilias_repository_${this.getSessionId() || 'default'}_${data.container_ref_id}`, JSON.stringify(data));
+      this.setCacheTimestamp(`ilias_repository_${this.getSessionId() || 'default'}_${data.container_ref_id}`);
     } catch (e) {
       console.warn('Could not cache repository page', e);
     }
@@ -464,6 +534,7 @@ export const cache = {
       }
 
       localStorage.setItem(MATERIALS_CACHE_PREFIX + refId, JSON.stringify(data));
+      this.setCacheTimestamp(MATERIALS_CACHE_PREFIX + refId);
     } catch (e) {
       console.warn('Storage quota exceeded for course materials cache', e);
     }
@@ -494,6 +565,7 @@ export const cache = {
       }
 
       localStorage.setItem('ilias_podcast_cache_' + refId, JSON.stringify(data));
+      this.setCacheTimestamp('ilias_podcast_cache_' + refId);
     } catch (e) {
       console.warn('Storage quota exceeded for podcast cache', e);
     }
@@ -620,6 +692,7 @@ export const cache = {
   setCachedExerciseOverview(refId: string, data: ExerciseOverviewResponse) {
     try {
       localStorage.setItem(EXERCISE_OVERVIEW_PREFIX + refId, JSON.stringify(data));
+      this.setCacheTimestamp(EXERCISE_OVERVIEW_PREFIX + refId);
     } catch (e) {
       console.warn('Storage quota exceeded for exercise overview cache', e);
     }
@@ -640,6 +713,7 @@ export const cache = {
     try {
       const key = `${EXERCISE_SUBMISSIONS_PREFIX}${refId}_${assId || 'default'}`;
       localStorage.setItem(key, JSON.stringify(data));
+      this.setCacheTimestamp(key);
     } catch (e) {
       console.warn('Storage quota exceeded for exercise submissions cache', e);
     }
@@ -658,6 +732,7 @@ export const cache = {
   setCachedExerciseInfo(refId: string, data: ExerciseInfoResponse) {
     try {
       localStorage.setItem(EXERCISE_INFO_PREFIX + refId, JSON.stringify(data));
+      this.setCacheTimestamp(EXERCISE_INFO_PREFIX + refId);
     } catch (e) {
       console.warn('Storage quota exceeded for exercise info cache', e);
     }
@@ -676,6 +751,7 @@ export const cache = {
   setCachedStudentAssignment(refId: string, assId: string, data: StudentAssignmentDetail) {
     try {
       localStorage.setItem(`${STUDENT_ASSIGNMENT_PREFIX}${refId}_${assId}`, JSON.stringify(data));
+      this.setCacheTimestamp(`${STUDENT_ASSIGNMENT_PREFIX}${refId}_${assId}`);
     } catch (e) {
       console.warn('Storage quota exceeded for student assignment cache', e);
     }
