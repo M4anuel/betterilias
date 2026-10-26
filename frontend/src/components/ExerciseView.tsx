@@ -23,11 +23,13 @@ import {
   User,
   Shield,
   Upload,
+  Trash2,
   MoreVertical,
   Edit3,
 } from 'lucide-react';
 import {
   AssignmentItem,
+  FeedbackFileItem,
   BreadcrumbItem,
   ExerciseInfoResponse,
   ExerciseOverviewResponse,
@@ -350,6 +352,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   // Sub-tab selection inside each card ('feedback' vs 'notice')
   const [rowTabState, setRowTabState] = useState<Record<string, 'feedback' | 'notice'>>({});
+
+  // Feedback files per member in overview
+  const [rowFeedbackFiles, setRowFeedbackFiles] = useState<Record<string, FeedbackFileItem[]>>({});
+  const [loadingFeedbackFilesFor, setLoadingFeedbackFilesFor] = useState<Record<string, boolean>>({});
+  const [deletingFeedbackFileId, setDeletingFeedbackFileId] = useState<string | null>(null);
+  const fetchedFeedbackMembersRef = useRef<Set<string>>(new Set());
 
   // Sorting state for TA grading submissions
   const [taSortField, setTaSortField] = useState<'time' | 'name' | 'status' | 'mark' | 'ilias'>('time');
@@ -684,6 +692,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         setTaSubmissionsData(null);
       }
 
+      fetchedFeedbackMembersRef.current.clear();
+      setRowFeedbackFiles({});
       lastRevalidatedAssKeyRef.current = `${exerciseRefId}_${newAssId}`;
       loadTaSubmissions(newAssId, false);
     },
@@ -695,13 +705,17 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     setUploadingMemberId(memberId);
     try {
       const sub = taSubmissionsData?.submissions?.find((s) => s.member_id === memberId);
-      await api.uploadFeedbackFile(
+      const res = await api.uploadFeedbackFile(
         exerciseRefId,
         memberId,
         file,
         selectedTaAssId || undefined,
         sub?.evaluation_by_file_url
       );
+      setRowFeedbackFiles((prev) => ({
+        ...prev,
+        [memberId]: res.files || [],
+      }));
       setFileUploadSuccessId(memberId);
       setTimeout(() => setFileUploadSuccessId(null), 3500);
     } catch (err: any) {
@@ -710,6 +724,85 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       setUploadingMemberId(null);
     }
   };
+
+  const handleDeleteRowFeedbackFile = async (memberId: string, fileId: string, feedbackUrl?: string) => {
+    if (!exerciseRefId || deletingFeedbackFileId) return;
+    if (!window.confirm(t("Möchten Sie diese Korrekturdatei wirklich löschen?"))) return;
+
+    setDeletingFeedbackFileId(fileId);
+    try {
+      const res = await api.deleteFeedbackFile(
+        exerciseRefId,
+        memberId,
+        fileId,
+        selectedTaAssId || undefined,
+        feedbackUrl
+      );
+      setRowFeedbackFiles((prev) => ({
+        ...prev,
+        [memberId]: res.files || [],
+      }));
+    } catch (err: any) {
+      alert(err.message || t("Fehler beim Löschen der Korrekturdatei"));
+    } finally {
+      setDeletingFeedbackFileId(null);
+    }
+  };
+
+  // Auto-load feedback files in overview when file mode is active
+  useEffect(() => {
+    if (activeTab === 'ta_grading' && evalModeInOverview === 'file' && taSubmissionsData?.submissions && exerciseRefId) {
+      const needed = taSubmissionsData.submissions.filter(
+        (s) => s.evaluation_by_file_url && !fetchedFeedbackMembersRef.current.has(s.member_id)
+      );
+      if (needed.length === 0) return;
+
+      needed.forEach((s) => fetchedFeedbackMembersRef.current.add(s.member_id));
+
+      let isCancelled = false;
+      const fetchBatch = async () => {
+        const queue = [...needed];
+        const workers = Array.from({ length: Math.min(3, queue.length) }, async () => {
+          while (queue.length > 0 && !isCancelled) {
+            const sub = queue.shift();
+            if (!sub || !sub.evaluation_by_file_url) continue;
+            setLoadingFeedbackFilesFor((prev) => ({ ...prev, [sub.member_id]: true }));
+            try {
+              const res = await api.getFeedbackFiles(
+                exerciseRefId,
+                sub.member_id,
+                selectedTaAssId || undefined,
+                sub.evaluation_by_file_url
+              );
+              if (!isCancelled) {
+                setRowFeedbackFiles((prev) => ({
+                  ...prev,
+                  [sub.member_id]: res.files || [],
+                }));
+              }
+            } catch {
+              if (!isCancelled) {
+                setRowFeedbackFiles((prev) => ({
+                  ...prev,
+                  [sub.member_id]: [],
+                }));
+              }
+            } finally {
+              if (!isCancelled) {
+                setLoadingFeedbackFilesFor((prev) => ({ ...prev, [sub.member_id]: false }));
+              }
+            }
+          }
+        });
+        await Promise.all(workers);
+      };
+
+      fetchBatch();
+      return () => {
+        isCancelled = true;
+      };
+    }
+  }, [activeTab, evalModeInOverview, taSubmissionsData?.submissions, exerciseRefId, selectedTaAssId]);
 
   const handleUploadFeedbackFile = async (
     memberId: string,
@@ -2087,18 +2180,116 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           )}
                         </div>
                       ) : evalModeInOverview === 'file' ? (
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
-                              {t("Korrektur per Datei")}
-                            </span>
-                            {edit.feedback && (
-                              <span className="text-[10px] text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
-                                {t("Kommentar hinterlegt")}
+                        <div className="flex-1 space-y-2.5">
+                          {/* Header row: Title, badge, and management buttons */}
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
+                                {t("Korrektur per Datei")}
                               </span>
-                            )}
+                              {rowFeedbackFiles[sub.member_id] && rowFeedbackFiles[sub.member_id].length > 0 && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+                                  <FileText className="h-3 w-3" />
+                                  <span>
+                                    {rowFeedbackFiles[sub.member_id].length}{' '}
+                                    {rowFeedbackFiles[sub.member_id].length === 1
+                                      ? t("Datei")
+                                      : t("Dateien")}
+                                  </span>
+                                </span>
+                              )}
+                              {edit.feedback && (
+                                <span className="text-[10px] text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                                  {t("Kommentar hinterlegt")}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              {sub.evaluation_by_file_url && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDetailModalSubmission(sub)}
+                                    className="flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+                                    title={t("Dateien verwalten")}
+                                  >
+                                    <FileText className="h-3 w-3" />
+                                    <span>{t("Verwalten")}</span>
+                                  </button>
+                                  <a
+                                    href={sub.evaluation_by_file_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700"
+                                    title={t("In ILIAS öffnen")}
+                                  >
+                                    <span>{t("ILIAS")}</span>
+                                    <ExternalLink className="h-3 w-3 opacity-60" />
+                                  </a>
+                                </>
+                              )}
+                            </div>
                           </div>
 
+                          {/* Uploaded Feedback Files List */}
+                          {loadingFeedbackFilesFor[sub.member_id] && !rowFeedbackFiles[sub.member_id] ? (
+                            <div className="p-2.5 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80">
+                              <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
+                              <span>{t("Lade Korrekturdateien aus ILIAS...")}</span>
+                            </div>
+                          ) : rowFeedbackFiles[sub.member_id] && rowFeedbackFiles[sub.member_id].length > 0 ? (
+                            <div className="space-y-1.5">
+                              {rowFeedbackFiles[sub.member_id].map((ff) => (
+                                <div
+                                  key={ff.id}
+                                  className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 p-2 text-xs"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                                    <FileText className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-slate-800 dark:text-slate-200 truncate" title={ff.title}>
+                                        {ff.title}
+                                      </p>
+                                      <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                                        {ff.size && `${ff.size} • `}
+                                        {ff.created_on && t("Erstellt: {p0}", { p0: ff.created_on })}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {ff.download_url && (
+                                      <a
+                                        href={api.getDownloadUrl(exerciseRefId, ff.download_url)}
+                                        download
+                                        className="flex items-center gap-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2 py-1 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition border border-indigo-200 dark:border-indigo-800"
+                                        title={t("Korrekturdatei herunterladen")}
+                                      >
+                                        <Download className="h-3 w-3" />
+                                        <span>{t("Download")}</span>
+                                      </a>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteRowFeedbackFile(sub.member_id, ff.id, sub.evaluation_by_file_url)}
+                                      disabled={deletingFeedbackFileId === ff.id}
+                                      className="flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition border border-transparent hover:border-rose-200 dark:hover:border-rose-800 disabled:opacity-50 cursor-pointer"
+                                      title={t("Korrekturdatei löschen")}
+                                    >
+                                      {deletingFeedbackFileId === ff.id ? (
+                                        <RefreshCw className="h-3.5 w-3.5 animate-spin text-rose-600" />
+                                      ) : (
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {/* Upload Dropzone Box */}
                           <div
                             onDragOver={(e) => {
                               if (!sub.evaluation_by_file_url) return;
@@ -2139,6 +2330,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 <span className="font-semibold text-indigo-700 dark:text-indigo-300">
                                   {t("Datei hier loslassen zum Hochladen...")}
                                 </span>
+                              ) : rowFeedbackFiles[sub.member_id] && rowFeedbackFiles[sub.member_id].length > 0 ? (
+                                <span>{t("Weitere Korrekturdatei per Drag & Drop hierher ziehen oder auswählen.")}</span>
                               ) : sub.evaluation_by_file_url ? (
                                 <span>{t("Korrekturdatei per Drag & Drop hierher ziehen oder Button nutzen.")}</span>
                               ) : (
@@ -2160,7 +2353,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                     ) : (
                                       <Upload className="h-3.5 w-3.5" />
                                     )}
-                                    <span>{uploadingMemberId === sub.member_id ? t("Lädt...") : t("Datei hochladen")}</span>
+                                    <span>
+                                      {uploadingMemberId === sub.member_id
+                                        ? t("Lädt...")
+                                        : rowFeedbackFiles[sub.member_id] && rowFeedbackFiles[sub.member_id].length > 0
+                                        ? t("Datei hinzufügen")
+                                        : t("Datei hochladen")}
+                                    </span>
                                   </label>
                                   <input
                                     id={`row-upload-${sub.member_id}`}
@@ -2169,25 +2368,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                     disabled={uploadingMemberId === sub.member_id}
                                     onChange={(e) => handleUploadFeedbackFile(sub.member_id, e)}
                                   />
-                                  <button
-                                    type="button"
-                                    onClick={() => setDetailModalSubmission(sub)}
-                                    className="flex items-center gap-1 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition"
-                                    title={t("Dateien verwalten")}
-                                  >
-                                    <FileText className="h-3.5 w-3.5" />
-                                    <span>{t("Verwalten")}</span>
-                                  </button>
-                                  <a
-                                    href={sub.evaluation_by_file_url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700"
-                                    title={t("In ILIAS öffnen")}
-                                  >
-                                    <span>{t("ILIAS")}</span>
-                                    <ExternalLink className="h-3 w-3 opacity-60" />
-                                  </a>
                                 </>
                               )}
                             </div>
@@ -2325,6 +2505,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           assId={selectedTaAssId || undefined}
           isUpdating={isLoadingTaSubmissions}
           initialEdit={localEdits[detailModalSubmission.member_id]}
+          initialFeedbackFiles={rowFeedbackFiles[detailModalSubmission.member_id]}
+          onFeedbackFilesChange={(memberId, files) => {
+            setRowFeedbackFiles((prev) => ({ ...prev, [memberId]: files }));
+          }}
           onSave={handleSaveFromModal}
           onClose={() => setDetailModalSubmission(null)}
         />

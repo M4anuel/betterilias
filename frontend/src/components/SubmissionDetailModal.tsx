@@ -42,6 +42,8 @@ interface SubmissionDetailModalProps {
     memberId: string,
     data: { status: string; mark: string; feedback: string; notice: string }
   ) => Promise<void>;
+  initialFeedbackFiles?: FeedbackFileItem[];
+  onFeedbackFilesChange?: (memberId: string, files: FeedbackFileItem[]) => void;
   onClose: () => void;
 }
 
@@ -53,6 +55,8 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
   assId,
   isUpdating,
   initialEdit,
+  initialFeedbackFiles,
+  onFeedbackFilesChange,
   onSave,
   onClose,
 }) => {
@@ -76,7 +80,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
   const [isDirty, setIsDirty] = useState(false);
 
   // Feedback files state
-  const [feedbackFiles, setFeedbackFiles] = useState<FeedbackFileItem[]>([]);
+  const [feedbackFiles, setFeedbackFiles] = useState<FeedbackFileItem[]>(initialFeedbackFiles || []);
   const [isLoadingFeedbackFiles, setIsLoadingFeedbackFiles] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isDraggingFeedbackFile, setIsDraggingFeedbackFile] = useState(false);
@@ -85,11 +89,14 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
 
   useEffect(() => {
     if (exerciseRefId && submission.evaluation_by_file_url) {
-      setIsLoadingFeedbackFiles(true);
+      if (!initialFeedbackFiles || initialFeedbackFiles.length === 0) {
+        setIsLoadingFeedbackFiles(true);
+      }
       api
         .getFeedbackFiles(exerciseRefId, submission.member_id, assId, submission.evaluation_by_file_url)
         .then((res) => {
           setFeedbackFiles(res.files || []);
+          onFeedbackFilesChange?.(submission.member_id, res.files || []);
         })
         .catch(() => {})
         .finally(() => setIsLoadingFeedbackFiles(false));
@@ -110,6 +117,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
         submission.evaluation_by_file_url
       );
       setFeedbackFiles(res.files || []);
+      onFeedbackFilesChange?.(submission.member_id, res.files || []);
       setUploadSuccessMsg(`"${file.name}" erfolgreich hochgeladen.`);
       setTimeout(() => setUploadSuccessMsg(null), 3500);
     } catch (err: any) {
@@ -151,6 +159,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
         submission.evaluation_by_file_url
       );
       setFeedbackFiles(res.files || []);
+      onFeedbackFilesChange?.(submission.member_id, res.files || []);
     } catch (err: any) {
       alert(err.message || t("Fehler beim Löschen der Korrekturdatei"));
     } finally {
@@ -619,7 +628,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{ff.title}</p>
                           <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                            {ff.size && `${ff.size} • `}{ff.created_on && `Erstellt: ${ff.created_on}`}
+                            {ff.size && `${ff.size} • `}{ff.created_on && t("Erstellt: {p0}", { p0: ff.created_on })}
                           </p>
                         </div>
                       </div>

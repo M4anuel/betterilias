@@ -991,5 +991,10 @@
   "Möchten Sie diese Korrekturdatei wirklich löschen?": "Möchten Sie diese Korrekturdatei wirklich löschen?",
   "Fehler beim Löschen der Korrekturdatei": "Fehler beim Löschen der Korrekturdatei",
   "Korrekturdatei löschen": "Korrekturdatei löschen",
-  "Failed to delete feedback file": "Korrekturdatei konnte nicht gelöscht werden"
+  "Failed to delete feedback file": "Korrekturdatei konnte nicht gelöscht werden",
+  "Erstellt: {p0}": "Erstellt: {p0}",
+  "Korrekturdatei herunterladen": "Korrekturdatei herunterladen",
+  "Datei hinzufügen": "Datei hinzufügen",
+  "Weitere Korrekturdatei per Drag & Drop hierher ziehen oder auswählen.": "Weitere Korrekturdatei per Drag & Drop hierher ziehen oder auswählen.",
+  "Lade Korrekturdateien...": "Lade Korrekturdateien..."
 }

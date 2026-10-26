@@ -991,5 +991,10 @@
   "Möchten Sie diese Korrekturdatei wirklich löschen?": "Are you sure you want to delete this feedback file?",
   "Fehler beim Löschen der Korrekturdatei": "Error deleting feedback file",
   "Korrekturdatei löschen": "Delete feedback file",
-  "Failed to delete feedback file": "Could not delete feedback file"
+  "Failed to delete feedback file": "Could not delete feedback file",
+  "Erstellt: {p0}": "Created: {p0}",
+  "Korrekturdatei herunterladen": "Download feedback file",
+  "Datei hinzufügen": "Add file",
+  "Weitere Korrekturdatei per Drag & Drop hierher ziehen oder auswählen.": "Drag another feedback file here or browse.",
+  "Lade Korrekturdateien...": "Loading feedback files..."
 }
