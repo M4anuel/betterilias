@@ -1,26 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { FileText, FolderPlus, Layers, Plus, X } from 'lucide-react';
+import { FileText, FolderPlus, Layers, Plus, Upload, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { t, useLanguage } from '../lib/i18n';
 import { objectCategories, supportedCreationTypes } from '../lib/iliasObjects';
 import { useNavigationGuard } from '../lib/navigationGuard';
+import { describeFileLicense } from '../lib/fileLicenses';
 import type { AuthoringContext, FileLicense } from '../types';
 
-type QueueItem = { id: number; file: File; status: 'pending' | 'saving' | 'saved' | 'failed'; progress: number };
+type QueueItem = { id: number; file: File; status: 'pending' | 'saving' | 'saved' | 'failed'; progress: number; error?: string };
 type CompletionKey = 'authoring.created' | 'authoring.files_saved';
 const fieldClass = 'w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-2 text-slate-900 dark:text-slate-100';
 const buttonClass = 'rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 disabled:opacity-50';
-
-function licenseLabel(license: FileLicense) {
-  // Native copyright IDs are installation-specific; translate known interface labels.
-  if (/^(all rights reserved|alle rechte vorbehalten)$/i.test(license.label)) return t('authoring.rights');
-  if (/^(no license selected|keine lizenz ausgewählt)$/i.test(license.label)) return t('authoring.no_license');
-  const cc = license.label.match(/\(by(-nc)?(-nd|-sa)?\)/i)?.[0].slice(1, -1).toUpperCase();
-  if (cc) return `CC ${cc}`;
-  if (/^attribution non-commercial no derivatives$/i.test(license.label)) return 'CC BY-NC-ND';
-  if (/^public domain$/i.test(license.label)) return t('authoring.public_domain');
-  return license.label; // Preserve custom institution/lecturer license names.
-}
 
 export function CourseAuthoring({ context, onRefresh }: { context: AuthoringContext; onRefresh: () => void }) {
   useLanguage();
@@ -41,6 +31,7 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
 }) {
   useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [context, setContext] = useState<AuthoringContext | null>(null);
   const [step, setStep] = useState<'catalogue' | 'fold' | 'file'>('catalogue');
   const [search, setSearch] = useState('');
@@ -56,6 +47,8 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [uncertain, setUncertain] = useState(false);
+  const hasFailedUploads = queue.some(item => item.status === 'failed');
+  const selectedLicense = licenses?.find(option => option.value === license);
   // The whole queue remains pending between individual native file saves.
   useNavigationGuard({ isPending: busy });
   useEffect(() => {
@@ -107,15 +100,27 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
         await api.createFolder(refId, { title: title.trim(), description, template_id: template });
         onComplete('authoring.created');
       } else {
-        for (const item of queue.filter(item => item.status === 'pending')) {
-          update(item.id, { status: 'saving' });
-          try {
-            await api.uploadCourseFile(refId, item.file, license, progress => update(item.id, { progress }));
-            update(item.id, { status: 'saved', progress: 100 });
-            onRefresh();
-          } catch (e) { update(item.id, { status: 'failed' }); throw e; }
-        }
-        onComplete('authoring.files_saved');
+        const pending = queue.filter(item => item.status === 'pending');
+        let next = 0;
+        let failed = hasFailedUploads;
+        // Limit parallel uploads to avoid saturating memory/connections for big lectures.
+        const worker = async () => {
+          while (next < pending.length) {
+            const item = pending[next++];
+            update(item.id, { status: 'saving' });
+            try {
+              await api.uploadCourseFile(refId, item.file, license, progress => update(item.id, { progress }));
+              update(item.id, { status: 'saved', progress: 100 });
+            } catch (e) {
+              failed = true;
+              update(item.id, { status: 'failed', error: e instanceof Error ? e.message : t('authoring.uncertain') });
+            }
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(3, pending.length) }, worker));
+        onRefresh();
+        if (failed) setError(t('authoring.uploads_partial'));
+        else onComplete('authoring.files_saved');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : t('authoring.uncertain'));
@@ -129,9 +134,8 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
       <button disabled={busy} onClick={onClose} aria-label={t('authoring.close')} className={buttonClass}><X size={18} /></button>
     </div>
     <div className="space-y-4 p-5" aria-busy={busy || loading}>
-      {loading && <p role="status">{t('authoring.busy')}</p>}
       {error && <div role="alert" className="rounded-lg bg-rose-50 dark:bg-rose-950/40 p-3 text-rose-800 dark:text-rose-200">{error}</div>}
-      {uncertain && <a className="block text-teal-700 dark:text-teal-300 underline" target="_blank" rel="noreferrer"
+      {(uncertain || hasFailedUploads) && <a className="block text-teal-700 dark:text-teal-300 underline" target="_blank" rel="noreferrer"
         href={`https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&ref_id=${encodeURIComponent(refId)}`}>{t('authoring.open_ilias')}</a>}
       {step === 'catalogue' ? <>
         <label className="block">{t('authoring.search')}<input autoFocus className={fieldClass} value={search} onChange={e => setSearch(e.target.value)} /></label>
@@ -155,7 +159,7 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
         })}
         {!objectCategories.some(category => category.types.some(type => t(`objects.${type}`).toLocaleLowerCase().includes(search.toLocaleLowerCase()))) && <p>{t('authoring.empty')}</p>}
       </> : <form id="object-creation-form" onSubmit={event => { event.preventDefault(); void save(); }} className="space-y-4">
-        <fieldset disabled={busy || uncertain} className="space-y-4">
+        <fieldset disabled={busy || uncertain} className="min-w-0 space-y-4">
           {step === 'fold' ? <>
             <label className="block">{t('authoring.title')}<input autoFocus required maxLength={200} className={fieldClass} value={title} onChange={e => setTitle(e.target.value)} /></label>
             <label className="block">{t('authoring.description')}<textarea maxLength={4000} className={fieldClass} value={description} onChange={e => setDescription(e.target.value)} /></label>
@@ -163,31 +167,42 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
               {templates?.map(option => <option key={option.value} value={option.value}>{/^(default|standard)$/i.test(option.label) ? t('authoring.standard') : /^(hidden folder|versteckter ordner)$/i.test(option.label) ? t('authoring.hidden') : option.label}</option>)}
             </select></label>
           </> : <>
-            <label className="block rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 p-6 text-center"
+            <div className="rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/40 p-6 text-center"
               onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); addFiles(event.dataTransfer.files); }}>
-              {t('authoring.choose_files')}<input type="file" multiple className="mt-3 block w-full" onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
-            </label>
+              <Upload aria-hidden="true" className="mx-auto mb-3 h-7 w-7 text-teal-700 dark:text-teal-300" />
+              <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{t('authoring.drop_files')}</p>
+              <button type="button" onClick={() => fileInput.current?.click()} className="rounded-lg border border-teal-600 dark:border-teal-400 px-4 py-2 text-sm font-semibold text-teal-800 dark:text-teal-200 hover:bg-teal-50 dark:hover:bg-teal-950/50">{t('authoring.browse_files')}</button>
+              <input ref={fileInput} type="file" multiple hidden aria-label={t('authoring.browse_files')} onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+            </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('authoring.select_limit')}</p>
             <ul className="space-y-2">{queue.map(item => <li key={item.id} className="rounded-lg bg-slate-100 dark:bg-slate-800 p-3">
               <div className="flex items-center justify-between gap-2"><span className="min-w-0 break-all text-sm">{item.file.name} · {(item.file.size / 1_000_000).toFixed(1)} MB</span>
                 {item.status === 'pending' && <button type="button" className={buttonClass} aria-label={t('authoring.remove', { name: item.file.name })}
                   onClick={() => setQueue(previous => previous.filter(other => other.id !== item.id))}><X size={14} /></button>}</div>
               <p role="status" className="text-xs">{t(`authoring.${item.status}`)}</p>
+              {item.error && <p className="mt-1 text-xs text-rose-700 dark:text-rose-300">{item.error}</p>}
               {item.status === 'saving' && <progress className="w-full accent-teal-600" max={100} value={item.progress} aria-label={t('authoring.file_progress', { name: item.file.name })} />}
             </li>)}</ul>
-            <label className="block">{t('authoring.license')}<select required disabled={!licenses} className={fieldClass} value={license} onChange={e => setLicense(e.target.value)}>
-              {licenses?.map(option => <option key={option.value} value={option.value}>{licenseLabel(option)}</option>)}
+            <label className="block">{t('authoring.license')}<select required disabled={!licenses} aria-describedby="file-license-description" className={fieldClass} value={license} onChange={e => setLicense(e.target.value)}>
+              {licenses?.map(option => {
+                const info = describeFileLicense(option);
+                return <option key={option.value} value={option.value}>{info.label} — {info.description}</option>;
+              })}
             </select></label>
+            {selectedLicense && <p id="file-license-description" className="text-sm text-slate-600 dark:text-slate-300">{describeFileLicense(selectedLicense).description}</p>}
           </>}
         </fieldset>
       </form>}
     </div>
-    <div className="flex justify-end gap-2 border-t border-slate-200 dark:border-slate-700 p-4">
-      {step !== 'catalogue' && !uncertain && <button disabled={busy} className={buttonClass} onClick={() => { setStep('catalogue'); setError(''); }}>{t('authoring.back')}</button>}
+    <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 dark:border-slate-700 p-4">
+      {step !== 'catalogue' && !uncertain && <button disabled={busy || loading} className={buttonClass} onClick={() => { setStep('catalogue'); setError(''); }}>{t('authoring.change_object')}</button>}
       <button disabled={busy} className={buttonClass} onClick={onClose}>{t('authoring.cancel')}</button>
-      {step !== 'catalogue' && <button type="submit" form="object-creation-form" className="rounded-lg bg-[#0AACA5] px-4 py-2 font-semibold text-slate-950 disabled:opacity-50"
+      {step !== 'catalogue' && <span className="group relative inline-flex" tabIndex={busy || loading ? 0 : undefined}>
+        <button type="submit" form="object-creation-form" className="rounded-lg bg-[#0AACA5] px-4 py-2 font-semibold text-slate-950 disabled:pointer-events-none disabled:opacity-50"
         disabled={busy || loading || uncertain || (step === 'file' && (!license || !queue.some(item => item.status === 'pending')))}>
-        {t(busy ? 'authoring.busy' : step === 'fold' ? 'authoring.create' : 'authoring.upload')}</button>}
+        {t(step === 'fold' ? 'authoring.create' : 'authoring.upload')}</button>
+        {(busy || loading) && <span role="tooltip" className="pointer-events-none absolute bottom-full right-0 mb-2 hidden whitespace-nowrap rounded-md bg-slate-900 dark:bg-slate-100 px-3 py-2 text-xs text-white dark:text-slate-900 shadow-lg group-hover:block group-focus:block">{t('authoring.busy')}</span>}
+      </span>}
     </div>
   </dialog>;
 }

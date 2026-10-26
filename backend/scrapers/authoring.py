@@ -60,6 +60,29 @@ class CreationForm:
     file_fields: list[str] = field(default_factory=list)
 
 
+@safe_parser('authoring_file_names')
+def parse_file_names(html_content: str) -> dict[str, str]:
+    """The native action menu retains full filenames when titles omit extensions."""
+    soup = BeautifulSoup(html_content, 'lxml')
+    names = {}
+    for item in soup.select('.ilContainerListItemOuter, .ilContainerListItem, .il_ContainerListItem'):
+        title = item.select_one('h3 a[href], .il_ContainerItemTitle a[href]')
+        action = item.select_one('button.dropdown-toggle[aria-label]')
+        if not title or not action:
+            continue
+        label = re.match(r'^(?:Actions for|Aktionen für)\s+(.+)$', action['aria-label'])
+        if not label:
+            continue
+        url = urlparse(title['href'])
+        ref_id = parse_qs(url.query).get('ref_id', [None])[0]
+        if not ref_id:
+            permalink = re.search(r'/go/file/(\d+)', url.path)
+            ref_id = permalink[1] if permalink else None
+        if ref_id:
+            names[ref_id] = label[1]
+    return names
+
+
 @safe_parser('authoring_creation_form')
 def parse_creation_form(html_content: str, ref_id: str, object_type: str) -> CreationForm:
     soup = BeautifulSoup(html_content, 'lxml')

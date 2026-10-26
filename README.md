@@ -53,8 +53,8 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
   * Authors can create folders and upload course files from the course or folder header. Permissions are checked against the current native ILIAS page before every creation.
   * The searchable Add Object dialog lists all 30 native object types in six categories. Folder and file creation are enabled where ILIAS permits them; remaining types are marked as coming soon.
   * Folder creation supports title, description and the native folder templates (Default or Hidden folder where offered).
-  * Multi-file selection and drag-and-drop provide a queue, per-file upload progress and a license selector. Each file follows the native temporary-upload and metadata-save flow; successful files remain marked as saved if a later upload fails.
-  * Saves are confirmed against a fresh container listing. Uncertain outcomes stop the queue and link to ILIAS for inspection before another attempt.
+  * Localized file selection and drag-and-drop provide a queue, per-file upload progress and short explanations for license choices. Up to three files upload concurrently through the native temporary-upload and metadata-save flow.
+  * Saves are confirmed against a fresh container listing, including ILIAS file titles that omit the extension. An uncertain outcome is shown for the affected file while the remaining uploads continue; successful files remain marked as saved.
 
 * **TA Grading Automation & Correction Mode:**
   * **Participant & Submission Overview:** View student submissions, grading status, and uploaded files filtered by assignment.

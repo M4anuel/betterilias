@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from backend.api.deps import get_ilias_client
 from backend.main import app
 from backend.schemas import CreateFolderRequest
-from backend.scrapers.authoring import parse_authoring_context, parse_creation_form
+from backend.scrapers.authoring import parse_authoring_context, parse_creation_form, parse_file_names
 from backend.services.authoring import AuthoringError
 from backend.services.ilias_client import IliasClient
 
@@ -22,6 +22,7 @@ FIXTURES = Path(__file__).parent / 'fixtures' / 'authoring'
 CONTEXT = (FIXTURES / 'context.html').read_text(encoding='utf8')
 FOLDER = (FIXTURES / 'folder.html').read_text(encoding='utf8')
 FILE = (FIXTURES / 'file.html').read_text(encoding='utf8')
+CREATED_FILE = (FIXTURES / 'created_file.html').read_text(encoding='utf8')
 
 
 def material(ref_id, title, kind):
@@ -109,7 +110,8 @@ async def test_timeout_does_not_replay_folder_creation():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('upload_result', [{'status': 1, 'file_id': 'resource-123'}, {'status': 0}, {'status': 1}])
-async def test_file_upload_follows_handler_then_metadata_save(upload_result):
+@pytest.mark.parametrize('display_title', ['notes.pdf', 'notes'])
+async def test_file_upload_follows_handler_then_metadata_save(upload_result, display_title):
     posts = []
     def handler(request):
         query = parse_qs(request.url.query.decode())
@@ -125,7 +127,7 @@ async def test_file_upload_follows_handler_then_metadata_save(upload_result):
             return httpx.Response(200, text='<div id="ilTab">Saved</div>')
         if query.get('cmd') == ['create']:
             return httpx.Response(200, text=FILE)
-        return httpx.Response(200, text=CONTEXT + (material('51', 'notes.pdf', 'file') if len(posts) == 2 else ''))
+        return httpx.Response(200, text=CONTEXT + (material('51', display_title, 'file') if len(posts) == 2 else ''))
     upload = UploadFile(filename='notes.pdf', file=BytesIO(b'PDF content'))
     if upload_result.get('file_id'):
         result = await service(handler).upload_course_file('42', upload, 'il_copyright_entry__0__7')
@@ -134,6 +136,30 @@ async def test_file_upload_follows_handler_then_metadata_save(upload_result):
         with pytest.raises(AuthoringError):
             await service(handler).upload_course_file('42', upload, 'il_copyright_entry__0__7')
         assert len(posts) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('existing,filename,confirmed', [(False, 'downloadfile.pdf', True), (True, 'downloadfile.pdf', False), (False, 'downloadfile.txt', False)])
+async def test_live_extensionless_file_title_and_full_filename(existing, filename, confirmed):
+    posts = []
+    def handler(request):
+        if request.method == 'POST':
+            posts.append(request)
+            if 'cmd=upload&' in str(request.url):
+                return httpx.Response(200, json={'status': 1, 'file_id': 'native-resource'})
+            return httpx.Response(200, text=CREATED_FILE)
+        if 'cmd=create' in str(request.url):
+            return httpx.Response(200, text=FILE)
+        return httpx.Response(200, text=CONTEXT + (CREATED_FILE if existing or len(posts) == 2 else ''))
+    assert parse_file_names(CREATED_FILE) == {'51': 'downloadfile.pdf'}
+    upload = UploadFile(filename=filename, file=BytesIO(b'file content'))
+    if confirmed:
+        result = await service(handler).upload_course_file('42', upload, 'il_copyright_entry__0__7')
+        assert result.items[0].title == 'downloadfile'
+    else:
+        with pytest.raises(AuthoringError):
+            await service(handler).upload_course_file('42', upload, 'il_copyright_entry__0__7')
+    assert len(posts) == 2
 
 
 @pytest.mark.asyncio

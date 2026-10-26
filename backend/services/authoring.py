@@ -1,12 +1,13 @@
 """Repository authoring shared by courses and folders, with verified writes."""
 from urllib.parse import urlencode
+from pathlib import PurePath
 
 import httpx
 
 from backend.config import settings
 from backend.i18n import t
 from backend.schemas import AuthoringResult, CreateFolderRequest
-from backend.scrapers.authoring import parse_authoring_context, parse_creation_form
+from backend.scrapers.authoring import parse_authoring_context, parse_creation_form, parse_file_names
 from backend.scrapers.dumper import dump_failed_html
 from backend.scrapers.materials import parse_course_materials
 from backend.services.assignment_multipart import encode_assignment_form
@@ -68,8 +69,13 @@ class AuthoringMixin:
             response.raise_for_status()
             after = await self._authoring_container(client, ref_id)
             previous = {item.ref_id for item in parse_course_materials(before.text, ref_id).items}
+            # ILIAS strips the final filename extension from file display titles.
+            # Keep the new-reference check: an existing namesake is not a saved upload.
+            titles = {title, PurePath(title).stem} if item_type == 'file' else {title}
+            full_names = parse_file_names(after.text) if item_type == 'file' else {}
             created = [item for item in parse_course_materials(after.text, ref_id).items
-                       if item.ref_id not in previous and item.item_type == item_type and item.title == title]
+                       if item.ref_id not in previous and item.item_type == item_type
+                       and (full_names[item.ref_id] == title if item.ref_id in full_names else item.title in titles)]
             if len(created) == 1:
                 return AuthoringResult(items=created)
             dump_failed_html(response.text, 'authoring_unconfirmed')
