@@ -28,8 +28,8 @@ interface TAFilterSettingsModalProps {
   onToggleShowMarksInOverview: () => void;
   evalModeInOverview: 'statement' | 'file' | 'email';
   onSetEvalMode: (mode: 'statement' | 'file' | 'email') => void;
-  sortField: 'time' | 'name' | 'status' | 'mark';
-  onSetSortField: (field: 'time' | 'name' | 'status' | 'mark') => void;
+  sortField: 'time' | 'name' | 'status' | 'mark' | 'ilias';
+  onSetSortField: (field: 'time' | 'name' | 'status' | 'mark' | 'ilias') => void;
   sortOrder: 'asc' | 'desc';
   onSetSortOrder: (order: 'asc' | 'desc') => void;
   quickFilters: TAQuickFilter[];
@@ -143,6 +143,20 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                title={t('Nachname des Empfängers unter „Korrektur per Datei“')}
+                onClick={() => onSetSortField('ilias')}
+                className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border text-xs font-semibold transition cursor-pointer ${
+                  sortField === 'ilias'
+                    ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 ring-2 ring-indigo-500/20 dark:border-indigo-500 dark:bg-indigo-950/60 dark:text-indigo-200'
+                    : 'border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                }`}
+              >
+                <User className={`h-4 w-4 ${sortField === 'ilias' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
+                <span>{t('ILIAS-Standardsortierung')}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => onSetSortField('time')}

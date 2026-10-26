@@ -231,8 +231,11 @@ export const api = {
     return res.json();
   },
 
-  async getExerciseSubmissions(exerciseId: string, assId?: string): Promise<ExerciseSubmissionsResponse> {
-    const query = assId ? `?ass_id=${encodeURIComponent(assId)}` : '';
+  async getExerciseSubmissions(exerciseId: string, assId?: string, includeIliasOrder = false): Promise<ExerciseSubmissionsResponse> {
+    const params = new URLSearchParams();
+    if (assId) params.set('ass_id', assId);
+    if (includeIliasOrder) params.set('include_ilias_order', 'true');
+    const query = params.size ? `?${params}` : '';
     const res = await sessionFetch(`${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/submissions${query}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

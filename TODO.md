@@ -101,6 +101,8 @@ build validation, and English fallback for partial languages.
 
 ## Completed
 
+- [x] Sort the ILIAS default grading order by the feedback recipient surname shown under Evaluation by file; replace the incorrect first-added-team-member lookup.
+
 - [x] Highlight invalid assignment inputs, show localised errors beside each field, and scroll/focus the first invalid input on submission; clear errors as values are corrected.
 
 - [x] Show dismissible, localised green confirmations in assignment management after creation, editing and confirmed deletion, including screen-reader announcements.

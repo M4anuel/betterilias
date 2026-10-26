@@ -376,7 +376,7 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
                 feedback_mail_url = full_url
             elif "evaluation by file" in el_text or "file" in el_text or "datei" in el_text:
                 evaluation_by_file_url = full_url
-            elif "log" in el_text:
+            elif urllib.parse.parse_qs(urllib.parse.urlparse(full_url).query).get("cmd", [""])[0].lower() == "showteamlog" or "log" in el_text:
                 team_log_url = full_url
 
         if submission_status in ["submitted", "late"]:
@@ -1360,4 +1360,3 @@ def parse_student_upload_errors(html_content: str) -> Optional[str]:
         if message and message not in messages:
             messages.append(message)
     return '\n'.join(messages) or None
-

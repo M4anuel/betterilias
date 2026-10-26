@@ -20,12 +20,14 @@ def parse_feedback_files(html: str, base_url: str = settings.ilias_base_url) -> 
     # 1. Student name
     student_name: Optional[str] = None
     for h in soup.find_all(["h1", "h2", "h3", "h4"]):
-        text = h.get_text(strip=True)
-        if any(w in text for w in ["Evaluation Files:", "Korrektur-Dateien:", "Feedback Files:"]):
-            parts = text.split(":", 1)
-            if len(parts) > 1:
-                student_name = parts[1].strip()
-                break
+        text = h.get_text(" ", strip=True)
+        match = re.fullmatch(
+            r"(?:Evaluation Files|Feedback Files|Korrektur-?Dateien|Feedback-Dateien|Bewertungsdateien)\s*:\s*(.+)",
+            text, re.I,
+        )
+        if match:
+            student_name = match.group(1).strip()
+            break
 
     # 2. Member ID
     member_id = ""
