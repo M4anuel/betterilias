@@ -1090,5 +1090,11 @@
   "Minuten": "minutes",
   "Minuten (Standard)": "minutes (default)",
   "Minuten (1 Std.)": "minutes (1 hr)",
-  "Min.": "min."
+  "Min.": "min.",
+  "Bewertung gespeichert": "Grade saved",
+  "Aus «Zu korrigieren» entfernt, da jetzt bewertet.": "Removed from 'To correct' because it is now graded.",
+  "Einreichung ansehen": "View submission",
+  "Filter aufheben": "Clear filter",
+  "Erfolgreich gespeichert — wird aus der Liste gefiltert": "Saved successfully — filtering out of list",
+  "Einreichung": "Submission"
 }
