@@ -1,7 +1,6 @@
 import { t, useLanguage, assignmentStatusText } from '../lib/i18n';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
-  ArrowLeft,
   Layers,
   FileText,
   Clock,
@@ -29,14 +28,17 @@ import {
 } from 'lucide-react';
 import {
   AssignmentItem,
+  BreadcrumbItem,
   ExerciseInfoResponse,
   ExerciseOverviewResponse,
   ExerciseSubmissionsResponse,
+  ExerciseTab,
   SubmissionItem,
   TAQuickFilter,
 } from '../types';
 import { api } from '../lib/api';
 import { cache } from '../lib/cache';
+import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { StudentAssignmentModal } from './StudentAssignmentModal';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { TAFilterSettingsModal } from './TAFilterSettingsModal';
@@ -48,8 +50,15 @@ interface ExerciseViewProps {
   exerciseRefId: string;
   courseNickname: string;
   courseRefId: string;
+  courseBreadcrumbs?: BreadcrumbItem[];
+  activeTabProp?: ExerciseTab | null;
+  onTabChange?: (tab: ExerciseTab) => void;
   onBack: () => void;
+  onNavigateHome: () => void;
+  onNavigateCourse: (courseRefId: string) => void;
   onNavigateFolder?: (folderRefId: string) => void;
+  onNavigateRepository: (repoRefId: string) => void;
+  onNavigateSemester?: (semester: string) => void;
   onNotifyChange?: (notifications: ChangeNotification[]) => void;
 }
 
@@ -57,14 +66,74 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   exerciseRefId,
   courseNickname,
   courseRefId,
+  courseBreadcrumbs,
+  activeTabProp,
+  onTabChange,
   onBack,
+  onNavigateHome,
+  onNavigateCourse,
   onNavigateFolder,
+  onNavigateRepository,
+  onNavigateSemester,
   onNotifyChange,
 }) => {
   const language = useLanguage();
   // Top Navigation Tab: 'assignments' | 'info' | 'ta_grading'
-  const [activeTab, setActiveTab] = useState<'assignments' | 'info' | 'ta_grading'>('assignments');
-  const [taManagementMode, setTaManagementMode] = useState<'none' | 'list' | 'editor'>('none');
+  const [activeTab, setActiveTab] = useState<'assignments' | 'info' | 'ta_grading'>(() => {
+    if (activeTabProp === 'info') return 'info';
+    if (activeTabProp === 'submissions') return 'ta_grading';
+    return 'assignments';
+  });
+  const [taManagementMode, setTaManagementMode] = useState<'none' | 'list' | 'editor'>(() => {
+    if (activeTabProp === 'manage') return 'list';
+    if (activeTabProp === 'manage-edit') return 'editor';
+    return 'none';
+  });
+
+  // Sync state when activeTabProp changes (from URL / popstate / Mouse 4/5)
+  useEffect(() => {
+    if (!activeTabProp || activeTabProp === 'assignments') {
+      setActiveTab('assignments');
+      setTaManagementMode('none');
+    } else if (activeTabProp === 'info') {
+      setActiveTab('info');
+      setTaManagementMode('none');
+    } else if (activeTabProp === 'submissions') {
+      setActiveTab('ta_grading');
+      setTaManagementMode('none');
+    } else if (activeTabProp === 'manage') {
+      setActiveTab('assignments');
+      setTaManagementMode('list');
+    } else if (activeTabProp === 'manage-edit') {
+      setActiveTab('assignments');
+      setTaManagementMode('editor');
+    }
+  }, [activeTabProp]);
+
+  const switchTab = useCallback(
+    (tab: ExerciseTab) => {
+      if (tab === 'assignments') {
+        setActiveTab('assignments');
+        setTaManagementMode('none');
+      } else if (tab === 'info') {
+        setActiveTab('info');
+        setTaManagementMode('none');
+      } else if (tab === 'submissions') {
+        setActiveTab('ta_grading');
+        setTaManagementMode('none');
+      } else if (tab === 'manage') {
+        setActiveTab('assignments');
+        setTaManagementMode('list');
+      } else if (tab === 'manage-edit') {
+        setActiveTab('assignments');
+        setTaManagementMode('editor');
+      }
+      if (onTabChange) {
+        onTabChange(tab);
+      }
+    },
+    [onTabChange]
+  );
   const [editingTaAssId, setEditingTaAssId] = useState<string | null>(null);
   const [editingTaTypeId, setEditingTaTypeId] = useState<number>(1);
   const [assignmentFeedback, setAssignmentFeedback] = useState<AssignmentFeedback | null>(null);
@@ -310,43 +379,50 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     }
   }, [taSortField, language]);
 
-  // Process breadcrumbs from overviewData to show full course -> intermediate folder(s) -> exercise hierarchy
-  const processedBreadcrumbs = useMemo(() => {
-    if (!overviewData?.breadcrumbs || overviewData.breadcrumbs.length === 0) {
-      return [];
-    }
-
-    const ignoredWords = ['repository', 'fakultät', 'fakultat', 'vorlesung', 'seminar', 'magazin', 'root'];
-
-    let courseIndex = -1;
-    for (let i = 0; i < overviewData.breadcrumbs.length; i++) {
-      const b = overviewData.breadcrumbs[i];
-      if (
-        b.ref_id === courseRefId ||
-        b.title.toLowerCase().includes('mensch-maschine') ||
-        b.title.toLowerCase().includes('schnittstelle') ||
-        b.title.includes(courseNickname)
-      ) {
-        courseIndex = i;
-        break;
+  // Close any open modal on Mouse 4 (Back)
+  useEffect(() => {
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 3) {
+        if (activeModalAssignment) {
+          e.preventDefault();
+          e.stopPropagation();
+          setActiveModalAssignment(null);
+          return;
+        }
+        if (detailModalSubmission) {
+          e.preventDefault();
+          e.stopPropagation();
+          setDetailModalSubmission(null);
+          return;
+        }
+        if (isSettingsModalOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsSettingsModalOpen(false);
+          return;
+        }
       }
+    };
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => window.removeEventListener('mouseup', handleMouseUp);
+  }, [activeModalAssignment, detailModalSubmission, isSettingsModalOpen]);
+
+  // Process breadcrumbs for CompactBreadcrumbs
+  const effectiveBreadcrumbs = useMemo(() => {
+    if (overviewData?.breadcrumbs && overviewData.breadcrumbs.length > 0) {
+      return overviewData.breadcrumbs.map((b, idx, arr) => {
+        if (idx === arr.length - 1 && !b.ref_id) {
+          return { ...b, ref_id: exerciseRefId };
+        }
+        return b;
+      });
     }
-
-    const items: Array<{ title: string; ref_id: string }> = [];
-    const startIdx = courseIndex !== -1 ? courseIndex + 1 : 0;
-    const endIdx = overviewData.breadcrumbs.length - 1; // Exclude the exercise itself
-
-    for (let i = startIdx; i < endIdx; i++) {
-      const b = overviewData.breadcrumbs[i];
-      const titleLower = b.title.toLowerCase();
-      if (ignoredWords.some((w) => titleLower.includes(w))) continue;
-      if (b.ref_id) {
-        items.push({ title: b.title, ref_id: b.ref_id });
-      }
-    }
-
-    return items;
-  }, [overviewData?.breadcrumbs, courseRefId, courseNickname]);
+    const fallback = courseBreadcrumbs ? [...courseBreadcrumbs] : [];
+    return [
+      ...fallback,
+      { title: overviewData?.title || t("Übungsübersicht"), ref_id: exerciseRefId },
+    ];
+  }, [overviewData?.breadcrumbs, overviewData?.title, exerciseRefId, courseBreadcrumbs]);
 
   // 1. Load Overview (defaults to mode=all so all 11+ assignments are fetched!)
   const loadOverview = useCallback(() => {
@@ -1047,145 +1123,119 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
-      {/* Top Header with Breadcrumbs & Back Button */}
+      {/* Top Header with Breadcrumbs & Sync Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
-        <div className="flex items-center gap-3">
+        <CompactBreadcrumbs
+          rawBreadcrumbs={effectiveBreadcrumbs}
+          courseNickname={courseNickname}
+          courseRefId={courseRefId}
+          currentFolderRefId={exerciseRefId}
+          onNavigateHome={onNavigateHome}
+          onNavigateRepository={onNavigateRepository}
+          onNavigateSemester={onNavigateSemester}
+          onNavigateCourse={(ref) => {
+            onNavigateCourse(ref);
+            onBack();
+          }}
+          onNavigateFolder={(ref) => {
+            if (onNavigateFolder) onNavigateFolder(ref);
+            onBack();
+          }}
+        />
+
+        {/* Sync / Refresh status */}
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          {isLoadingOverview || isRevalidatingOverview ? (
+            <div className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:text-blue-300">
+              <RefreshCw className="h-3 w-3 animate-spin" />
+              <span>{t("Synchronisiere...")}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
+              <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+              <span>{t("Lokal bereitgestellt")}</span>
+            </div>
+          )}
+
           <button
             type="button"
-            onClick={onBack}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-2xs cursor-pointer"
+            onClick={handleRefresh}
+            disabled={isLoadingOverview && !overviewData}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-200 transition disabled:opacity-50 cursor-pointer"
+            title={t("Neu von ILIAS abrufen")}
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span>{t("Zurück zur Vorlesung")}</span>
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${
+                isLoadingOverview || isRevalidatingOverview || (activeTab === 'ta_grading' && isLoadingTaSubmissions)
+                  ? 'animate-spin text-indigo-600 dark:text-indigo-400'
+                  : ''
+              }`}
+            />
           </button>
-          <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 overflow-x-auto py-0.5">
-            <button
-              type="button"
-              onClick={onBack}
-              className="font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition truncate max-w-[180px] cursor-pointer"
-              title={t("Zurück zum Kurs")}
-            >
-              {courseNickname}
-            </button>
-            {processedBreadcrumbs.map((b) => (
-              <React.Fragment key={b.ref_id}>
-                <span className="text-slate-400 dark:text-slate-600">›</span>
-                <button
-                  type="button"
-                  onClick={() => (onNavigateFolder ? onNavigateFolder(b.ref_id) : onBack())}
-                  className="font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition truncate max-w-[180px] cursor-pointer"
-                  title={t("Zum Ordner {p0}", { p0: b.title })}
-                >
-                  {b.title}
-                </button>
-              </React.Fragment>
-            ))}
-            <span className="text-slate-400 dark:text-slate-600">›</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 shrink-0">{overviewData?.title || t("Übungen")}</span>
-          </div>
         </div>
-
-        {/* Sync Button */}
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={isLoadingOverview && !overviewData}
-          className="flex items-center gap-1.5 rounded-lg p-1.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition disabled:opacity-50 cursor-pointer self-start sm:self-auto"
-          title={t("Neu laden")}
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${
-              isLoadingOverview || isRevalidatingOverview || (activeTab === 'ta_grading' && isLoadingTaSubmissions)
-                ? 'animate-spin text-indigo-600 dark:text-indigo-400'
-                : ''
-            }`}
-          />
-          <span className="text-xs font-semibold">{t("Aktualisieren")}</span>
-        </button>
       </div>
 
       {/* Main Title Row & Navigation Tabs */}
-      <div className="space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shadow-2xs">
-                <Layers className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                    {overviewData?.title || t("Übungsübersicht")}
-                  </h1>
-                  {isRevalidatingOverview && (
-                    <span className="flex items-center gap-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800 animate-pulse">
-                      <RefreshCw className="h-2.5 w-2.5 animate-spin" />
-                      {t("Aktualisiert...")}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                  {(overviewData?.assignments || []).length} {t("Übungsblätter verfügbar")}
-                  {ongoingCount > 0 && ` • ${ongoingCount} aktuell aktiv`}
-                </p>
-              </div>
-            </div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <Layers className="h-5 w-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
+              {overviewData?.title || t("Übungsübersicht")}
+            </h1>
           </div>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+            {(overviewData?.assignments || []).length} {t("Übungsblätter verfügbar")}
+            {ongoingCount > 0 && ` • ${ongoingCount} ${t("aktuell aktiv")}`}
+          </p>
+        </div>
 
-          {/* Navigation Bar / Tabs */}
-          <div className="flex items-center gap-1 rounded-2xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200/60 dark:border-slate-700/60 self-start md:self-auto">
+        {/* Navigation Bar / Tabs */}
+        <div className="flex items-center gap-1 rounded-2xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200/60 dark:border-slate-700/60 self-start md:self-auto">
+          <button
+            type="button"
+            onClick={() => switchTab('assignments')}
+            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
+              activeTab === 'assignments' && taManagementMode === 'none'
+                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            <span>{t("Übungsblätter")}</span>
+            <span className="rounded-full bg-slate-200/80 dark:bg-slate-700 px-1.5 py-0.2 text-[10px]">
+              {(overviewData?.assignments || []).length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => switchTab('info')}
+            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
+              activeTab === 'info'
+                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <Info className="h-3.5 w-3.5" />
+            <span>{t("Informationen")}</span>
+          </button>
+
+          {/* Tutor Abgaben & Noten Tab: ONLY shown if tutor access is detected! */}
+          {overviewData?.has_ta_access && (
             <button
               type="button"
-              onClick={() => setActiveTab('assignments')}
+              onClick={() => switchTab('submissions')}
               className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
-                activeTab === 'assignments'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                activeTab === 'ta_grading'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50'
               }`}
             >
-              <FileText className="h-3.5 w-3.5" />
-              <span>{t("Übungsblätter")}</span>
-              <span className="rounded-full bg-slate-200/80 dark:bg-slate-700 px-1.5 py-0.2 text-[10px]">
-                {(overviewData?.assignments || []).length}
-              </span>
+              <Award className="h-3.5 w-3.5" />
+              <span>{t("Abgaben & Noten (Tutor)")}</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('info');
-                setTaManagementMode('none');
-              }}
-              className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
-                activeTab === 'info'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Info className="h-3.5 w-3.5" />
-              <span>{t("Informationen")}</span>
-            </button>
-
-            {/* Tutor Abgaben & Noten Tab: ONLY shown if tutor access is detected! */}
-            {overviewData?.has_ta_access && (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('ta_grading');
-                  setTaManagementMode('none');
-                }}
-                className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
-                  activeTab === 'ta_grading'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50'
-                }`}
-              >
-                <Award className="h-3.5 w-3.5" />
-                <span>{t("Abgaben & Noten (Tutor)")}</span>
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
@@ -1200,14 +1250,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           onFeedbackChange={setAssignmentFeedback}
           onBack={() => {
             setAssignmentFeedback(null);
-            setTaManagementMode('none');
+            switchTab('assignments');
             loadOverview();
           }}
           onEditAssignment={(assId, typeId) => {
             setAssignmentFeedback(null);
             setEditingTaAssId(assId);
             setEditingTaTypeId(typeId || 1);
-            setTaManagementMode('editor');
+            switchTab('manage-edit');
           }}
         />
       )}
@@ -1217,12 +1267,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           exerciseRefId={exerciseRefId}
           assId={editingTaAssId}
           initialTypeId={editingTaTypeId}
-          onBack={() => setTaManagementMode('list')}
+          onBack={() => switchTab('manage')}
           onSaved={(savedAssId, result) => {
             setAssignmentFeedback({ kind: result.created ? 'created' : 'updated', title: result.title });
             loadOverview();
             setEditingTaAssId(savedAssId);
-            setTaManagementMode('list');
+            switchTab('manage');
           }}
         />
       )}
@@ -1300,7 +1350,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               {overviewData?.has_ta_access && (
                 <button
                   type="button"
-                  onClick={() => setTaManagementMode('list')}
+                  onClick={() => switchTab('manage')}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 font-bold text-xs transition cursor-pointer shrink-0 shadow-2xs"
                   title={t("Übungen verwalten & bearbeiten (Tutor)")}
                 >

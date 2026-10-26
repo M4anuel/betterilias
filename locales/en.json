@@ -976,5 +976,6 @@
   "video.opencast_player": "Opencast lecture player",
   "video.unsupported": "Your browser does not support the video tag.",
   "embedded.ilias_content": "Embedded content (ILIAS)",
-  "embedded.open_in_ilias": "Open in ILIAS →"
+  "embedded.open_in_ilias": "Open in ILIAS →",
+  "aktuell aktiv": "currently active"
 }

@@ -349,6 +349,8 @@ export interface ExerciseInfoResponse {
   fetched_at: string;
 }
 
+export type ExerciseTab = 'assignments' | 'info' | 'submissions' | 'manage' | 'manage-edit';
+
 export interface ExerciseOverviewResponse {
   exercise_ref_id: string;
   title: string;

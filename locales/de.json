@@ -976,5 +976,6 @@
   "video.opencast_player": "Opencast Vorlesungs-Player",
   "video.unsupported": "Ihr Browser unterstützt das Video-Tag nicht.",
   "embedded.ilias_content": "Eingebetteter Inhalt (ILIAS)",
-  "embedded.open_in_ilias": "In ILIAS öffnen →"
+  "embedded.open_in_ilias": "In ILIAS öffnen →",
+  "aktuell aktiv": "aktuell aktiv"
 }

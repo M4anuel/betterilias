@@ -116,3 +116,4 @@ build validation, and English fallback for partial languages.
 - [x] Show the fixed submission type explanation in an edit-only info tooltip; preserve live caret formatting when toggling bold and italic independently.
 - [x] Preserve formatted instructions in student assignment dialogs and show team controls only for assignments with native Team Upload support; verify rendered styles in light and dark mode.
 - [x] Localise known ILIAS assignment status, requirement, type and deadline messages in overviews and dialogs; document localisation requirements in AGENTS.md.
+- [x] Standardise exercise view layout and navigation: replaced disruptive standalone "Zurück zur Vorlesung" button with unified CompactBreadcrumbs matching CourseView (preventing layout jump), reflected active exercise tabs and TA management views in URL search params, and enabled Mouse 4 & 5 browser history back/forward navigation across all tabs and editor views.

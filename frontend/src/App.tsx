@@ -14,6 +14,7 @@ import {
   AuthStatus,
   CourseItem,
   CourseMaterialsResponse,
+  ExerciseTab,
   SemesterScreenResponse,
   MembershipAction,
 } from './types';
@@ -26,6 +27,7 @@ export interface NavigationState {
   courseId: string | null;
   containerId: string | null;
   exerciseId: string | null;
+  exerciseTab?: ExerciseTab | null;
   repositoryId?: string | null;
 }
 
@@ -40,6 +42,9 @@ export function stateToUrl(state: NavigationState): string {
     }
     if (state.exerciseId) {
       params.set('exercise', state.exerciseId);
+      if (state.exerciseTab && state.exerciseTab !== 'assignments') {
+        params.set('tab', state.exerciseTab);
+      }
     }
   } else {
     if (state.semester) {
@@ -56,7 +61,17 @@ export function parseStateFromUrl(defaultSemester: string): NavigationState {
   const courseId = repositoryId ? null : params.get('course');
   const folderId = repositoryId ? null : params.get('folder');
   const exerciseId = repositoryId ? null : params.get('exercise');
+  const tabParam = repositoryId ? null : params.get('tab');
   const semester = params.get('semester') || defaultSemester;
+
+  let exerciseTab: ExerciseTab | null = null;
+  if (exerciseId && tabParam) {
+    if (tabParam === 'info') exerciseTab = 'info';
+    else if (tabParam === 'submissions' || tabParam === 'ta_grading' || tabParam === 'grades') exerciseTab = 'submissions';
+    else if (tabParam === 'manage') exerciseTab = 'manage';
+    else if (tabParam === 'manage-edit' || tabParam === 'edit') exerciseTab = 'manage-edit';
+    else if (tabParam === 'assignments' || tabParam === 'overview') exerciseTab = 'assignments';
+  }
 
   return {
     semester,
@@ -64,6 +79,7 @@ export function parseStateFromUrl(defaultSemester: string): NavigationState {
     courseId: courseId || null,
     containerId: folderId || courseId || null,
     exerciseId: exerciseId || null,
+    exerciseTab,
   };
 }
 
@@ -85,6 +101,7 @@ export const App: React.FC = () => {
   const initialCourseParam = initialParams.get('course');
   const initialFolderParam = initialParams.get('folder');
   const initialExerciseParam = initialParams.get('exercise');
+  const initialTabParam = initialParams.get('tab');
 
   // --- Semester & Courses State ---
   const [selectedSemester, setSelectedSemester] = useState<string>(() => {
@@ -117,6 +134,15 @@ export const App: React.FC = () => {
   });
   const [activeExerciseRefId, setActiveExerciseRefId] = useState<string | null>(() => {
     return initialExerciseParam || null;
+  });
+  const [activeExerciseTab, setActiveExerciseTab] = useState<ExerciseTab | null>(() => {
+    if (!initialExerciseParam || !initialTabParam) return null;
+    if (initialTabParam === 'info') return 'info';
+    if (initialTabParam === 'submissions' || initialTabParam === 'ta_grading' || initialTabParam === 'grades') return 'submissions';
+    if (initialTabParam === 'manage') return 'manage';
+    if (initialTabParam === 'manage-edit' || initialTabParam === 'edit') return 'manage-edit';
+    if (initialTabParam === 'assignments' || initialTabParam === 'overview') return 'assignments';
+    return null;
   });
 
   const [materialsData, setMaterialsData] = useState<CourseMaterialsResponse | null>(() => {
@@ -363,6 +389,7 @@ export const App: React.FC = () => {
       setSelectedCourseId(null);
       setCurrentContainerId(null);
       setActiveExerciseRefId(null);
+      setActiveExerciseTab(null);
       cache.setLastOpenedCourseId(null);
       setMaterialsData(null);
       setLoadMaterialsError(null);
@@ -373,6 +400,7 @@ export const App: React.FC = () => {
         courseId: null,
         containerId: null,
         exerciseId: null,
+        exerciseTab: null,
       };
       window.history.pushState(nextState, '', stateToUrl(nextState));
     },
@@ -393,6 +421,7 @@ export const App: React.FC = () => {
       setSelectedCourseId(courseRefId);
       setCurrentContainerId(courseRefId);
       setActiveExerciseRefId(null);
+      setActiveExerciseTab(null);
       activeContainerRef.current = courseRefId;
       cache.setLastOpenedCourseId(courseRefId);
       loadCourseMaterials(courseRefId, true);
@@ -402,6 +431,7 @@ export const App: React.FC = () => {
         courseId: courseRefId,
         containerId: courseRefId,
         exerciseId: null,
+        exerciseTab: null,
       };
       window.history.pushState(nextState, '', stateToUrl(nextState));
     },
@@ -416,6 +446,7 @@ export const App: React.FC = () => {
 
       setCurrentContainerId(folderRefId);
       setActiveExerciseRefId(null);
+      setActiveExerciseTab(null);
       activeContainerRef.current = folderRefId;
       loadCourseMaterials(folderRefId, false);
 
@@ -424,6 +455,7 @@ export const App: React.FC = () => {
         courseId: selectedCourseId,
         containerId: folderRefId,
         exerciseId: null,
+        exerciseTab: null,
       };
       window.history.pushState(nextState, '', stateToUrl(nextState));
     },
@@ -437,6 +469,7 @@ export const App: React.FC = () => {
 
       setCurrentContainerId(courseRefId);
       setActiveExerciseRefId(null);
+      setActiveExerciseTab(null);
       activeContainerRef.current = courseRefId;
       loadCourseMaterials(courseRefId, true);
 
@@ -445,6 +478,7 @@ export const App: React.FC = () => {
         courseId: courseRefId,
         containerId: courseRefId,
         exerciseId: null,
+        exerciseTab: null,
       };
       window.history.pushState(nextState, '', stateToUrl(nextState));
     },
@@ -461,6 +495,7 @@ export const App: React.FC = () => {
     setSelectedCourseId(null);
     setCurrentContainerId(null);
     setActiveExerciseRefId(null);
+    setActiveExerciseTab(null);
     cache.setLastOpenedCourseId(null);
     setMaterialsData(null);
     setLoadMaterialsError(null);
@@ -470,6 +505,7 @@ export const App: React.FC = () => {
       courseId: null,
       containerId: null,
       exerciseId: null,
+      exerciseTab: null,
     };
     window.history.pushState(nextState, '', stateToUrl(nextState));
   }, [repositoryId, selectedCourseId, activeExerciseRefId, selectedSemester]);
@@ -483,11 +519,13 @@ export const App: React.FC = () => {
     setSelectedCourseId(null);
     setCurrentContainerId(null);
     setActiveExerciseRefId(null);
+    setActiveExerciseTab(null);
     setMaterialsData(null);
     setLoadMaterialsError(null);
     cache.setLastOpenedCourseId(null);
     const nextState: NavigationState = {
       semester: selectedSemester, courseId: null, containerId: null, exerciseId: null,
+      exerciseTab: null,
       repositoryId: refId,
     };
     window.history.pushState(nextState, '', stateToUrl(nextState));
@@ -495,8 +533,8 @@ export const App: React.FC = () => {
 
   // --- Exercise View Handler ---
   const handleSelectExercise = useCallback(
-    (exerciseRefId: string | null) => {
-      if (exerciseRefId === activeExerciseRefId) return;
+    (exerciseRefId: string | null, tab: ExerciseTab | null = null) => {
+      if (exerciseRefId === activeExerciseRefId && tab === activeExerciseTab) return;
 
       if (exerciseRefId === null) {
         if (window.history.state?.exerciseId) {
@@ -506,15 +544,33 @@ export const App: React.FC = () => {
       }
 
       setActiveExerciseRefId(exerciseRefId);
+      setActiveExerciseTab(tab);
       const nextState: NavigationState = {
         semester: selectedSemester,
         courseId: selectedCourseId,
         containerId: currentContainerId,
         exerciseId: exerciseRefId,
+        exerciseTab: tab,
       };
       window.history.pushState(nextState, '', stateToUrl(nextState));
     },
-    [activeExerciseRefId, selectedSemester, selectedCourseId, currentContainerId]
+    [activeExerciseRefId, activeExerciseTab, selectedSemester, selectedCourseId, currentContainerId]
+  );
+
+  const handleExerciseTabChange = useCallback(
+    (tab: ExerciseTab) => {
+      if (tab === activeExerciseTab) return;
+      setActiveExerciseTab(tab);
+      const nextState: NavigationState = {
+        semester: selectedSemester,
+        courseId: selectedCourseId,
+        containerId: currentContainerId,
+        exerciseId: activeExerciseRefId,
+        exerciseTab: tab === 'assignments' ? null : tab,
+      };
+      window.history.pushState(nextState, '', stateToUrl(nextState));
+    },
+    [activeExerciseTab, selectedSemester, selectedCourseId, currentContainerId, activeExerciseRefId]
   );
 
   // --- Initial Mount Effect & History Priming ---
@@ -527,6 +583,7 @@ export const App: React.FC = () => {
       courseId: selectedCourseId,
       containerId: currentContainerId,
       exerciseId: activeExerciseRefId,
+      exerciseTab: activeExerciseTab,
     };
 
     if (!window.history.state) {
@@ -538,6 +595,7 @@ export const App: React.FC = () => {
           courseId: null,
           containerId: null,
           exerciseId: null,
+          exerciseTab: null,
         };
         window.history.replaceState(baseState, '', stateToUrl(baseState));
         window.history.pushState(currentState, '', stateToUrl(currentState));
@@ -618,8 +676,9 @@ export const App: React.FC = () => {
         loadSemesters(state.semester);
       }
 
-      // 2. Update exercise
+      // 2. Update exercise & tab
       setActiveExerciseRefId(state.exerciseId || null);
+      setActiveExerciseTab(state.exerciseTab || null);
 
       // 3. Update course & container
       if (state.courseId && state.containerId) {
@@ -806,7 +865,9 @@ export const App: React.FC = () => {
                 ? handleSelectSemester : undefined}
               onNavigateCourseRoot={handleNavigateCourseRoot}
               activeExerciseRefId={activeExerciseRefId}
+              activeExerciseTab={activeExerciseTab}
               onSelectExercise={handleSelectExercise}
+              onExerciseTabChange={handleExerciseTabChange}
               isRevalidating={isRevalidatingMaterials}
               onManualRefresh={() => loadCourseMaterials(currentContainerId, false)}
               onNotifyChange={(notifs) => setChangeNotifications((prev) => [...prev, ...notifs])}

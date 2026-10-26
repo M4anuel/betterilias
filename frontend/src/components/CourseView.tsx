@@ -27,7 +27,7 @@ import {
   Files,
   MessageSquare,
 } from 'lucide-react';
-import { CourseMaterialsResponse, MaterialItem, CourseContentBlock, CourseMembership, MembershipAction } from '../types';
+import { CourseMaterialsResponse, MaterialItem, CourseContentBlock, CourseMembership, MembershipAction, ExerciseTab } from '../types';
 import { CourseIcon } from './CourseIcon';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { PodcastModal } from './PodcastModal';
@@ -134,7 +134,9 @@ interface CourseViewProps {
   onNotifyChange?: (notifications: any[]) => void;
   loadError?: string | null;
   activeExerciseRefId?: string | null;
+  activeExerciseTab?: ExerciseTab | null;
   onSelectExercise?: (exerciseRefId: string | null) => void;
+  onExerciseTabChange?: (tab: ExerciseTab) => void;
 }
 
 export const CourseView: React.FC<CourseViewProps> = ({
@@ -153,7 +155,9 @@ export const CourseView: React.FC<CourseViewProps> = ({
   onNotifyChange,
   loadError,
   activeExerciseRefId: controlledExerciseRefId,
+  activeExerciseTab,
   onSelectExercise,
+  onExerciseTabChange,
 }) => {
   const language = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
@@ -680,11 +684,21 @@ export const CourseView: React.FC<CourseViewProps> = ({
         exerciseRefId={activeExerciseRefId}
         courseNickname={courseNickname}
         courseRefId={courseRefId}
+        courseBreadcrumbs={materialsData?.breadcrumbs || []}
+        activeTabProp={activeExerciseTab}
+        onTabChange={onExerciseTabChange}
         onBack={() => setActiveExerciseRefId(null)}
+        onNavigateHome={onNavigateHome}
+        onNavigateCourse={(ref) => {
+          onNavigateCourseRoot(ref);
+          setActiveExerciseRefId(null);
+        }}
         onNavigateFolder={(folderRefId) => {
           onNavigateFolder(folderRefId);
           setActiveExerciseRefId(null);
         }}
+        onNavigateRepository={onNavigateRepository}
+        onNavigateSemester={onNavigateSemester}
         onNotifyChange={onNotifyChange}
       />
     );
