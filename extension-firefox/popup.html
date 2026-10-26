@@ -304,43 +304,43 @@
     <img src="logo.png" alt="BetterIlias Logo" class="logo" />
     <div class="title-area">
       <h1><span class="brand-better">Better</span><span class="brand-ilias">Ilias</span> Companion</h1>
-      <span>Sichere Sitzungs-Synchronisation</span>
+      <span data-i18n="Sichere Sitzungs-Synchronisation"></span>
     </div>
   </div>
 
   <div class="status-card">
     <div class="status-row">
-      <span class="status-label">ILIAS-Sitzung im Browser:</span>
-      <span id="ilias-status-badge" class="status-badge badge-warning">Prüfe...</span>
+      <span class="status-label" data-i18n="ILIAS-Sitzung im Browser:"></span>
+      <span id="ilias-status-badge" class="status-badge badge-warning" data-i18n="Prüfe..."></span>
     </div>
-    <div id="ilias-status-sub" class="info-sub">Lade Cookies für ilias.unibe.ch...</div>
+    <div id="ilias-status-sub" class="info-sub" data-i18n="Lade Cookies für ilias.unibe.ch..."></div>
   </div>
 
   <div id="feedback-box" class="feedback"></div>
 
   <button id="sync-btn" class="btn btn-primary">
-    <span>Sitzung mit BetterIlias synchronisieren</span>
+    <span data-i18n="Sitzung mit BetterIlias synchronisieren"></span>
   </button>
 
   <button id="open-app-btn" class="btn btn-secondary">
-    <span>BetterIlias öffnen</span>
+    <span data-i18n="BetterIlias öffnen"></span>
   </button>
 
+  <div class="settings-group"><label for="language" data-i18n="Language"></label><select id="language" style="width:100%;padding:6px;background:var(--input-bg);color:var(--input-text);border:1px solid var(--input-border);border-radius:6px"></select></div>
   <details>
-    <summary>Erweiterte Server-Einstellungen</summary>
+    <summary data-i18n="Erweiterte Server-Einstellungen"></summary>
     <div class="settings-group">
-      <label for="server-url">Backend API URL:</label>
+      <label for="server-url" data-i18n="Backend API URL:"></label>
       <input type="text" id="server-url" value="http://localhost:8000" />
 
-      <label for="frontend-url">Frontend Web URL:</label>
+      <label for="frontend-url" data-i18n="Frontend Web URL:"></label>
       <input type="text" id="frontend-url" value="http://localhost:5173" />
 
-      <button id="save-settings-btn" class="btn btn-secondary" style="padding: 5px 10px; font-size: 11px; margin-bottom: 0;">
-        Einstellungen speichern
-      </button>
+      <button id="save-settings-btn" class="btn btn-secondary" style="padding: 5px 10px; font-size: 11px; margin-bottom: 0;" data-i18n="Einstellungen speichern"></button>
     </div>
   </details>
 
+  <script src="i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

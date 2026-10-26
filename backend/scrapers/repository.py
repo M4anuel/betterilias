@@ -1,5 +1,6 @@
 """Read repository categories without treating menu actions as content links."""
 import re
+from backend.i18n import t
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -16,7 +17,7 @@ from backend.scrapers.membership import parse_membership
 def parse_repository(html_content: str, container_ref_id: str) -> RepositoryResponse:
     soup = BeautifulSoup(html_content, "lxml")
     heading = soup.select_one("h1.il-page-content-header, h1.ilHeader, h1")
-    title = heading.get_text(" ", strip=True) if heading else "Magazin"
+    title = heading.get_text(" ", strip=True) if heading else t("Magazin")
     center = soup.select_one("#il_center_col, main, #ilContentContainer")
     items = []
     seen = set()

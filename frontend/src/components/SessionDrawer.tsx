@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Calendar,
@@ -19,6 +20,7 @@ interface SessionDrawerProps {
 }
 
 export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRefId }) => {
+  useLanguage();
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const [filterMode, setFilterMode] = useState<'all' | 'with_materials' | 'upcoming'>('all');
   const [loadedMaterials, setLoadedMaterials] = useState<Record<string, MaterialItem[]>>({});
@@ -149,10 +151,10 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
           </div>
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
-              Sitzungen & Termine
+              {t("Sitzungen & Termine")}
             </h3>
             <p className="text-[11px] text-slate-400 dark:text-slate-500">
-              {sessions.length} Sitzungen • {totalMaterials} hinterlegte Dateien
+              {sessions.length} {t("Sitzungen •")} {totalMaterials} {t("hinterlegte Dateien")}
             </p>
           </div>
         </div>
@@ -169,7 +171,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                   : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
               }`}
             >
-              Alle ({sessions.length})
+              {t("Alle (")}{sessions.length})
             </button>
             <button
               type="button"
@@ -180,7 +182,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                   : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
               }`}
             >
-              Mit Dateien ({sessions.filter(hasMaterials).length})
+              {t("Mit Dateien (")}{sessions.filter(hasMaterials).length})
             </button>
           </div>
 
@@ -190,8 +192,8 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
             className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition px-2 py-1 cursor-pointer"
           >
             {sessions.some((s) => expandedSessions[s.ref_id])
-              ? 'Alle einklappen'
-              : 'Alle ausklappen'}
+              ? t("Alle einklappen")
+              : t("Alle ausklappen")}
           </button>
         </div>
       </div>
@@ -244,7 +246,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                       )}
                       {session.is_past && (
                         <span className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 text-[9px] font-medium text-slate-500 dark:text-slate-400">
-                          Vergangen
+                          {t("Vergangen")}
                         </span>
                       )}
                     </div>
@@ -258,13 +260,13 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                   {isLoading ? (
                     <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
                       <RefreshCw className="h-3 w-3 animate-spin text-emerald-600 dark:text-emerald-400" />
-                      <span>Lade...</span>
+                      <span>{t("Lade...")}</span>
                     </div>
                   ) : sessionHasMats ? (
                     <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/60 transition">
                       <FolderOpen className="h-3 w-3" />
                       <span>
-                        {matsCount} {matsCount === 1 ? 'Datei' : 'Dateien'}
+                        {matsCount} {matsCount === 1 ? t("Datei") : t("Dateien")}
                       </span>
                       {isExpanded ? (
                         <ChevronUp className="h-3.5 w-3.5 ml-0.5" />
@@ -274,7 +276,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                     </div>
                   ) : (
                     <span className="text-[10px] text-slate-300 dark:text-slate-600 font-medium px-2">
-                      Keine Anhänge
+                      {t("Keine Anhänge")}
                     </span>
                   )}
                 </div>
@@ -286,7 +288,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                   {isLoading ? (
                     <div className="flex items-center gap-2 py-2 text-xs text-slate-500 dark:text-slate-400">
                       <RefreshCw className="h-3.5 w-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
-                      <span>Lade Sitzungsunterlagen...</span>
+                      <span>{t("Lade Sitzungsunterlagen...")}</span>
                     </div>
                   ) : mats.length > 0 ? (
                     <div className="space-y-1.5">
@@ -322,7 +324,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                                 className="flex items-center gap-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition shadow-2xs"
                               >
                                 <Download className="h-3 w-3" />
-                                <span>Download</span>
+                                <span>{t("Download")}</span>
                               </a>
                             </div>
                           </div>
@@ -331,7 +333,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                     </div>
                   ) : (
                     <p className="text-xs text-slate-400 dark:text-slate-500 italic py-1">
-                      Keine Dateien in dieser Sitzung gefunden
+                      {t("Keine Dateien in dieser Sitzung gefunden")}
                     </p>
                   )}
                 </div>

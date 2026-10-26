@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useState } from 'react';
 import {
   X,
@@ -54,6 +55,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
   onSave,
   onClose,
 }) => {
+  useLanguage();
   // Editable form state
   const [status, setStatus] = useState<string>(
     initialEdit?.status || submission.passed_status || 'not_graded'
@@ -103,7 +105,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
       setUploadSuccessMsg(`"${file.name}" erfolgreich hochgeladen.`);
       setTimeout(() => setUploadSuccessMsg(null), 3500);
     } catch (err: any) {
-      alert(`Fehler beim Hochladen: ${err.message}`);
+      alert(t("Fehler beim Hochladen: {p0}", { p0: err.message }));
     } finally {
       setIsUploadingFile(false);
     }
@@ -155,7 +157,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
       setIsDirty(false);
       setTimeout(() => setIsSaved(false), 3000);
     } catch (err: any) {
-      alert(err.message || 'Fehler beim Speichern der Bewertung');
+      alert(err.message || t("Fehler beim Speichern der Bewertung"));
     } finally {
       setIsSaving(false);
     }
@@ -173,7 +175,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
       return (
         <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
           <CheckCircle2 className="h-3.5 w-3.5" />
-          <span>Bestanden</span>
+          <span>{t("Bestanden")}</span>
         </span>
       );
     }
@@ -181,7 +183,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
       return (
         <span className="inline-flex items-center gap-1 rounded-lg bg-red-50 dark:bg-red-950/60 px-2.5 py-1 text-xs font-bold text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
           <AlertCircle className="h-3.5 w-3.5" />
-          <span>Nicht bestanden</span>
+          <span>{t("Nicht bestanden")}</span>
         </span>
       );
     }
@@ -189,14 +191,14 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
       return (
         <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 px-2.5 py-1 text-xs font-bold text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
           <Clock className="h-3.5 w-3.5" />
-          <span>Abgegeben (Offen)</span>
+          <span>{t("Abgegeben (Offen)")}</span>
         </span>
       );
     }
     return (
       <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
         <HelpCircle className="h-3.5 w-3.5" />
-        <span>Nicht abgegeben</span>
+        <span>{t("Nicht abgegeben")}</span>
       </span>
     );
   };
@@ -222,12 +224,12 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="rounded-md bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800">
-                Abgabe-Details & Bewertung
+                {t("Abgabe-Details & Bewertung")}
               </span>
               {renderStatusBadge()}
             </div>
             <h2 id="submission-modal-title" className="text-lg font-bold text-slate-900 dark:text-slate-100 leading-snug">
-              {submission.team_id ? `Team #${submission.team_id}` : submission.student_name}
+              {submission.team_id ? t("Team #{p0}", { p0: submission.team_id }) : submission.student_name}
             </h2>
             {(assignmentTitle || exerciseTitle) && (
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -242,7 +244,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
             type="button"
             onClick={onClose}
             className="rounded-full p-2 text-slate-400 hover:bg-slate-200/70 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
-            aria-label="Schließen"
+            aria-label={t("Schließen")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -255,7 +257,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
             <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               <Users className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
               <span>
-                {members.length > 1 ? `Gruppenmitglieder (${members.length})` : 'Teilnehmer'}
+                {members.length > 1 ? t("Gruppenmitglieder ({p0})", { p0: members.length }) : t("Teilnehmer")}
               </span>
             </div>
 
@@ -273,7 +275,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
               ))}
               {submission.login && (
                 <div className="flex items-center gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-mono text-slate-500 dark:text-slate-400">
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500">Login:</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500">{t("Login:")}</span>
                   <span>{submission.login}</span>
                 </div>
               )}
@@ -289,10 +291,10 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    Korrektur & Bewertung bearbeiten
+                    {t("Korrektur & Bewertung bearbeiten")}
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Status, Noten, Feedback und Tutoren-Notizen direkt speichern
+                    {t("Status, Noten, Feedback und Tutoren-Notizen direkt speichern")}
                   </p>
                 </div>
               </div>
@@ -302,7 +304,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                   type="button"
                   onClick={handleSave}
                   disabled={isSaving || isUpdating}
-                  title={isUpdating ? 'Aktualisierung läuft... Bitte warten' : 'Speichern'}
+                  title={isUpdating ? t("Aktualisierung läuft... Bitte warten") : t("Speichern")}
                   className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer ${
                     isSaved
                       ? 'bg-emerald-600'
@@ -314,22 +316,22 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                   {isSaving ? (
                     <>
                       <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      <span>Speichern...</span>
+                      <span>{t("Speichern...")}</span>
                     </>
                   ) : isUpdating ? (
                     <>
                       <RefreshCw className="h-3.5 w-3.5 animate-spin text-slate-300" />
-                      <span>Lädt...</span>
+                      <span>{t("Lädt...")}</span>
                     </>
                   ) : isSaved ? (
                     <>
                       <Check className="h-3.5 w-3.5 text-white" />
-                      <span>Gespeichert!</span>
+                      <span>{t("Gespeichert!")}</span>
                     </>
                   ) : (
                     <>
                       <Save className="h-3.5 w-3.5" />
-                      <span>Speichern</span>
+                      <span>{t("Speichern")}</span>
                     </>
                   )}
                 </button>
@@ -340,7 +342,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
               {/* Left Column: Status Buttons & Grade/Points Input */}
               <div className="space-y-3">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                  Status (Bestanden / Nicht bestanden)
+                  {t("Status (Bestanden / Nicht bestanden)")}
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
@@ -355,7 +357,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                         : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
                     }`}
                   >
-                    <span>Bestanden</span>
+                    <span>{t("Bestanden")}</span>
                     {status === 'passed' && <Check className="h-3.5 w-3.5 mt-0.5" />}
                   </button>
 
@@ -371,7 +373,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                         : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-950/30'
                     }`}
                   >
-                    <span>Nicht best.</span>
+                    <span>{t("Nicht best.")}</span>
                     {status === 'failed' && <Check className="h-3.5 w-3.5 mt-0.5" />}
                   </button>
 
@@ -387,7 +389,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                         : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                     }`}
                   >
-                    <span>Offen</span>
+                    <span>{t("Offen")}</span>
                     {status === 'not_graded' && <Check className="h-3.5 w-3.5 mt-0.5" />}
                   </button>
                 </div>
@@ -395,7 +397,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                 {/* Grade / Points input (Always editable here in info modal!) */}
                 <div className="space-y-1 pt-1">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                    Note / Punkte (Mark)
+                    {t("Note / Punkte (Mark)")}
                   </label>
                   <input
                     type="text"
@@ -404,7 +406,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                       setMark(e.target.value);
                       setIsDirty(true);
                     }}
-                    placeholder="Note oder Punktzahl (z.B. 5.5 oder 18/20)"
+                    placeholder={t("Note oder Punktzahl (z.B. 5.5 oder 18/20)")}
                     className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden"
                   />
                 </div>
@@ -414,7 +416,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
                   <Shield className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>Notiz für Tutoren (Nur intern sichtbar)</span>
+                  <span>{t("Notiz für Tutoren (Nur intern sichtbar)")}</span>
                 </div>
                 <textarea
                   rows={4}
@@ -423,7 +425,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                     setNotice(e.target.value);
                     setIsDirty(true);
                   }}
-                  placeholder="Interne Tutor-Notiz eingeben (wird für Studierende NICHT angezeigt)..."
+                  placeholder={t("Interne Tutor-Notiz eingeben (wird für Studierende NICHT angezeigt)...")}
                   className="w-full rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/30 p-2.5 text-xs text-amber-950 dark:text-amber-200 placeholder-amber-700/50 dark:placeholder-amber-400/40 focus:border-amber-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-hidden focus:ring-1 focus:ring-amber-400"
                 />
               </div>
@@ -433,7 +435,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
             <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                 <MessageSquare className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                <span>Evaluation Statement (Korrektur-Feedback für Studierende)</span>
+                <span>{t("Evaluation Statement (Korrektur-Feedback für Studierende)")}</span>
               </div>
               <textarea
                 rows={3}
@@ -442,7 +444,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                   setFeedback(e.target.value);
                   setIsDirty(true);
                 }}
-                placeholder="Korrektur-Kommentar für den/die Studierende verfassen..."
+                placeholder={t("Korrektur-Kommentar für den/die Studierende verfassen...")}
                 className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-400"
               />
             </div>
@@ -452,7 +454,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               <FileText className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
-              <span>Eingereichte Dateien ({submission.files.length})</span>
+              <span>{t("Eingereichte Dateien (")}{submission.files.length})</span>
             </div>
 
             {submission.files.length > 0 ? (
@@ -469,7 +471,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{file.filename}</p>
                         {file.upload_time && (
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500">Hochgeladen: {file.upload_time}</p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500">{t("Hochgeladen:")} {file.upload_time}</p>
                         )}
                       </div>
                     </div>
@@ -480,26 +482,26 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                       className="flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition shrink-0 border border-indigo-200 dark:border-indigo-800"
                     >
                       <Download className="h-3.5 w-3.5" />
-                      <span>Download</span>
+                      <span>{t("Download")}</span>
                     </a>
                   </div>
                 ))}
               </div>
             ) : submission.download_url ? (
               <div className="flex items-center justify-between rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 p-3.5">
-                <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">Abgabe-Archiv verfügbar</span>
+                <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">{t("Abgabe-Archiv verfügbar")}</span>
                 <a
                   href={submission.download_url}
                   download
                   className="flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition border border-indigo-200 dark:border-indigo-800"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  <span>Gesamtabgabe herunterladen</span>
+                  <span>{t("Gesamtabgabe herunterladen")}</span>
                 </a>
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-4 text-center text-xs text-slate-400 dark:text-slate-500">
-                Keine Dateien eingereicht.
+                {t("Keine Dateien eingereicht.")}
               </div>
             )}
           </div>
@@ -528,7 +530,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
             >
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  Korrektur-Dateien (Evaluation Files)
+                  {t("Korrektur-Dateien (Evaluation Files)")}
                 </h3>
                 <div className="flex items-center gap-2">
                   <label
@@ -542,7 +544,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                     ) : (
                       <Upload className="h-3.5 w-3.5" />
                     )}
-                    <span>{isUploadingFile ? 'Wird hochgeladen...' : 'Korrekturdatei hochladen'}</span>
+                    <span>{isUploadingFile ? t("Wird hochgeladen...") : t("Korrekturdatei hochladen")}</span>
                   </label>
                   <input
                     id={`modal-upload-${submission.member_id}`}
@@ -556,10 +558,10 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
-                    title="In ILIAS öffnen"
+                    title={t("In ILIAS öffnen")}
                   >
                     <ExternalLink className="h-3 w-3" />
-                    <span>ILIAS</span>
+                    <span>{t("ILIAS")}</span>
                   </a>
                 </div>
               </div>
@@ -574,7 +576,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
               {isLoadingFeedbackFiles ? (
                 <div className="p-3 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-2">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600" />
-                  <span>Lade Korrekturdateien aus ILIAS...</span>
+                  <span>{t("Lade Korrekturdateien aus ILIAS...")}</span>
                 </div>
               ) : feedbackFiles.length > 0 ? (
                 <div className="space-y-2">
@@ -599,7 +601,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                           className="flex items-center gap-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition border border-indigo-200 dark:border-indigo-800"
                         >
                           <Download className="h-3 w-3" />
-                          <span>Download</span>
+                          <span>{t("Download")}</span>
                         </a>
                       )}
                     </div>
@@ -617,8 +619,8 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                   <Upload className="h-4 w-4 mb-1 opacity-70" />
                   <span>
                     {isDraggingFeedbackFile
-                      ? 'Korrekturdatei hier loslassen zum Hochladen...'
-                      : 'Korrekturdatei per Drag & Drop hierher ziehen oder klicken zum Hochladen'}
+                      ? t("Korrekturdatei hier loslassen zum Hochladen...")
+                      : t("Korrekturdatei per Drag & Drop hierher ziehen oder klicken zum Hochladen")}
                   </span>
                 </label>
               )}
@@ -628,24 +630,24 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
           {/* All Columns / Timestamps Grid */}
           <div className="space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Spalten- & Zeitdaten
+              {t("Spalten- & Zeitdaten")}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               {/* Submitted on (Bug-fixed: shows Eingereicht even if timestamp column was hidden in ILIAS table) */}
               <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-3 space-y-1">
                 <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 font-semibold text-[11px]">
                   <Clock className="h-3.5 w-3.5 text-sky-500 dark:text-sky-400" />
-                  <span>Abgegeben am (Submitted on)</span>
+                  <span>{t("Abgegeben am (Submitted on)")}</span>
                 </div>
                 <div className="font-bold text-slate-800 dark:text-slate-200">
                   {submission.submission_time ? (
                     submission.submission_time
                   ) : hasSubmitted ? (
                     <span className="text-emerald-700 dark:text-emerald-400 font-medium">
-                      Eingereicht (Zeitpunkt in ILIAS-Tabelle ausgeblendet)
+                      {t("Eingereicht (Zeitpunkt in ILIAS-Tabelle ausgeblendet)")}
                     </span>
                   ) : (
-                    <span className="text-slate-400 dark:text-slate-500 font-normal">Keine Abgabe vorhanden</span>
+                    <span className="text-slate-400 dark:text-slate-500 font-normal">{t("Keine Abgabe vorhanden")}</span>
                   )}
                 </div>
               </div>
@@ -654,11 +656,11 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
               <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-3 space-y-1">
                 <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 font-semibold text-[11px]">
                   <Calendar className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
-                  <span>Bewertet am (Graded on)</span>
+                  <span>{t("Bewertet am (Graded on)")}</span>
                 </div>
                 <div className="font-bold text-slate-800 dark:text-slate-200">
                   {submission.graded_on || (
-                    <span className="text-slate-400 dark:text-slate-500 font-normal">Noch nicht erfasst</span>
+                    <span className="text-slate-400 dark:text-slate-500 font-normal">{t("Noch nicht erfasst")}</span>
                   )}
                 </div>
               </div>
@@ -667,11 +669,11 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
               <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-3 space-y-1">
                 <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 font-semibold text-[11px]">
                   <MessageSquare className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-                  <span>Rückmeldung am (Evaluation on)</span>
+                  <span>{t("Rückmeldung am (Evaluation on)")}</span>
                 </div>
                 <div className="font-bold text-slate-800 dark:text-slate-200">
                   {submission.evaluation_on || (
-                    <span className="text-slate-400 dark:text-slate-500 font-normal">Noch nicht erfasst</span>
+                    <span className="text-slate-400 dark:text-slate-500 font-normal">{t("Noch nicht erfasst")}</span>
                   )}
                 </div>
               </div>
@@ -680,11 +682,11 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
               <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-3 space-y-1">
                 <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 font-semibold text-[11px]">
                   <Clock className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
-                  <span>Individuelle Frist</span>
+                  <span>{t("Individuelle Frist")}</span>
                 </div>
                 <div className="font-bold text-slate-800 dark:text-slate-200">
                   {submission.individual_deadline || (
-                    <span className="text-slate-400 dark:text-slate-500 font-normal">Standardfrist</span>
+                    <span className="text-slate-400 dark:text-slate-500 font-normal">{t("Standardfrist")}</span>
                   )}
                 </div>
               </div>
@@ -694,7 +696,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                 <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-3 space-y-1">
                   <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 font-semibold text-[11px]">
                     <Calendar className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
-                    <span>Aufgabe versendet am</span>
+                    <span>{t("Aufgabe versendet am")}</span>
                   </div>
                   <div className="font-bold text-slate-800 dark:text-slate-200">{submission.sent_on}</div>
                 </div>
@@ -706,7 +708,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
           {submission.additional_columns && Object.keys(submission.additional_columns).length > 0 && (
             <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
               <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                Alle Tabellenspalten aus ILIAS
+                {t("Alle Tabellenspalten aus ILIAS")}
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 {Object.entries(submission.additional_columns).map(([k, v]) => (
@@ -733,7 +735,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                 className="flex items-center gap-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-2xs"
               >
                 <FileText className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
-                <span>Evaluation by File</span>
+                <span>{t("Evaluation by File")}</span>
                 <ExternalLink className="h-3 w-3 opacity-60" />
               </a>
             )}
@@ -746,7 +748,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                 className="flex items-center gap-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-2xs"
               >
                 <Mail className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                <span>Feedback-Mail verfassen</span>
+                <span>{t("Feedback-Mail verfassen")}</span>
                 <ExternalLink className="h-3 w-3 opacity-60" />
               </a>
             )}
@@ -759,7 +761,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                 className="flex items-center gap-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-2xs"
               >
                 <Users className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                <span>Team-Log</span>
+                <span>{t("Team-Log")}</span>
                 <ExternalLink className="h-3 w-3 opacity-60" />
               </a>
             )}
@@ -771,7 +773,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                 type="button"
                 onClick={handleSave}
                 disabled={isSaving || isUpdating}
-                title={isUpdating ? 'Aktualisierung läuft... Bitte warten' : 'Speichern'}
+                title={isUpdating ? t("Aktualisierung läuft... Bitte warten") : t("Speichern")}
                 className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer ${
                   isSaved
                     ? 'bg-emerald-600'
@@ -783,22 +785,22 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                 {isSaving ? (
                   <>
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    <span>Speichern...</span>
+                    <span>{t("Speichern...")}</span>
                   </>
                 ) : isUpdating ? (
                   <>
                     <RefreshCw className="h-3.5 w-3.5 animate-spin text-slate-300" />
-                    <span>Lädt...</span>
+                    <span>{t("Lädt...")}</span>
                   </>
                 ) : isSaved ? (
                   <>
                     <Check className="h-3.5 w-3.5 text-white" />
-                    <span>Gespeichert!</span>
+                    <span>{t("Gespeichert!")}</span>
                   </>
                 ) : (
                   <>
                     <Save className="h-3.5 w-3.5" />
-                    <span>Speichern</span>
+                    <span>{t("Speichern")}</span>
                   </>
                 )}
               </button>
@@ -809,7 +811,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
               onClick={onClose}
               className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-2xs cursor-pointer"
             >
-              Schließen
+              {t("Schließen")}
             </button>
           </div>
         </div>

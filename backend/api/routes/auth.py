@@ -1,3 +1,4 @@
+from backend.i18n import t
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Response, status
 from typing import Dict, Any
 
@@ -26,13 +27,13 @@ async def prepare_mobile_session(
     response.headers['Cache-Control'] = 'no-store'
     current = await client.get_auth_status()
     if not current.authenticated:
-        raise HTTPException(status_code=401, detail='Bitte synchronisiere zuerst deine ILIAS-Sitzung am Desktop.')
+        raise HTTPException(status_code=401, detail=t('Bitte synchronisiere zuerst deine ILIAS-Sitzung am Desktop.'))
     session_id = manager.session_id
     if session_id == 'default':
         # Legacy/local desktop logins also need an explicit key on the phone.
         cookies = manager.load_cookies()
         if not cookies.get('PHPSESSID'):
-            raise HTTPException(status_code=409, detail='Für diese Sitzung ist kein übertragbarer ILIAS-Login vorhanden.')
+            raise HTTPException(status_code=409, detail=t('Für diese Sitzung ist kein übertragbarer ILIAS-Login vorhanden.'))
         session_id = SessionManager.generate_session_id()
         target = SessionManager(session_id=session_id)
         target.save_cookies(cookies, metadata=manager.load_metadata())
@@ -64,7 +65,7 @@ async def sync_extension_cookies(
     if not cookies or not cookies.get("PHPSESSID"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="PHPSESSID cookie is missing from the submitted payload."
+            detail=t('PHPSESSID cookie is missing from the submitted payload.')
         )
 
     # Ensure ilClientId is set (Uni Bern requires ilias3_unibe client identifier)
@@ -109,7 +110,7 @@ async def sync_extension_cookies(
         authenticated=is_valid,
         session_id=session_id,
         user_name=user_or_msg if is_valid else None,
-        message="Erfolgreich mit ILIAS synchronisiert" if is_valid else f"Sitzung ungültig: {user_or_msg}"
+        message=t('Erfolgreich mit ILIAS synchronisiert') if is_valid else t('Sitzung ungültig: {p0}', p0=user_or_msg)
     )
 
 
@@ -162,7 +163,7 @@ async def set_cookies_manually(
     return {
         "success": True,
         "session_id": target_manager.session_id if target_manager.session_id != "default" else None,
-        "message": "Cookies saved successfully."
+        "message": t('Cookies saved successfully.')
     }
 
 
@@ -170,5 +171,5 @@ async def set_cookies_manually(
 async def logout(manager: SessionManager = Depends(get_session_manager)):
     """Clear stored session cookies for the current tenant."""
     cleared = manager.clear_session()
-    return {"success": True, "message": "Session cleared." if cleared else "No active session was found."}
+    return {"success": True, "message": t('Session cleared.') if cleared else t('No active session was found.')}
 

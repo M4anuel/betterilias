@@ -1,3 +1,4 @@
+import { t, useLanguage } from './lib/i18n';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { AlertCircle, ExternalLink, Puzzle } from 'lucide-react';
 import { Header } from './components/Header';
@@ -67,6 +68,7 @@ export function parseStateFromUrl(defaultSemester: string): NavigationState {
 }
 
 export const App: React.FC = () => {
+  const language = useLanguage();
   // --- Auth & Session State ---
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
@@ -275,7 +277,7 @@ export const App: React.FC = () => {
                 id: `item-${item.ref_id}`,
                 type: item.item_type === 'file' ? 'file' : item.item_type === 'mcst' ? 'podcast' : 'general',
                 title: item.title,
-                subtitle: item.item_type === 'file' ? 'Neue Datei hinzugefügt' : 'Neues Material',
+                subtitle: item.item_type === 'file' ? t("Neue Datei hinzugefügt") : t("Neues Material"),
               });
             }
 
@@ -287,7 +289,7 @@ export const App: React.FC = () => {
                 id: `sess-${s.ref_id}`,
                 type: 'session',
                 title: s.title,
-                subtitle: 'Neuer Vorlesungstermin / Sitzung',
+                subtitle: t('Neuer Vorlesungstermin / Sitzung'),
               });
             }
 
@@ -303,7 +305,7 @@ export const App: React.FC = () => {
                 id: `sess-mat-${sm.ref_id}`,
                 type: 'file',
                 title: sm.title,
-                subtitle: 'Neuer Anhang in Sitzung hinterlegt',
+                subtitle: t("Neuer Anhang in Sitzung hinterlegt"),
               });
             }
 
@@ -336,7 +338,7 @@ export const App: React.FC = () => {
           if (cached) {
             setMaterialsData(cached);
           }
-          setLoadMaterialsError(err?.message || 'Fehler beim Abrufen der Vorlesungsinhalte');
+          setLoadMaterialsError(err?.message || t("Fehler beim Abrufen der Vorlesungsinhalte"));
         }
       } finally {
         if (reqId === materialsRequestSeq.current) {
@@ -697,20 +699,21 @@ export const App: React.FC = () => {
   // --- Dynamic Document Title ---
   useEffect(() => {
     if (repositoryId) {
-      document.title = 'BetterIlias - Magazin';
+      document.title = t("BetterIlias - Magazin");
     } else if (activeExerciseRefId) {
-      document.title = `BetterIlias – Übungen (${currentNickname || currentCourse?.title || 'Vorlesung'})`;
+      document.title = t("BetterIlias – Übungen ({p0})", { p0: currentNickname || currentCourse?.title || t('Vorlesung') });
     } else if (selectedCourseId) {
-      const courseTitle = currentNickname || currentCourse?.title || 'Vorlesung';
+      const courseTitle = currentNickname || currentCourse?.title || t("Vorlesung");
       const folderTitle =
         currentContainerId && currentContainerId !== selectedCourseId && materialsData?.title
           ? ` – ${materialsData.title}`
           : '';
-      document.title = `BetterIlias – ${courseTitle}${folderTitle}`;
+      document.title = t("BetterIlias – {p0}{p1}", { p0: courseTitle, p1: folderTitle });
     } else {
-      document.title = `BetterIlias – ${selectedSemester} Vorlesungsübersicht`;
+      document.title = t("BetterIlias – {p0} Vorlesungsübersicht", { p0: selectedSemester });
     }
   }, [
+    language,
     repositoryId,
     activeExerciseRefId,
     selectedCourseId,
@@ -761,7 +764,7 @@ export const App: React.FC = () => {
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <span>
-                  <strong>Sitzung nicht aktiv:</strong> Du bist aktuell nicht bei ILIAS angemeldet. Gespeicherte Inhalte werden aus dem Cache angezeigt.
+                  <strong>{t("Sitzung nicht aktiv:")}</strong> {t("Du bist aktuell nicht bei ILIAS angemeldet. Gespeicherte Inhalte werden aus dem Cache angezeigt.")}
                 </span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -772,7 +775,7 @@ export const App: React.FC = () => {
                   className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 shadow-2xs hover:bg-amber-100 transition dark:border-amber-800 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-slate-800"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                  <span>Bei ILIAS anmelden</span>
+                  <span>{t("Bei ILIAS anmelden")}</span>
                 </a>
                 <button
                   type="button"
@@ -780,7 +783,7 @@ export const App: React.FC = () => {
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[#0AACA5] px-2.5 py-1 text-xs font-semibold text-white shadow-2xs hover:opacity-90 transition cursor-pointer"
                 >
                   <Puzzle className="h-3.5 w-3.5" />
-                  <span>Browser-Erweiterung</span>
+                  <span>{t("Browser-Erweiterung")}</span>
                 </button>
               </div>
             </div>

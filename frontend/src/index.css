@@ -40,6 +40,15 @@
   }
 
   /* Rich text styling for ILIAS imported content */
+  .ilias-rich-content strong, .ilias-rich-content b {
+    font-weight: 700;
+  }
+  .ilias-rich-content em, .ilias-rich-content i {
+    font-style: italic;
+  }
+  .ilias-rich-content u {
+    text-decoration: underline;
+  }
   .ilias-rich-content p {
     margin-bottom: 0.5rem;
   }

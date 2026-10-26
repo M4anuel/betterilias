@@ -1,0 +1,4 @@
+{
+  "en": { "name": "English", "locale": "en-GB", "support": "full" },
+  "de": { "name": "Deutsch", "locale": "de-CH", "support": "full" }
+}

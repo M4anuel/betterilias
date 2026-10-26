@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useEffect } from 'react';
 import {
   FileText,
@@ -22,6 +23,7 @@ export const CourseLogsPanel: React.FC<CourseLogsPanelProps> = ({
   courseId,
   initialLogs,
 }) => {
+  useLanguage();
   const [logs, setLogs] = useState<CourseLogItem[]>([]);
   const [isLoadingAll, setIsLoadingAll] = useState(false);
   const [hasFetchedAll, setHasFetchedAll] = useState(false);
@@ -69,11 +71,11 @@ export const CourseLogsPanel: React.FC<CourseLogsPanelProps> = ({
       <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/70">
         <div className="flex items-center gap-2">
           <Terminal className="h-4 w-4 text-slate-700 dark:text-slate-300" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">Logs</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">{t("Logs")}</h3>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-mono font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-            {logs.length} Einträge
+            {logs.length} {t("Einträge")}
           </span>
         </div>
       </div>
@@ -101,7 +103,7 @@ export const CourseLogsPanel: React.FC<CourseLogsPanelProps> = ({
                     target="_blank"
                     rel="noreferrer"
                     className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition shrink-0"
-                    title="In ILIAS öffnen"
+                    title={t("In ILIAS öffnen")}
                   >
                     <ExternalLink className="h-3 w-3" />
                   </a>
@@ -141,7 +143,7 @@ export const CourseLogsPanel: React.FC<CourseLogsPanelProps> = ({
             ) : (
               <DownloadCloud className="h-3 w-3 text-slate-400" />
             )}
-            <span>{isLoadingAll ? 'Lade ältere Logs...' : 'Ältere Logs abrufen'}</span>
+            <span>{isLoadingAll ? t("Lade ältere Logs...") : t("Ältere Logs abrufen")}</span>
           </button>
         </div>
       )}

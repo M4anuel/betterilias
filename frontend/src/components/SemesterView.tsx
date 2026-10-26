@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useMemo } from 'react';
 import {
   User,
@@ -46,6 +47,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
   coursesList,
   isLoading,
 }) => {
+  useLanguage();
   // Find last opened course object if available
   const lastOpenedCourse = coursesList.find((c) => c.ref_id === lastOpenedCourseId);
 
@@ -109,7 +111,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                   className="text-xs font-bold uppercase tracking-wider"
                   style={{ color: 'var(--accent, #0AACA5)' }}
                 >
-                  Zuletzt geöffnet
+                  {t("Zuletzt geöffnet")}
                 </span>
                 <span
                   className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
@@ -133,7 +135,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
             style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
             className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:opacity-90 transition shrink-0 cursor-pointer"
           >
-            <span>Weiterlernen</span>
+            <span>{t("Weiterlernen")}</span>
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -145,13 +147,13 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
           <div>
             <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
               <GraduationCap className="h-6 w-6" style={{ color: 'var(--accent, #0AACA5)' }} />
-              <span>Vorlesungsübersicht</span>
+              <span>{t("Vorlesungsübersicht")}</span>
               {isLoading && (
                 <RefreshCw className="h-4 w-4 animate-spin text-slate-400 ml-2" />
               )}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Aktuell ausgewählt: <strong className="text-slate-800 dark:text-slate-200">{currentSemesterMeta.full}</strong>
+              {t("Aktuell ausgewählt:")} <strong className="text-slate-800 dark:text-slate-200">{currentSemesterMeta.full}</strong>
             </p>
           </div>
 
@@ -188,10 +190,10 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                   value={selectedSemester}
                   onChange={(e) => onSelectSemester(e.target.value)}
                   className="appearance-none rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-xs font-semibold text-slate-700 shadow-xs hover:border-slate-300 focus:outline-hidden transition cursor-pointer dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                  title="Semester auswählen"
+                  title={t('semester.choose')}
                 >
                   {/* Current & Preview */}
-                  <optgroup label="Aktuelle & Künftige Semester">
+                  <optgroup label={t('semester.current_preview')}>
                     {currentAndPreview.map((sem) => (
                       <option key={sem.id} value={sem.id}>
                         {sem.short} – {sem.full}
@@ -200,7 +202,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                   </optgroup>
 
                   {/* All Past Semesters (Unified, no useless archive split) */}
-                  <optgroup label="Vergangene Semester">
+                  <optgroup label={t('semester.past')}>
                     {past.map((sem) => (
                       <option key={sem.id} value={sem.id}>
                         {sem.short} – {sem.full}
@@ -210,7 +212,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
 
                   {/* Fallback if selected is outside generated list */}
                   {!allSemesters.some((s) => s.id === selectedSemester) && (
-                    <optgroup label="Ausgewähltes Semester">
+                    <optgroup label={t('semester.selected')}>
                       <option value={selectedSemester}>{selectedSemester}</option>
                     </optgroup>
                   )}
@@ -223,14 +225,14 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                 type="button"
                 onClick={() => setIsRangeModalOpen(true)}
                 className="rounded-xl border border-slate-200 bg-white p-1.5 text-slate-500 shadow-xs hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition cursor-pointer"
-                title="Studienbeginn / Startsemester anpassen"
+                title={t('semester.adjust_start')}
               >
                 <SlidersHorizontal className="h-4 w-4" />
               </button>
             </div>
 
             {/* View Mode Toggle: Cards vs. List */}
-            <div className="flex items-center gap-0.5 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800" title="Ansicht umschalten">
+            <div className="flex items-center gap-0.5 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800" title={t("Ansicht umschalten")}>
               <button
                 type="button"
                 onClick={() => handleViewModeChange('cards')}
@@ -239,7 +241,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                     ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
                     : 'text-slate-500 hover:text-slate-800 hover:bg-white/50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50'
                 }`}
-                title="Kartenansicht"
+                title={t("Kartenansicht")}
               >
                 <LayoutGrid className="h-4 w-4" />
               </button>
@@ -251,7 +253,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                     ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
                     : 'text-slate-500 hover:text-slate-800 hover:bg-white/50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50'
                 }`}
-                title="Kompakte Listenansicht"
+                title={t("Kompakte Listenansicht")}
               >
                 <List className="h-4 w-4" />
               </button>
@@ -267,7 +269,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                 className="h-6 w-6 animate-spin rounded-full border-2 border-t-transparent"
                 style={{ borderColor: 'var(--accent, #0AACA5)', borderTopColor: 'transparent' }}
               />
-              <span className="text-xs font-medium">Lade Semester-Angebote für {currentSemesterMeta.short}...</span>
+              <span className="text-xs font-medium">{t("Lade Semester-Angebote für")} {currentSemesterMeta.short}...</span>
             </div>
           </div>
         )}
@@ -276,9 +278,9 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
         {!isLoading && semesterData && Object.keys(semesterData.grouped_by_category).length === 0 && (
           <div className="flex h-52 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center dark:border-slate-800 dark:bg-slate-900">
             <GraduationCap className="h-8 w-8 text-slate-300 dark:text-slate-600 mb-2" />
-            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Keine Vorlesungen gefunden</h4>
+            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">{t("Keine Vorlesungen gefunden")}</h4>
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-sm">
-              Für das Semester <strong>{currentSemesterMeta.full}</strong> sind keine eingeschriebenen Module vorhanden.
+              {t("Für das Semester")} <strong>{currentSemesterMeta.full}</strong> {t("sind keine eingeschriebenen Module vorhanden.")}
             </p>
           </div>
         )}
@@ -291,7 +293,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                 <div className="flex items-center gap-2.5">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">{category}</h3>
                   <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                  <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">{courses.length} Vorlesungen</span>
+                  <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">{courses.length} {t("Vorlesungen")}</span>
                 </div>
 
                 {viewMode === 'cards' ? (
@@ -336,7 +338,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                                 <span className="truncate">{course.description.replace('Contact: ', '')}</span>
                               </div>
                             ) : (
-                              <span className="text-slate-400 dark:text-slate-600">Keine Dozenten-Info</span>
+                              <span className="text-slate-400 dark:text-slate-600">{t("Keine Dozenten-Info")}</span>
                             )}
                             <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-[var(--accent)] group-hover:translate-x-0.5 transition shrink-0 dark:text-slate-600" />
                           </div>
@@ -383,7 +385,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                               </span>
                             )}
                             <span className="inline-flex items-center gap-1 font-semibold text-slate-700 group-hover:text-[var(--accent)] dark:text-slate-300 transition text-xs">
-                              Öffnen
+                              {t("Öffnen")}
                               <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition" />
                             </span>
                           </div>

@@ -77,8 +77,8 @@ def test_membership_actions_and_automatic_icons():
 
     try:
         with playwright.sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+            browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+            page = browser.new_page(locale='de-CH')
             errors = []
             page.on('pageerror', lambda err: errors.append(str(err)))
             page.route('**/api/**', respond)
@@ -125,11 +125,11 @@ def test_membership_actions_and_automatic_icons():
             # Reset remains reversible until saved, then restores the subject default.
             sidebar.get_by_role('button', name='Vorlesungen anpassen', exact=True).click()
             row = page.locator('#course-nickname-43').locator('xpath=../..')
-            row.get_by_role('button', name='Reset', exact=True).click()
+            row.get_by_role('button', name='Zurücksetzen', exact=True).click()
             page.get_by_role('button', name='Abbrechen', exact=True).click()
             playwright.expect(sidebar.get_by_role('button', name='My course', exact=False).locator('svg.lucide-book-open')).to_be_visible()
             sidebar.get_by_role('button', name='Vorlesungen anpassen', exact=True).click()
-            row.get_by_role('button', name='Reset', exact=True).click()
+            row.get_by_role('button', name='Zurücksetzen', exact=True).click()
             page.get_by_role('button', name='Änderungen speichern', exact=True).click()
             playwright.expect(voluntary.locator('svg.lucide-code')).to_be_visible()
 
@@ -155,7 +155,7 @@ def test_membership_actions_and_automatic_icons():
             page.evaluate('localStorage.clear()')
             page.goto(base + '/?course=44&folder=51')
             page.wait_for_function("localStorage.getItem('ilias_materials_cache_44') !== null")
-            playwright.expect(page.get_by_role('navigation', name='Breadcrumb', exact=True).get_by_role('button', name='HS2026', exact=True)).to_have_attribute('title', 'Meine Kurse im HS2026')
+            playwright.expect(page.get_by_role('navigation', name='Navigationspfad', exact=True).get_by_role('button', name='HS2026', exact=True)).to_have_attribute('title', 'Meine Kurse im HS2026')
             assert not errors
             browser.close()
     finally:

@@ -1,3 +1,4 @@
+from backend.i18n import t
 import functools
 import logging
 import os
@@ -76,10 +77,10 @@ def safe_parser(context_name: str, check_empty: bool = False):
         @functools.wraps(func)
         def wrapper(html_content: str, *args, **kwargs):
             if not html_content or not html_content.strip():
-                dump_path = dump_failed_html("", context_name, error=ValueError("Empty HTML received"))
+                dump_path = dump_failed_html("", context_name, error=ValueError(t('Empty HTML received')))
                 raise ScrapingParsingError(
                     context=context_name,
-                    message="Received empty HTML content",
+                    message=t('Received empty HTML content'),
                     dump_path=dump_path
                 )
 
@@ -89,11 +90,11 @@ def safe_parser(context_name: str, check_empty: bool = False):
                     dump_path = dump_failed_html(
                         html_content,
                         context_name,
-                        error=ValueError("Parser returned empty result collection")
+                        error=ValueError(t('Parser returned empty result collection'))
                     )
                     raise ScrapingParsingError(
                         context=context_name,
-                        message="Parser returned 0 items unexpectedly",
+                        message=t('Parser returned 0 items unexpectedly'),
                         dump_path=dump_path
                     )
                 return result
@@ -103,7 +104,7 @@ def safe_parser(context_name: str, check_empty: bool = False):
                 dump_path = dump_failed_html(html_content, context_name, error=e)
                 raise ScrapingParsingError(
                     context=context_name,
-                    message=f"DOM extraction error: {str(e)}",
+                    message=t('DOM extraction error: {p0}', p0=str(e)),
                     dump_path=dump_path,
                     original_error=e
                 ) from e

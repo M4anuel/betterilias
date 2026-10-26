@@ -1,4 +1,5 @@
 from pathlib import Path
+from backend.i18n import t
 import copy
 import hashlib
 import re
@@ -370,9 +371,9 @@ def _calc_layout_hash(blocks: List[CourseContentBlock]) -> str:
     """Compute a deterministic hash representing the ILIAS layout structure."""
     tokens = []
     for b in blocks:
-        tokens.append(f"{b.id}:{b.title or ''}:{b.block_type}")
+        tokens.append(f"{b.id}:{b.title_key or b.title or ''}:{b.block_type}")
         for cb in b.child_blocks:
-            tokens.append(f"  {cb.id}:{cb.title or ''}:{cb.block_type}")
+            tokens.append(f"  {cb.id}:{cb.title_key or cb.title or ''}:{cb.block_type}")
     return hashlib.md5("||".join(tokens).encode("utf-8")).hexdigest()
 
 
@@ -555,7 +556,9 @@ def parse_course_blocks(
                 icntrs = acc.select("[class*='AccordICntr'], .ilc_va_icntr_AccordICntr, .ilc_va_icntr_VAccordICntr")
                 for acc_idx, ic in enumerate(icntrs):
                     head_el = ic.select_one("[class*='AccordIHeadCap'], [class*='AccordIHead']")
-                    head_title = _clean_plain_text(head_el.get_text(" ", strip=True)) if head_el else f"Abschnitt {child_idx}"
+                    head_title = _clean_plain_text(head_el.get_text(" ", strip=True)) if head_el else t("Abschnitt {p0}", p0=child_idx)
+                    head_title_key = None if head_el else "Abschnitt {p0}"
+                    head_title_values = {} if head_el else {"p0": child_idx}
 
 
                     cont_el = ic.select_one(".il_VAccordionContentDef, .ilc_va_icont_VAccordICont, [class*='AccordICont']")
@@ -627,7 +630,9 @@ def parse_course_blocks(
                         sess_block = CourseContentBlock(
                             id=f"sessions-{slug or child_idx}-{child_idx}-{acc_idx}",
                             block_type="sessions",
-                            title=head_title or "Sitzungen & Termine",
+                            title=head_title or t("Sitzungen & Termine"),
+                            title_key=head_title_key if head_title else "Sitzungen & Termine",
+                            title_values=head_title_values,
                             sessions=session_items,
                         )
                         blocks.append(sess_block)
@@ -657,12 +662,15 @@ def parse_course_blocks(
                     html_content = rem_html if (rem_text or has_media) else None
                     plain_text = rem_text if rem_text else None
 
-                    slug = re.sub(r'[^a-zA-Z0-9]+', '-', head_title.lower()).strip('-')
+                    slug_title = head_title if head_el else f"Abschnitt {child_idx}"
+                    slug = re.sub(r'[^a-zA-Z0-9]+', '-', slug_title.lower()).strip('-')
                     acc_drawer = CourseContentBlock(
                         id=f"drawer-{slug or child_idx}-{child_idx}-{acc_idx}",
                         block_type="drawer",
                         presentation="tiles" if is_acc_tiles else "list",
                         title=head_title,
+                        title_key=head_title_key,
+                        title_values=head_title_values,
                         html_content=html_content,
                         plain_text=plain_text,
                         items=acc_items,
@@ -739,12 +747,12 @@ def parse_course_blocks(
 
             if session_items:
                 sess_header = child.select_one("h2, h3, .ilHeader, .ilBlockHeader, legend")
-                sess_title = sess_header.get_text(strip=True) if sess_header else "Sitzungen & Termine"
-                sess_title = re.sub(r'^(Sessions|Sitzungen)\s*', 'Sitzungen & Termine', sess_title).strip()
+                sess_title = sess_header.get_text(strip=True) if sess_header else t("Sitzungen & Termine")
                 sess_block = CourseContentBlock(
                     id=f"sessions-{child_idx}",
                     block_type="sessions",
                     title=sess_title,
+                    title_key=None if sess_header else "Sitzungen & Termine",
                     sessions=session_items,
                 )
                 blocks.append(sess_block)
@@ -757,10 +765,9 @@ def parse_course_blocks(
         if items_in_child:
             hdr_elem = child.select_one("h2, h3, h4, .ilHeader, .ilBlockHeader, legend")
             raw_hdr = hdr_elem.get_text(strip=True) if hdr_elem else ""
-            if raw_hdr.lower() in ["content", "inhalt", "kursinhalte", "kursinhalt", "inhalte"]:
-                group_title = "Inhalte"
-            else:
-                group_title = raw_hdr
+            generic_content = raw_hdr.lower() in ("content", "inhalt", "kursinhalte", "kursinhalt", "inhalte")
+            group_title = "Inhalte" if generic_content else raw_hdr
+            generated_heading = generic_content or not bool(raw_hdr)
 
             parsed_items: List[MaterialItem] = []
             for item_el in items_in_child:
@@ -773,11 +780,11 @@ def parse_course_blocks(
                     if all(it.item_type == "fold" for it in parsed_items):
                         group_title = "Ordner"
                     elif all(it.item_type == "file" for it in parsed_items):
-                        group_title = "Dateien & Unterlagen"
+                        group_title = 'Dateien & Unterlagen'
                     elif all(it.item_type == "mcst" for it in parsed_items):
-                        group_title = "Podcasts & Aufzeichnungen"
+                        group_title = 'Podcasts & Aufzeichnungen'
                     elif all(it.item_type == "exc" for it in parsed_items):
-                        group_title = "Übungen & Aufgaben"
+                        group_title = 'Übungen & Aufgaben'
                     elif all(it.item_type == "frm" for it in parsed_items):
                         group_title = "Forum"
                     else:
@@ -788,7 +795,8 @@ def parse_course_blocks(
                     id=f"items-{block_slug or child_idx}-{child_idx}",
                     block_type="items",
                     presentation="tiles" if is_tiles else "list",
-                    title=group_title,
+                    title=t(group_title) if generated_heading else group_title,
+                    title_key=group_title if generated_heading else None,
                     items=parsed_items,
                 )
                 blocks.append(item_block)
@@ -857,7 +865,8 @@ def parse_course_blocks(
                 CourseContentBlock(
                     id=f"items-folders-{container_ref_id}",
                     block_type="items",
-                    title="Ordner",
+                    title=t("Ordner"),
+                    title_key="Ordner",
                     items=fold_items,
                 )
             )
@@ -866,7 +875,8 @@ def parse_course_blocks(
                 CourseContentBlock(
                     id=f"items-files-{container_ref_id}",
                     block_type="items",
-                    title="Dateien & Unterlagen",
+                    title=t("Dateien & Unterlagen"),
+                    title_key="Dateien & Unterlagen",
                     items=file_items,
                 )
             )
@@ -875,7 +885,8 @@ def parse_course_blocks(
                 CourseContentBlock(
                     id=f"items-other-{container_ref_id}",
                     block_type="items",
-                    title="Materialien & Übungen",
+                    title=t("Materialien & Übungen"),
+                    title_key="Materialien & Übungen",
                     items=other_items,
                 )
             )
@@ -889,7 +900,8 @@ def parse_course_blocks(
                 CourseContentBlock(
                     id=f"sessions-{container_ref_id}",
                     block_type="sessions",
-                    title="Sitzungen & Termine",
+                    title=t("Sitzungen & Termine"),
+                    title_key="Sitzungen & Termine",
                     sessions=sessions,
                 ),
             )
@@ -917,7 +929,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
         soup.select_one("h1.il-page-content-header, h1.ilHeader:not(.modal-title), h1.media-heading:not(.modal-title), h1.il-item-title, .ilMainHeader h1, h1:not(.modal-title)")
         or soup.select_one(".ilTopTitle")
     )
-    raw_title = title_elem.get_text(strip=True) if title_elem else f"Container {container_ref_id}"
+    raw_title = title_elem.get_text(strip=True) if title_elem else t("Container {p0}", p0=container_ref_id)
     # Clean leading "View: Content: " or "Content: "
     container_title = re.sub(r'^(View:\s*)?(Content:\s*)?', '', raw_title).strip()
 
@@ -1114,7 +1126,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
             if container_blocks:
                 for cb in container_blocks:
                     hdr_elem = cb.select_one("h2, h3, .ilHeader, .ilBlockHeader, legend")
-                    group_title = hdr_elem.get_text(strip=True) if hdr_elem else "Inhalte"
+                    group_title = hdr_elem.get_text(strip=True) if hdr_elem else t("Inhalte")
 
                     group_items: List[MaterialItem] = []
                     cb_tiles = cb.select(".ilContainerTileRows .il-card, .il-deck .il-card, .il-card.thumbnail")
@@ -1134,7 +1146,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
                             if not sections:
                                 sections.append(CourseSection(
                                     id="general",
-                                    title="Inhalte",
+                                    title=t("Inhalte"),
                                     groups=[],
                                     items=[],
                                     rich_text_blocks=[]
@@ -1154,8 +1166,8 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
             if not sections:
                 sections.append(CourseSection(
                     id="general",
-                    title="Inhalte",
-                    groups=[ContentGroup(title="Materialien", items=[item])],
+                    title=t("Inhalte"),
+                    groups=[ContentGroup(title=t("Materialien"), items=[item])],
                     items=[item],
                     rich_text_blocks=[]
                 ))

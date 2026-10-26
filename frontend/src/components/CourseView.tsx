@@ -1,3 +1,4 @@
+import { t, useLanguage, generatedTitle } from '../lib/i18n';
 import React, { useState, useEffect } from 'react';
 import {
   Folder,
@@ -154,6 +155,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
   activeExerciseRefId: controlledExerciseRefId,
   onSelectExercise,
 }) => {
+  const language = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedDrawers, setCollapsedDrawers] = useState<Record<string, boolean>>(() =>
     cache.getCourseDrawersState(courseRefId)
@@ -579,21 +581,26 @@ export const CourseView: React.FC<CourseViewProps> = ({
   }, [materialsData]);
 
   // Construct available blocks (including virtual all-files block if enabled)
-  const rawBlocks = materialsData?.blocks || [];
+  const rawBlocks = React.useMemo(() => {
+    const localise = (block: CourseContentBlock): CourseContentBlock => ({
+      ...block, title: generatedTitle(block), child_blocks: block.child_blocks?.map(localise),
+    });
+    return (materialsData?.blocks || []).map(localise);
+  }, [materialsData?.blocks, language]);
   const availableBlocks: CourseContentBlock[] = React.useMemo(() => {
     if (!materialsData) return [];
     if (!showAllFilesBlock) return rawBlocks;
     const virtualBlock: CourseContentBlock = {
       id: 'block-all-files',
       block_type: 'all_files',
-      title: 'Alle Dateien des Kurses',
+      title: t("Alle Dateien des Kurses"),
       items: allCourseFiles,
       level: 1,
       child_blocks: [],
       sessions: [],
     };
     return [...rawBlocks, virtualBlock];
-  }, [materialsData, rawBlocks, showAllFilesBlock, allCourseFiles]);
+  }, [materialsData, rawBlocks, showAllFilesBlock, allCourseFiles, language]);
 
   // Map of blocks by id for ordered rendering
   const orderedBlocksToRender: CourseContentBlock[] = React.useMemo(() => {
@@ -638,7 +645,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 mx-auto">
               <RefreshCw className="h-5 w-5" />
             </div>
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">Vorlesungsinhalte konnten nicht geladen werden</h3>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">{t("Vorlesungsinhalte konnten nicht geladen werden")}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{loadError}</p>
             <button
               type="button"
@@ -647,7 +654,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               className="mt-2 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white hover:opacity-90 transition cursor-pointer shadow-xs"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              <span>Erneut versuchen</span>
+              <span>{t("Erneut versuchen")}</span>
             </button>
           </div>
         </div>
@@ -661,7 +668,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             className="h-7 w-7 animate-spin rounded-full border-2 border-t-transparent"
             style={{ borderColor: 'var(--accent, #0AACA5)', borderTopColor: 'transparent' }}
           />
-          <p className="text-xs font-semibold">Lade Vorlesungsinhalte...</p>
+          <p className="text-xs font-semibold">{t("Lade Vorlesungsinhalte...")}</p>
         </div>
       </div>
     );
@@ -712,7 +719,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
       item.title.toLowerCase().includes(q) ||
       (!!item.description && item.description.toLowerCase().includes(q));
 
-    const currentTitle = materialsData.title || courseNickname || 'Hauptordner';
+    const currentTitle = materialsData.title || courseNickname || t("Hauptordner");
 
     // 1. Items in current container
     for (const item of materialsData.items) {
@@ -749,7 +756,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
     // 2. Items in crawled subfolders
     for (const [folderId, entry] of Object.entries(subfolderMaterials)) {
       if (folderId === materialsData.container_ref_id) continue;
-      const folderTitle = entry.materials.title || entry.path[entry.path.length - 1] || 'Unterordner';
+      const folderTitle = entry.materials.title || entry.path[entry.path.length - 1] || t("Unterordner");
 
       for (const item of entry.materials.items || []) {
         if (itemMatches(item) && !seenItemRefIds.has(item.ref_id)) {
@@ -855,7 +862,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 bg-slate-100/90 dark:bg-slate-800 px-2 py-0.5 rounded-md w-fit mt-1.5 border border-slate-200/50 dark:border-slate-700/50">
               <Folder className="h-3 w-3 text-amber-500 shrink-0" />
               <span className="font-semibold text-slate-600 dark:text-slate-300 truncate max-w-md">
-                {breadcrumbs.join(' › ') || 'Hauptordner'}
+                {breadcrumbs.join(' › ') || t("Hauptordner")}
               </span>
             </div>
           </div>
@@ -867,10 +874,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
               type="button"
               onClick={() => onNavigateFolder(containerRefId)}
               className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 transition shadow-2xs"
-              title="Zu diesem Ordner navigieren"
+              title={t("Zu diesem Ordner navigieren")}
             >
               <Folder className="h-3 w-3 text-amber-500" />
-              <span>In Ordner anzeigen</span>
+              <span>{t("In Ordner anzeigen")}</span>
             </button>
           )}
 
@@ -880,7 +887,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               onClick={() => onNavigateFolder(item.ref_id)}
               className="flex items-center gap-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 text-xs font-semibold transition shadow-2xs"
             >
-              <span>Öffnen</span>
+              <span>{t("Öffnen")}</span>
               <ArrowRight className="h-3 w-3" />
             </button>
           ) : isPodcast ? (
@@ -890,7 +897,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               className="flex items-center gap-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1 text-xs font-semibold transition shadow-2xs"
             >
               <Play className="h-3 w-3" />
-              <span>Aufzeichnungen</span>
+              <span>{t("Aufzeichnungen")}</span>
             </button>
           ) : isExercise ? (
             <button
@@ -899,7 +906,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               className="flex items-center gap-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 text-xs font-semibold transition shadow-2xs cursor-pointer"
             >
               <Layers className="h-3 w-3" />
-              <span>Übungen</span>
+              <span>{t("Übungen")}</span>
             </button>
           ) : isFile && downloadUrl ? (
             <a
@@ -909,7 +916,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               className="flex items-center gap-1 rounded-lg text-white px-2.5 py-1 text-xs font-semibold hover:opacity-90 transition shadow-2xs"
             >
               <Download className="h-3 w-3" />
-              <span>Download</span>
+              <span>{t("Download")}</span>
             </a>
           ) : (
             <a
@@ -918,7 +925,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               rel="noreferrer"
               className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2.5 py-1 text-xs font-semibold transition shadow-2xs"
             >
-              <span>ILIAS</span>
+              <span>{t("ILIAS")}</span>
               <ExternalLink className="h-3 w-3" />
             </a>
           )}
@@ -1192,15 +1199,15 @@ export const CourseView: React.FC<CourseViewProps> = ({
               stat.isMapped ? (
                 stat.isEmpty ? (
                   <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
-                    Leer
+                    {t("Leer")}
                   </span>
                 ) : (
                   <span className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
                     {stat.files > 0 && stat.folders > 0
-                      ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}, ${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`
+                      ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}, ${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`
                       : stat.files > 0
-                      ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}`
-                      : `${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`}
+                      ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}`
+                      : `${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`}
                   </span>
                 )
               ) : null
@@ -1210,7 +1217,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               </span>
             ) : null}
             <span className="text-[11px] font-semibold text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition shrink-0">
-              Öffnen →
+              {t("Öffnen →")}
             </span>
           </div>
         </div>
@@ -1233,7 +1240,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 {item.title}
               </span>
               <span className="text-[10px] text-sky-600 dark:text-sky-400 font-medium block truncate">
-                {item.description || 'Opencast Vorlesungsaufzeichnungen ansehen'}
+                {item.description || t("Opencast Vorlesungsaufzeichnungen ansehen")}
               </span>
             </div>
           </div>
@@ -1248,7 +1255,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs cursor-pointer"
             >
               <Play className="h-3 w-3 fill-white" />
-              <span>Aufnahmen</span>
+              <span>{t("Aufnahmen")}</span>
             </button>
           </div>
         </div>
@@ -1271,7 +1278,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 {item.title}
               </span>
               <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium block truncate">
-                {item.description || 'Übungsblätter, Abgaben & Bewertungen verwalten'}
+                {item.description || t("Übungsblätter, Abgaben & Bewertungen verwalten")}
               </span>
             </div>
           </div>
@@ -1286,7 +1293,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-indigo-700 transition shadow-2xs cursor-pointer"
             >
               <Layers className="h-3 w-3" />
-              <span>Öffnen</span>
+              <span>{t("Öffnen")}</span>
             </button>
           </div>
         </div>
@@ -1314,7 +1321,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 {item.title}
               </a>
               <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium block truncate">
-                {item.description || 'ILIAS Live Voting'}
+                {item.description || t("ILIAS Live Voting")}
               </span>
             </div>
           </div>
@@ -1327,7 +1334,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-purple-700 transition shadow-2xs"
             >
               <Vote className="h-3 w-3" />
-              <span>Live Voting</span>
+              <span>{t("Live Voting")}</span>
               <ExternalLink className="h-3 w-3 opacity-80" />
             </a>
           </div>
@@ -1395,7 +1402,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-[var(--accent)] hover:text-white transition shadow-2xs"
             >
               <Download className="h-3 w-3" />
-              <span>Download</span>
+              <span>{t("Download")}</span>
             </a>
           ) : (
             <a
@@ -1404,7 +1411,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               rel="noreferrer"
               className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition shadow-2xs"
             >
-              <span>ILIAS</span>
+              <span>{t("ILIAS")}</span>
               <ExternalLink className="h-3 w-3" />
             </a>
           )}
@@ -1434,7 +1441,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
               }`}
             />
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {block.title || 'Schublade'}
+              {block.title || t("Schublade")}
             </h3>
           </div>
 
@@ -1548,7 +1555,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
             <Calendar className="h-4 w-4 text-emerald-500" />
-            <span>{block.title || 'Sitzungen (Termine)'}</span>
+            <span>{block.title || t("Sitzungen (Termine)")}</span>
             <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
               {sessList.length}
             </span>
@@ -1567,7 +1574,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
             <Files className="h-4 w-4 text-amber-500" />
-            <span>{block.title || 'Alle Dateien des Kurses'}</span>
+            <span>{block.title || t("Alle Dateien des Kurses")}</span>
             <span className="rounded-full bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
               {block.items.length}
             </span>
@@ -1621,7 +1628,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <Folder className="h-4 w-4 text-amber-500" />
-              <span>{block.title || 'Ordner'}</span>
+              <span>{block.title || t("Ordner")}</span>
               <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
                 {items.length}
               </span>
@@ -1629,7 +1636,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             {isScanningTree && (
               <div className="flex items-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md font-medium">
                 <RefreshCw className="h-3 w-3 animate-spin" />
-                <span>Analysiere Unterordner...</span>
+                <span>{t("Analysiere Unterordner...")}</span>
               </div>
             )}
           </div>
@@ -1664,31 +1671,31 @@ export const CourseView: React.FC<CourseViewProps> = ({
                       stat.isMapped ? (
                         stat.isEmpty ? (
                           <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 font-medium text-slate-400 dark:text-slate-500">
-                            Leer
+                            {t("Leer")}
                           </span>
                         ) : (
                           <span className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 font-semibold text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
                             {stat.files > 0 && stat.folders > 0
-                              ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}, ${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`
+                              ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}, ${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`
                               : stat.files > 0
-                              ? `${stat.files} ${stat.files === 1 ? 'Datei' : 'Dateien'}`
-                              : `${stat.folders} ${stat.folders === 1 ? 'Ordner' : 'Ordner'}`}
+                              ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}`
+                              : `${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`}
                           </span>
                         )
                       ) : (
-                        <span className="text-slate-400 dark:text-slate-500">Ordner</span>
+                        <span className="text-slate-400 dark:text-slate-500">{t("Ordner")}</span>
                       )
                     ) : isScanningTree ? (
                       <span className="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500">
                         <RefreshCw className="h-2.5 w-2.5 animate-spin" />
-                        <span>Prüfe...</span>
+                        <span>{t("Prüfe...")}</span>
                       </span>
                     ) : (
-                      <span className="text-slate-400 dark:text-slate-500">Ordner</span>
+                      <span className="text-slate-400 dark:text-slate-500">{t("Ordner")}</span>
                     )}
 
                     <span className="font-semibold text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">
-                      Öffnen →
+                      {t("Öffnen →")}
                     </span>
                   </div>
                 </div>
@@ -1737,7 +1744,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
         <div className="flex items-center justify-between">
           <h3 className={`text-xs font-bold uppercase tracking-wider ${titleColor} flex items-center gap-1.5`}>
             {icon}
-            <span>{block.title || 'Inhalte'}</span>
+            <span>{block.title || t("Inhalte")}</span>
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badgeClass}`}>
               {items.length}
             </span>
@@ -1756,7 +1763,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
         <div className="flex items-center gap-2.5">
           <div className="h-5 w-1 rounded-full bg-indigo-600" />
           <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 tracking-tight">
-            {block.title || 'Abschnitt'}
+            {block.title || t("Abschnitt")}
           </h2>
         </div>
       </div>
@@ -1824,12 +1831,12 @@ export const CourseView: React.FC<CourseViewProps> = ({
           {isRevalidating ? (
             <div className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:text-blue-300">
               <RefreshCw className="h-3 w-3 animate-spin" />
-              <span>Synchronisiere...</span>
+              <span>{t("Synchronisiere...")}</span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
               <CheckCircle className="h-3 w-3 text-emerald-500" />
-              <span>Lokal bereitgestellt</span>
+              <span>{t("Lokal bereitgestellt")}</span>
             </div>
           )}
 
@@ -1837,7 +1844,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             onClick={onManualRefresh}
             disabled={isRevalidating}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-200 transition disabled:opacity-50 cursor-pointer"
-            title="Neu von ILIAS abrufen"
+            title={t("Neu von ILIAS abrufen")}
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
@@ -1854,7 +1861,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                <span>Zurück</span>
+                <span>{t("Zurück")}</span>
               </button>
             )}
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
@@ -1863,29 +1870,29 @@ export const CourseView: React.FC<CourseViewProps> = ({
             </h1>
           </div>
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-            {(materialsData?.items?.length || 0)} {((materialsData?.items?.length || 0) === 1 ? 'Material' : 'Materialien')} verfügbar
+            {(materialsData?.items?.length || 0)} {((materialsData?.items?.length || 0) === 1 ? t("Material") : t("Materialien"))} {t("verfügbar")}
           </p>
         </div>
 
         {/* Search & Actions Bar */}
         <div className="flex items-center gap-2 w-full md:w-auto">
           {membership?.can_leave && <button type="button" onClick={() => onManageMembership('leave')}
-            className="rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800">Kurs verlassen</button>}
+            className="rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800">{t("Kurs verlassen")}</button>}
           <button
             type="button"
             onClick={() => setIsOrderModalOpen(true)}
             className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition shadow-2xs cursor-pointer shrink-0"
-            title="Reihenfolge der Abschnitte anpassen"
+            title={t("Reihenfolge der Abschnitte anpassen")}
           >
             <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-            <span className="hidden sm:inline">Reihenfolge</span>
+            <span className="hidden sm:inline">{t("Reihenfolge")}</span>
           </button>
 
           <div className="relative w-full md:w-72">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
             <input
               type="text"
-              placeholder="Vorlesung durchsuchen..."
+              placeholder={t("Vorlesung durchsuchen...")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-9 pr-4 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-hidden focus:ring-2 focus:ring-[var(--accent)]/30 transition shadow-2xs"
@@ -1896,11 +1903,11 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
       {/* Main course content */}
       {membership?.can_join && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/30 p-4">
-        <p className="text-sm">Du bist diesem Kurs noch nicht beigetreten.</p>
-        <button type="button" onClick={() => onManageMembership('join')} className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white">Kurs beitreten</button>
+        <p className="text-sm">{t("Du bist diesem Kurs noch nicht beigetreten.")}</p>
+        <button type="button" onClick={() => onManageMembership('join')} className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white">{t("Kurs beitreten")}</button>
       </div>}
       {!isInsideSubfolder && materialsData && !membership?.can_join && materialsData.items.length === 0 && !(materialsData.blocks?.length) && !(materialsData.sessions?.length) &&
-        <p className="text-sm text-slate-500">Für diesen Kurs sind keine Inhalte sichtbar. Falls die Anmeldung über KSL erfolgt, verwalte sie dort.</p>}
+        <p className="text-sm text-slate-500">{t("Für diesen Kurs sind keine Inhalte sichtbar. Falls die Anmeldung über KSL erfolgt, verwalte sie dort.")}</p>}
       <div>
         {/* Main Content Area */}
         <div className="space-y-6">
@@ -1912,19 +1919,19 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                     <Search className="h-4 w-4" style={{ color: 'var(--accent, #0AACA5)' }} />
-                    <span>Suchergebnisse für &quot;{searchQuery}&quot;</span>
+                    <span>{t("Suchergebnisse für \"")}{searchQuery}&quot;</span>
                     <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      {filteredSearchResults.length} {filteredSearchResults.length === 1 ? 'Treffer' : 'Treffer'}
+                      {filteredSearchResults.length} {filteredSearchResults.length === 1 ? t("Treffer") : t("Treffer")}
                     </span>
                   </h2>
                   <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
                     <span>
-                      Durchsucht: Aktueller Ordner + {Object.keys(subfolderMaterials).length} Unterordner
+                      {t("Durchsucht: Aktueller Ordner +")} {Object.keys(subfolderMaterials).length} {t("Unterordner")}
                     </span>
                     {isScanningTree && (
                       <span className="flex items-center gap-1 text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 px-2.5 py-0.5 rounded-md font-medium text-[11px]">
                         <RefreshCw className="h-3 w-3 animate-spin" />
-                        <span>Analysiere Ordnerstruktur...</span>
+                        <span>{t("Analysiere Ordnerstruktur...")}</span>
                       </span>
                     )}
                   </div>
@@ -1935,7 +1942,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                   onClick={() => setSearchQuery('')}
                   className="self-start sm:self-auto text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-[var(--accent)] transition cursor-pointer"
                 >
-                  Suche zurücksetzen
+                  {t("Suche zurücksetzen")}
                 </button>
               </div>
 
@@ -1950,7 +1957,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                   }`}
                 >
-                  Alle ({searchResults.length})
+                  {t("Alle (")}{searchResults.length})
                 </button>
                 {searchFileCount > 0 && (
                   <button
@@ -1963,7 +1970,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                   >
-                    Dateien & Folien ({searchFileCount})
+                    {t("Dateien & Folien (")}{searchFileCount})
                   </button>
                 )}
                 {searchFoldCount > 0 && (
@@ -1976,7 +1983,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                         : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60'
                     }`}
                   >
-                    Unterordner ({searchFoldCount})
+                    {t("Unterordner (")}{searchFoldCount})
                   </button>
                 )}
                 {searchMcstCount > 0 && (
@@ -1989,7 +1996,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                         : 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60'
                     }`}
                   >
-                    Podcasts ({searchMcstCount})
+                    {t("Podcasts (")}{searchMcstCount})
                   </button>
                 )}
                 {searchExcCount > 0 && (
@@ -2002,7 +2009,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                         : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
                     }`}
                   >
-                    Übungen & Weiteres ({searchExcCount})
+                    {t("Übungen & Weiteres (")}{searchExcCount})
                   </button>
                 )}
               </div>
@@ -2015,16 +2022,16 @@ export const CourseView: React.FC<CourseViewProps> = ({
               ) : (
                 <div className="flex h-52 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center">
                   <Search className="h-8 w-8 text-slate-300 dark:text-slate-600 mb-2" />
-                  <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Keine Suchergebnisse gefunden</h4>
+                  <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">{t("Keine Suchergebnisse gefunden")}</h4>
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-sm">
-                    In diesem Kurs oder dessen Unterordnern wurden keine Materialien zu &quot;{searchQuery}&quot; gefunden.
+                    {t("In diesem Kurs oder dessen Unterordnern wurden keine Materialien zu \"")}{searchQuery}{t("\" gefunden.")}
                   </p>
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
                     className="mt-4 rounded-xl bg-slate-100 dark:bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
                   >
-                    Suche zurücksetzen
+                    {t("Suche zurücksetzen")}
                   </button>
                 </div>
               )}
@@ -2037,7 +2044,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 return (
                   <div className="flex h-56 flex-col items-center justify-center rounded-2xl border border-red-200 dark:border-red-950/60 bg-red-50/50 dark:bg-red-950/20 p-6 text-center">
                     <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
-                    <p className="text-sm font-bold text-red-900 dark:text-red-300">Fehler beim Abrufen der Vorlesungsinhalte</p>
+                    <p className="text-sm font-bold text-red-900 dark:text-red-300">{t("Fehler beim Abrufen der Vorlesungsinhalte")}</p>
                     <p className="text-xs text-red-700 dark:text-red-400 mt-1 max-w-md">{loadError}</p>
                     <button
                       type="button"
@@ -2045,7 +2052,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                       style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
                       className="mt-4 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-xs hover:opacity-90 transition cursor-pointer"
                     >
-                      Erneut versuchen
+                      {t("Erneut versuchen")}
                     </button>
                   </div>
                 );
@@ -2059,8 +2066,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
                       className="h-8 w-8 animate-spin rounded-full border-3 border-t-transparent mb-3"
                       style={{ borderColor: 'var(--accent, #0AACA5)', borderTopColor: 'transparent' }}
                     />
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Lade Vorlesungsinhalte...</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Materialien werden von ILIAS abgerufen</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{t("Lade Vorlesungsinhalte...")}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{t("Materialien werden von ILIAS abgerufen")}</p>
                   </div>
                 );
               }
@@ -2072,8 +2079,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 return (
                   <div className="flex h-44 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center p-6">
                     <Search className="h-6 w-6 text-slate-300 dark:text-slate-600 mb-2" />
-                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Keine Materialien vorhanden</p>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">In diesem Bereich wurden noch keine Materialien gefunden.</p>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{t("Keine Materialien vorhanden")}</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{t("In diesem Bereich wurden noch keine Materialien gefunden.")}</p>
                   </div>
                 );
               }

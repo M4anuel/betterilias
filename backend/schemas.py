@@ -133,6 +133,9 @@ class CourseContentBlock(BaseModel):
     block_type: str  # 'heading' | 'drawer' | 'items' | 'text' | 'sessions' | 'all_files' | 'columns' | 'column'
     presentation: Optional[str] = None  # 'tiles' | 'list'
     title: Optional[str] = None
+    # Only generated headings have a translation key. ILIAS titles stay untouched.
+    title_key: Optional[str] = None
+    title_values: Dict[str, Any] = Field(default_factory=dict)
 
     items: List[MaterialItem] = Field(default_factory=list)
     html_content: Optional[str] = None
@@ -339,6 +342,7 @@ class StudentAssignmentDetail(BaseModel):
     ass_id: str
     title: str
     instructions: Optional[str] = None
+    is_team_upload: bool = False
     start_time: Optional[str] = None
     ended_on: Optional[str] = None
     time_remaining: Optional[str] = None
@@ -392,6 +396,9 @@ class TAAssignmentListResponse(BaseModel):
     assignments: List[TAAssignmentListItem] = Field(default_factory=list)
     form_action_url: Optional[str] = None
     rtoken: Optional[str] = None
+    add_action_url: Optional[str] = None
+    add_submit_command: Optional[str] = None
+    available_types: Dict[int, str] = Field(default_factory=dict)
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class AssignmentOrderUpdateRequest(BaseModel):
@@ -412,7 +419,7 @@ class TAAssignmentDetailResponse(BaseModel):
     mandatory: bool = True
     instruction_html: str = ""
     start_time: Optional[str] = None
-    deadline_mode: int = 1  # 0: no deadline, 1: ending date
+    deadline_mode: int = 0  # 0: fixed date, -1: no deadline
     deadline: Optional[str] = None
     has_grace_period: bool = False
     deadline2: Optional[str] = None
@@ -422,6 +429,14 @@ class TAAssignmentDetailResponse(BaseModel):
     form_action: Optional[str] = None
     rtoken: Optional[str] = None
     hidden_inputs: Dict[str, str] = Field(default_factory=dict)
+    form_values: Dict[str, str] = Field(default_factory=dict)
+    form_fields: List[str] = Field(default_factory=list)
+    form_dependencies: Dict[str, Dict[str, str]] = Field(default_factory=dict)
+    disabled_fields: List[str] = Field(default_factory=list)
+    file_inputs: List[str] = Field(default_factory=list)
+    submit_command: Optional[str] = None
+    available_types: Dict[int, str] = Field(default_factory=dict)
+    existing_assignment_ids: List[str] = Field(default_factory=list)
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class SaveTAAssignmentRequest(BaseModel):
@@ -431,7 +446,7 @@ class SaveTAAssignmentRequest(BaseModel):
     mandatory: bool = True
     instruction_html: str = ""
     start_time: Optional[str] = None
-    deadline_mode: int = 1
+    deadline_mode: int = 0
     deadline: Optional[str] = None
     has_grace_period: bool = False
     deadline2: Optional[str] = None

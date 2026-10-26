@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useState, useRef } from 'react';
 import {
   X,
@@ -30,6 +31,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
   onClose,
   onNewPodcastFound,
 }) => {
+  useLanguage();
   const [loading, setLoading] = useState(true);
   const [isRevalidating, setIsRevalidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
     } catch (err: any) {
       console.error('Failed to load podcasts:', err);
       if (!cached) {
-        setError(err.message || 'Podcasts konnten nicht geladen werden.');
+        setError(err.message || t("Podcasts konnten nicht geladen werden."));
       }
     } finally {
       setLoading(false);
@@ -141,12 +143,12 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 px-2 py-0.5 rounded-md">
-                  Opencast Vorlesungsaufzeichnungen
+                  {t("Opencast Vorlesungsaufzeichnungen")}
                 </span>
                 {series && series.pages_available.length > 0 && (
                   <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md flex items-center gap-1">
                     <CheckCircle2 className="h-2.5 w-2.5" />
-                    Seiten synchronisiert
+                    {t("Seiten synchronisiert")}
                   </span>
                 )}
               </div>
@@ -159,7 +161,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition shrink-0 cursor-pointer"
-            title="Schliessen"
+            title={t("Schliessen")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -178,7 +180,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                 }`}
               >
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Aufnahmen ({series.recorded_count})</span>
+                <span>{t("Aufnahmen (")}{series.recorded_count})</span>
               </button>
 
               <button
@@ -190,7 +192,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                 }`}
               >
                 <Clock className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                <span>Geplant ({series.scheduled_count})</span>
+                <span>{t("Geplant (")}{series.scheduled_count})</span>
               </button>
 
               <button
@@ -201,7 +203,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <span>Alle ({series.total_episodes})</span>
+                <span>{t("Alle (")}{series.total_episodes})</span>
               </button>
             </div>
 
@@ -210,7 +212,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
               <input
                 type="text"
-                placeholder="Episode suchen..."
+                placeholder={t("Episode suchen...")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-hidden focus:ring-1 focus:ring-[var(--accent)] transition"
@@ -225,7 +227,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
             <div className="flex h-56 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
               <RefreshCw className="h-6 w-6 animate-spin text-sky-500" />
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Lade Aufnahmen und synchronisiere Seiten...
+                {t("Lade Aufnahmen und synchronisiere Seiten...")}
               </p>
             </div>
           )}
@@ -234,14 +236,14 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
             <div className="rounded-xl border border-red-200 dark:border-red-950/60 bg-red-50 dark:bg-red-950/30 p-4 text-xs text-red-700 dark:text-red-300 flex items-start gap-3">
               <AlertCircle className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
               <div className="space-y-1">
-                <p className="font-bold">Fehler beim Laden der Podcasts</p>
+                <p className="font-bold">{t("Fehler beim Laden der Podcasts")}</p>
                 <p>{error}</p>
                 <button
                   onClick={fetchPodcasts}
                   style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
                   className="mt-2 inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90 cursor-pointer"
                 >
-                  <RefreshCw className="h-3 w-3" /> Erneut versuchen
+                  <RefreshCw className="h-3 w-3" /> {t("Erneut versuchen")}
                 </button>
               </div>
             </div>
@@ -250,11 +252,11 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
           {!loading && !error && filteredEpisodes.length === 0 && (
             <div className="flex h-44 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center">
               <Radio className="h-6 w-6 text-slate-300 dark:text-slate-600 mb-1" />
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Keine Episoden in dieser Auswahl</p>
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{t("Keine Episoden in dieser Auswahl")}</p>
               <p className="text-[11px] text-slate-400 dark:text-slate-500">
                 {filter === 'available'
-                  ? 'Noch keine fertigen Aufnahmen vorhanden.'
-                  : 'Keine passenden Termine gefunden.'}
+                  ? t("Noch keine fertigen Aufnahmen vorhanden.")
+                  : t("Keine passenden Termine gefunden.")}
               </p>
             </div>
           )}
@@ -278,12 +280,12 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                       {isRecorded ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
                           <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                          Aufnahme bereit
+                          {t("Aufnahme bereit")}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
                           <Clock className="h-3 w-3 text-slate-400" />
-                          Zukünftiger Termin
+                          {t("Zukünftiger Termin")}
                         </span>
                       )}
 
@@ -326,11 +328,11 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                         className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs"
                       >
                         <Play className="h-3.5 w-3.5 fill-white" />
-                        <span>Streamen</span>
+                        <span>{t("Streamen")}</span>
                       </a>
                     ) : (
                       <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 px-2">
-                        Wird aufgezeichnet
+                        {t("Wird aufgezeichnet")}
                       </span>
                     )}
                   </div>
@@ -347,7 +349,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
             rel="noreferrer"
             className="flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition"
           >
-            <span>In ILIAS öffnen</span>
+            <span>{t("In ILIAS öffnen")}</span>
             <ExternalLink className="h-3 w-3" />
           </a>
 
@@ -355,7 +357,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
             onClick={onClose}
             className="rounded-lg bg-slate-100 dark:bg-slate-800 px-4 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
           >
-            Schliessen
+            {t("Schliessen")}
           </button>
         </div>
       </div>

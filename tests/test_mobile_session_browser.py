@@ -48,8 +48,8 @@ def test_desktop_qr_transfers_session_to_mobile_without_extension():
 
     try:
         with playwright.sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            desktop = browser.new_page()
+            browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+            desktop = browser.new_page(locale='de-CH')
             errors = []
             desktop.on('pageerror', lambda err: errors.append(str(err)))
             desktop.route('**/api/**', api_response)
@@ -79,7 +79,7 @@ def test_desktop_qr_transfers_session_to_mobile_without_extension():
             desktop.get_by_role('button', name='Design & Einstellungen', exact=True).click()
             playwright.expect(qr).to_have_count(0)
 
-            mobile = browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
+            mobile = browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True, locale='de-CH')
             phone = mobile.new_page()
             phone.on('pageerror', lambda err: errors.append(str(err)))
             phone.add_init_script("""if (!localStorage.getItem('seeded')) {

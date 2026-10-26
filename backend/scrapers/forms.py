@@ -1,3 +1,4 @@
+from backend.i18n import t
 import re
 import urllib.parse
 from dataclasses import dataclass, field
@@ -58,7 +59,7 @@ def extract_grading_form(html_content: str, member_id: Optional[str] = None) -> 
         )
 
     if not form:
-        raise ValueError("Could not find any <form> element on the grading page.")
+        raise ValueError(t('Could not find any <form> element on the grading page.'))
 
     action_url = form.get("action", "")
     full_action_url = urllib.parse.urljoin(settings.ilias_base_url, action_url)
@@ -180,7 +181,7 @@ def verify_grading_success(response_html: str) -> Tuple[bool, str]:
     )
     if success_elem:
         msg = " ".join(success_elem.get_text().split()).strip()
-        return True, msg or "Changes successfully saved in ILIAS."
+        return True, msg or t("Changes successfully saved in ILIAS.")
 
     # 2. Check for ILIAS error alert message
     error_elem = soup.select_one(
@@ -188,20 +189,20 @@ def verify_grading_success(response_html: str) -> Tuple[bool, str]:
     )
     if error_elem:
         msg = " ".join(error_elem.get_text().split()).strip()
-        return False, msg or "ILIAS returned an error."
+        return False, msg or t("ILIAS returned an error.")
 
     # 3. Check for text indications in page
     text = soup.get_text()
     if any(s in text for s in ["Erfolgreich gespeichert", "Änderungen gespeichert", "Saved successfully", "Gespeichert"]):
-        return True, "Grading saved successfully."
+        return True, t('Grading saved successfully.')
 
     # 4. Check for async modal redirect script (validateAndSubmitFeedbackForm)
     if "window.location" in response_html or "members" in response_html:
-        return True, "Grading processed and redirected."
+        return True, t('Grading processed and redirected.')
 
     # If redirected back to members table or overview without error, consider it a success
     if "saveStatus" not in response_html and ("tbl_il_exc" in response_html or "viewMembers" in response_html):
-        return True, "Grading form submitted and participant list updated."
+        return True, t('Grading form submitted and participant list updated.')
 
-    return False, "Could not verify success state from response."
+    return False, t('Could not verify success state from response.')
 

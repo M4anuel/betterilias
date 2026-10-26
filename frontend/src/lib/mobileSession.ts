@@ -1,25 +1,26 @@
+import { t } from './i18n';
 import { cache } from './cache';
 
 export function mobileAppUrl(address: string): URL {
   let url: URL;
   try { url = new URL(address.trim()); }
-  catch { throw new Error('Bitte gib die vollständige BetterIlias-Adresse mit http:// oder https:// ein.'); }
+  catch { throw new Error(t("Bitte gib die vollständige BetterIlias-Adresse mit http:// oder https:// ein.")); }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
-    throw new Error('Bitte verwende eine BetterIlias-Adresse mit http:// oder https://.');
+    throw new Error(t('Bitte verwende eine BetterIlias-Adresse mit http:// oder https://.'));
   }
   const hostname = url.hostname.toLowerCase().replace(/\.$/, '');
   if (hostname === 'localhost' || hostname.endsWith('.localhost') || /^127\./.test(hostname)
       || ['0.0.0.0', '[::1]', '[::]'].includes(hostname)) {
-    throw new Error('Diese Adresse ist nur am Desktop erreichbar. Verwende die WLAN- oder öffentliche Adresse deiner BetterIlias-Installation.');
+    throw new Error(t("Diese Adresse ist nur am Desktop erreichbar. Verwende die WLAN- oder öffentliche Adresse deiner BetterIlias-Installation."));
   }
   url.search = '';
   url.hash = '';
-  if (url.toString().length > 1024) throw new Error('Diese Adresse ist zu lang für den QR-Code. Verwende die Startadresse von BetterIlias.');
+  if (url.toString().length > 1024) throw new Error(t("Diese Adresse ist zu lang für den QR-Code. Verwende die Startadresse von BetterIlias."));
   return url;
 }
 
 export function mobileSessionUrl(address: string, sessionId: string): string {
-  if (!/^[a-zA-Z0-9_-]{1,256}$/.test(sessionId) || sessionId === 'default') throw new Error('Diese Sitzung hat keinen gültigen Verbindungsschlüssel. Bitte synchronisiere sie erneut.');
+  if (!/^[a-zA-Z0-9_-]{1,256}$/.test(sessionId) || sessionId === 'default') throw new Error(t("Diese Sitzung hat keinen gültigen Verbindungsschlüssel. Bitte synchronisiere sie erneut."));
   const url = mobileAppUrl(address);
   url.hash = new URLSearchParams({ session_id: sessionId }).toString();
   return url.toString();

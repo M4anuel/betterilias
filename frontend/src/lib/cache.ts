@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { getDefaultCourseIcon } from './courseIcons';
 import { getCurrentSemester } from './semesterUtils';
+import { t } from './i18n';
 
 export type ContentSectionId =
   | 'folders'
@@ -376,7 +377,7 @@ export const cache = {
       const location = raw ? JSON.parse(raw) : null;
       if (location?.container_ref_id === refId && Array.isArray(location.breadcrumbs)) return location;
     } catch { /* Navigation also works when storage is unavailable. */ }
-    return refId === '1' ? { container_ref_id: '1', title: 'Repository', breadcrumbs: [] } : null;
+    return refId === '1' ? { container_ref_id: '1', title: t('Magazin'), breadcrumbs: [] } : null;
   },
 
   rememberRepositoryPath(breadcrumbs: BreadcrumbItem[]) {

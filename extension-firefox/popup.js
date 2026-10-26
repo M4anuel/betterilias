@@ -1,218 +1,123 @@
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
-
+const { t, languages, getLanguage, setLanguage } = BetterIliasI18n;
 document.addEventListener('DOMContentLoaded', async () => {
-  const iliasBadge = document.getElementById('ilias-status-badge');
-  const iliasSub = document.getElementById('ilias-status-sub');
-  const feedbackBox = document.getElementById('feedback-box');
-  const syncBtn = document.getElementById('sync-btn');
-  const openAppBtn = document.getElementById('open-app-btn');
-  const serverUrlInput = document.getElementById('server-url');
-  const frontendUrlInput = document.getElementById('frontend-url');
-  const saveSettingsBtn = document.getElementById('save-settings-btn');
-
-  // Load configured URLs
+  const byId = id => document.getElementById(id);
+  const badge = byId('ilias-status-badge'), subtitle = byId('ilias-status-sub');
+  const feedback = byId('feedback-box'), sync = byId('sync-btn'), language = byId('language');
+  let syncing = false;
   try {
-    const stored = await browserAPI.storage.local.get(['serverUrl', 'frontendUrl', 'sessionId']);
-    if (stored.serverUrl) serverUrlInput.value = stored.serverUrl;
-    if (stored.frontendUrl) frontendUrlInput.value = stored.frontendUrl;
-  } catch (err) {
-    console.warn('Could not load stored URLs:', err);
-  }
-
-  const getServerUrl = () => (serverUrlInput.value || 'http://localhost:8000').replace(/\/+$/, '');
-  const getFrontendUrl = () => (frontendUrlInput.value || 'http://localhost:5173').replace(/\/+$/, '');
-
-  function showFeedback(text, type = 'success', isHtml = false) {
-    if (isHtml) {
-      feedbackBox.innerHTML = text;
-    } else {
-      feedbackBox.textContent = text;
+    const stored = await browserAPI.storage.local.get(['serverUrl', 'frontendUrl', 'language']);
+    for (const [key, id] of [['serverUrl', 'server-url'], ['frontendUrl', 'frontend-url']]) {
+      if (stored[key]) byId(id).value = stored[key];
     }
-    feedbackBox.className = `feedback visible ${type}`;
+    if (stored.language) setLanguage(stored.language);
+  } catch (error) { console.warn('Could not load settings:', error); }
+  const serverUrl = () => (byId('server-url').value || 'http://localhost:8000').replace(/\/+$/, '');
+  const frontendUrl = () => (byId('frontend-url').value || 'http://localhost:5173').replace(/\/+$/, '');
+  function showFeedback(message, type = 'success') {
+    feedback.textContent = message;
+    feedback.className = `feedback visible ${type}`;
   }
-
-  function hideFeedback() {
-    feedbackBox.className = 'feedback';
-    feedbackBox.textContent = '';
-  }
-
-  // Fetch all cookies for ILIAS via multiple strategies (URL, Domain, FPI)
-  async function fetchAllIliasCookies() {
-    const cookieMap = new Map();
-    const addList = (list) => {
-      if (Array.isArray(list)) {
-        for (const c of list) {
-          if (c && c.name && c.value) {
-            cookieMap.set(c.name, c.value);
-          }
-        }
-      }
-    };
-
-    // 1. Query by full URL (captures host-only & path-specific cookies)
-    try {
-      const urlCookies = await browserAPI.cookies.getAll({ url: 'https://ilias.unibe.ch/' });
-      addList(urlCookies);
-    } catch (_) {}
-
-    // 2. Query by domain (captures wildcard domain cookies)
-    try {
-      const domainCookies = await browserAPI.cookies.getAll({ domain: 'ilias.unibe.ch' });
-      addList(domainCookies);
-    } catch (_) {}
-
-    // 3. Firefox with firstPartyDomain (Total Cookie Protection / State Partitioning)
-    try {
-      const fpiCookies = await browserAPI.cookies.getAll({ domain: 'ilias.unibe.ch', firstPartyDomain: null });
-      addList(fpiCookies);
-    } catch (_) {}
-
-    // Ensure ilClientId is present (Uni Bern client)
-    if (!cookieMap.has('ilClientId')) {
-      cookieMap.set('ilClientId', 'ilias3_unibe');
+  function render() {
+    document.documentElement.lang = getLanguage();
+    document.querySelectorAll('[data-i18n]').forEach(element => { element.textContent = t(element.dataset.i18n); });
+    language.replaceChildren();
+    for (const [code, definition] of Object.entries(languages)) {
+      const option = document.createElement('option'); option.value = code;
+      option.textContent = definition.name + (definition.support === 'partial' ? ` (${t('Partially translated')})` : '');
+      language.append(option);
     }
-
-    return Object.fromEntries(cookieMap);
+    language.value = getLanguage();
+    sync.textContent = syncing ? t('Synchronisiere...') : t('Sitzung mit BetterIlias synchronisieren');
+    sync.disabled = syncing;
   }
-
-  // 1. Check ILIAS cookies in browser
-  async function checkIliasCookies() {
-    try {
-      const cookiesDict = await fetchAllIliasCookies();
-      const hasPhpSess = Boolean(cookiesDict['PHPSESSID']);
-      const hasShibSession = Object.keys(cookiesDict).some((k) => k.startsWith('_shibsession_'));
-
-      if (hasPhpSess && hasShibSession) {
-        iliasBadge.textContent = 'Bereit';
-        iliasBadge.className = 'status-badge badge-success';
-        iliasSub.innerHTML = 'Aktive SWITCH edu-ID Sitzung gefunden.';
-        syncBtn.disabled = false;
-        return cookiesDict;
-      } else if (hasPhpSess) {
-        // PHPSESSID exists but no Shibboleth SSO token (might be guest or expired)
-        iliasBadge.textContent = 'Nicht verifiziert';
-        iliasBadge.className = 'status-badge badge-warning';
-        iliasSub.innerHTML = 'Gast-Sitzung oder abgelaufen. Bitte auf <a href="https://ilias.unibe.ch" target="_blank" style="color:var(--accent);text-decoration:underline;">ilias.unibe.ch</a> mit SWITCH edu-ID einloggen.';
-        syncBtn.disabled = false;
-        return cookiesDict;
-      } else {
-        iliasBadge.textContent = 'Nicht angemeldet';
-        iliasBadge.className = 'status-badge badge-danger';
-        iliasSub.innerHTML = 'Keine Sitzung gefunden. Bitte logge dich zuerst auf <a href="https://ilias.unibe.ch" target="_blank" style="color:var(--accent);text-decoration:underline;">ilias.unibe.ch</a> ein.';
-        syncBtn.disabled = true;
-        return null;
-      }
-    } catch (err) {
-      iliasBadge.textContent = 'Fehler';
-      iliasBadge.className = 'status-badge badge-danger';
-      iliasSub.textContent = `Fehler beim Prüfen der Cookies: ${err.message}`;
-      return null;
-    }
-  }
-
-  await checkIliasCookies();
-
-  // 2. Handle Sync Click
-  syncBtn.addEventListener('click', async () => {
-    hideFeedback();
-    syncBtn.disabled = true;
-    syncBtn.textContent = 'Synchronisiere...';
-
-    try {
-      const cookiesDict = await fetchAllIliasCookies();
-
-      if (!cookiesDict['PHPSESSID']) {
-        throw new Error('Kein PHPSESSID Cookie gefunden. Bitte zuerst bei ILIAS (ilias.unibe.ch) einloggen.');
-      }
-
-      const storedData = await browserAPI.storage.local.get(['sessionId']);
-      const isFirefox = typeof browser !== 'undefined';
-      const payload = {
-        cookies: cookiesDict,
-        session_id: storedData.sessionId || null,
-        source: isFirefox ? 'firefox_extension' : 'chrome_extension',
-        user_agent: navigator.userAgent
-      };
-
-      const serverUrl = getServerUrl();
-      let res;
+  async function fetchCookies() {
+    const cookies = new Map();
+    // Host-only, domain and Firefox partitioned cookies.
+    for (const query of [{ url: 'https://ilias.unibe.ch/' }, { domain: 'ilias.unibe.ch' },
+      { domain: 'ilias.unibe.ch', firstPartyDomain: null }]) {
       try {
-        res = await fetch(`${serverUrl}/api/auth/sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+        for (const cookie of await browserAPI.cookies.getAll(query)) {
+          if (cookie.name && cookie.value) cookies.set(cookie.name, cookie.value);
+        }
+      } catch (_) { /* Query support differs between browsers. */ }
+    }
+    if (!cookies.has('ilClientId')) cookies.set('ilClientId', 'ilias3_unibe');
+    return Object.fromEntries(cookies);
+  }
+  async function checkCookies() {
+    try {
+      const cookies = await fetchCookies(), present = Boolean(cookies.PHPSESSID);
+      const verified = present && Object.keys(cookies).some(key => key.startsWith('_shibsession_'));
+      badge.textContent = verified ? t('Bereit') : present ? t('Nicht verifiziert') : t('Nicht angemeldet');
+      badge.className = `status-badge ${verified ? 'badge-success' : present ? 'badge-warning' : 'badge-danger'}`;
+      subtitle.textContent = verified ? t('Aktive SWITCH edu-ID Sitzung gefunden.') : present
+        ? t('Gast-Sitzung oder abgelaufen. Bitte auf ilias.unibe.ch mit SWITCH edu-ID einloggen.')
+        : t('Keine Sitzung gefunden. Bitte logge dich zuerst auf ilias.unibe.ch ein.');
+      if (!verified) {
+        const link = document.createElement('a'); link.href = 'https://ilias.unibe.ch';
+        link.target = '_blank'; link.rel = 'noreferrer'; link.textContent = t('Bei ILIAS anmelden');
+        link.style.cssText = 'display:block;color:var(--accent);text-decoration:underline;margin-top:6px';
+        subtitle.append(link);
+      }
+      sync.disabled = syncing || !present;
+    } catch (error) {
+      badge.textContent = t('Fehler'); badge.className = 'status-badge badge-danger';
+      subtitle.textContent = t('Fehler beim Prüfen der Cookies: {error}', { error: error.message });
+      sync.disabled = true;
+    }
+  }
+  language.addEventListener('change', async () => {
+    setLanguage(language.value); feedback.className = 'feedback'; render();
+    try { await browserAPI.storage.local.set({ language: getLanguage() }); }
+    catch (_) { showFeedback(t('Could not save language preference.'), 'error'); }
+    await checkCookies();
+  });
+  sync.addEventListener('click', async () => {
+    feedback.className = 'feedback'; syncing = true; render();
+    try {
+      const cookies = await fetchCookies();
+      if (!cookies.PHPSESSID) throw new Error(t('Kein PHPSESSID Cookie gefunden. Bitte zuerst bei ILIAS (ilias.unibe.ch) einloggen.'));
+      const stored = await browserAPI.storage.local.get(['sessionId']);
+      let response;
+      try {
+        response = await fetch(`${serverUrl()}/api/auth/sync`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': getLanguage() },
+          body: JSON.stringify({ cookies, session_id: stored.sessionId || null,
+            source: typeof browser !== 'undefined' ? 'firefox_extension' : 'chrome_extension', user_agent: navigator.userAgent }),
         });
-      } catch (networkErr) {
-        throw new Error(`Verbindung zum Backend fehlgeschlagen (${networkErr.message}). Läuft das Backend auf ${serverUrl}?`);
+      } catch (error) {
+        throw new Error(t('Verbindung zum Backend fehlgeschlagen ({error}). Läuft das Backend auf {url}?', { error: error.message, url: serverUrl() }));
       }
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.detail || `Server Fehler (${res.status})`);
-      }
-
-      const data = await res.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : t('Server Fehler ({status})', { status: response.status }));
       if (!data.success || !data.authenticated) {
-        const msg = data.message || 'Sitzung konnte auf ILIAS nicht verifiziert werden.';
-        showFeedback(
-          `❌ ${msg}<br/><a href="https://ilias.unibe.ch" target="_blank" style="color:var(--accent);text-decoration:underline;font-weight:600;display:inline-block;margin-top:6px;">👉 Jetzt auf ilias.unibe.ch einloggen</a>`,
-          'error',
-          true
-        );
-        return;
+        showFeedback(data.message || t('Sitzung konnte auf ILIAS nicht verifiziert werden.'), 'error'); return;
       }
-
-      // Save sessionId in storage
       await browserAPI.storage.local.set({ sessionId: data.session_id });
-
-      const userName = data.user_name || 'Benutzer';
-      showFeedback(`✅ Erfolgreich synchronisiert als "${userName}"!`, 'success');
-
-      // Update badge to verified
-      iliasBadge.textContent = 'Synchronisiert';
-      iliasBadge.className = 'status-badge badge-success';
-      iliasSub.textContent = `Angemeldet als ${userName}`;
-
-      // Notify any active BetterIlias tabs
-      const tabs = await browserAPI.tabs.query({});
-      const frontendUrl = getFrontendUrl();
-      for (const tab of tabs) {
-        if (tab.url && tab.url.startsWith(frontendUrl) && tab.id) {
-          try {
-            await browserAPI.tabs.sendMessage(tab.id, {
-              type: 'BETTERILIAS_SESSION_SYNCED',
-              sessionId: data.session_id
-            });
-          } catch (_) {}
+      const user = data.user_name || t('Benutzer');
+      showFeedback(t('Erfolgreich synchronisiert als "{user}"!', { user }));
+      badge.textContent = t('Synchronisiert'); badge.className = 'status-badge badge-success';
+      subtitle.textContent = t('Angemeldet als {user}', { user });
+      for (const tab of await browserAPI.tabs.query({})) {
+        if (tab.url && tab.url.startsWith(frontendUrl()) && tab.id) {
+          try { await browserAPI.tabs.sendMessage(tab.id, { type: 'BETTERILIAS_SESSION_SYNCED', sessionId: data.session_id }); }
+          catch (_) { /* Tab may have closed. */ }
         }
       }
-
-    } catch (err) {
-      showFeedback(`❌ ${err.message}`, 'error');
-    } finally {
-      syncBtn.disabled = false;
-      syncBtn.textContent = 'Sitzung mit BetterIlias synchronisieren';
-    }
+    } catch (error) { showFeedback(error.message, 'error'); }
+    finally { syncing = false; sync.textContent = t('Sitzung mit BetterIlias synchronisieren'); sync.disabled = false; }
   });
-
-  // 3. Handle Open App Click
-  openAppBtn.addEventListener('click', async () => {
-    const frontendUrl = getFrontendUrl();
-    const storedData = await browserAPI.storage.local.get(['sessionId']);
-    const targetUrl = storedData.sessionId
-      ? `${frontendUrl}?session_id=${encodeURIComponent(storedData.sessionId)}`
-      : frontendUrl;
-
-    browserAPI.tabs.create({ url: targetUrl });
+  byId('open-app-btn').addEventListener('click', async () => {
+    const stored = await browserAPI.storage.local.get(['sessionId']), target = new URL(frontendUrl());
+    if (stored.sessionId) target.searchParams.set('session_id', stored.sessionId);
+    browserAPI.tabs.create({ url: target.href });
   });
-
-  // 4. Save Settings
-  saveSettingsBtn.addEventListener('click', async () => {
-    await browserAPI.storage.local.set({
-      serverUrl: getServerUrl(),
-      frontendUrl: getFrontendUrl()
-    });
-    showFeedback('Einstellungen gespeichert.', 'success');
-    setTimeout(hideFeedback, 2000);
+  byId('save-settings-btn').addEventListener('click', async () => {
+    try {
+      await browserAPI.storage.local.set({ serverUrl: serverUrl(), frontendUrl: frontendUrl() });
+      showFeedback(t('Einstellungen gespeichert.'));
+    } catch (_) { showFeedback(t('Could not save settings.'), 'error'); }
   });
+  render(); await checkCookies();
 });

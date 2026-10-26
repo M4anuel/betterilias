@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 export interface SemesterOption {
   id: string;
   short: string;
@@ -64,16 +66,14 @@ export function getSemesterOption(
 
   const isCurrent = semId === currentSemId;
   const isPreview = semId === previewSemId;
-  const termName = parsed.term === 'HS' ? 'Herbstsemester' : 'Frühjahrssemester';
-
-  let suffix = '';
-  if (isCurrent) suffix = ' (Aktuell)';
-  else if (isPreview) suffix = ' (Vorschau)';
-
   return {
     id: semId,
     short: `${parsed.term} ${parsed.year}`,
-    full: `${termName} ${parsed.year}${suffix}`,
+    get full() {
+      const termName = t(parsed.term === 'HS' ? 'semester.autumn' : 'semester.spring');
+      const suffix = isCurrent ? ` (${t('semester.current')})` : isPreview ? ` (${t('semester.preview')})` : '';
+      return `${termName} ${parsed.year}${suffix}`;
+    },
     term: parsed.term,
     year: parsed.year,
     isCurrent,

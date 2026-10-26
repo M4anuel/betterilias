@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "node ../scripts/sync-extension-locales.mjs && tsc && vite build",
+    "check:locales": "node ../scripts/check-locales.mjs",
+    "test:i18n": "node --test ../tests/localisation.test.mjs",
     "preview": "vite preview"
   },
   "devDependencies": {

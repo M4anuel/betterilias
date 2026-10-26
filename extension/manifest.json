@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "BetterIlias Companion",
   "version": "1.0.0",
-  "description": "Synchronisiert deine Uni Bern ILIAS-Sitzung sicher mit BetterIlias.",
+  "description": "__MSG_description__",
   "permissions": [
     "cookies",
     "storage"
@@ -21,7 +21,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "BetterIlias Sync",
+    "default_title": "__MSG_title__",
     "default_icon": {
       "16": "icon16.png",
       "48": "icon48.png",
@@ -34,8 +34,11 @@
         "http://localhost:5173/*",
         "http://127.0.0.1:5173/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start"
     }
-  ]
+  ],
+  "default_locale": "en"
 }

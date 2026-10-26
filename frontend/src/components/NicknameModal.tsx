@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Check, RotateCcw, ChevronDown, Smile } from 'lucide-react';
 import { CourseItem } from '../types';
@@ -17,6 +18,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
   onClose,
   onNicknamesUpdated,
 }) => {
+  useLanguage();
   const [nicknames, setNicknames] = useState<Record<string, string>>({});
   const [icons, setIcons] = useState<Record<string, string>>({});
   const [activePickerRefId, setActivePickerRefId] = useState<string | null>(null);
@@ -89,9 +91,9 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Vorlesungen anpassen</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{t("Vorlesungen anpassen")}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Wähle ein individuelles Icon und einen kurzen Namen für deine Seitenleiste.
+              {t("Wähle ein individuelles Icon und einen kurzen Namen für deine Seitenleiste.")}
             </p>
           </div>
           <button
@@ -106,7 +108,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
         <div className="max-h-[60vh] overflow-y-auto p-6 space-y-4">
           {courses.length === 0 ? (
             <div className="text-center py-8 text-xs text-slate-400">
-              Keine Vorlesungen zum Bearbeiten vorhanden.
+              {t("Keine Vorlesungen zum Bearbeiten vorhanden.")}
             </div>
           ) : (
             courses.map((course) => {
@@ -128,10 +130,10 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                       <button
                         onClick={() => handleReset(course.ref_id)}
                         className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-red-500 transition shrink-0 cursor-pointer"
-                        title="Auf Standard zurücksetzen"
+                        title={t("Auf Standard zurücksetzen")}
                       >
                         <RotateCcw className="h-3 w-3" />
-                        <span>Reset</span>
+                        <span>{t("Reset")}</span>
                       </button>
                     )}
                   </div>
@@ -149,7 +151,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                           ? 'border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent-text)] ring-2 ring-[var(--accent)]/20'
                           : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
                       }`}
-                      title="Icon auswählen"
+                      title={t("Icon auswählen")}
                     >
                       <CourseIcon iconName={currentIcon} className="h-4 w-4" style={{ color: 'var(--accent, #0AACA5)' }} />
                       <ChevronDown className="h-3 w-3 text-slate-400" />
@@ -166,7 +168,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                       spellCheck={false}
                       data-lpignore="true"
                       data-form-type="other"
-                      placeholder="Eigener Anzeigename (z.B. Vorlesung, Schnittstellen...)"
+                      placeholder={t("Eigener Anzeigename (z.B. Vorlesung, Schnittstellen...)")}
                       value={currentNickname}
                       onChange={(e) =>
                         setNicknames({
@@ -182,10 +184,10 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                   {isPickerOpen && (
                     <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-xs animate-in fade-in slide-in-from-top-1 duration-150">
                       <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
-                        Icon auswählen
+                        {t("Icon auswählen")}
                       </div>
                       <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
-                        <button type="button" title="Automatisch nach Fach und Fakultät" aria-label="Automatisch nach Fach und Fakultät"
+                        <button type="button" title={t("Automatisch nach Fach und Fakultät")} aria-label={t("Automatisch nach Fach und Fakultät")}
                           onClick={() => { const next = { ...icons }; delete next[course.ref_id]; setIcons(next); setActivePickerRefId(null); }}
                           className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                           <RotateCcw className="h-4 w-4" />
@@ -230,7 +232,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
             onClick={onClose}
             className="rounded-lg px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition cursor-pointer"
           >
-            Abbrechen
+            {t("Abbrechen")}
           </button>
           <button
             onClick={handleSave}
@@ -238,7 +240,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
             className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition cursor-pointer"
           >
             <Check className="h-4 w-4" />
-            <span>Änderungen speichern</span>
+            <span>{t("Änderungen speichern")}</span>
           </button>
         </div>
       </div>

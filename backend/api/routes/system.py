@@ -1,3 +1,4 @@
+from backend.i18n import t
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import HTMLResponse
 from typing import List
@@ -27,7 +28,7 @@ async def view_dump_html(filename: str):
     if content is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dump file '{filename}' not found."
+            detail=t("Dump file '{p0}' not found.", p0=filename)
         )
     return HTMLResponse(content=content)
 
@@ -41,7 +42,7 @@ async def get_dump_details(filename: str):
     if content is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dump file '{filename}' not found."
+            detail=t("Dump file '{p0}' not found.", p0=filename)
         )
 
     # Context extraction from filename
@@ -61,9 +62,9 @@ async def delete_dump_file(filename: str):
     dump_path = settings.log_path / safe_name
     if dump_path.exists() and dump_path.is_file():
         dump_path.unlink()
-        return {"success": True, "message": f"Dump '{safe_name}' deleted."}
+        return {"success": True, "message": t("Dump '{p0}' deleted.", p0=safe_name)}
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Dump file '{safe_name}' not found."
+        detail=t("Dump file '{p0}' not found.", p0=safe_name)
     )
 

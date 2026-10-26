@@ -1,3 +1,4 @@
+from backend.i18n import t
 import asyncio
 import logging
 import sys
@@ -60,8 +61,7 @@ async def _async_login_impl(
 
             if context is None:
                 msg = (
-                    f"Failed to launch browser: {last_err}. "
-                    "Make sure Google Chrome or Microsoft Edge is installed, or run: playwright install chromium"
+                    t('Failed to launch browser: {p0}. Make sure Google Chrome or Microsoft Edge is installed, or run: playwright install chromium', p0=last_err)
                 )
                 logger.error(msg)
                 return False, {}, msg
@@ -86,7 +86,7 @@ async def _async_login_impl(
                 active_pages = [p for p in context.pages if not p.is_closed()]
                 if not active_pages:
                     await context.close()
-                    return False, {}, "Das Browser-Fenster wurde vor Abschluss des Logins geschlossen."
+                    return False, {}, t('Das Browser-Fenster wurde vor Abschluss des Logins geschlossen.')
 
                 # Retrieve all cookies in context
                 try:
@@ -135,7 +135,7 @@ async def _async_login_impl(
                 return (
                     False,
                     {},
-                    f"Authentication timed out after {timeout} seconds without completing login."
+                    t('Authentication timed out after {p0} seconds without completing login.', p0=timeout)
                 )
 
             # Save session cookies
@@ -148,10 +148,10 @@ async def _async_login_impl(
             )
 
             update_status("Login successful! Session cookies captured and saved.")
-            return True, captured_cookies, "Login successful! Session cookies saved."
+            return True, captured_cookies, t('Login successful! Session cookies saved.')
 
     except Exception as e:
-        err_msg = f"Browser login failed with error: {str(e)}"
+        err_msg = t('Browser login failed with error: {p0}', p0=str(e))
         logger.error(err_msg, exc_info=True)
         return False, {}, err_msg
 

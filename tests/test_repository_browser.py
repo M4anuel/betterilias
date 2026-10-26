@@ -78,8 +78,8 @@ def test_repository_and_contextual_semester_navigation():
 
     try:
         with playwright.sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+            browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+            page = browser.new_page(locale='de-CH')
             errors = []
             page.on('pageerror', lambda err: errors.append(str(err)))
             page.route('**/api/**', respond)
@@ -89,7 +89,7 @@ def test_repository_and_contextual_semester_navigation():
                 page.get_by_role('button', name=title, exact=True).click()
             playwright.expect(page.get_by_role('button', name='Locked course', exact=False)).to_be_disabled()
             page.get_by_role('button', name='Preview course', exact=True).click()
-            breadcrumb = page.get_by_role('navigation', name='Breadcrumb', exact=True)
+            breadcrumb = page.get_by_role('navigation', name='Navigationspfad', exact=True)
             breadcrumb.get_by_role('button', name='FS2020', exact=True).click()
             playwright.expect(page).to_have_url(base + '/?repository=12')
             page.go_back()

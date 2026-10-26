@@ -109,6 +109,8 @@ export interface CourseContentBlock {
   block_type: 'heading' | 'drawer' | 'items' | 'text' | 'sessions' | 'all_files' | 'columns' | 'column';
   presentation?: 'tiles' | 'list';
   title?: string;
+  title_key?: string;
+  title_values?: Record<string, unknown>;
   items?: MaterialItem[];
   html_content?: string;
   plain_text?: string;
@@ -314,6 +316,7 @@ export interface StudentAssignmentDetail {
   ass_id: string;
   title: string;
   instructions?: string;
+  is_team_upload?: boolean;
   start_time?: string;
   ended_on?: string;
   time_remaining?: string;
@@ -375,6 +378,7 @@ export interface TAAssignmentListItem {
 export interface TAAssignmentListResponse {
   exercise_ref_id: string;
   assignments: TAAssignmentListItem[];
+  available_types?: Record<string, string>;
   form_action_url?: string | null;
   rtoken?: string | null;
   fetched_at: string;
@@ -397,6 +401,7 @@ export interface TAAssignmentDetailResponse {
   title: string;
   type_id: number;
   type_name: string;
+  available_types?: Record<string, string>;
   mandatory: boolean;
   instruction_html: string;
   start_time?: string | null;

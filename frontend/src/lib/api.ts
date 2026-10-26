@@ -1,3 +1,4 @@
+import { t, getLanguage } from './i18n';
 import {
   AuthStatus,
   CourseLogsResponse,
@@ -28,10 +29,17 @@ import { cache } from './cache';
 
 const API_BASE = '/api';
 
+function apiError(error: { detail?: unknown }): string | undefined {
+  if (typeof error.detail === 'string') return error.detail;
+  if (Array.isArray(error.detail)) return error.detail.map(item => item.msg).filter(Boolean).join(' ');
+  return undefined;
+}
+
 // Protected API responses confirm the current session, including expiry.
 async function sessionFetch(input: string, init?: RequestInit): Promise<Response> {
   const sessionId = cache.getSessionId();
   const headers = new Headers(init?.headers);
+  headers.set('Accept-Language', getLanguage());
   if (sessionId && !headers.has('X-Session-Id')) {
     headers.set('X-Session-Id', sessionId);
   }
@@ -54,7 +62,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/auth/mobile-session`, { method: 'POST', cache: 'no-store' });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Die mobile Verbindung konnte nicht vorbereitet werden');
+      throw new Error(apiError(err) || t("Die mobile Verbindung konnte nicht vorbereitet werden"));
     }
     return res.json();
   },
@@ -62,7 +70,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/courses/${encodeURIComponent(refId)}/membership?action=${action}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Kursaktion konnte nicht geladen werden');
+      throw new Error(apiError(err) || t("Kursaktion konnte nicht geladen werden"));
     }
     return res.json();
   },
@@ -73,7 +81,7 @@ export const api = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Kursaktion fehlgeschlagen');
+      throw new Error(apiError(err) || t("Kursaktion fehlgeschlagen"));
     }
     return res.json();
   },
@@ -81,13 +89,13 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/repository/${encodeURIComponent(refId)}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Magazin konnte nicht geladen werden');
+      throw new Error(apiError(err) || t("Magazin konnte nicht geladen werden"));
     }
     return res.json();
   },
   async getAuthStatus(): Promise<AuthStatus> {
     const res = await sessionFetch(`${API_BASE}/auth/status`);
-    if (!res.ok) throw new Error('Failed to fetch auth status');
+    if (!res.ok) throw new Error(t("Failed to fetch auth status"));
     return res.json();
   },
 
@@ -95,7 +103,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/auth/login-browser`, { method: 'POST' });
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.detail || 'Browser login failed');
+      throw new Error(apiError(err) || t("Browser login failed"));
     }
     const data = await res.json();
     if (data.session_id) {
@@ -115,7 +123,7 @@ export const api = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Fehler beim Synchronisieren der Cookies');
+      throw new Error(apiError(err) || t("Fehler beim Synchronisieren der Cookies"));
     }
     const data = await res.json();
     if (data.session_id) {
@@ -132,7 +140,7 @@ export const api = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Fehler beim Speichern der Cookies');
+      throw new Error(apiError(err) || t("Fehler beim Speichern der Cookies"));
     }
     const data = await res.json();
     if (data.session_id) {
@@ -156,7 +164,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/dashboard/semesters${query}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch semester courses');
+      throw new Error(apiError(err) || t("Failed to fetch semester courses"));
     }
     return res.json();
   },
@@ -165,7 +173,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/dashboard/courses`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch courses');
+      throw new Error(apiError(err) || t("Failed to fetch courses"));
     }
     return res.json();
   },
@@ -174,7 +182,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/courses/${encodeURIComponent(courseOrFolderId)}/materials`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch course materials');
+      throw new Error(apiError(err) || t("Failed to fetch course materials"));
     }
     return res.json();
   },
@@ -190,7 +198,7 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch session materials');
+      throw new Error(apiError(err) || t("Failed to fetch session materials"));
     }
     return res.json();
   },
@@ -200,7 +208,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/courses/${encodeURIComponent(courseId)}/logs?page=${page}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch course logs');
+      throw new Error(apiError(err) || t("Failed to fetch course logs"));
     }
     return res.json();
   },
@@ -209,7 +217,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/overview?mode=${encodeURIComponent(mode)}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch exercise overview');
+      throw new Error(apiError(err) || t("Failed to fetch exercise overview"));
     }
     return res.json();
   },
@@ -218,7 +226,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/info`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch exercise info');
+      throw new Error(apiError(err) || t("Failed to fetch exercise info"));
     }
     return res.json();
   },
@@ -228,7 +236,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/submissions${query}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch exercise submissions');
+      throw new Error(apiError(err) || t("Failed to fetch exercise submissions"));
     }
     return res.json();
   },
@@ -237,7 +245,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignment/${encodeURIComponent(assId)}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch student assignment detail');
+      throw new Error(apiError(err) || t("Failed to fetch student assignment detail"));
     }
     return res.json();
   },
@@ -258,7 +266,7 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to upload submission file');
+      throw new Error(apiError(err) || t("Failed to upload submission file"));
     }
     return res.json();
   },
@@ -276,7 +284,7 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to delete submission file');
+      throw new Error(apiError(err) || t("Failed to delete submission file"));
     }
     return res.json();
   },
@@ -291,7 +299,7 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Fehler beim Erstellen des Teams');
+      throw new Error(apiError(err) || t("Fehler beim Erstellen des Teams"));
     }
     return res.json();
   },
@@ -305,7 +313,7 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Fehler beim Laden der Kursteilnehmenden');
+      throw new Error(apiError(err) || t("Fehler beim Laden der Kursteilnehmenden"));
     }
     return res.json();
   },
@@ -325,7 +333,7 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Fehler beim Hinzufügen von Teammitgliedern');
+      throw new Error(apiError(err) || t("Fehler beim Hinzufügen von Teammitgliedern"));
     }
     return res.json();
   },
@@ -345,7 +353,7 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Fehler beim Entfernen von Teammitgliedern');
+      throw new Error(apiError(err) || t("Fehler beim Entfernen von Teammitgliedern"));
     }
     return res.json();
   },
@@ -360,7 +368,7 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Fehler beim Löschen des Teams');
+      throw new Error(apiError(err) || t("Fehler beim Löschen des Teams"));
     }
     return res.json();
   },
@@ -377,7 +385,7 @@ export const api = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to save grade');
+      throw new Error(apiError(err) || t("Failed to save grade"));
     }
     return res.json();
   },
@@ -393,7 +401,7 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch feedback files');
+      throw new Error(apiError(err) || t("Failed to fetch feedback files"));
     }
     return res.json();
   },
@@ -418,7 +426,7 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to upload feedback file');
+      throw new Error(apiError(err) || t("Failed to upload feedback file"));
     }
     return res.json();
   },
@@ -428,13 +436,14 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/podcasts/${encodeURIComponent(refId)}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch podcasts');
+      throw new Error(apiError(err) || t("Failed to fetch podcasts"));
     }
     return res.json();
   },
 
   getDownloadUrl(refId: string, customUrl?: string): string {
     const params = new URLSearchParams();
+    params.set('lang', getLanguage());
     if (customUrl) params.set('custom_url', customUrl);
     const sessionId = cache.getSessionId();
     if (sessionId) params.set('session_id', sessionId);
@@ -447,7 +456,10 @@ export const api = {
   // ---------------------------------------------------------
   async getTAAssignments(exerciseId: string): Promise<TAAssignmentListResponse> {
     const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignments`);
-    if (!res.ok) throw new Error('Übungsliste konnte nicht geladen werden');
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t("Übungsliste konnte nicht geladen werden"));
+    }
     return res.json();
   },
 
@@ -460,7 +472,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orders }),
     });
-    if (!res.ok) throw new Error('Reihenfolge konnte nicht gespeichert werden');
+    if (!res.ok) throw new Error(t("Reihenfolge konnte nicht gespeichert werden"));
     return res.json();
   },
 
@@ -473,7 +485,10 @@ export const api = {
     if (assId) params.append('ass_id', assId);
     params.append('type_id', String(typeId));
     const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignment-detail?${params.toString()}`);
-    if (!res.ok) throw new Error('Übungsdetails konnten nicht geladen werden');
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t("Übungsdetails konnten nicht geladen werden"));
+    }
     return res.json();
   },
 
@@ -486,7 +501,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Übung konnte nicht gespeichert werden');
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t("Übung konnte nicht gespeichert werden"));
+    }
     return res.json();
   },
 
@@ -497,7 +515,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignments/${assId}`, {
       method: 'DELETE',
     });
-    if (!res.ok) throw new Error('Übung konnte nicht gelöscht werden');
+    if (!res.ok) throw new Error(t("Übung konnte nicht gelöscht werden"));
     return res.json();
   },
 
@@ -506,7 +524,7 @@ export const api = {
     assId: string
   ): Promise<TAInstructionFileItem[]> {
     const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignments/${assId}/instruction-files`);
-    if (!res.ok) throw new Error('Anweisungsdateien konnten nicht geladen werden');
+    if (!res.ok) throw new Error(t("Anweisungsdateien konnten nicht geladen werden"));
     return res.json();
   },
 
@@ -521,7 +539,10 @@ export const api = {
       method: 'POST',
       body: formData,
     });
-    if (!res.ok) throw new Error('Anweisungsdatei konnte nicht hochgeladen werden');
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t("Anweisungsdatei konnte nicht hochgeladen werden"));
+    }
     return res.json();
   },
 
@@ -533,7 +554,7 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignments/${assId}/instruction-files/${fileId}`, {
       method: 'DELETE',
     });
-    if (!res.ok) throw new Error('Anweisungsdatei konnte nicht gelöscht werden');
+    if (!res.ok) throw new Error(t("Anweisungsdatei konnte nicht gelöscht werden"));
     return res.json();
   },
 };

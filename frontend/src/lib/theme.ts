@@ -1,3 +1,4 @@
+import { t } from './i18n';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface AccentPreset {
@@ -8,14 +9,14 @@ export interface AccentPreset {
 }
 
 export const ACCENT_PRESETS: AccentPreset[] = [
-  { id: 'teal', name: 'Türkis (Standard)', color: '#0AACA5', hover: '#088b85' },
-  { id: 'navy', name: 'Navy Blau', color: '#033683', hover: '#022863' },
-  { id: 'sky', name: 'Himmelblau', color: '#0284c7', hover: '#0369a1' },
-  { id: 'indigo', name: 'Indigo', color: '#6366f1', hover: '#4f46e5' },
-  { id: 'emerald', name: 'Smaragdgrün', color: '#10b981', hover: '#059669' },
-  { id: 'purple', name: 'Violett', color: '#8b5cf6', hover: '#7c3aed' },
-  { id: 'rose', name: 'Rosé', color: '#f43f5e', hover: '#e11d48' },
-  { id: 'amber', name: 'Bernstein', color: '#f59e0b', hover: '#d97706' },
+  { id: 'teal', get name() { return t("Türkis (Standard)"); }, color: '#0AACA5', hover: '#088b85' },
+  { id: 'navy', get name() { return t("Navy Blau"); }, color: '#033683', hover: '#022863' },
+  { id: 'sky', get name() { return t("Himmelblau"); }, color: '#0284c7', hover: '#0369a1' },
+  { id: 'indigo', get name() { return t("Indigo"); }, color: '#6366f1', hover: '#4f46e5' },
+  { id: 'emerald', get name() { return t("Smaragdgrün"); }, color: '#10b981', hover: '#059669' },
+  { id: 'purple', get name() { return t("Violett"); }, color: '#8b5cf6', hover: '#7c3aed' },
+  { id: 'rose', get name() { return t("Rosé"); }, color: '#f43f5e', hover: '#e11d48' },
+  { id: 'amber', get name() { return t("Bernstein"); }, color: '#f59e0b', hover: '#d97706' },
 ];
 
 const THEME_MODE_KEY = 'betterilias_theme_mode';

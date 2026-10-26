@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useRef } from 'react';
 import {
   X,
@@ -47,6 +48,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
   onToggleShowAllFiles,
   onResetToDefault,
 }) => {
+  useLanguage();
   const modalRef = useRef<HTMLDivElement>(null);
   const mouseDownInsideRef = useRef(false);
 
@@ -77,7 +79,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
     blockMap.set('block-all-files', {
       id: 'block-all-files',
       block_type: 'all_files',
-      title: 'Sammelblock: Alle Dateien',
+      title: t("Sammelblock: Alle Dateien"),
     });
   }
 
@@ -128,23 +130,23 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
       return {
         icon: <Files className="h-4 w-4 text-amber-600" />,
         badgeBg: 'bg-amber-50 text-amber-700',
-        label: b.title || 'Alle Dateien',
-        desc: 'Sammelübersicht aller Dateien des Kurses an einem Ort',
+        label: b.title || t("Alle Dateien"),
+        desc: t("Sammelübersicht aller Dateien des Kurses an einem Ort"),
       };
     }
     if (b.block_type === 'heading') {
       return {
         icon: <Heading className="h-4 w-4 text-indigo-600" />,
         badgeBg: 'bg-indigo-50 text-indigo-700',
-        label: b.title || 'Hauptüberschrift',
-        desc: 'Struktureller Abschnitt / Trenner',
+        label: b.title || t("Hauptüberschrift"),
+        desc: t('Struktureller Abschnitt / Trenner'),
       };
     }
     if (b.block_type === 'drawer') {
       return {
         icon: <Bookmark className="h-4 w-4 text-rose-500" />,
         badgeBg: 'bg-rose-50 text-rose-700',
-        label: b.title || 'Schublade / Modul',
+        label: b.title || t('Schublade / Modul'),
         desc: `${b.child_blocks?.length || 0} Unterabschnitte`,
       };
     }
@@ -152,16 +154,16 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
       return {
         icon: <Calendar className="h-4 w-4 text-emerald-500" />,
         badgeBg: 'bg-emerald-50 text-emerald-700',
-        label: b.title || 'Sitzungen & Termine',
-        desc: `${b.sessions?.length || 0} Termine mit Materialien`,
+        label: b.title || t("Sitzungen & Termine"),
+        desc: t("{p0} Termine mit Materialien", { p0: b.sessions?.length || 0 }),
       };
     }
     if (b.block_type === 'text') {
-      const preview = b.plain_text ? b.plain_text.slice(0, 55) + (b.plain_text.length > 55 ? '...' : '') : 'Informationstext';
+      const preview = b.plain_text ? b.plain_text.slice(0, 55) + (b.plain_text.length > 55 ? '...' : '') : t("Informationstext");
       return {
         icon: <Info className="h-4 w-4 text-blue-500" />,
         badgeBg: 'bg-blue-50 text-blue-700',
-        label: b.title || 'Kursinformation',
+        label: b.title || t("Kursinformation"),
         desc: preview,
       };
     }
@@ -187,11 +189,11 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
       badgeBg = 'bg-red-50 text-red-700';
     }
 
-    const preview = items.length > 0 ? `${items.length} ${items.length === 1 ? 'Element' : 'Elemente'}` : 'Leer';
+    const preview = items.length > 0 ? `${items.length} ${items.length === 1 ? t("Element") : t("Elemente")}` : t("Leer");
     return {
       icon,
       badgeBg,
-      label: b.title || 'Inhalte',
+      label: b.title || t("Inhalte"),
       desc: preview,
     };
   };
@@ -228,9 +230,9 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
               <SlidersHorizontal className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">Reihenfolge der Abschnitte & Blöcke</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">{t("Reihenfolge der Abschnitte & Blöcke")}</h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Passe die Anordnung der Vorlesungsblöcke nach deinen Wünschen an
+                {t("Passe die Anordnung der Vorlesungsblöcke nach deinen Wünschen an")}
               </p>
             </div>
           </div>
@@ -238,7 +240,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
             type="button"
             onClick={onClose}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
-            title="Schliessen"
+            title={t("Schliessen")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -298,7 +300,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
                           ? 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800'
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
-                      title={isHidden ? 'Block einblenden' : 'Block ausblenden'}
+                      title={isHidden ? t("Block einblenden") : t("Block ausblenden")}
                     >
                       {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -309,7 +311,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
                       onClick={() => moveUp(idx)}
                       disabled={isFirst}
                       className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition cursor-pointer"
-                      title="Nach oben verschieben"
+                      title={t("Nach oben verschieben")}
                     >
                       <ChevronUp className="h-4 w-4" />
                     </button>
@@ -320,7 +322,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
                       onClick={() => moveDown(idx)}
                       disabled={isLast}
                       className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition cursor-pointer"
-                      title="Nach unten verschieben"
+                      title={t("Nach unten verschieben")}
                     >
                       <ChevronDown className="h-4 w-4" />
                     </button>
@@ -338,10 +340,10 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
               </div>
               <div>
                 <span className="text-xs font-bold text-amber-950 dark:text-amber-100 block">
-                  Sammelblock &quot;Alle Dateien&quot;
+                  {t("Sammelblock \"Alle Dateien\"")}
                 </span>
                 <span className="text-[10px] text-amber-800/80 dark:text-amber-300/80 block">
-                  Erstellt eine zusätzliche Übersicht aller Dateien dieses Kurses
+                  {t("Erstellt eine zusätzliche Übersicht aller Dateien dieses Kurses")}
                 </span>
               </div>
             </div>
@@ -355,7 +357,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
                   : 'bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-slate-700'
               }`}
             >
-              {showAllFilesBlock ? 'Aktiv' : 'Hinzufügen'}
+              {showAllFilesBlock ? t("Aktiv") : t("Hinzufügen")}
             </button>
           </div>
         </div>
@@ -366,10 +368,10 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
             type="button"
             onClick={onResetToDefault}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition cursor-pointer"
-            title="Auf die originale ILIAS-Reihenfolge der Dozierenden zurücksetzen"
+            title={t("Auf die originale ILIAS-Reihenfolge der Dozierenden zurücksetzen")}
           >
             <RotateCcw className="h-3.5 w-3.5" />
-            <span>Auf ILIAS-Standard zurücksetzen</span>
+            <span>{t("Auf ILIAS-Standard zurücksetzen")}</span>
           </button>
 
           <button
@@ -378,7 +380,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
             className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 dark:bg-slate-100 px-4 py-2 text-xs font-bold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 transition cursor-pointer shadow-xs"
           >
             <Check className="h-3.5 w-3.5" />
-            <span>Fertig</span>
+            <span>{t("Fertig")}</span>
           </button>
         </div>
       </div>

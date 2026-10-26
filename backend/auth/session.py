@@ -1,3 +1,4 @@
+from backend.i18n import t
 import json
 import logging
 import re
@@ -160,22 +161,22 @@ class SessionManager:
         Returns (is_valid, user_or_message).
         """
         if not self.has_cookies():
-            return False, "Keine Sitzungs-Cookies gefunden. Bitte zuerst auf ilias.unibe.ch anmelden."
+            return False, t('Keine Sitzungs-Cookies gefunden. Bitte zuerst auf ilias.unibe.ch anmelden.')
 
         test_url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilPersonalDesktopGUI"
         async with self.get_http_client() as client:
             try:
                 response = await client.get(test_url)
                 if response.status_code in (401, 403):
-                    return False, f"HTTP {response.status_code} Nicht autorisiert"
+                    return False, t('HTTP {p0} Nicht autorisiert', p0=response.status_code)
                 if response.status_code != 200:
-                    return False, f"Unerwarteter Server-Status {response.status_code}"
+                    return False, t('Unerwarteter Server-Status {p0}', p0=response.status_code)
 
                 # 1. Check if redirected to login page or switch edu-id
                 final_url = str(response.url).lower()
                 login_tokens = ["login.php", "wayf", "eduid", "aai", "shibboleth", "cmd=force_login", "shib_login"]
                 if any(token in final_url for token in login_tokens):
-                    return False, "Sitzung abgelaufen oder Weiterleitung zum Login"
+                    return False, t('Sitzung abgelaufen oder Weiterleitung zum Login')
 
                 text_lower = response.text.lower()
                 if (
@@ -184,16 +185,16 @@ class SessionManager:
                     or "login.php?target=" in text_lower
                     or "shib_login.php" in text_lower
                 ):
-                    return False, "Sitzung abgelaufen: Login-Aufforderung erkannt"
+                    return False, t('Sitzung abgelaufen: Login-Aufforderung erkannt')
 
                 soup = BeautifulSoup(response.text, "html.parser")
                 
                 # 2. Check for login forms or startup screen
                 if soup.find("input", {"name": "username"}) and soup.find("input", {"name": "password"}):
-                    return False, "Sitzung abgelaufen: Login-Formular angezeigt"
+                    return False, t('Sitzung abgelaufen: Login-Formular angezeigt')
 
                 if soup.find(id="ilStartupSection") or soup.find(class_="ilStartupSection") or soup.find(id="ilStartupFrame"):
-                    return False, "Sitzung abgelaufen: Startbildschirm angezeigt"
+                    return False, t('Sitzung abgelaufen: Startbildschirm angezeigt')
 
                 # 3. Check for positive indicators of an authenticated ILIAS session
                 # - User avatar / profile button
@@ -219,7 +220,7 @@ class SessionManager:
                 )
 
                 if user_elem or desktop_present:
-                    return True, user_name or "Angemeldet"
+                    return True, user_name or t("Angemeldet")
 
                 # 4. If neither user avatar nor desktop is present, verify unauthorized reason
                 og_title = soup.find("meta", property="og:title")
@@ -234,13 +235,13 @@ class SessionManager:
                     "you are not logged in",
                 ]
                 if "kein zugriffsrecht" in og_title_content or any(phrase in text_lower for phrase in unauth_phrases):
-                    return False, "Sitzung auf ilias.unibe.ch ist abgelaufen oder nicht angemeldet. Bitte logge dich im Browser auf ilias.unibe.ch ein."
+                    return False, t('Sitzung auf ilias.unibe.ch ist abgelaufen oder nicht angemeldet. Bitte logge dich im Browser auf ilias.unibe.ch ein.')
 
-                return False, "ILIAS Dashboard-Struktur konnte nicht verifiziert werden."
+                return False, t('ILIAS Dashboard-Struktur konnte nicht verifiziert werden.')
 
             except Exception as e:
                 logger.error(f"Error verifying ILIAS session: {e}")
-                return False, f"Verifizierung fehlgeschlagen: {str(e)}"
+                return False, t('Verifizierung fehlgeschlagen: {p0}', p0=str(e))
 
 
 # Default singleton instance

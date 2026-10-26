@@ -1,3 +1,4 @@
+from backend.i18n import t
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.responses import StreamingResponse
 from typing import List, Optional, Literal
@@ -127,6 +128,6 @@ async def download_material_file(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to stream download: {str(e)}"
+            detail=t('Failed to stream download: {p0}', p0=str(e))
         )
 

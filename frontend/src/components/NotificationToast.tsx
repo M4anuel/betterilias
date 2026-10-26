@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useState } from 'react';
 import {
   X,
@@ -29,6 +30,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
   onDismiss,
   autoDismissMs = 10000,
 }) => {
+  useLanguage();
   const [isExpanded, setIsExpanded] = useState(false);
   const [progress, setProgress] = useState(100);
   const [isPaused, setIsPaused] = useState(false);
@@ -92,10 +94,10 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
             <div>
               <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
                 {isMultiple
-                  ? `${count} neue Aktualisierungen gefunden`
-                  : 'Aktualisierung gefunden'}
+                  ? t("{p0} neue Aktualisierungen gefunden", { p0: count })
+                  : t("Aktualisierung gefunden")}
               </h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Gerade mit ILIAS synchronisiert</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{t("Gerade mit ILIAS synchronisiert")}</p>
             </div>
           </div>
 
@@ -105,7 +107,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="rounded-lg p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                title={isExpanded ? 'Details einklappen' : 'Details aufklappen'}
+                title={isExpanded ? t("Details einklappen") : t("Details aufklappen")}
               >
                 {isExpanded ? (
                   <ChevronDown className="h-4 w-4" />
@@ -119,7 +121,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
               type="button"
               onClick={onDismiss}
               className="rounded-lg p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-              title="Schliessen"
+              title={t("Schliessen")}
             >
               <X className="h-4 w-4" />
             </button>
