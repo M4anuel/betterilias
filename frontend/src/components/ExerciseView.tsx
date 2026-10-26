@@ -46,6 +46,7 @@ import { StudentAssignmentModal } from './StudentAssignmentModal';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { TAFilterSettingsModal } from './TAFilterSettingsModal';
 import { NotificationToast, ChangeNotification } from './NotificationToast';
+import { GradingFeedbackBar, GradeSavedFeedback } from './GradingFeedbackBar';
 import { TAExerciseManagementView, AssignmentFeedback } from './TAExerciseManagementView';
 import { TAExerciseEditorView } from './TAExerciseEditorView';
 
@@ -290,6 +291,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   const [savingMemberId, setSavingMemberId] = useState<string | null>(null);
   const [savedSuccessId, setSavedSuccessId] = useState<string | null>(null);
+  const [gradingFeedback, setGradingFeedback] = useState<GradeSavedFeedback | null>(null);
   const [localEdits, setLocalEdits] = useState<
     Record<
       string,
@@ -1220,6 +1222,20 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
       setSavedSuccessId(memberId);
       setTimeout(() => setSavedSuccessId(null), 2500);
+
+      // Trigger modeless feedback toast
+      const sub = taSubmissionsData?.submissions.find((s) => s.member_id === memberId);
+      const isNotGradedFilter = taGradeFilter.includes('not_graded');
+      const isNowGraded = ['passed', 'failed'].includes(edit.status) || Boolean(edit.mark && edit.mark.trim());
+      setGradingFeedback({
+        id: `toast_${Date.now()}`,
+        memberId,
+        studentName: sub?.student_name || t("Einreichung"),
+        teamId: sub?.team_id,
+        status: edit.status,
+        mark: edit.mark || undefined,
+        wasFilteredOut: isNotGradedFilter && isNowGraded,
+      });
     } catch (err: any) {
       alert(t("Fehler beim Speichern: {p0}", { p0: err.message }));
     } finally {
@@ -1270,6 +1286,23 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       submissionsCacheRef.current[cacheKey] = updatedData;
       cache.setCachedExerciseSubmissions(exerciseRefId, selectedTaAssId || undefined, updatedData);
       return updatedData;
+    });
+
+    setSavedSuccessId(memberId);
+    setTimeout(() => setSavedSuccessId(null), 2500);
+
+    // Trigger modeless feedback toast
+    const sub = taSubmissionsData?.submissions.find((s) => s.member_id === memberId);
+    const isNotGradedFilter = taGradeFilter.includes('not_graded');
+    const isNowGraded = ['passed', 'failed'].includes(updated.status) || Boolean(updated.mark && updated.mark.trim());
+    setGradingFeedback({
+      id: `toast_${Date.now()}`,
+      memberId,
+      studentName: sub?.student_name || t("Einreichung"),
+      teamId: sub?.team_id,
+      status: updated.status,
+      mark: updated.mark || undefined,
+      wasFilteredOut: isNotGradedFilter && isNowGraded,
     });
   };
 
@@ -1951,6 +1984,23 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             </div>
           </div>
 
+          {/* Modeless Feedback Bar directly below filter bar (stays until dismissed with X) */}
+          <GradingFeedbackBar
+            feedback={gradingFeedback}
+            onDismiss={() => setGradingFeedback(null)}
+            onViewSubmission={(memberId) => {
+              const sub = taSubmissionsData?.submissions.find((s) => s.member_id === memberId);
+              if (sub) {
+                setDetailModalSubmission(sub);
+              }
+            }}
+            onResetFilter={() => {
+              handleSetSubmissionFilter('all');
+              setTaGradeFilter([]);
+              localStorage.setItem('ilias_ta_filter_grade', JSON.stringify([]));
+            }}
+          />
+
           {taSortField === 'ilias' && (
             <div role="status" className="text-xs text-slate-500 dark:text-slate-400">
               {!teamSortNames ? t('ILIAS-Reihenfolge wird geladen…') : teamOrder?.error ? (
@@ -1993,11 +2043,21 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   <div
                     key={sub.member_id}
                     className={`rounded-2xl border bg-white dark:bg-slate-900 p-4 transition shadow-2xs space-y-3 ${
-                      edit.isDirty
+                      isSaved
+                        ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/30 ring-2 ring-emerald-500/20'
+                        : edit.isDirty
                         ? 'border-amber-300 dark:border-amber-600/80 ring-1 ring-amber-200 dark:ring-amber-950/60'
                         : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
+                    {/* Saved success banner */}
+                    {isSaved && (
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-900/50 px-2.5 py-1 rounded-lg w-fit animate-in fade-in duration-150">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>{t("Erfolgreich gespeichert — wird aus der Liste gefiltert")}</span>
+                      </div>
+                    )}
+
                     {/* Row Header: Student Info & Actions */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
@@ -2581,6 +2641,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           onDismiss={() => setLocalNotifications([])}
         />
       )}
+
+
     </div>
   );
 };

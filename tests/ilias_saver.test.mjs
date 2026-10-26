@@ -71,3 +71,20 @@ test('ILIAS Saver TTL calculation and freshness check', async () => {
   // If TTL is increased to 10 minutes, the 6-minute-old cache is fresh again
   assert.equal(isFresh(testKey, 10), true);
 });
+
+test('Grading filter removal detection for modeless feedback bar', () => {
+  const taGradeFilter = ['not_graded'];
+  const isNotGradedFilter = taGradeFilter.includes('not_graded');
+
+  // Ungraded submission: not filtered out
+  const initialStatus = 'not_graded';
+  const initialMark = '';
+  assert.equal(isNotGradedFilter && ['passed', 'failed'].includes(initialStatus), false);
+
+  // When saved as passed: detected as filtered out
+  const savedStatus = 'passed';
+  const savedMark = '5.5';
+  const isNowGraded = ['passed', 'failed'].includes(savedStatus) || Boolean(savedMark && savedMark.trim());
+  const wasFilteredOut = isNotGradedFilter && isNowGraded;
+  assert.equal(wasFilteredOut, true);
+});
