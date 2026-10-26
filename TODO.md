@@ -88,8 +88,8 @@ build validation, and English fallback for partial languages.
 
 ### Instructor & TA Course Authoring Actions
 - [ ] Course "Add Object" toolbar button & creation modal (`c-toolbar__item navbar-form -> button "Add Object"`):
-  - [ ] Support creating folders (`ilObjFolderGUI&cmd=save&new_type=fold`, `form/input_0/input_1` title, `form/input_0/input_2` description).
-  - [ ] Support uploading files (`ilObjFileGUI&cmd=uploadFiles&new_type=file`, multi-file dropzone & license selection).
+  - [x] Support creating folders using fresh native forms, title/description fields, and the available native folder templates (Default/Hidden folder; `dtpl_5` is not a column layout).
+  - [x] Support uploading files using the native temporary-upload handler and metadata-save form, multi-file dropzone, per-file progress, license selection, and verified creation.
   - [ ] Support creating weblinks (`ilObjLinkResourceGUI&new_type=webr`).
   - [ ] Support creating item groups (`ilObjItemGroupGUI&new_type=itgr`).
   - [ ] Support creating exercises (`ilObjExerciseGUI&new_type=exc`).
@@ -157,7 +157,7 @@ build validation, and English fallback for partial languages.
 
 ## Teaching assistant tools
 
-- [ ] Support creating folders (`ilObjFolderGUI&cmd=save&new_type=fold`).
+- [x] Support creating folders (`ilObjFolderGUI&cmd=save&new_type=fold`).
 - [ ] Support creating exercises (`ilObjExerciseGUI&cmd=create&new_type=exc`).
 - [ ] Support course content creation via native "Add Object" dialog (`cmd=create&new_type=<type>`).
 - [ ] Course object management: delete, reorder, and organize items into folders/item groups.
@@ -172,6 +172,8 @@ build validation, and English fallback for partial languages.
   - [x] Handle both in-app navigation (tab switching, breadcrumbs, back/forward history, Mouse 4 & 5) and browser-level actions (tab close, window close, page reload via window.beforeunload).
 
 ## Completed
+
+- [x] Add reusable course/folder authoring permission context, a searchable bilingual 30-object creation catalogue (folder/file enabled; other types disabled), native folder creation and course file uploads. Cover native saved-page forms and browser flows in German/English and dark/light mode. Exercise creation, batch organization and navigation guards remain separate work.
 
 - [x] Sort the ILIAS default grading order by the feedback recipient surname shown under Evaluation by file; replace the incorrect first-added-team-member lookup.
 

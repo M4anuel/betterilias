@@ -31,6 +31,7 @@ import { CourseMaterialsResponse, MaterialItem, CourseContentBlock, CourseMember
 import { CourseIcon } from './CourseIcon';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { PodcastModal } from './PodcastModal';
+import { CourseAuthoring } from './AddObjectModal';
 import { SessionDrawer } from './SessionDrawer';
 import { ContentOrderModal } from './ContentOrderModal';
 import { ExerciseView } from './ExerciseView';
@@ -1842,6 +1843,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
         {/* Sync / Refresh status */}
         <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          {materialsData?.authoring && <CourseAuthoring key={materialsData.container_ref_id} context={materialsData.authoring} onRefresh={onManualRefresh} />}
           {isRevalidating ? (
             <div className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:text-blue-300">
               <RefreshCw className="h-3 w-3 animate-spin" />

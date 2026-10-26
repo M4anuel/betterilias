@@ -1186,6 +1186,10 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
             if a.find_parent(["aside", "footer"]) or a.find_parent(id=re.compile(r"right_col|news", re.I)):
                 continue
             href = a.get("href", "")
+            # The authoring catalogue is not course content, including in empty folders.
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(href).query)
+            if 'new_type' in query or query.get('cmd') == ['create']:
+                continue
             if "ref_id=" in href and ("cmd=sendfile" in href or "file" in href or "fold" in href or "exc" in href or "target=" in href):
                 ref_id = _extract_ref_id_from_url(href)
                 title = a.get_text(strip=True)
@@ -1250,7 +1254,9 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
     blocks = parse_course_blocks(soup, container_ref_id, sessions=sessions, fallback_items=items)
     layout_hash = _calc_layout_hash(blocks)
 
+    from backend.scrapers.authoring import parse_authoring_context
     return CourseMaterialsResponse(
+        authoring=parse_authoring_context(html_content, container_ref_id),
         container_ref_id=container_ref_id,
         title=container_title,
         is_enrolled=membership.is_enrolled,

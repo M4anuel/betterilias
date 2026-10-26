@@ -185,8 +185,29 @@ class MembershipResult(BaseModel):
     message: str
 
 
+class AuthoringContext(BaseModel):
+    ref_id: str
+    can_create: bool = False
+    can_manage: bool = False
+    can_edit_page: bool = False
+    creatable_types: List[str] = Field(default_factory=list)
+    creation_urls: Dict[str, str] = Field(default_factory=dict, exclude=True)
+
+
+class CreateFolderRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(default='', max_length=4000)
+    template_id: Optional[str] = None
+
+
+class AuthoringResult(BaseModel):
+    success: bool = True
+    items: List[MaterialItem] = Field(default_factory=list)
+
+
 class CourseMaterialsResponse(BaseModel):
     container_ref_id: str
+    authoring: Optional[AuthoringContext] = None
     title: Optional[str] = None
     is_enrolled: Optional[bool] = None
     membership: Optional[CourseMembership] = None
