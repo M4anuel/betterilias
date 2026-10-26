@@ -26,7 +26,7 @@ interface TAExerciseEditorViewProps {
   assId: string | null;
   initialTypeId?: number;
   onBack: () => void;
-  onSaved: (savedAssId: string) => void;
+  onSaved: (savedAssId: string, result: { created: boolean; title: string }) => void;
 }
 
 export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
@@ -213,7 +213,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       setSuccessMsg(t("Übung erfolgreich gespeichert."));
       setTimeout(() => setSuccessMsg(null), 3000);
       if (newAssId) {
-        onSaved(newAssId);
+        onSaved(newAssId, { created: !assId, title: title.trim() });
       }
     } catch (err: any) {
       setError(err?.message || t("Fehler beim Speichern der Übung"));

@@ -41,7 +41,7 @@ import { StudentAssignmentModal } from './StudentAssignmentModal';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { TAFilterSettingsModal } from './TAFilterSettingsModal';
 import { NotificationToast, ChangeNotification } from './NotificationToast';
-import { TAExerciseManagementView } from './TAExerciseManagementView';
+import { TAExerciseManagementView, AssignmentFeedback } from './TAExerciseManagementView';
 import { TAExerciseEditorView } from './TAExerciseEditorView';
 
 interface ExerciseViewProps {
@@ -67,6 +67,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const [taManagementMode, setTaManagementMode] = useState<'none' | 'list' | 'editor'>('none');
   const [editingTaAssId, setEditingTaAssId] = useState<string | null>(null);
   const [editingTaTypeId, setEditingTaTypeId] = useState<number>(1);
+  const [assignmentFeedback, setAssignmentFeedback] = useState<AssignmentFeedback | null>(null);
 
   // Overview data (Cached with SWR)
   const [overviewData, setOverviewData] = useState<ExerciseOverviewResponse | null>(() => {
@@ -1195,11 +1196,15 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         <TAExerciseManagementView
           exerciseRefId={exerciseRefId}
           exerciseTitle={overviewData?.title}
+          feedback={assignmentFeedback}
+          onFeedbackChange={setAssignmentFeedback}
           onBack={() => {
+            setAssignmentFeedback(null);
             setTaManagementMode('none');
             loadOverview();
           }}
           onEditAssignment={(assId, typeId) => {
+            setAssignmentFeedback(null);
             setEditingTaAssId(assId);
             setEditingTaTypeId(typeId || 1);
             setTaManagementMode('editor');
@@ -1213,7 +1218,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           assId={editingTaAssId}
           initialTypeId={editingTaTypeId}
           onBack={() => setTaManagementMode('list')}
-          onSaved={(savedAssId) => {
+          onSaved={(savedAssId, result) => {
+            setAssignmentFeedback({ kind: result.created ? 'created' : 'updated', title: result.title });
             loadOverview();
             setEditingTaAssId(savedAssId);
             setTaManagementMode('list');

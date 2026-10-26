@@ -45,9 +45,12 @@ def test_delete_timeout_is_verified_or_shows_visible_uncertainty(local_site, out
             page.get_by_role('button', name='Permanently delete assignment', exact=True).click()
             playwright.expect(page.get_by_role('button', name='Permanently delete assignment', exact=True)).to_have_count(0)
             if outcome == 'timeout_deleted':
+                playwright.expect(page.get_by_role('status', name='Assignment confirmation', exact=True)).to_have_text(f'Assignment “{title}” deleted successfully.')
+                playwright.expect(page.get_by_role('status', name='Assignment confirmation', exact=True)).to_be_visible()
                 playwright.expect(page.locator('tbody tr')).to_have_count(11)
                 playwright.expect(page.get_by_role('button', name=f'Delete assignment {title}', exact=True)).to_have_count(0)
             else:
+                playwright.expect(page.get_by_role('status', name='Assignment confirmation', exact=True)).to_have_count(0)
                 playwright.expect(page.get_by_text('ILIAS did not respond in time', exact=False)).to_be_visible()
                 playwright.expect(page.locator('tbody tr')).to_have_count(12)
             assert len(scenario.posts) == 2

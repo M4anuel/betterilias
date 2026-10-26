@@ -101,6 +101,8 @@ build validation, and English fallback for partial languages.
 
 ## Completed
 
+- [x] Show dismissible, localised green confirmations in assignment management after creation, editing and confirmed deletion, including screen-reader announcements.
+
 - [x] Verify TA assignment deletion after slow or lost ILIAS responses without replaying the deletion; use the native confirmation and show localised errors for uncertain outcomes.
 
 - [x] Correct and grade exercise submissions.

@@ -104,11 +104,19 @@ def test_create_team_assignment_preserves_draft_and_recovers_from_rejection(loca
         page.get_by_role('button', name='Create assignment', exact=True).last.click()
         playwright.expect(page.get_by_role('heading', name='Manage & edit assignments', exact=True)).to_be_visible()
         playwright.expect(page.get_by_text(title, exact=True)).to_be_visible()
+        confirmation = page.get_by_role('status', name='Assignment confirmation', exact=True)
+        playwright.expect(confirmation).to_have_text(f'Assignment “{title}” created successfully.')
+        playwright.expect(confirmation).to_be_visible()
+        playwright.expect(confirmation).to_have_attribute('aria-live', 'polite')
+        confirmation.get_by_role('button', name='Close', exact=True).click()
+        playwright.expect(confirmation).to_have_count(0)
         assert len(drafts) == 2 and drafts[0] == drafts[1]
         assert drafts[1]['type_id'] == 4 and drafts[1]['deadline'] == '2030-12-31T23:59'
         assert 'Keep these instructions' in drafts[1]['instruction_html']
         page.get_by_role('button', name=f'Edit assignment {title}', exact=True).click()
         playwright.expect(page.get_by_label('Submission type', exact=True)).to_be_disabled()
+        page.get_by_role('button', name='Save changes', exact=True).first.click()
+        playwright.expect(page.get_by_role('status', name='Assignment confirmation', exact=True)).to_have_text(f'Assignment “{title}” saved successfully.')
         assert errors == []
         browser.close()
 
@@ -155,6 +163,7 @@ def test_native_management_list_and_creation_toolbar_through_backend(local_site)
             playwright.expect(page.get_by_role('heading', name='Manage & edit assignments', exact=True)).to_be_visible()
             playwright.expect(page.locator('tbody tr')).to_have_count(13)
             playwright.expect(page.get_by_text(scenario.title, exact=True)).to_be_visible()
+            playwright.expect(page.get_by_role('status', name='Assignment confirmation', exact=True)).to_have_text(f'Assignment “{scenario.title}” created successfully.')
             assert scenario.posts[0][1] == {'type':'4'}
             browser.close()
     finally:

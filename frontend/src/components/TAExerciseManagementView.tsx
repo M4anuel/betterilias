@@ -1,5 +1,5 @@
 import { t, useLanguage } from '../lib/i18n';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   ArrowLeft,
   ArrowUp,
@@ -18,15 +18,23 @@ import {
   Paperclip,
   Loader2,
   Search,
+  X,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { TAAssignmentListItem } from '../types';
+
+export interface AssignmentFeedback {
+  kind: 'created' | 'updated' | 'deleted';
+  title: string;
+}
 
 interface TAExerciseManagementViewProps {
   exerciseRefId: string;
   exerciseTitle?: string;
   onBack: () => void;
   onEditAssignment: (assId: string | null, typeId?: number) => void;
+  feedback: AssignmentFeedback | null;
+  onFeedbackChange: (feedback: AssignmentFeedback | null) => void;
 }
 
 export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> = ({
@@ -34,6 +42,8 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
   exerciseTitle,
   onBack,
   onEditAssignment,
+  feedback,
+  onFeedbackChange,
 }) => {
   useLanguage();
   const [assignments, setAssignments] = useState<TAAssignmentListItem[]>([]);
@@ -42,6 +52,10 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
   const [error, setError] = useState<string | null>(null);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const feedbackRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (feedback) feedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [feedback]);
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,6 +137,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
   };
 
   const handleSaveOrder = async () => {
+    onFeedbackChange(null);
     setIsSavingOrder(true);
     setSaveSuccessMsg(null);
     setError(null);
@@ -150,11 +165,14 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
+    onFeedbackChange(null);
+    setSaveSuccessMsg(null);
     setIsDeleting(true);
     setError(null);
     try {
       await api.deleteTAAssignment(exerciseRefId, deleteTarget.ass_id);
       setAssignments((prev) => prev.filter((a) => a.ass_id !== deleteTarget.ass_id));
+      onFeedbackChange({ kind: 'deleted', title: deleteTarget.title });
       setDeleteTarget(null);
     } catch (err: any) {
       setError(err?.message || t("Übung konnte nicht gelöscht werden"));
@@ -221,10 +239,14 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
         </div>
       )}
 
-      {saveSuccessMsg && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-sm">
+      {(feedback || saveSuccessMsg) && (
+        <div ref={feedbackRef} role="status" aria-label={t('assignment.confirmation')} aria-live="polite" aria-atomic="true" className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-sm">
           <CheckCircle2 className="h-5 w-5 shrink-0" />
-          <span>{saveSuccessMsg}</span>
+          <span className="flex-1">{feedback ? t(`assignment.${feedback.kind}`, { title: feedback.title }) : saveSuccessMsg}</span>
+          <button type="button" aria-label={t('Schließen')} onClick={() => { onFeedbackChange(null); setSaveSuccessMsg(null); }}
+            className="rounded-lg p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 focus-visible:outline-2 focus-visible:outline-emerald-600">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
