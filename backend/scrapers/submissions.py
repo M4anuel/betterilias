@@ -376,7 +376,7 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
                 feedback_mail_url = full_url
             elif "evaluation by file" in el_text or "file" in el_text or "datei" in el_text:
                 evaluation_by_file_url = full_url
-            elif "log" in el_text:
+            elif urllib.parse.parse_qs(urllib.parse.urlparse(full_url).query).get("cmd", [""])[0].lower() == "showteamlog" or "log" in el_text:
                 team_log_url = full_url
 
         if submission_status in ["submitted", "late"]:
@@ -1361,3 +1361,54 @@ def parse_student_upload_errors(html_content: str) -> Optional[str]:
             messages.append(message)
     return '\n'.join(messages) or None
 
+
+
+@safe_parser(context_name="team_first_added_member")
+def parse_team_first_added_member(html_content: str) -> Optional[str]:
+    """Read the first addition from a team log requested in timestamp ascending order.
+
+    Creation events and the actor column do not identify the first student.
+    Preserve row order for events with identical displayed timestamps.
+    """
+    soup = BeautifulSoup(html_content, "lxml")
+    additions = []
+    months = {
+        "jan": 1, "feb": 2, "mar": 3, "mär": 3, "apr": 4,
+        "may": 5, "mai": 5, "jun": 6, "jul": 7, "aug": 8,
+        "sep": 9, "oct": 10, "okt": 10, "nov": 11, "dec": 12, "dez": 12,
+    }
+    for row in soup.select("table tbody tr"):
+        cells = row.find_all("td", recursive=False)
+        if len(cells) != 3:
+            continue
+        details = _clean_text(cells[2])
+        match = re.fullmatch(r"Added member (.+?)\.", details, re.I)
+        if not match:
+            match = re.fullmatch(r"Mitglied (.+?) hinzugef[üu]gt\.", details, re.I)
+        if match:
+            date = re.search(r"(\d{1,2})\.\s*(\d{1,2}|[^\W\d_]+)\.?\s*(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?", _clean_text(cells[0]))
+            timestamp = None
+            if date:
+                day, month, year, hour, minute, second = date.groups()
+                month = int(month) if month.isdigit() else months.get(month.casefold()[:3])
+                if month:
+                    timestamp = (int(year), month, int(day), int(hour), int(minute), int(second or 0))
+            additions.append((timestamp, match.group(1).strip()))
+    if not additions:
+        return None
+    if all(timestamp is not None for timestamp, _ in additions):
+        return min(additions, key=lambda item: item[0])[1]
+    # The service explicitly requests ascending timestamps, even if a future
+    # ILIAS date format is not recognized here.
+    return additions[0][1]
+
+
+def first_added_surname(name: str, members: List[str]) -> str:
+    """Resolve the log's given-name-first name using native surname-first names."""
+    normalized = " ".join(name.casefold().split())
+    for member in members:
+        surname, separator, given = member.partition(",")
+        if separator and " ".join(f"{given} {surname}".casefold().split()) == normalized:
+            return surname.strip()
+    # The original member may have left the team and no longer appear in its row.
+    return name.partition(",")[0].strip() if "," in name else name.split()[-1]

@@ -980,5 +980,10 @@
   "video.unsupported": "Ihr Browser unterstützt das Video-Tag nicht.",
   "embedded.ilias_content": "Eingebetteter Inhalt (ILIAS)",
   "embedded.open_in_ilias": "In ILIAS öffnen →",
-  "aktuell aktiv": "aktuell aktiv"
+  "aktuell aktiv": "aktuell aktiv",
+  "ILIAS-Standardsortierung": "ILIAS-Standardsortierung",
+  "Nachname des zuerst hinzugefügten Teammitglieds": "Nachname des zuerst hinzugefügten Teammitglieds",
+  "Team-Reihenfolge wird geladen…": "Team-Reihenfolge wird geladen…",
+  "Team-Reihenfolge konnte nicht geladen werden.": "Team-Reihenfolge konnte nicht geladen werden.",
+  "Teams ohne protokollierten Beitritt stehen am Ende.": "Teams ohne protokollierten Beitritt stehen am Ende."
 }

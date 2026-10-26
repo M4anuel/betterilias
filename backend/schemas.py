@@ -243,6 +243,7 @@ class SubmissionItem(BaseModel):
     feedback: Optional[str] = None
     notice: Optional[str] = None
     feedback_mail_url: Optional[str] = None
+    first_added_surname: Optional[str] = None
     team_log_url: Optional[str] = None
     evaluation_by_file_url: Optional[str] = None
     can_grade: bool = True

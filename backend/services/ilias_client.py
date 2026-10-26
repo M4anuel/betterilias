@@ -18,7 +18,7 @@ from backend.scrapers.repository import parse_repository
 from backend.schemas import MembershipFormResponse, MembershipRequest, MembershipResult
 from backend.scrapers.membership import membership_link, parse_membership, prepare_membership_form
 from backend.scrapers.materials import _extract_breadcrumbs
-from backend.scrapers.submissions import parse_student_submission_navigation, parse_student_upload_errors, parse_native_file_upload_form
+from backend.scrapers.submissions import parse_team_first_added_member, first_added_surname, parse_student_submission_navigation, parse_student_upload_errors, parse_native_file_upload_form
 from backend.scrapers.exercise_editor import (
     build_ta_assignment_payload, validate_ta_assignment_request, parse_ta_assignment_error,
     parse_ta_assignment_delete_form,
@@ -638,7 +638,7 @@ class IliasClient:
             self._check_response_for_session_loss(resp, url)
             return parse_course_logs(resp.text, course_id=course_id)
 
-    async def get_exercise_submissions(self, ref_id: str, ass_id: Optional[str] = None) -> ExerciseSubmissionsResponse:
+    async def get_exercise_submissions(self, ref_id: str, ass_id: Optional[str] = None, include_team_order: bool = False) -> ExerciseSubmissionsResponse:
         """Fetch and parse exercise participant submissions list (TA grading view)."""
         self._ensure_authenticated()
         extra = f"&ass_id={ass_id}&member_id=0&part_id=0" if ass_id else ""
@@ -659,12 +659,41 @@ class IliasClient:
                 last_resp = resp
                 # If we hit the members submissions table
                 if "exc_mem" in resp.text:
-                    return parse_exercise_submissions(resp.text, exercise_ref_id=ref_id)
+                    result = parse_exercise_submissions(resp.text, exercise_ref_id=ref_id)
+                    if include_team_order:
+                        await self._load_team_sort_names(client, result)
+                    return result
 
             if last_resp:
                 return parse_exercise_submissions(last_resp.text, exercise_ref_id=ref_id)
 
             raise ValueError(t('Failed to fetch exercise with ref_id {p0}', p0=ref_id))
+
+    async def _load_team_sort_names(self, client: httpx.AsyncClient, result: ExerciseSubmissionsResponse) -> None:
+        # Limit requests to avoid flooding ILIAS for large assignment tables.
+        semaphore = asyncio.Semaphore(4)
+
+        async def load(submission):
+            if not submission.team_log_url:
+                if not submission.team_id:
+                    submission.first_added_surname = submission.student_name.partition(",")[0].strip()
+                return
+            url = urllib.parse.urlparse(submission.team_log_url)
+            if (url.scheme, url.netloc) != (urllib.parse.urlparse(settings.ilias_base_url).scheme,
+                                           urllib.parse.urlparse(settings.ilias_base_url).netloc):
+                raise ValueError("Unexpected team log origin")
+            query = urllib.parse.parse_qs(url.query)
+            query["_table_nav"] = ["tstamp:asc:0"]
+            log_url = urllib.parse.urlunparse(url._replace(query=urllib.parse.urlencode(query, doseq=True)))
+            async with semaphore:
+                response = await client.get(log_url)
+                self._check_response_for_session_loss(response, log_url)
+                response.raise_for_status()
+                name = parse_team_first_added_member(response.text)
+                if name:
+                    submission.first_added_surname = first_added_surname(name, submission.team_members)
+
+        await asyncio.gather(*(load(submission) for submission in result.submissions))
 
     async def get_exercise_overview(self, ref_id: str, mode: str = "all") -> ExerciseOverviewResponse:
         """Fetch and parse exercise overview and sub-assignments (showOverview) with mode=all by default."""

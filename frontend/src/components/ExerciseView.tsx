@@ -352,10 +352,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const [rowTabState, setRowTabState] = useState<Record<string, 'feedback' | 'notice'>>({});
 
   // Sorting state for TA grading submissions
-  const [taSortField, setTaSortField] = useState<'time' | 'name' | 'status' | 'mark'>('time');
+  const [taSortField, setTaSortField] = useState<'time' | 'name' | 'status' | 'mark' | 'ilias'>('time');
   const [taSortOrder, setTaSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const handleSortToggle = (field: 'time' | 'name' | 'status' | 'mark') => {
+  const handleSortToggle = (field: 'time' | 'name' | 'status' | 'mark' | 'ilias') => {
     if (taSortField === field) {
       setTaSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -368,6 +368,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     switch (taSortField) {
       case 'time':
         return t("Abgabezeit");
+      case 'ilias':
+        return t('ILIAS-Standardsortierung');
       case 'name':
         return t("Name");
       case 'status':
@@ -378,6 +380,33 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         return t("Abgabezeit");
     }
   }, [taSortField, language]);
+
+  const [teamOrder, setTeamOrder] = useState<{
+    source: ExerciseSubmissionsResponse;
+    names: Record<string, string | null>;
+    error: boolean;
+  } | null>(null);
+  const [teamOrderRetry, setTeamOrderRetry] = useState(0);
+  const teamSortNames = teamOrder?.source === taSubmissionsData ? teamOrder?.names : undefined;
+
+  useEffect(() => {
+    if (taSortField !== 'ilias' || !taSubmissionsData || isLoadingTaSubmissions) return;
+    let cancelled = false;
+    const source = taSubmissionsData;
+    setTeamOrder(null);
+    api.getExerciseSubmissions(exerciseRefId, source.active_assignment_id || selectedTaAssId || undefined, true)
+      .then((result) => {
+        if (!cancelled) setTeamOrder({
+          source,
+          names: Object.fromEntries(result.submissions.map((s) => [s.member_id, s.first_added_surname || null])),
+          error: false,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setTeamOrder({ source, names: {}, error: true });
+      });
+    return () => { cancelled = true; };
+  }, [taSortField, taSubmissionsData, isLoadingTaSubmissions, exerciseRefId, selectedTaAssId, teamOrderRetry]);
 
   // Close any open modal on Mouse 4 (Back)
   useEffect(() => {
@@ -909,6 +938,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         const tA = parseSubmissionTimestamp(a.submission_time);
         const tB = parseSubmissionTimestamp(b.submission_time);
         comparison = tA - tB;
+      } else if (taSortField === 'ilias') {
+        const nameA = teamSortNames?.[a.member_id];
+        const nameB = teamSortNames?.[b.member_id];
+        // Unresolved teams stay last in either direction; never guess from display order.
+        if (!nameA || !nameB) return nameA ? -1 : nameB ? 1 : 0;
+        comparison = nameA.localeCompare(nameB, 'de');
       } else if (taSortField === 'name') {
         const nameA = (a.team_members && a.team_members.length > 0 ? a.team_members[0] : a.student_name) || '';
         const nameB = (b.team_members && b.team_members.length > 0 ? b.team_members[0] : b.student_name) || '';
@@ -950,6 +985,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     savedSuccessId,
     taSortField,
     taSortOrder,
+    teamSortNames,
   ]);
 
   // TA Grading Handlers
@@ -1776,6 +1812,16 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             </div>
           </div>
 
+          {taSortField === 'ilias' && (
+            <div role="status" className="text-xs text-slate-500 dark:text-slate-400">
+              {!teamSortNames ? t('Team-Reihenfolge wird geladen…') : teamOrder?.error ? (
+                <>{t('Team-Reihenfolge konnte nicht geladen werden.')} <button type="button" className="underline" onClick={() => setTeamOrderRetry((value) => value + 1)}>{t('Erneut versuchen')}</button></>
+              ) : taSubmissionsData?.submissions.some((s) => !teamSortNames[s.member_id]) ? (
+                t('Teams ohne protokollierten Beitritt stehen am Ende.')
+              ) : null}
+            </div>
+          )}
+
           {/* Submissions List */}
           {isLoadingTaSubmissions && !taSubmissionsData ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
@@ -2278,7 +2324,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         evalModeInOverview={evalModeInOverview}
         onSetEvalMode={handleSetEvalMode}
         sortField={taSortField}
-        onSetSortField={setTaSortField}
+        onSetSortField={(field) => {
+          setTaSortField(field);
+          if (field === 'ilias' && taSortField !== 'ilias') setTaSortOrder('asc');
+        }}
         sortOrder={taSortOrder}
         onSetSortOrder={setTaSortOrder}
         quickFilters={quickFilters}

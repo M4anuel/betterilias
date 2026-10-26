@@ -231,8 +231,11 @@ export const api = {
     return res.json();
   },
 
-  async getExerciseSubmissions(exerciseId: string, assId?: string): Promise<ExerciseSubmissionsResponse> {
-    const query = assId ? `?ass_id=${encodeURIComponent(assId)}` : '';
+  async getExerciseSubmissions(exerciseId: string, assId?: string, includeTeamOrder = false): Promise<ExerciseSubmissionsResponse> {
+    const params = new URLSearchParams();
+    if (assId) params.set('ass_id', assId);
+    if (includeTeamOrder) params.set('include_team_order', 'true');
+    const query = params.size ? `?${params}` : '';
     const res = await sessionFetch(`${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/submissions${query}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
