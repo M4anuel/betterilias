@@ -38,6 +38,7 @@ translation catalogues, and build validation are not implemented yet.
 - [ ] Native In-App Opencast Podcast Player with Dual-Stream Support:
   - [ ] Synchronized playback for presenter camera feed (with `mainAudio`) and presentation slides feed.
   - [ ] Viewing layouts: Picture-in-Picture (PiP), Side-by-Side (desktop split), and one-click screen swap.
+  - [ ] Bandwidth Saver / Slides-Only Mode: Ability to set presenter video quality to lowest (480p) while keeping presentation slides at 1080p.
   - [ ] Slide chapter navigation using Opencast `frameList` thumbnails and timestamps.
   - [ ] Fast on-demand stream resolution for podcast episode IDs (`eid`).
 
@@ -52,8 +53,12 @@ translation catalogues, and build validation are not implemented yet.
 
 2. **Stream Structure & Audio Track Mapping:**
    - `<config_json>.streams` provides two synchronized MP4 streams:
-     - **Stream 0 — Presenter Camera:** `content: "presenter"`, `role: "mainAudio"`. Contains the lecturer camera feed **and the primary AAC audio track** from the lecture hall microphone. Multiple qualities available (1080p, 720p, 480p).
-     - **Stream 1 — Presentation/Slides:** `content: "presentation"`, `role: null`. Contains the projector / slides screen capture. Muted / video-only.
+     - **Stream 0 — Presenter Camera:** `content: "presenter"`, `role: "mainAudio"`. Contains the lecturer camera feed **and the primary AAC audio track** from the lecture hall microphone.
+       - *1080p:* ~1,078 MB (Video ~1665 kbps, Audio 129 kbps AAC stereo 44.1 kHz)
+       - *720p:* ~716 MB (Video ~1059 kbps, Audio 129 kbps AAC stereo 44.1 kHz)
+       - *480p:* ~443 MB (Video ~668 kbps, Audio 65 kbps AAC mono 44.1 kHz — crystal clear voice quality, cuts data by ~60%)
+     - **Stream 1 — Presentation/Slides:** `content: "presentation"`, `role: null`. Contains the projector / slides screen capture. Muted / video-only (854x480, 1280x720, 1920x1080).
+     - **Bandwidth Optimization Tip:** When students only care about the presentation slides, BetterIlias can stream the 480p presenter feed for audio and the 1080p presentation feed for crisp slide text, saving over 600 MB of cellular/Wi-Fi bandwidth per lecture with zero loss in spoken audio comprehension.
    - **Stream Synchronization:** Both streams start at timestamp `t = 0.000` and have identical duration (`<config_json>.metadata.duration` in ms).
    - **CDN & Range Requests:** Streams are hosted on `https://dist.opencast.unibe.ch/...mp4`. They support standard HTTP byte-range requests (`HTTP 206 Partial Content`) and do **not** require cookies, credentials, or special CORS headers.
 
