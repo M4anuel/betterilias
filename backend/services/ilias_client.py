@@ -21,6 +21,7 @@ from backend.scrapers.materials import _extract_breadcrumbs
 from backend.scrapers.submissions import parse_student_submission_navigation, parse_student_upload_errors, parse_native_file_upload_form
 from backend.scrapers.exercise_editor import (
     build_ta_assignment_payload, validate_ta_assignment_request, parse_ta_assignment_error,
+    parse_ta_assignment_delete_form,
 )
 from backend.schemas import (
     AuthStatus,
@@ -82,6 +83,12 @@ logger = logging.getLogger("ilias.service")
 class SessionExpiredError(Exception):
     """Raised when an ILIAS request detects that the user session is expired or invalid."""
     pass
+
+
+class AssignmentDeletionError(Exception):
+    def __init__(self, message: str, status_code: int = 502):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class StudentUploadError(Exception):
@@ -1627,6 +1634,7 @@ class IliasClient:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
             self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
+            resp.raise_for_status()
             return parse_ta_assignments_list(resp.text, exercise_ref_id=ref_id)
 
     async def update_ta_assignment_order(
@@ -1763,34 +1771,59 @@ class IliasClient:
             return saved
 
     async def delete_ta_assignment(self, ref_id: str, ass_id: str) -> bool:
-        """
-        Delete an assignment using cmd[confirmAssignmentsDeletion] and cmd[deleteAssignments].
-        """
+        """Follow the confirmation once, then verify deletion even after a timeout."""
+        from backend.scrapers.dumper import ScrapingParsingError
+
         self._ensure_authenticated()
-        current = await self.get_ta_assignments_list(ref_id)
-        base_node = self._get_exercise_base_node(ref_id)
-
-        post_url = current.form_action_url or (
-            f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=post"
-            f"&ref_id={ref_id}&from_overview=1"
-        )
-        if current.rtoken and "rtoken=" not in post_url:
-            post_url = f"{post_url}&rtoken={current.rtoken}"
-
         async with self.session_manager.get_http_client() as client:
-            # 1. Confirm dialog
-            conf_resp = await client.post(
-                post_url, data={"id[]": ass_id, "cmd[confirmAssignmentsDeletion]": "Delete"}
-            )
-            self._check_response_for_session_loss(conf_resp, post_url)
+            current = await self.get_ta_assignments_list(ref_id, http_client=client)
+            if not any(item.ass_id == ass_id for item in current.assignments):
+                return True
 
-            # 2. Final deletion
-            del_resp = await client.post(
-                post_url, data={"id[]": ass_id, "cmd[deleteAssignments]": "Delete"}
-            )
-            self._check_response_for_session_loss(del_resp, post_url)
-            return del_resp.status_code == 200
+            def target(url: str) -> str:
+                parsed, origin = urllib.parse.urlparse(url), urllib.parse.urlparse(settings.ilias_base_url)
+                query = urllib.parse.parse_qs(parsed.query)
+                if ((parsed.scheme, parsed.netloc) != (origin.scheme, origin.netloc)
+                        or query.get('ref_id') != [ref_id]
+                        or query.get('cmdClass', [''])[0].lower() != 'ilexassignmenteditorgui'):
+                    raise AssignmentDeletionError(t('editor.invalid_target'))
+                return url
+
+            if not current.form_action_url:
+                raise AssignmentDeletionError(t('delete.form_missing'))
+            post_url = target(current.form_action_url)
+            confirmation = await client.post(post_url, data={
+                'id[]': ass_id, 'cmd[confirmAssignmentsDeletion]': 'Delete'})
+            self._check_response_for_session_loss(confirmation, post_url)
+            if not confirmation.is_success:
+                raise AssignmentDeletionError(t('delete.http_error', status=confirmation.status_code))
+            if error := parse_ta_assignment_error(confirmation.text):
+                raise AssignmentDeletionError(error, 400)
+            action, payload = parse_ta_assignment_delete_form(confirmation.text, ref_id, ass_id)
+            response = None
+            try:
+                # File/resource cleanup may outlast the ordinary 30-second timeout.
+                # Skip the automatic redirect; the list is fetched explicitly below.
+                response = await client.post(target(action), data=payload,
+                    timeout=httpx.Timeout(120.0, connect=10.0), follow_redirects=False)
+                self._check_response_for_session_loss(response, action)
+            except httpx.RequestError as exc:
+                logger.warning('Assignment deletion response unavailable (%s); checking exercise %s, assignment %s',
+                               type(exc).__name__, ref_id, ass_id)
+
+            try:
+                updated = await self.get_ta_assignments_list(ref_id, http_client=client)
+            except (httpx.HTTPError, ScrapingParsingError) as exc:
+                raise AssignmentDeletionError(t('delete.unconfirmed'), 504) from exc
+            if not any(item.ass_id == ass_id for item in updated.assignments):
+                return True
+            if response is None:
+                raise AssignmentDeletionError(t('delete.unconfirmed'), 504)
+            if error := parse_ta_assignment_error(response.text):
+                raise AssignmentDeletionError(error, 400)
+            if not (response.is_success or response.is_redirect):
+                raise AssignmentDeletionError(t('delete.http_error', status=response.status_code))
+            raise AssignmentDeletionError(t('delete.still_present'), 409)
 
     async def get_ta_instruction_files(
         self, ref_id: str, ass_id: str, *, http_client: Optional[httpx.AsyncClient] = None,

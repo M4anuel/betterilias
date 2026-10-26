@@ -515,7 +515,10 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/exercises/${exerciseId}/ta/assignments/${assId}`, {
       method: 'DELETE',
     });
-    if (!res.ok) throw new Error(t("Übung konnte nicht gelöscht werden"));
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t("Übung konnte nicht gelöscht werden"));
+    }
     return res.json();
   },
 

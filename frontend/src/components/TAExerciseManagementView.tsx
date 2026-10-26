@@ -158,6 +158,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
       setDeleteTarget(null);
     } catch (err: any) {
       setError(err?.message || t("Übung konnte nicht gelöscht werden"));
+      setDeleteTarget(null);
     } finally {
       setIsDeleting(false);
     }

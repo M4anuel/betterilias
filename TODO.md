@@ -101,6 +101,8 @@ build validation, and English fallback for partial languages.
 
 ## Completed
 
+- [x] Verify TA assignment deletion after slow or lost ILIAS responses without replaying the deletion; use the native confirmation and show localised errors for uncertain outcomes.
+
 - [x] Correct and grade exercise submissions.
 - [x] Connect a phone using a QR code in the desktop app's top-right settings menu.
 - [x] Follow live assignment upload links and ILIAS file-field encoding; validate upload responses and confirm the new file, with GTI/MMS regression fixtures.

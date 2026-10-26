@@ -24,7 +24,7 @@ from backend.schemas import (
     AssignmentOrderUpdateRequest,
     SaveTAAssignmentRequest,
 )
-from backend.services.ilias_client import IliasClient, StudentUploadError, SessionExpiredError
+from backend.services.ilias_client import IliasClient, StudentUploadError, SessionExpiredError, AssignmentDeletionError
 from backend.scrapers.dumper import ScrapingParsingError
 
 router = APIRouter(prefix="/exercises", tags=["Exercises & Grading"])
@@ -327,7 +327,12 @@ async def delete_ta_assignment(
     """
     Delete an assignment.
     """
-    success = await client.delete_ta_assignment(ref_id=exercise_id, ass_id=ass_id)
+    try:
+        success = await client.delete_ta_assignment(ref_id=exercise_id, ass_id=ass_id)
+    except AssignmentDeletionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=t('delete.network_error')) from exc
     if not success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

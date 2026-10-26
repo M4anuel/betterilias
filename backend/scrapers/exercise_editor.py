@@ -18,6 +18,27 @@ from backend.scrapers.dumper import safe_parser
 logger = logging.getLogger(__name__)
 
 
+@safe_parser(context_name='ta_assignment_delete_form')
+def parse_ta_assignment_delete_form(html: str, ref_id: str, ass_id: str) -> tuple[str, Dict[str, str]]:
+    """Read the native confirmation, refusing missing or additional targets."""
+    soup = BeautifulSoup(html, 'lxml')
+    for form in soup.find_all('form', action=True):
+        button = form.find(attrs={'name': 'cmd[deleteAssignments]'})
+        if button is None:
+            continue
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(form['action']).query)
+        if query.get('ref_id') != [ref_id]:
+            continue
+        ids = {control.get('value') for control in form.select('[name="id[]"]') if not control.has_attr('disabled')}
+        if ids != {ass_id}:
+            continue
+        payload = {control['name']: control.get('value', '') for control in form.select('input[type="hidden"][name]')
+                   if not control.has_attr('disabled')}
+        payload.update({'id[]': ass_id, 'cmd[deleteAssignments]': button.get('value') or button.get_text(strip=True)})
+        return urllib.parse.urljoin(settings.ilias_base_url, form['action']), payload
+    raise ValueError(t('delete.form_missing'))
+
+
 def _clean_text(elem) -> str:
     if not elem:
         return ""

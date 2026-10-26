@@ -37,3 +37,8 @@ scripts and dialogs were excluded. These cover the `upload` JSON handler, the
 filename. They are exercised with a mock HTTP transport; browser tests cover
 formatting, HTML editing, link targets, reloading existing instructions and retrying
 failed attachments without creating the assignment again.
+
+`ta_delete_confirmation.html` is the native confirmation form from the provided
+saved deletion workflow. Account navigation was excluded and its request token
+was replaced. Deletion tests check the exact selected ID and fresh form action,
+and simulate lost responses to verify outcomes without repeating a delete.
