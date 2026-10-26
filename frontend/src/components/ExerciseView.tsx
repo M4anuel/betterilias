@@ -46,7 +46,7 @@ import { StudentAssignmentModal } from './StudentAssignmentModal';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { TAFilterSettingsModal } from './TAFilterSettingsModal';
 import { NotificationToast, ChangeNotification } from './NotificationToast';
-import { GradingSavedToast, GradeSavedFeedback } from './GradingSavedToast';
+import { GradingFeedbackBar, GradeSavedFeedback } from './GradingFeedbackBar';
 import { TAExerciseManagementView, AssignmentFeedback } from './TAExerciseManagementView';
 import { TAExerciseEditorView } from './TAExerciseEditorView';
 
@@ -1984,6 +1984,23 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             </div>
           </div>
 
+          {/* Modeless Feedback Bar directly below filter bar (stays until dismissed with X) */}
+          <GradingFeedbackBar
+            feedback={gradingFeedback}
+            onDismiss={() => setGradingFeedback(null)}
+            onViewSubmission={(memberId) => {
+              const sub = taSubmissionsData?.submissions.find((s) => s.member_id === memberId);
+              if (sub) {
+                setDetailModalSubmission(sub);
+              }
+            }}
+            onResetFilter={() => {
+              handleSetSubmissionFilter('all');
+              setTaGradeFilter([]);
+              localStorage.setItem('ilias_ta_filter_grade', JSON.stringify([]));
+            }}
+          />
+
           {taSortField === 'ilias' && (
             <div role="status" className="text-xs text-slate-500 dark:text-slate-400">
               {!teamSortNames ? t('ILIAS-Reihenfolge wird geladen…') : teamOrder?.error ? (
@@ -2625,22 +2642,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         />
       )}
 
-      {/* Modeless Feedback Toast for saved submission */}
-      <GradingSavedToast
-        feedback={gradingFeedback}
-        onDismiss={() => setGradingFeedback(null)}
-        onViewSubmission={(memberId) => {
-          const sub = taSubmissionsData?.submissions.find((s) => s.member_id === memberId);
-          if (sub) {
-            setDetailModalSubmission(sub);
-          }
-        }}
-        onResetFilter={() => {
-          handleSetSubmissionFilter('all');
-          setTaGradeFilter([]);
-          localStorage.setItem('ilias_ta_filter_grade', JSON.stringify([]));
-        }}
-      />
+
     </div>
   );
 };

@@ -72,7 +72,7 @@ test('ILIAS Saver TTL calculation and freshness check', async () => {
   assert.equal(isFresh(testKey, 10), true);
 });
 
-test('Grading filter removal detection for modeless toast', () => {
+test('Grading filter removal detection for modeless feedback bar', () => {
   const taGradeFilter = ['not_graded'];
   const isNotGradedFilter = taGradeFilter.includes('not_graded');
 
