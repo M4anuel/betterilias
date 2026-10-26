@@ -589,11 +589,7 @@ def test_real_unibe_course_content_blocks():
 
 
 def test_real_unibe_new_work_drawers():
-    import glob
-    matches = find_html_dump("New Work")
-    assert len(matches) > 0, "New Work dump not found"
-
-    html = Path(matches[0]).read_text(encoding="utf-8", errors="replace")
+    html = (FIXTURES_UNIBE / "unibe_new_work_content.html").read_text(encoding="utf-8")
     res = parse_course_materials(html, "3394943")
 
     drawers = [b for b in res.blocks if b.block_type == "drawer"]
@@ -627,12 +623,7 @@ def test_real_unibe_new_work_drawers():
 
 
 def test_real_unibe_valuation_items_and_files():
-    import glob
-    matches = find_html_dump("Valuation")
-    val_files = [p for p in matches if "BetterIlias" not in p]
-    assert len(val_files) > 0, "Valuation dump not found"
-
-    html = Path(val_files[0]).read_text(encoding="utf-8", errors="replace")
+    html = (FIXTURES_UNIBE / "unibe_valuation_content.html").read_text(encoding="utf-8")
     res = parse_course_materials(html, "5349")
 
     # Main items block must be titled "Inhalte" (NOT "Ordner")
@@ -651,11 +642,7 @@ def test_real_unibe_valuation_items_and_files():
 
 
 def test_real_unibe_psychopathologie_sessions_and_expand():
-    import glob
-    matches = find_html_dump("Psychopathologie")
-    assert len(matches) > 0, "Psychopathologie dump not found"
-
-    html = Path(matches[0]).read_text(encoding="utf-8", errors="replace")
+    html = (FIXTURES_UNIBE / "unibe_psychopathologie_content.html").read_text(encoding="utf-8")
     res = parse_course_materials(html, "3364036")
 
     assert len(res.sessions) == 14, f"Expected 14 sessions, got {len(res.sessions)}"
