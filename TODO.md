@@ -34,6 +34,68 @@ build validation, and English fallback for partial languages.
   - [x] Responsive table wrappers and optimal reading measure (~68ch max width for prose).
 - [ ] Continue preserving custom lecturer layouts and edge cases.
 
+## Comprehensive ILIAS Object Support & Course Management
+
+**Status:** Inventory of all 30 native ILIAS object types extracted from course authoring views (`htmlfromilias/ActualListOfAllSubjects/Ilias Course Formatting/`). Core learning objects (`file`, `fold`, `exc`, `xoct`, `sess`) are fully supported; remaining objects are catalogued below with current status and integration roadmap.
+
+### Object Inventory & Current Support Status
+
+#### 1. Content (`Inhalt`)
+- [x] `file` — **File** (`Datei`): Fully supported. Dedicated file card/row, download link, PDF preview embed, and file size parsing.
+- [x] `webr` — **Weblink** (`Weblink`): Partially supported. Detected by `_detect_material_type`, opens external link in a new tab.
+- [ ] `copa` — **Content Page** (`Inhaltsseite`): Needs parser to extract rich HTML page content directly into BetterIlias rather than redirecting.
+- [ ] `glo` — **Glossary** (`Glossar`): Needs glossary term extraction, search, and letter index navigation.
+- [ ] `lm` — **Learning Module ILIAS** (`Lernmodul ILIAS`): Needs chapter tree and page navigation viewer.
+- [ ] `htlm` — **Learning Module HTML** (`Lernmodul HTML`): Needs sandboxed iframe viewer with asset resolution.
+- [ ] `sahs` — **Learning Module SCORM** (`Lernmodul SCORM/AICC`): Needs SCORM API player runtime wrapper.
+- [ ] `dcl` — **Data Collection** (`Datensammlung`): Needs table view, field filters, and entry detail view.
+- [ ] `xds2` — **Literature Ordering (DigiSem)** (`Digitale Seminarbibliothek`): Needs status display and direct link handling.
+
+#### 2. Video and Audio (`Video und Audio`)
+- [x] `xoct` — **Video- & Audioseries (Opencast/Tobira)** (`Video- & Audioserie`): Supported. In-app Opencast podcast player modal with dual-stream audio/slides support.
+- [ ] `xvid` — **Interactive Video** (`Interaktives Video`): Needs interactive video player supporting embedded questions and jump markers.
+- [ ] `mep` — **Media Pool** (`Medienpool`): Needs media gallery viewer (audio/video/image assets).
+
+#### 3. Organisation (`Organisation`)
+- [x] `fold` — **Folder** (`Ordner`): Fully supported for browsing. Multi-column row layout, nested navigation, breadcrumbs, search, and file counts.
+- [x] `sess` — **Session** (`Sitzung`): Supported. Identified with calendar badge, scheduled date/time, and room/location details.
+- [ ] `itgr` — **Item Group** (`Objektgruppe`): Needs container/section divider styling to group related materials logically under a title.
+- [ ] `lso` — **Learning Sequence** (`Lernsequenz`): Needs sequential step-by-step progress viewer.
+
+#### 4. Communication & Collaboration (`Kommunikation und Zusammenarbeit`)
+- [x] `frm` — **Forum** (`Forum`): Partially supported. Forum card representation and direct navigation to ILIAS forum threads.
+- [x] `grp` — **Group** (`Gruppe`): Partially supported. Group membership parsed; needs dedicated group workspace view.
+- [ ] `blog` — **Blog** (`Blog`): Needs blog post timeline and comments feed.
+- [ ] `wiki` — **Wiki** (`Wiki`): Needs wiki page viewer, page history, and internal wiki linking.
+- [ ] `xpdl` — **Texteditor (Etherpad)** (`Texteditor / Etherpad`): Needs collaborative live editor embed.
+
+#### 5. Performance & Assessment (`Leistungsüberprüfung`)
+- [x] `exc` — **Exercise** (`Übung`): Fully supported. Student submission uploads with drag-and-drop, TA assignment management (create, edit, delete), feedback files, and grading.
+- [x] `tst` — **Test** (`Test`): Partially supported. Detected in backend; links to ILIAS test environment.
+- [ ] `qpl` — **Question Pool for Tests** (`Fragenpool für Tests`): Needs question pool browser for instructors/TAs.
+- [ ] `prtt` — **Portfolio Template** (`Portfoliovorlage`): Needs portfolio template preview.
+
+#### 6. Feedback & Evaluation (`Feedback und Evaluation`)
+- [x] `xlvo` — **LiveVoting** (`LiveVoting`): Partially supported. Quick launcher card and vote icon.
+- [ ] `poll` — **Poll** (`Umfrage`): Needs quick voting card and live results chart.
+- [ ] `svy` — **Survey** (`Befragung`): Needs survey overview, participation link, and results summary.
+- [ ] `spl` — **Question Pool for Surveys** (`Fragenpool für Umfragen`): Needs survey question pool browser.
+- [ ] `xsev` — **Self-evaluation** (`Selbstevaluation`): Needs self-evaluation question rubric and spider/bar chart results.
+
+### Object Detection & Parsing Roadmap
+- [ ] Extend `_detect_material_type` in `backend/scrapers/materials.py` to recognize all 30 object types by `icon_<type>` CSS class, `/go/<type>/` permalink, or `cmdClass=ilObj<Type>GUI` instead of falling back to `"other"`.
+- [ ] Map distinct Lucide React icons, semantic color badges, and localized labels for all 30 types in `frontend/src/components/CourseView.tsx`.
+
+### Instructor & TA Course Authoring Actions
+- [ ] Course "Add Object" toolbar button & creation modal (`c-toolbar__item navbar-form -> button "Add Object"`):
+  - [ ] Support creating folders (`ilObjFolderGUI&cmd=save&new_type=fold`, `form/input_0/input_1` title, `form/input_0/input_2` description).
+  - [ ] Support uploading files (`ilObjFileGUI&cmd=uploadFiles&new_type=file`, multi-file dropzone & license selection).
+  - [ ] Support creating weblinks (`ilObjLinkResourceGUI&new_type=webr`).
+  - [ ] Support creating item groups (`ilObjItemGroupGUI&new_type=itgr`).
+  - [ ] Support creating exercises (`ilObjExerciseGUI&new_type=exc`).
+- [ ] Support deleting course objects with native confirmation (`select_and_deleting.html` via `ilObjectTableGUI&cmd=delete`).
+- [ ] Support course page customization & resource placement (`edit_page.html` via `ilPCResourcesGUI`).
+
 ## Media & Podcast Streaming
 
 - [ ] Native In-App Opencast Podcast Player with Dual-Stream Support:
@@ -95,8 +157,11 @@ build validation, and English fallback for partial languages.
 
 ## Teaching assistant tools
 
-- [ ] Support creating folders.
-- [ ] Support creating exercises.
+- [ ] Support creating folders (`ilObjFolderGUI&cmd=save&new_type=fold`).
+- [ ] Support creating exercises (`ilObjExerciseGUI&cmd=create&new_type=exc`).
+- [ ] Support course content creation via native "Add Object" dialog (`cmd=create&new_type=<type>`).
+- [ ] Course object management: delete, reorder, and organize items into folders/item groups.
+- [ ] Course page layout editor (`ilPCResourcesGUI`).
 - [ ] Identify remaining TA workflows that should be available in BetterIlias.
 
 ## Completed
