@@ -21,6 +21,7 @@ import {
 import { api } from './lib/api';
 import { cache } from './lib/cache';
 import { theme } from './lib/theme';
+import { navigationGuard } from './lib/navigationGuard';
 
 export interface NavigationState {
   semester: string;
@@ -155,6 +156,24 @@ export const App: React.FC = () => {
   const [isRevalidatingMaterials, setIsRevalidatingMaterials] = useState(false);
   const [loadMaterialsError, setLoadMaterialsError] = useState<string | null>(null);
   const materialsRequestSeq = useRef<number>(0);
+  const currentNavStateRef = useRef<NavigationState>({
+    semester: selectedSemester,
+    courseId: selectedCourseId,
+    containerId: currentContainerId,
+    exerciseId: activeExerciseRefId,
+    exerciseTab: activeExerciseTab,
+    repositoryId,
+  });
+  useEffect(() => {
+    currentNavStateRef.current = {
+      semester: selectedSemester,
+      courseId: selectedCourseId,
+      containerId: currentContainerId,
+      exerciseId: activeExerciseRefId,
+      exerciseTab: activeExerciseTab,
+      repositoryId,
+    };
+  }, [selectedSemester, selectedCourseId, currentContainerId, activeExerciseRefId, activeExerciseTab, repositoryId]);
   const activeContainerRef = useRef<string | null>(
     initialFolderParam ||
       initialCourseParam ||
@@ -378,6 +397,7 @@ export const App: React.FC = () => {
   // --- Semester Selection Handler ---
   const handleSelectSemester = useCallback(
     (semId: string) => {
+      if (!navigationGuard.confirmNavigation()) return;
       if (!repositoryId && semId === selectedSemester && selectedCourseId === null && !activeExerciseRefId) {
         return;
       }
@@ -410,6 +430,7 @@ export const App: React.FC = () => {
   // --- Course Selection Handler ---
   const handleSelectCourse = useCallback(
     (courseRefId: string) => {
+      if (!navigationGuard.confirmNavigation()) return;
       if (
         courseRefId === selectedCourseId &&
         currentContainerId === courseRefId &&
@@ -441,6 +462,7 @@ export const App: React.FC = () => {
   // --- Subfolder Navigation Handler ---
   const handleNavigateFolder = useCallback(
     (folderRefId: string) => {
+      if (!navigationGuard.confirmNavigation()) return;
       if (!selectedCourseId) return;
       if (folderRefId === currentContainerId && !activeExerciseRefId) return;
 
@@ -465,6 +487,7 @@ export const App: React.FC = () => {
   // --- Return to Course Root ---
   const handleNavigateCourseRoot = useCallback(
     (courseRefId: string) => {
+      if (!navigationGuard.confirmNavigation()) return;
       if (currentContainerId === courseRefId && !activeExerciseRefId) return;
 
       setCurrentContainerId(courseRefId);
@@ -487,6 +510,7 @@ export const App: React.FC = () => {
 
   // --- Return to Semester Overview ---
   const handleNavigateHome = useCallback(() => {
+    if (!navigationGuard.confirmNavigation()) return;
     if (!repositoryId && selectedCourseId === null && !activeExerciseRefId) return;
     setRepositoryId(null);
 
@@ -511,6 +535,7 @@ export const App: React.FC = () => {
   }, [repositoryId, selectedCourseId, activeExerciseRefId, selectedSemester]);
 
   const handleNavigateRepository = useCallback((refId: string) => {
+    if (!navigationGuard.confirmNavigation()) return;
     if (repositoryId === refId) return;
     cache.rememberRepositoryPath(materialsData?.breadcrumbs || []);
     materialsRequestSeq.current++;
@@ -534,6 +559,7 @@ export const App: React.FC = () => {
   // --- Exercise View Handler ---
   const handleSelectExercise = useCallback(
     (exerciseRefId: string | null, tab: ExerciseTab | null = null) => {
+      if (exerciseRefId !== activeExerciseRefId && !navigationGuard.confirmNavigation()) return;
       if (exerciseRefId === activeExerciseRefId && tab === activeExerciseTab) return;
 
       if (exerciseRefId === null) {
@@ -559,6 +585,7 @@ export const App: React.FC = () => {
 
   const handleExerciseTabChange = useCallback(
     (tab: ExerciseTab) => {
+      if (tab !== activeExerciseTab && !navigationGuard.confirmNavigation()) return;
       if (tab === activeExerciseTab) return;
       setActiveExerciseTab(tab);
       const nextState: NavigationState = {
@@ -664,6 +691,11 @@ export const App: React.FC = () => {
   // --- History Navigation & PopState Effect ---
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
+      if (!navigationGuard.confirmNavigation()) {
+        const current = currentNavStateRef.current;
+        window.history.pushState(current, '', stateToUrl(current));
+        return;
+      }
       const state: NavigationState =
         (event.state as NavigationState) || parseStateFromUrl(cache.getSelectedSemester());
 

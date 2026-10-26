@@ -25,6 +25,7 @@ import {
   SaveTAAssignmentRequest,
 } from '../types';
 import { cache } from './cache';
+import { navigationGuard } from './navigationGuard';
 
 
 const API_BASE = '/api';
@@ -44,17 +45,30 @@ async function sessionFetch(input: string, init?: RequestInit): Promise<Response
     headers.set('X-Session-Id', sessionId);
   }
 
-  const response = await fetch(input, {
-    ...init,
-    headers,
-  });
-
-  if (response.status === 401) {
-    window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
-  } else if (response.ok && !input.startsWith(`${API_BASE}/auth/`)) {
-    window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
+  const isMutation = Boolean(
+    init?.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(init.method.toUpperCase())
+  );
+  if (isMutation) {
+    navigationGuard.incrementPending();
   }
-  return response;
+
+  try {
+    const response = await fetch(input, {
+      ...init,
+      headers,
+    });
+
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
+    } else if (response.ok && !input.startsWith(`${API_BASE}/auth/`)) {
+      window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
+    }
+    return response;
+  } finally {
+    if (isMutation) {
+      navigationGuard.decrementPending();
+    }
+  }
 }
 
 export const api = {

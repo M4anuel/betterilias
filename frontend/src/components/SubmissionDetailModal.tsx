@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { SubmissionItem, FeedbackFileItem } from '../types';
 import { api } from '../lib/api';
+import { useNavigationGuard } from '../lib/navigationGuard';
 
 interface SubmissionDetailModalProps {
   submission: SubmissionItem;
@@ -168,21 +169,42 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
   };
 
 
+  useNavigationGuard({
+    id: `submission-detail-${submission.member_id}`,
+    isDirty: () => isDirty,
+    isPending: () => isUploadingFile || isSaving || deletingFileId !== null,
+    message: () => t("Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?"),
+  });
+
+  const handleSafeClose = () => {
+    if (isDirty) {
+      if (!window.confirm(t("Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?"))) {
+        return;
+      }
+    }
+    if (isUploadingFile || isSaving) {
+      if (!window.confirm(t("Ein Vorgang oder Upload wird gerade ausgeführt. Wenn Sie die Seite jetzt verlassen, wird er möglicherweise abgebrochen. Möchten Sie wirklich fortfahren?"))) {
+        return;
+      }
+    }
+    onClose();
+  };
+
   // Close on Escape key press
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        handleSafeClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [handleSafeClose]);
 
   // Handle backdrop click
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
-      onClose();
+      handleSafeClose();
     }
   };
 
@@ -280,7 +302,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="rounded-full p-2 text-slate-400 hover:bg-slate-200/70 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
             aria-label={t("Schließen")}
           >

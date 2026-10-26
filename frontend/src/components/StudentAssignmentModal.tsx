@@ -22,6 +22,7 @@ import {
 import { CourseUserCandidate, StudentAssignmentDetail, TeamMemberInfo } from '../types';
 import { api } from '../lib/api';
 import { cache } from '../lib/cache';
+import { useNavigationGuard } from '../lib/navigationGuard';
 
 interface StudentAssignmentModalProps {
   exerciseRefId: string;
@@ -451,16 +452,31 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
     }
   };
 
+  useNavigationGuard({
+    id: `student-assignment-${assId}`,
+    isPending: () => isUploading || isDeletingTeam || deletingDeliveredId !== null,
+    message: () => t("Ein Vorgang oder Upload wird gerade ausgeführt. Wenn Sie die Seite jetzt verlassen, wird er möglicherweise abgebrochen. Möchten Sie wirklich fortfahren?"),
+  });
+
+  const handleSafeClose = () => {
+    if (isUploading || isDeletingTeam || deletingDeliveredId !== null) {
+      if (!window.confirm(t("Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?"))) {
+        return;
+      }
+    }
+    onClose();
+  };
+
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        handleSafeClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [handleSafeClose]);
 
   // Fetch assignment presentation detail
   useEffect(() => {
@@ -499,7 +515,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-150"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
-          onClose();
+          handleSafeClose();
         }
       }}
     >
@@ -523,7 +539,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
             title={t("Schließen (Esc)")}
           >
@@ -1233,7 +1249,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
           <span className="text-[11px] text-slate-400 dark:text-slate-500">{t("Drücke Esc zum Schließen")}</span>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="rounded-xl bg-slate-900 dark:bg-slate-800 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:hover:bg-slate-700 transition cursor-pointer"
           >
             {t("Schließen")}
