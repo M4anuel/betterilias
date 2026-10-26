@@ -39,6 +39,7 @@ import {
   TAQuickFilter,
 } from '../types';
 import { api } from '../lib/api';
+import { navigationGuard, useNavigationGuard } from '../lib/navigationGuard';
 import { cache } from '../lib/cache';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { StudentAssignmentModal } from './StudentAssignmentModal';
@@ -80,6 +81,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   onNotifyChange,
 }) => {
   const language = useLanguage();
+
   // Top Navigation Tab: 'assignments' | 'info' | 'ta_grading'
   const [activeTab, setActiveTab] = useState<'assignments' | 'info' | 'ta_grading'>(() => {
     if (activeTabProp === 'info') return 'info';
@@ -114,6 +116,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   const switchTab = useCallback(
     (tab: ExerciseTab) => {
+      if (tab !== activeTabProp && !navigationGuard.confirmNavigation()) {
+        return;
+      }
       if (tab === 'assignments') {
         setActiveTab('assignments');
         setTaManagementMode('none');
@@ -358,6 +363,19 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const [loadingFeedbackFilesFor, setLoadingFeedbackFilesFor] = useState<Record<string, boolean>>({});
   const [deletingFeedbackFileId, setDeletingFeedbackFileId] = useState<string | null>(null);
   const fetchedFeedbackMembersRef = useRef<Set<string>>(new Set());
+
+  // Check for unsaved grades or feedback notes
+  const hasDirtyGrades = useMemo(
+    () => Object.values(localEdits).some((e) => e.isDirty),
+    [localEdits]
+  );
+
+  useNavigationGuard({
+    id: `exercise-grading-${exerciseRefId}`,
+    isDirty: () => hasDirtyGrades,
+    isPending: () => uploadingMemberId !== null || deletingFeedbackFileId !== null,
+    message: () => t("Sie haben ungespeicherte Bewertungen oder Notizen. Möchten Sie die Seite wirklich verlassen?"),
+  });
 
   // Sorting state for TA grading submissions
   const [taSortField, setTaSortField] = useState<'time' | 'name' | 'status' | 'mark' | 'ilias'>('time');
@@ -661,6 +679,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   const handleSelectTaAssignment = useCallback(
     (newAssId: string) => {
+      if (newAssId !== selectedTaAssId && hasDirtyGrades && !navigationGuard.confirmNavigation()) {
+        return;
+      }
       setSelectedTaAssId(newAssId);
       const cacheKey = newAssId || 'default';
       let cached: ExerciseSubmissionsResponse | null = submissionsCacheRef.current[cacheKey] || null;
@@ -1270,10 +1291,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           onNavigateRepository={onNavigateRepository}
           onNavigateSemester={onNavigateSemester}
           onNavigateCourse={(ref) => {
+            if (!navigationGuard.confirmNavigation()) return;
             onNavigateCourse(ref);
             onBack();
           }}
           onNavigateFolder={(ref) => {
+            if (!navigationGuard.confirmNavigation()) return;
             if (onNavigateFolder) onNavigateFolder(ref);
             onBack();
           }}

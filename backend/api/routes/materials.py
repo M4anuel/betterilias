@@ -16,7 +16,10 @@ router = APIRouter(tags=["Materials"])
 
 @router.get('/materials/{ref_id}/authoring-context', response_model=AuthoringContext)
 async def get_authoring_context(ref_id: str = Path(pattern=r'^\d+$'), client: IliasClient = Depends(get_ilias_client)):
-    return await client.get_authoring_context(ref_id)
+    try:
+        return await client.get_authoring_context(ref_id)
+    except AuthoringError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
 
 
 @router.get('/materials/{ref_id}/files/options')

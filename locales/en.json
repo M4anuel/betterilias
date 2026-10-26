@@ -1072,5 +1072,11 @@
   "objects.xsev": "Self-evaluation",
   "authoring.hidden": "Hidden folder",
   "authoring.public_domain": "Public domain",
-  "authoring.form_changed": "The ILIAS creation form has changed or is unavailable. Reload the page or create the object in ILIAS."
+  "authoring.form_changed": "The ILIAS creation form has changed or is unavailable. Reload the page or create the object in ILIAS.",
+  "Sie haben ungespeicherte Änderungen. Möchten Sie die Seite wirklich verlassen und Ihre Änderungen verwerfen?": "You have unsaved changes. Do you really want to leave this page and discard your changes?",
+  "Ein Vorgang oder Upload wird gerade ausgeführt. Wenn Sie die Seite jetzt verlassen, wird er möglicherweise abgebrochen. Möchten Sie wirklich fortfahren?": "An operation or upload is currently in progress. If you leave now, it may be cancelled. Do you really want to continue?",
+  "Sie haben ungespeicherte Bewertungen oder Notizen. Möchten Sie die Seite wirklich verlassen?": "You have unsaved grades or feedback notes. Do you really want to leave this page?",
+  "Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?": "You have unsaved changes in this evaluation. Do you really want to close?",
+  "Sie haben ungespeicherte Änderungen. Möchten Sie das Fenster wirklich schließen?": "You have unsaved changes. Do you really want to close the dialog?",
+  "Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?": "An upload is currently in progress. Do you really want to cancel?"
 }

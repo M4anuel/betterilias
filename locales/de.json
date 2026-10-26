@@ -1072,5 +1072,11 @@
   "objects.xsev": "Selbstevaluation",
   "authoring.hidden": "Versteckter Ordner",
   "authoring.public_domain": "Gemeinfrei",
-  "authoring.form_changed": "Das ILIAS-Erstellungsformular hat sich geändert oder ist nicht verfügbar. Bitte die Seite neu laden oder das Objekt in ILIAS erstellen."
+  "authoring.form_changed": "Das ILIAS-Erstellungsformular hat sich geändert oder ist nicht verfügbar. Bitte die Seite neu laden oder das Objekt in ILIAS erstellen.",
+  "Sie haben ungespeicherte Änderungen. Möchten Sie die Seite wirklich verlassen und Ihre Änderungen verwerfen?": "Sie haben ungespeicherte Änderungen. Möchten Sie die Seite wirklich verlassen und Ihre Änderungen verwerfen?",
+  "Ein Vorgang oder Upload wird gerade ausgeführt. Wenn Sie die Seite jetzt verlassen, wird er möglicherweise abgebrochen. Möchten Sie wirklich fortfahren?": "Ein Vorgang oder Upload wird gerade ausgeführt. Wenn Sie die Seite jetzt verlassen, wird er möglicherweise abgebrochen. Möchten Sie wirklich fortfahren?",
+  "Sie haben ungespeicherte Bewertungen oder Notizen. Möchten Sie die Seite wirklich verlassen?": "Sie haben ungespeicherte Bewertungen oder Notizen. Möchten Sie die Seite wirklich verlassen?",
+  "Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?": "Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?",
+  "Sie haben ungespeicherte Änderungen. Möchten Sie das Fenster wirklich schließen?": "Sie haben ungespeicherte Änderungen. Möchten Sie das Fenster wirklich schließen?",
+  "Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?": "Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?"
 }

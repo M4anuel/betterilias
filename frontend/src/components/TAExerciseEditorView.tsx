@@ -1,4 +1,5 @@
 import { t, useLanguage } from '../lib/i18n';
+import { navigationGuard, useNavigationGuard } from '../lib/navigationGuard';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ArrowLeft,
@@ -107,6 +108,24 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   const [isDeletingFileId, setIsDeletingFileId] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(() => {
+    if (!assId) {
+      return JSON.stringify({
+        title: '',
+        typeId: initialTypeId,
+        mandatory: true,
+        instructionHtml: '',
+        startTime: '',
+        deadlineMode: 0,
+        deadline: '',
+        hasGracePeriod: false,
+        deadline2: '',
+        maxFileEnabled: false,
+        maxFile: null,
+      });
+    }
+    return null;
+  });
 
 
   // Track if initial load happened so typeId changes don't wipe user inputs
@@ -159,6 +178,19 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       setMaxFileEnabled(data.max_file_enabled || false);
       setMaxFile(data.max_file ?? null);
       setInstructionFiles(data.instruction_files || []);
+      setInitialSnapshot(JSON.stringify({
+        title: data.title || '',
+        typeId: data.type_id || initialTypeId,
+        mandatory: data.mandatory,
+        instructionHtml: data.instruction_html || '',
+        startTime: data.start_time || '',
+        deadlineMode: data.deadline_mode === -1 ? -1 : 0,
+        deadline: data.deadline || '',
+        hasGracePeriod: data.has_grace_period || false,
+        deadline2: data.deadline2 || '',
+        maxFileEnabled: data.max_file_enabled || false,
+        maxFile: data.max_file ?? null,
+      }));
 
     } catch (err: any) {
       setError(err?.message || t("Fehler beim Laden der Übungsdetails"));
@@ -246,6 +278,19 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
         setInstructionFiles(res.instruction_files);
       }
 
+      setInitialSnapshot(JSON.stringify({
+        title,
+        typeId,
+        mandatory,
+        instructionHtml,
+        startTime,
+        deadlineMode,
+        deadline,
+        hasGracePeriod,
+        deadline2,
+        maxFileEnabled,
+        maxFile,
+      }));
       setSuccessMsg(t("Übung erfolgreich gespeichert."));
       setTimeout(() => setSuccessMsg(null), 3000);
       if (newAssId) {
@@ -339,6 +384,33 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
 
   const totalFilesCount = instructionFiles.length + pendingFiles.length;
 
+  const currentSnapshot = JSON.stringify({
+    title,
+    typeId,
+    mandatory,
+    instructionHtml,
+    startTime,
+    deadlineMode,
+    deadline,
+    hasGracePeriod,
+    deadline2,
+    maxFileEnabled,
+    maxFile,
+  });
+  const isDirty = (initialSnapshot !== null && initialSnapshot !== currentSnapshot) || pendingFiles.length > 0;
+
+  useNavigationGuard({
+    isDirty,
+    isPending: isSaving || isUploadingFile || Boolean(isDeletingFileId),
+    message: t("Sie haben ungespeicherte Änderungen. Möchten Sie die Seite wirklich verlassen und Ihre Änderungen verwerfen?"),
+  });
+
+  const handleSafeBack = () => {
+    if (navigationGuard.confirmNavigation()) {
+      onBack();
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -346,7 +418,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={onBack}
+            onClick={handleSafeBack}
             className="flex items-center justify-center p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
             title={t("Zurück zur Übungsverwaltung")}
             aria-label={t("Zurück zur Übungsverwaltung")}
@@ -367,7 +439,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onBack}
+            onClick={handleSafeBack}
             className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer"
           >
             {t("Abbrechen")}
@@ -777,7 +849,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
-              onClick={onBack}
+              onClick={handleSafeBack}
               className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer"
             >
               {t("Abbrechen")}

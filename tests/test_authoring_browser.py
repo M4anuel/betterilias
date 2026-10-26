@@ -45,6 +45,7 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
             items.append(item)
             body = dict(success=True, items=[item])
         elif path.endswith('/files'):
+            assert page.evaluate("!window.dispatchEvent(new Event('beforeunload', { cancelable: true }))")
             uploads.append(route.request.post_data_buffer)
             assert route.request.headers.get('accept-language') == language
             assert route.request.headers.get('x-session-id') == 'test-author-session'
@@ -96,6 +97,7 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
             assert len(uploads) == 2
             assert b'first.pdf' in uploads[0] and b'second.pdf' in uploads[1]
             assert b'rights' in uploads[0]
+            assert page.evaluate("window.dispatchEvent(new Event('beforeunload', { cancelable: true }))")
             dialog.get_by_role('button', name=tr('authoring.cancel'), exact=True).click()
             context.update(can_create=False, creatable_types=[])
             page.reload()

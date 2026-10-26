@@ -26,6 +26,7 @@ import {
   SaveTAAssignmentRequest,
 } from '../types';
 import { cache } from './cache';
+import { navigationGuard } from './navigationGuard';
 
 
 const API_BASE = '/api';
@@ -45,17 +46,30 @@ async function sessionFetch(input: string, init?: RequestInit): Promise<Response
     headers.set('X-Session-Id', sessionId);
   }
 
-  const response = await fetch(input, {
-    ...init,
-    headers,
-  });
-
-  if (response.status === 401) {
-    window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
-  } else if (response.ok && !input.startsWith(`${API_BASE}/auth/`)) {
-    window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
+  const isMutation = Boolean(
+    init?.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(init.method.toUpperCase())
+  );
+  if (isMutation) {
+    navigationGuard.incrementPending();
   }
-  return response;
+
+  try {
+    const response = await fetch(input, {
+      ...init,
+      headers,
+    });
+
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
+    } else if (response.ok && !input.startsWith(`${API_BASE}/auth/`)) {
+      window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
+    }
+    return response;
+  } finally {
+    if (isMutation) {
+      navigationGuard.decrementPending();
+    }
+  }
 }
 
 export const api = {
@@ -82,7 +96,8 @@ export const api = {
     return res.json();
   },
   uploadCourseFile(refId: string, file: File, license: string, onProgress: (progress: number) => void): Promise<AuthoringResult> {
-    return new Promise((resolve, reject) => {
+    navigationGuard.incrementPending();
+    return new Promise<AuthoringResult>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${API_BASE}/materials/${encodeURIComponent(refId)}/files`);
       xhr.setRequestHeader('Accept-Language', getLanguage());
@@ -103,7 +118,7 @@ export const api = {
       const body = new FormData();
       body.append('file', file); body.append('license', license);
       xhr.send(body);
-    });
+    }).finally(() => navigationGuard.decrementPending());
   },
   async prepareMobileSession(): Promise<{ session_id: string }> {
     const res = await sessionFetch(`${API_BASE}/auth/mobile-session`, { method: 'POST', cache: 'no-store' });

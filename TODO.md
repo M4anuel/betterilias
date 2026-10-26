@@ -166,10 +166,10 @@ build validation, and English fallback for partial languages.
 
 ## Data Safety & Navigation Guards
 
-- [ ] Confirm before leaving the page when there are unsaved steps or pending operations:
-  - [ ] Unsaved grading & corrections: Prompt the user with a confirmation dialog before navigating away if any submission has unsaved edits (e.g. modified points/mark, passed status, feedback statement, or internal tutor notice).
-  - [ ] In-progress uploads & pending requests: Guard against accidental tab closing or navigation while file uploads (student assignment files, TA feedback files, instruction attachments) or background POST/DELETE requests are actively in flight.
-  - [ ] Handle both in-app navigation (tab switching, breadcrumbs, back/forward history, Mouse 4 & 5) and browser-level actions (tab close, window close, page reload via window.beforeunload).
+- [x] Confirm before leaving the page when there are unsaved steps or pending operations:
+  - [x] Unsaved grading & corrections: Prompt the user with a confirmation dialog before navigating away if any submission has unsaved edits (e.g. modified points/mark, passed status, feedback statement, or internal tutor notice).
+  - [x] In-progress uploads & pending requests: Guard against accidental tab closing or navigation while file uploads (student assignment files, TA feedback files, instruction attachments) or background POST/DELETE requests are actively in flight.
+  - [x] Handle both in-app navigation (tab switching, breadcrumbs, back/forward history, Mouse 4 & 5) and browser-level actions (tab close, window close, page reload via window.beforeunload).
 
 ## Completed
 

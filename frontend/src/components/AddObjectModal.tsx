@@ -3,6 +3,7 @@ import { FileText, FolderPlus, Layers, Plus, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { t, useLanguage } from '../lib/i18n';
 import { objectCategories, supportedCreationTypes } from '../lib/iliasObjects';
+import { useNavigationGuard } from '../lib/navigationGuard';
 import type { AuthoringContext, FileLicense } from '../types';
 
 type QueueItem = { id: number; file: File; status: 'pending' | 'saving' | 'saved' | 'failed'; progress: number };
@@ -55,6 +56,8 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [uncertain, setUncertain] = useState(false);
+  // The whole queue remains pending between individual native file saves.
+  useNavigationGuard({ isPending: busy });
   useEffect(() => {
     dialog.current?.showModal();
     let active = true;
