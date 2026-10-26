@@ -113,3 +113,8 @@ Write clear, structured commit messages following Conventional Commits:
 * `docs: ...` for documentation updates
 * `test: ...` for adding or improving automated tests
 
+### 4.3 Complete the Commit, Merge & Push Workflow
+* Put completed changes into sensible, focused commits, each covering one coherent change. Separate unrelated work and use the Conventional Commit messages above; do not accumulate an entire session into one large commit.
+* Once the task is ready and the required checks pass, finish the workflow in Sections 1 and 2: fetch upstream, merge `origin/main` into your designated branch, resolve conflicts while preserving others' work, and verify the combined result. Push your branch, then merge and push the tested changes to `main` using the repository's permitted workflow.
+* Treat committing and publishing completed work as part of finishing the task, unless the user explicitly requests local-only work or a repository restriction prevents publication. Do not leave finished changes uncommitted or unpushed without explaining the concrete blocker.
+* Never bypass failing checks, branch protections, or the prohibition on force-pushing. Report the resulting branch and commit IDs, verification results, and any remaining blockers.
