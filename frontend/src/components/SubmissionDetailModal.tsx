@@ -20,6 +20,7 @@ import {
   Check,
   RefreshCw,
   Upload,
+  Trash2,
 } from 'lucide-react';
 import { SubmissionItem, FeedbackFileItem } from '../types';
 import { api } from '../lib/api';
@@ -80,6 +81,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isDraggingFeedbackFile, setIsDraggingFeedbackFile] = useState(false);
   const [uploadSuccessMsg, setUploadSuccessMsg] = useState<string | null>(null);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
 
   useEffect(() => {
     if (exerciseRefId && submission.evaluation_by_file_url) {
@@ -126,6 +128,21 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
     const file = e.dataTransfer.files?.[0];
     if (file) {
       await uploadFeedbackFileDirect(file);
+    }
+  };
+
+  const handleDeleteFeedbackFile = async (fileId: string) => {
+    if (!exerciseRefId || deletingFileId) return;
+    if (!window.confirm(t("Möchten Sie diese Korrekturdatei wirklich löschen?"))) return;
+
+    setDeletingFileId(fileId);
+    try {
+      const res = await api.deleteFeedbackFile(exerciseRefId, submission.member_id, fileId, assId);
+      setFeedbackFiles(res.files || []);
+    } catch (err: any) {
+      alert(err.message || t("Fehler beim Löschen der Korrekturdatei"));
+    } finally {
+      setDeletingFileId(null);
     }
   };
 
@@ -594,16 +611,31 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                           </p>
                         </div>
                       </div>
-                      {ff.download_url && (
-                        <a
-                          href={ff.download_url}
-                          download
-                          className="flex items-center gap-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition border border-indigo-200 dark:border-indigo-800"
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {ff.download_url && (
+                          <a
+                            href={exerciseRefId ? api.getDownloadUrl(exerciseRefId, ff.download_url) : ff.download_url}
+                            download
+                            className="flex items-center gap-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition border border-indigo-200 dark:border-indigo-800"
+                          >
+                            <Download className="h-3 w-3" />
+                            <span>{t("Download")}</span>
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteFeedbackFile(ff.id)}
+                          disabled={deletingFileId === ff.id}
+                          className="flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition border border-transparent hover:border-rose-200 dark:hover:border-rose-800 disabled:opacity-50"
+                          title={t("Korrekturdatei löschen")}
                         >
-                          <Download className="h-3 w-3" />
-                          <span>{t("Download")}</span>
-                        </a>
-                      )}
+                          {deletingFileId === ff.id ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin text-rose-600" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

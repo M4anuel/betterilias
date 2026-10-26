@@ -985,5 +985,11 @@
   "Nachname des zuerst hinzugefügten Teammitglieds": "Nachname des zuerst hinzugefügten Teammitglieds",
   "Team-Reihenfolge wird geladen…": "Team-Reihenfolge wird geladen…",
   "Team-Reihenfolge konnte nicht geladen werden.": "Team-Reihenfolge konnte nicht geladen werden.",
-  "Teams ohne protokollierten Beitritt stehen am Ende.": "Teams ohne protokollierten Beitritt stehen am Ende."
+  "Teams ohne protokollierten Beitritt stehen am Ende.": "Teams ohne protokollierten Beitritt stehen am Ende.",
+  "Dateien verwalten": "Dateien verwalten",
+  "Verwalten": "Verwalten",
+  "Möchten Sie diese Korrekturdatei wirklich löschen?": "Möchten Sie diese Korrekturdatei wirklich löschen?",
+  "Fehler beim Löschen der Korrekturdatei": "Fehler beim Löschen der Korrekturdatei",
+  "Korrekturdatei löschen": "Korrekturdatei löschen",
+  "Failed to delete feedback file": "Korrekturdatei konnte nicht gelöscht werden"
 }

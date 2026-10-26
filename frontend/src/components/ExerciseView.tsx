@@ -2162,6 +2162,15 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                     disabled={uploadingMemberId === sub.member_id}
                                     onChange={(e) => handleUploadFeedbackFile(sub.member_id, e)}
                                   />
+                                  <button
+                                    type="button"
+                                    onClick={() => setDetailModalSubmission(sub)}
+                                    className="flex items-center gap-1 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition"
+                                    title={t("Dateien verwalten")}
+                                  >
+                                    <FileText className="h-3.5 w-3.5" />
+                                    <span>{t("Verwalten")}</span>
+                                  </button>
                                   <a
                                     href={sub.evaluation_by_file_url}
                                     target="_blank"

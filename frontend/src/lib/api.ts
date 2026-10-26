@@ -435,6 +435,26 @@ export const api = {
   },
 
 
+  async deleteFeedbackFile(
+    exerciseRefId: string,
+    memberId: string,
+    fileId: string,
+    assId?: string
+  ): Promise<FeedbackFilesResponse> {
+    const params = assId ? `?ass_id=${encodeURIComponent(assId)}` : '';
+    const res = await sessionFetch(
+      `${API_BASE}/exercises/${encodeURIComponent(exerciseRefId)}/submissions/${encodeURIComponent(memberId)}/feedback-files/${encodeURIComponent(fileId)}${params}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(apiError(err) || t("Failed to delete feedback file"));
+    }
+    return res.json();
+  },
+
   async getPodcasts(refId: string): Promise<PodcastSeriesResponse> {
     const res = await sessionFetch(`${API_BASE}/podcasts/${encodeURIComponent(refId)}`);
     if (!res.ok) {
