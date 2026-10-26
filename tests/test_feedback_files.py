@@ -156,3 +156,23 @@ async def test_delete_submission_feedback_file_flow():
     mock_http.post.assert_called_once()
     assert "cmd=remove" in mock_http.post.call_args[0][0]
     assert mock_http.post.call_args[1]["data"]["interruptive_items[]"] == "37646162663135642d333936302d343466342d623239632d323632656665646633613661"
+
+
+
+def test_feedback_files_url_resolution():
+    client = IliasClient()
+    # Case 1: default base node "dc:o5"
+    url1 = client._get_feedback_files_url("3803739", "3216297", "53188")
+    assert "cmdNode=dc:o5:dd:z6" in url1
+    assert "cmdNode=dc:o5:o5" not in url1
+
+    # Case 2: cached base node ending with :dd
+    client._exercise_cmd_nodes["3803739"] = "dc:o5:dd"
+    url2 = client._get_feedback_files_url("3803739", "3216297", "53188")
+    assert "cmdNode=dc:o5:dd:z6" in url2
+    assert "dd:dd" not in url2
+
+    # Case 3: custom_url supplied
+    custom = "https://ilias.unibe.ch/ilias.php?baseClass=ilexercisehandlergui&cmdNode=custom:node&cmdClass=ilResourceCollectionGUI"
+    url3 = client._get_feedback_files_url("3803739", "3216297", "53188", custom_url=custom)
+    assert url3 == custom

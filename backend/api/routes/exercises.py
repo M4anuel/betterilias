@@ -221,12 +221,18 @@ async def get_feedback_files(
     exercise_id: str,
     member_id: str,
     ass_id: Optional[str] = Query(None, description="Optional assignment ID"),
+    feedback_url: Optional[str] = Query(None, description="Direct evaluation by file URL if known"),
     client: IliasClient = Depends(get_ilias_client)
 ):
     """
     Fetch existing feedback/evaluation files and upload URL for a student submission.
     """
-    return await client.get_submission_feedback_files(exercise_ref_id=exercise_id, member_id=member_id, ass_id=ass_id)
+    return await client.get_submission_feedback_files(
+        exercise_ref_id=exercise_id,
+        member_id=member_id,
+        ass_id=ass_id,
+        feedback_url=feedback_url,
+    )
 
 
 @router.post("/{exercise_id}/submissions/{member_id}/feedback-files", response_model=FeedbackFilesResponse)
@@ -235,6 +241,7 @@ async def upload_feedback_file(
     member_id: str,
     file: UploadFile = File(...),
     ass_id: Optional[str] = Form(None),
+    feedback_url: Optional[str] = Form(None),
     client: IliasClient = Depends(get_ilias_client)
 ):
     """
@@ -249,6 +256,7 @@ async def upload_feedback_file(
             file_bytes=content,
             content_type=file.content_type or "application/octet-stream",
             ass_id=ass_id,
+            feedback_url=feedback_url,
         )
     except StudentUploadError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
@@ -262,6 +270,7 @@ async def delete_feedback_file(
     member_id: str,
     file_id: str,
     ass_id: Optional[str] = Query(None, description="Optional assignment ID"),
+    feedback_url: Optional[str] = Query(None, description="Direct evaluation by file URL if known"),
     client: IliasClient = Depends(get_ilias_client)
 ):
     """
@@ -273,6 +282,7 @@ async def delete_feedback_file(
             member_id=member_id,
             file_id=file_id,
             ass_id=ass_id,
+            feedback_url=feedback_url,
         )
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail=t('upload.network_error')) from exc

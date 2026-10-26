@@ -87,7 +87,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
     if (exerciseRefId && submission.evaluation_by_file_url) {
       setIsLoadingFeedbackFiles(true);
       api
-        .getFeedbackFiles(exerciseRefId, submission.member_id, assId)
+        .getFeedbackFiles(exerciseRefId, submission.member_id, assId, submission.evaluation_by_file_url)
         .then((res) => {
           setFeedbackFiles(res.files || []);
         })
@@ -102,7 +102,13 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
     setIsUploadingFile(true);
     setUploadSuccessMsg(null);
     try {
-      const res = await api.uploadFeedbackFile(exerciseRefId, submission.member_id, file, assId);
+      const res = await api.uploadFeedbackFile(
+        exerciseRefId,
+        submission.member_id,
+        file,
+        assId,
+        submission.evaluation_by_file_url
+      );
       setFeedbackFiles(res.files || []);
       setUploadSuccessMsg(`"${file.name}" erfolgreich hochgeladen.`);
       setTimeout(() => setUploadSuccessMsg(null), 3500);
@@ -137,7 +143,13 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
 
     setDeletingFileId(fileId);
     try {
-      const res = await api.deleteFeedbackFile(exerciseRefId, submission.member_id, fileId, assId);
+      const res = await api.deleteFeedbackFile(
+        exerciseRefId,
+        submission.member_id,
+        fileId,
+        assId,
+        submission.evaluation_by_file_url
+      );
       setFeedbackFiles(res.files || []);
     } catch (err: any) {
       alert(err.message || t("Fehler beim Löschen der Korrekturdatei"));

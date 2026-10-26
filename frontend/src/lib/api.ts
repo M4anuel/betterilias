@@ -393,11 +393,15 @@ export const api = {
   async getFeedbackFiles(
     exerciseRefId: string,
     memberId: string,
-    assId?: string
+    assId?: string,
+    feedbackUrl?: string
   ): Promise<FeedbackFilesResponse> {
-    const params = assId ? `?ass_id=${encodeURIComponent(assId)}` : '';
+    const params = new URLSearchParams();
+    if (assId) params.set('ass_id', assId);
+    if (feedbackUrl) params.set('feedback_url', feedbackUrl);
+    const qs = params.toString() ? `?${params.toString()}` : '';
     const res = await sessionFetch(
-      `${API_BASE}/exercises/${encodeURIComponent(exerciseRefId)}/submissions/${encodeURIComponent(memberId)}/feedback-files${params}`
+      `${API_BASE}/exercises/${encodeURIComponent(exerciseRefId)}/submissions/${encodeURIComponent(memberId)}/feedback-files${qs}`
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -410,12 +414,16 @@ export const api = {
     exerciseRefId: string,
     memberId: string,
     file: File,
-    assId?: string
+    assId?: string,
+    feedbackUrl?: string
   ): Promise<FeedbackFilesResponse> {
     const formData = new FormData();
     formData.append('file', file);
     if (assId) {
       formData.append('ass_id', assId);
+    }
+    if (feedbackUrl) {
+      formData.append('feedback_url', feedbackUrl);
     }
     const res = await sessionFetch(
       `${API_BASE}/exercises/${encodeURIComponent(exerciseRefId)}/submissions/${encodeURIComponent(memberId)}/feedback-files`,
@@ -431,16 +439,19 @@ export const api = {
     return res.json();
   },
 
-
   async deleteFeedbackFile(
     exerciseRefId: string,
     memberId: string,
     fileId: string,
-    assId?: string
+    assId?: string,
+    feedbackUrl?: string
   ): Promise<FeedbackFilesResponse> {
-    const params = assId ? `?ass_id=${encodeURIComponent(assId)}` : '';
+    const params = new URLSearchParams();
+    if (assId) params.set('ass_id', assId);
+    if (feedbackUrl) params.set('feedback_url', feedbackUrl);
+    const qs = params.toString() ? `?${params.toString()}` : '';
     const res = await sessionFetch(
-      `${API_BASE}/exercises/${encodeURIComponent(exerciseRefId)}/submissions/${encodeURIComponent(memberId)}/feedback-files/${encodeURIComponent(fileId)}${params}`,
+      `${API_BASE}/exercises/${encodeURIComponent(exerciseRefId)}/submissions/${encodeURIComponent(memberId)}/feedback-files/${encodeURIComponent(fileId)}${qs}`,
       {
         method: 'DELETE',
       }

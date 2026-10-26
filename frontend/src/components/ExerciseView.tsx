@@ -665,7 +665,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     if (!file) return;
     setUploadingMemberId(memberId);
     try {
-      await api.uploadFeedbackFile(exerciseRefId, memberId, file, selectedTaAssId || undefined);
+      const sub = taSubmissionsData?.submissions?.find((s) => s.member_id === memberId);
+      await api.uploadFeedbackFile(
+        exerciseRefId,
+        memberId,
+        file,
+        selectedTaAssId || undefined,
+        sub?.evaluation_by_file_url
+      );
       setFileUploadSuccessId(memberId);
       setTimeout(() => setFileUploadSuccessId(null), 3500);
     } catch (err: any) {

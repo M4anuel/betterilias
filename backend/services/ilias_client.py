@@ -1565,11 +1565,44 @@ class IliasClient:
 
         return file_generator(), filtered_headers, resp.status_code
 
+    def _get_feedback_files_url(
+        self,
+        exercise_ref_id: str,
+        member_id: str,
+        ass_id: Optional[str] = None,
+        custom_url: Optional[str] = None,
+    ) -> str:
+        if custom_url and custom_url.startswith("http"):
+            return custom_url
+        if custom_url and custom_url.startswith("ilias.php"):
+            return f"{settings.ilias_base_url}/{custom_url}"
+
+        base_node = self._get_exercise_base_node(exercise_ref_id)
+        node_suffix = "z6" if base_node.endswith(":dd") else "dd:z6"
+        return (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:{node_suffix}&cmdClass=ilResourceCollectionGUI"
+            f"&ref_id={exercise_ref_id}&ass_id={ass_id or 0}&vw=1&member_id={member_id}&part_id=0"
+        )
+
+    def _get_feedback_files_remove_url(
+        self,
+        exercise_ref_id: str,
+        member_id: str,
+        ass_id: Optional[str] = None,
+        custom_url: Optional[str] = None,
+    ) -> str:
+        base_url = self._get_feedback_files_url(exercise_ref_id, member_id, ass_id, custom_url)
+        if "cmd=" in base_url:
+            return re.sub(r"cmd=[^&]+", "cmd=remove", base_url)
+        return f"{base_url}&cmd=remove"
+
     async def get_submission_feedback_files(
         self,
         exercise_ref_id: str,
         member_id: str,
         ass_id: Optional[str] = None,
+        feedback_url: Optional[str] = None,
         *,
         http_client: Optional[httpx.AsyncClient] = None,
     ) -> FeedbackFilesResponse:
@@ -1577,16 +1610,13 @@ class IliasClient:
         Fetch the ILIAS ilResourceCollectionGUI page for feedback files and parse existing files and upload URL.
         """
         self._ensure_authenticated()
-        base_node = self._get_exercise_base_node(exercise_ref_id)
-        url = (
-            f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:o5:dd:z6&cmdClass=ilResourceCollectionGUI"
-            f"&ref_id={exercise_ref_id}&ass_id={ass_id or 0}&vw=1&member_id={member_id}&part_id=0"
-        )
+        url = self._get_feedback_files_url(exercise_ref_id, member_id, ass_id, custom_url=feedback_url)
         logger.info(f"Fetching feedback files page: {url}")
         async with (nullcontext(http_client) if http_client is not None else self.session_manager.get_http_client()) as client:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
+            if resp.status_code != 200:
+                raise StudentUploadError(f"ILIAS returned HTTP {resp.status_code} for feedback page", 502)
             self._cache_exercise_cmd_nodes_from_html(exercise_ref_id, resp.text, url=str(resp.url))
             return parse_feedback_files(resp.text, base_url=settings.ilias_base_url)
 
@@ -1598,6 +1628,7 @@ class IliasClient:
         file_bytes: bytes,
         content_type: str = "application/octet-stream",
         ass_id: Optional[str] = None,
+        feedback_url: Optional[str] = None,
         *,
         http_client: Optional[httpx.AsyncClient] = None,
     ) -> FeedbackFilesResponse:
@@ -1605,17 +1636,14 @@ class IliasClient:
         Upload a feedback file to ILIAS for this submission following the native 2-step Dropzone + postUpload flow.
         """
         self._ensure_authenticated()
-        base_node = self._get_exercise_base_node(exercise_ref_id)
-        page_url = (
-            f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:o5:dd:z6&cmdClass=ilResourceCollectionGUI"
-            f"&ref_id={exercise_ref_id}&ass_id={ass_id or 0}&vw=1&member_id={member_id}&part_id=0"
-        )
+        page_url = self._get_feedback_files_url(exercise_ref_id, member_id, ass_id, custom_url=feedback_url)
         logger.info(f"Uploading feedback file {filename} for member {member_id} at {page_url}")
 
         async with (nullcontext(http_client) if http_client is not None else self.session_manager.get_http_client()) as client:
             page = await client.get(page_url)
             self._check_response_for_session_loss(page, page_url)
+            if page.status_code != 200:
+                raise StudentUploadError(f"ILIAS returned HTTP {page.status_code} for feedback page", 502)
             self._cache_exercise_cmd_nodes_from_html(exercise_ref_id, page.text, url=str(page.url))
 
             form = parse_native_file_upload_form(page.text, str(page.url), command='postUpload')
@@ -1631,6 +1659,8 @@ class IliasClient:
                 headers={'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Referer': str(page.url)},
             )
             self._check_response_for_session_loss(uploaded, form.upload_url)
+            if uploaded.status_code != 200:
+                raise StudentUploadError(f"ILIAS rejected Dropzone upload with HTTP {uploaded.status_code}", 502)
             try:
                 result = uploaded.json()
             except ValueError as exc:
@@ -1656,7 +1686,7 @@ class IliasClient:
             parsed = parse_feedback_files(saved.text, base_url=settings.ilias_base_url)
             if any(f.title == filename for f in parsed.files):
                 return parsed
-            return await self.get_submission_feedback_files(exercise_ref_id, member_id, ass_id, http_client=client)
+            return await self.get_submission_feedback_files(exercise_ref_id, member_id, ass_id, feedback_url=page_url, http_client=client)
 
     async def delete_submission_feedback_file(
         self,
@@ -1664,6 +1694,7 @@ class IliasClient:
         member_id: str,
         file_id: str,
         ass_id: Optional[str] = None,
+        feedback_url: Optional[str] = None,
         *,
         http_client: Optional[httpx.AsyncClient] = None,
     ) -> FeedbackFilesResponse:
@@ -1671,12 +1702,7 @@ class IliasClient:
         Delete a feedback/evaluation file from a student submission (ilResourceCollectionGUI&cmd=remove).
         """
         self._ensure_authenticated()
-        base_node = self._get_exercise_base_node(exercise_ref_id)
-        remove_url = (
-            f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:o5:dd:z6&cmdClass=ilResourceCollectionGUI&cmd=remove"
-            f"&ref_id={exercise_ref_id}&ass_id={ass_id or 0}&vw=1&member_id={member_id}&part_id=0"
-        )
+        remove_url = self._get_feedback_files_remove_url(exercise_ref_id, member_id, ass_id, custom_url=feedback_url)
         logger.info(f"Deleting feedback file {file_id} at {remove_url}")
         async with (nullcontext(http_client) if http_client is not None else self.session_manager.get_http_client()) as client:
             resp = await client.post(
@@ -1685,7 +1711,8 @@ class IliasClient:
                 headers={'Referer': remove_url},
             )
             self._check_response_for_session_loss(resp, remove_url)
-            return await self.get_submission_feedback_files(exercise_ref_id, member_id, ass_id=ass_id, http_client=client)
+            page_url = self._get_feedback_files_url(exercise_ref_id, member_id, ass_id, custom_url=feedback_url)
+            return await self.get_submission_feedback_files(exercise_ref_id, member_id, ass_id=ass_id, feedback_url=page_url, http_client=client)
 
 
 
