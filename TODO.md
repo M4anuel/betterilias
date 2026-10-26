@@ -33,6 +33,14 @@ translation catalogues, and build validation are not implemented yet.
   - [x] Responsive table wrappers and optimal reading measure (~68ch max width for prose).
 - [ ] Continue preserving custom lecturer layouts and edge cases.
 
+## Media & Podcast Streaming
+
+- [ ] Native In-App Opencast Podcast Player with Dual-Stream Support:
+  - [ ] Synchronized playback for presenter camera feed (with mainAudio) and presentation slides feed.
+  - [ ] Viewing layouts: Picture-in-Picture (PiP), Side-by-Side (desktop split), and one-click screen swap.
+  - [ ] Slide chapter navigation using Opencast frameList thumbnails and timestamps.
+  - [ ] Fast on-demand stream resolution for podcast episode IDs (eid).
+
 ## Teaching assistant tools
 
 - [ ] Support creating folders.
