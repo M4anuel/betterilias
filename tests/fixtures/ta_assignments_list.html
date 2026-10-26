@@ -1,0 +1,486 @@
+<!-- Native list/toolbar forms only, including the leading layout table and unnamed Add button. Original CSRF tokens removed. -->
+<form action="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=post&amp;fallbackCmd=addAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;rtoken=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" class="ilForm" id="ilToolbar" method="post">
+<h3 class="hidden">Functions</h3>
+<div class="c-toolbar l-bar__container" id="1">
+<div class="l-bar__space-keeper">
+<div class="l-bar__group c-toolbar__lead-items">
+<div class="l-bar__element c-toolbar__item--sticky"><div class="navbar-form"><label for="type">Type of Submission </label>
+<select aria-label="Type of Submission" class="form-control" id="type" name="type" required="required">
+<option selected="selected" value="1">Upload</option>
+<option value="4">Team Upload</option>
+<option value="5">Text</option>
+<option value="3">Portfolio</option>
+<option value="6">Team Wiki</option>
+</select>
+</div></div>
+<div class="l-bar__element c-toolbar__item--sticky"><div class="navbar-form"><button class="btn btn-default" data-action="" id="il_ui_fw_6ade8f4c17ac17_39269383">Add Assignment</button>
+</div></div>
+</div>
+<div class="l-bar__group c-toolbar__main-body">
+</div>
+</div>
+</div>
+</form>
+<form action="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=post&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;rtoken=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" class="form-inline preventDoubleSubmission" id="table_4f6185ad202d9344ceb12c5dc587e603" method="post" name="table_4f6185ad202d9344ceb12c5dc587e603">
+<div class="ilTableHeaderTitle">
+<div class="ilFloatRight">
+</div>
+<h2 class="ilHeader ilTableHeaderTitle">Assignments</h2>
+</div>
+<div class="ilTableNav yui-skin-sam">
+<table><tr class="hidden-print">
+<td class="ilWhiteSpaceNowrap ilLeft ilValignMiddle">
+<span class="ilTableFootLight">(1 - 12 of 12)</span>
+
+
+	</td>
+<td class="ilWhiteSpaceNowrap ilRight">
+</td>
+</tr></table>
+</div>
+<div class="ilTableOuter">
+<div class="ilTableCommandRowTop form-inline">
+<div class="ilFloatLeft">
+<img alt="Action" src="./Customizing/skin/ilias10/unibern/images/nav/arrow_upright.svg" style="vertical-align:middle;"/>
+<input class="btn btn-default" name="cmd[confirmAssignmentsDeletion]" type="submit" value="Delete"/>
+</div>
+<div class="ilRight">
+<input class="btn btn-default" name="cmd[orderAssignmentsByDeadline]" type="submit" value="Order by Deadline"/>
+<input class="btn btn-default" name="cmd[saveAssignmentOrder]" type="submit" value="Save Order"/>
+</div>
+<div style="clear:both;"></div>
+</div>
+<div class="table-responsive">
+<table class="table table-striped fullwidth" id="excass4041264">
+<thead>
+<tr>
+<td style="width:1%"><span class="sr-only">Selection</span>
+</td>
+<th>
+<a class="tblheader" href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=listAssignments&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;excass4041264_table_nav=title:asc:0" title="Sort by this column"><span id="thc_excass4041264_2">Title</span>
+</a>
+</th>
+<th>
+<a class="tblheader" href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=listAssignments&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;excass4041264_table_nav=type:asc:0" title="Sort by this column"><span id="thc_excass4041264_3">Type of Submission</span>
+</a>
+</th>
+<th>
+<a class="tblheader" href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=listAssignments&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;excass4041264_table_nav=order_val:asc:0" title="Sort by this column"><span id="thc_excass4041264_4">Presentation Order</span>
+</a>
+</th>
+<th>
+<a class="tblheader" href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=listAssignments&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;excass4041264_table_nav=start_time:asc:0" title="Sort by this column"><span id="thc_excass4041264_5">Start Time</span>
+</a>
+</th>
+<th>
+<a class="tblheader" href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=listAssignments&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;excass4041264_table_nav=deadline:asc:0" title="Sort by this column"><span id="thc_excass4041264_6">Deadline</span>
+</a>
+</th>
+<th>
+<a class="tblheader" href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=listAssignments&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;excass4041264_table_nav=mandatory:asc:0" title="Sort by this column"><span id="thc_excass4041264_7">Mandatory</span>
+</a>
+</th>
+<th>
+<a class="tblheader" href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=listAssignments&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;excass4041264_table_nav=peer:asc:0" title="Sort by this column"><span id="thc_excass4041264_8">Peer-Feedback</span>
+</a>
+</th>
+<th style="width:30%"><span id="thc_excass4041264_9">Work Instructions</span></th>
+<th><span id="thc_excass4041264_10">Actions</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="tblrow1">
+<td class="std">
+<input name="id[]" type="checkbox" value="39067"/>
+</td>
+<td class="std small">
+	Übung 1
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[39067]" size="4" type="text" value="10"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	16. Sep 2024, 08:00
+	</td>
+<td class="std small ilWhiteSpaceNowrap">
+	23. Sep 2024, 16:15
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=39067">Edit</a>
+</td>
+</tr><tr class="tblrow2">
+<td class="std">
+<input name="id[]" type="checkbox" value="40004"/>
+</td>
+<td class="std small">
+	Übung 2
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[40004]" size="4" type="text" value="20"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	16. Sep 2024, 19:00
+	</td>
+<td class="std small ilWhiteSpaceNowrap">
+	30. Sep 2024, 16:10
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=40004">Edit</a>
+</td>
+</tr><tr class="tblrow1">
+<td class="std">
+<input name="id[]" type="checkbox" value="40294"/>
+</td>
+<td class="std small">
+	Übung 3
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[40294]" size="4" type="text" value="30"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	7. Oct 2024, 16:15
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=40294">Edit</a>
+</td>
+</tr><tr class="tblrow2">
+<td class="std">
+<input name="id[]" type="checkbox" value="40425"/>
+</td>
+<td class="std small">
+	Übung 4
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[40425]" size="4" type="text" value="40"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	30. Sep 2024, 19:00
+	</td>
+<td class="std small ilWhiteSpaceNowrap">
+	14. Oct 2024, 16:15
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=40425">Edit</a>
+</td>
+</tr><tr class="tblrow1">
+<td class="std">
+<input name="id[]" type="checkbox" value="40591"/>
+</td>
+<td class="std small">
+	Übung 5
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[40591]" size="4" type="text" value="50"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	8. Oct 2024, 08:00
+	</td>
+<td class="std small ilWhiteSpaceNowrap">
+	21. Oct 2024, 16:15
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=40591">Edit</a>
+</td>
+</tr><tr class="tblrow2">
+<td class="std">
+<input name="id[]" type="checkbox" value="40932"/>
+</td>
+<td class="std small">
+	Übung 6
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[40932]" size="4" type="text" value="60"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	28. Oct 2024, 16:15
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=40932">Edit</a>
+</td>
+</tr><tr class="tblrow1">
+<td class="std">
+<input name="id[]" type="checkbox" value="41062"/>
+</td>
+<td class="std small">
+	Übung 7
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[41062]" size="4" type="text" value="70"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	4. Nov 2024, 16:15
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=41062">Edit</a>
+</td>
+</tr><tr class="tblrow2">
+<td class="std">
+<input name="id[]" type="checkbox" value="41105"/>
+</td>
+<td class="std small">
+	Übung 8
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[41105]" size="4" type="text" value="80"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	29. Oct 2024, 08:10
+	</td>
+<td class="std small ilWhiteSpaceNowrap">
+	11. Nov 2024, 16:15
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=41105">Edit</a>
+</td>
+</tr><tr class="tblrow1">
+<td class="std">
+<input name="id[]" type="checkbox" value="41238"/>
+</td>
+<td class="std small">
+	Übung 9
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[41238]" size="4" type="text" value="90"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	18. Nov 2024, 16:15
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=41238">Edit</a>
+</td>
+</tr><tr class="tblrow2">
+<td class="std">
+<input name="id[]" type="checkbox" value="41533"/>
+</td>
+<td class="std small">
+	Übung 10
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[41533]" size="4" type="text" value="100"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	25. Nov 2024, 16:15
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=41533">Edit</a>
+</td>
+</tr><tr class="tblrow1">
+<td class="std">
+<input name="id[]" type="checkbox" value="41640"/>
+</td>
+<td class="std small">
+	Übung 11
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[41640]" size="4" type="text" value="110"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	18. Nov 2024, 19:00
+	</td>
+<td class="std small ilWhiteSpaceNowrap">
+	2. Dec 2024, 16:15
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=41640">Edit</a>
+</td>
+</tr><tr class="tblrow2">
+<td class="std">
+<input name="id[]" type="checkbox" value="41801"/>
+</td>
+<td class="std small">
+	Übung 12
+	</td>
+<td class="std small">
+	Team Upload
+	</td>
+<td class="std small">
+<input class="form-control" maxlength="4" name="order[41801]" size="4" type="text" value="120"/>
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+</td>
+<td class="std small ilWhiteSpaceNowrap">
+	9. Dec 2024, 16:15
+	</td>
+<td class="std small">
+	Yes
+	</td>
+<td class="std small">
+	No
+
+	</td>
+<td class="std small">
+</td>
+<td class="std small">
+<a href="ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:cs&amp;cmdClass=ilExAssignmentEditorGUI&amp;cmd=editAssignment&amp;ref_id=3114495&amp;mode=all&amp;from_overview=1&amp;ass_id=41801">Edit</a>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="ilTableSelectAll">
+<input id="chb_select_all_4f6185ad202d9344ceb12c5dc587e603" name="chb_select_all_4f6185ad202d9344ceb12c5dc587e603" onclick="il.Util.setChecked('table_4f6185ad202d9344ceb12c5dc587e603', 'id', document.forms['table_4f6185ad202d9344ceb12c5dc587e603'].elements['chb_select_all_4f6185ad202d9344ceb12c5dc587e603'].checked);" type="checkbox" value="1"/>
+<label for="chb_select_all_4f6185ad202d9344ceb12c5dc587e603">Select All</label>
+</div>
+<div class="ilTableCommandRow form-inline">
+<div class="ilFloatLeft">
+<img alt="Action" src="./Customizing/skin/ilias10/unibern/images/nav/arrow_downright.svg" style="vertical-align:middle;"/>
+<input class="btn btn-default" name="cmd[confirmAssignmentsDeletion]" type="submit" value="Delete"/>
+</div>
+<div class="ilRight">
+<input class="btn btn-default" name="cmd[orderAssignmentsByDeadline]" type="submit" value="Order by Deadline"/>
+<input class="btn btn-default" name="cmd[saveAssignmentOrder]" type="submit" value="Save Order"/>
+</div>
+<div style="clear:both;"></div>
+</div>
+</div>
+<div class="ilTableNav hidden-print">
+<div class="ilLeft ilValignMiddle">
+<span class="ilTableFootLight">(1 - 12 of 12)</span>
+
+
+	</div>
+</div>
+<div style="clear:both;"></div>
+</form>

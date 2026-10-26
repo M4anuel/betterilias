@@ -1,3 +1,4 @@
+from backend.i18n import t
 import re
 import urllib.parse
 from typing import Dict, List, Optional, Tuple
@@ -23,6 +24,25 @@ from backend.scrapers.dumper import safe_parser
 from backend.scrapers.materials import _extract_breadcrumbs
 
 
+def _instruction_html(element) -> str:
+    """Preserve native instruction markup without executable page content."""
+    fragment = BeautifulSoup(element.decode_contents(), 'html.parser')
+    for node in fragment.select('script, style, iframe, object, embed, template'):
+        node.decompose()
+    for node in fragment.find_all(True):
+        for name in list(node.attrs):
+            if name.lower().startswith('on') or name.lower() == 'srcdoc':
+                del node[name]
+        for name in ('href', 'src', 'xlink:href'):
+            if node.has_attr(name):
+                url = re.sub(r'[\x00-\x20]', '', node[name])
+                if urllib.parse.urlparse(url).scheme.lower() not in ('', 'http', 'https', 'mailto'):
+                    del node[name]
+        if node.get('target') == '_blank':
+            node['rel'] = 'noopener noreferrer'
+    return fragment.decode_contents().strip()
+
+
 def _clean_text(elem) -> str:
     """Helper to get stripped text without extra whitespace."""
     if not elem:
@@ -44,7 +64,7 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
         soup.select_one("h1.ilHeader, h1.il-item-title, .ilMainHeader h1, h1")
         or soup.select_one(".ilTopTitle")
     )
-    exercise_title = _clean_text(title_elem) or f"Exercise {exercise_ref_id}"
+    exercise_title = _clean_text(title_elem) or t("Exercise {p0}", p0=exercise_ref_id)
 
     # Extract Deadline / Due date & instructions if present
     deadline = None
@@ -445,12 +465,13 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
         or soup.select_one(".panel-title")
         or soup.select_one(".ilTopTitle")
     )
-    title = _clean_text(title_el) or f"Assignment {ass_id}"
+    title = _clean_text(title_el) or t("Assignment {p0}", p0=ass_id)
 
     sub_panels = soup.select("div.panel.panel-sub")
     panels = sub_panels if sub_panels else soup.find_all("div", class_="panel")
 
     instructions = None
+    is_team_upload = False
     start_time = None
     ended_on = None
     time_remaining = None
@@ -509,7 +530,7 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
             body_text = body.get_text()
             if "time is up" in body_text.lower() or "abgelaufen" in body_text.lower():
                 is_ended = True
-                time_remaining = "Time is up"
+                time_remaining = t('schedule.time_up')
 
             inst_p = body.select_one(".ilAssignmentInstructions")
             if not inst_p:
@@ -522,7 +543,7 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
                             inst_p = cand_p
                             break
             if inst_p and _clean_text(inst_p):
-                instructions = _clean_text(inst_p)
+                instructions = _instruction_html(inst_p)
 
         # 2. Files (Prompt materials provided by lecturer)
         elif any(w in p_title for w in ["file", "datei"]):
@@ -547,6 +568,7 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
 
         # 3. Team Information
         elif "team" in p_title:
+            is_team_upload = True
             for el in p.find_all(["a", "button"]):
                 el_txt = _clean_text(el)
                 raw_target = el.get("href") or el.get("data-action")
@@ -579,7 +601,7 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
                         )
                     )
             elif "keinem team" in text.lower() or "not assigned to a team" in text.lower():
-                team_status_text = "Sie gehören noch keinem Team an."
+                team_status_text = t('Sie gehören noch keinem Team an.')
 
         # 4. Student Submission
         elif any(w in p_title for w in ["submission", "einreichung", "abgabe"]):
@@ -641,6 +663,7 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
         title=title,
         instructions=instructions,
         start_time=start_time,
+        is_team_upload=is_team_upload,
         ended_on=ended_on,
         time_remaining=time_remaining,
         is_ended=is_ended,
@@ -960,16 +983,11 @@ def parse_student_submitted_files_screen(
     submitted_files: List[SubmissionFile] = []
     last_submission: Optional[str] = None
 
-    table = soup.select_one("table.table-striped, table.fullwidth, table")
-    if not table:
-        return submitted_files, last_submission
-
-    rows = table.select("tbody tr")
+    # Ignore calendars, navigation tables and empty placeholder rows. Only an
+    # actual delivered-file control/download identifies a submission record.
+    rows = [row for row in soup.select('table tbody tr')
+            if row.select_one("input[name='delivered[]'], a[href*='cmd=download'][href*='delivered=']")]
     for r in rows:
-        row_text = r.get_text(strip=True)
-        if "empty" in row_text.lower() or "keine" in row_text.lower():
-            continue
-
         cells = r.find_all("td")
         if not cells:
             continue
@@ -991,7 +1009,18 @@ def parse_student_submitted_files_screen(
 
         # Extract date
         upload_time = None
+        table = r.find_parent('table')
+        headers = table.select('thead tr')
+        if headers:
+            columns = headers[-1].find_all(['th', 'td'], recursive=False)
+            for index, column in enumerate(columns):
+                if index < len(cells) and (column.select_one("a[href*='timestamp']") or
+                        _clean_text(column).lower() in ('date', 'datum')):
+                    upload_time = _clean_text(cells[index]) or None
+                    break
         for c in cells:
+            if upload_time:
+                break
             txt = _clean_text(c)
             if re.search(r"\d{1,2}\.\s*[A-Za-zäöüÄÖÜ]+\s*\d{4}|\d{2}\.\d{2}\.\d{4}", txt):
                 upload_time = txt
@@ -1034,7 +1063,7 @@ def parse_exercise_overview(html_content: str, exercise_ref_id: str) -> Exercise
         soup.select_one("h1.il-page-content-header, h1.ilHeader:not(.modal-title), h1.media-heading:not(.modal-title), h1:not(.modal-title)")
         or soup.select_one(".ilTopTitle")
     )
-    exercise_title = _clean_text(title_el) or f"Exercise {exercise_ref_id}"
+    exercise_title = _clean_text(title_el) or t("Exercise {p0}", p0=exercise_ref_id)
 
     # Extract Breadcrumbs
     breadcrumbs = _extract_breadcrumbs(soup)
@@ -1154,13 +1183,13 @@ def parse_exercise_info(html_content: str, ref_id: str) -> ExerciseInfoResponse:
     """
     soup = BeautifulSoup(html_content, "lxml")
     title_el = soup.select_one("h1.il-page-content-header, h1.ilHeader, h1")
-    title = _clean_text(title_el) or f"Exercise Info {ref_id}"
+    title = _clean_text(title_el) or t("Exercise information {p0}", p0=ref_id)
 
     sections: List[ExerciseInfoSection] = []
     sec_elems = soup.select(".ilInfoScreenSec")
     for sec in sec_elems:
         header_el = sec.select_one(".ilFormHeader h2, .ilFormHeader h3, h2, h3") or sec.find_previous(["h2", "h3"])
-        sec_title = _clean_text(header_el) if header_el else "Information"
+        sec_title = _clean_text(header_el) if header_el else t("Informationen")
 
         props: Dict[str, str] = {}
         for row in sec.select(".form-group"):
@@ -1189,8 +1218,16 @@ def parse_exercise_info(html_content: str, ref_id: str) -> ExerciseInfoResponse:
 class StudentUploadFormInfo(BaseModel):
     upload_url: Optional[str] = None
     form_action: Optional[str] = None
-    input_name: str = "form/input_0/input_1"
-    file_identifier: str = "filename"
+    input_name: Optional[str] = None
+    token_input_name: Optional[str] = None
+    file_identifier: Optional[str] = None
+    file_field: str = "file"
+    max_files: Optional[int] = None
+    current_files: int = 0
+    max_size: Optional[int] = None
+    disabled: bool = False
+    chunked: bool = False
+    chunk_size: Optional[int] = None
     hidden_inputs: Dict[str, str] = Field(default_factory=dict)
 
 
@@ -1198,57 +1235,129 @@ class StudentUploadFormInfo(BaseModel):
 def parse_student_upload_form(
     html_content: str, base_url: str = settings.ilias_base_url
 ) -> StudentUploadFormInfo:
+    return parse_native_file_upload_form(html_content, base_url, command='addUpload')
+
+
+@safe_parser(context_name='native_file_upload_form')
+def parse_native_file_upload_form(
+    html_content: str, base_url: str = settings.ilias_base_url, *, command: str,
+) -> StudentUploadFormInfo:
     """
     Parses the ILIAS student file upload form screen (cmdClass=ilExSubmissionFileGUI&cmd=uploadForm).
     Extracts the Repo Standard Upload Handler AJAX URL, file identifier, form action,
     input field name, and any hidden inputs.
     """
+    import ast
+    from html import unescape
+
     soup = BeautifulSoup(html_content, "lxml")
-    upload_url: Optional[str] = None
-    file_identifier = "filename"
-    form_action: Optional[str] = None
-    input_name = "form/input_0/input_1"
-    hidden_inputs: Dict[str, str] = {}
+    info = StudentUploadFormInfo()
+    form = next((form for form in soup.find_all('form')
+                 if urllib.parse.parse_qs(urllib.parse.urlparse(form.get('action', '')).query).get('cmd') == [command]
+                 and form.select_one('[data-il-ui-component="file-field-input"]')), None)
+    if form is None:
+        return info
 
-    # 1. Locate the addUpload form
-    form = soup.find("form", action=lambda a: bool(a and ("addUpload" in a or "ilexercisehandlergui" in a)))
-    if not form:
-        form = soup.find("form", enctype="multipart/form-data")
+    info.form_action = urllib.parse.urljoin(base_url, form['action'])
+    field = form.select_one('[data-il-ui-component="file-field-input"]')
+    info.input_name = field.get('data-il-ui-input-name')
+    for inp in form.select('input[type="hidden"][name]'):
+        if inp.find_parent('template') is None and field not in inp.parents and not inp.has_attr('disabled'):
+            info.hidden_inputs[inp['name']] = inp.get('value', '')
 
-    if form:
-        if form.has_attr("action"):
-            form_action = urllib.parse.urljoin(base_url, form["action"])
-        for inp in form.find_all("input", type="hidden"):
-            name = inp.get("name")
-            val = inp.get("value", "")
-            if name:
-                hidden_inputs[name] = val
+    # Live HTML contains the dynamic token input; browser-saved pages can have an
+    # empty <template>. ILIAS DynamicInputsNameSource defines its fallback name.
+    if info.input_name:
+        tokens = [inp for inp in field.select('input[type="hidden"][name]')
+                  if inp['name'].startswith(info.input_name + '[')]
+        info.token_input_name = tokens[-1]['name'] if tokens else f'{info.input_name}[input_0][]'
 
-    # 2. Locate the file input field name
-    field_elem = soup.find("fieldset", attrs={"data-il-ui-component": "file-field-input"})
-    if field_elem and field_elem.get("data-il-ui-input-name"):
-        input_name = field_elem["data-il-ui-input-name"]
+    for script in soup.find_all('script'):
+        text = script.string or ''
+        for match in re.finditer(r'\b(?:il\.)?UI\.Input\.File\.init\s*\(', text):
+            args = _student_upload_js_arguments(text, match.end())
+            if len(args) < 9:
+                continue
+            # Decode string literals only, never execute JavaScript from ILIAS.
+            try:
+                widget_id = ast.literal_eval(args[0])
+            except (ValueError, SyntaxError):
+                continue
+            if widget_id != field.get('id'):
+                continue
+            strings = [ast.literal_eval(value.replace(r'\/', '/')) for value in args[:4]]
+            info.upload_url = urllib.parse.urljoin(base_url, unescape(strings[1])) if strings[1] else None
+            info.file_identifier = strings[3] or None
+            info.current_files = int(args[4])
+            info.max_files = int(args[5])
+            info.max_size = int(args[6])
+            info.disabled = args[8].strip() == 'true'
+            info.chunked = len(args) > 10 and args[10].strip() == 'true'
+            info.chunk_size = int(args[11]) if len(args) > 11 else None
+            # Dropzone appends an index when uploadMultiple is enabled, even
+            # when only one file is sent (parallelUploads is 1 in ILIAS).
+            info.file_field = 'file[0]' if info.max_files > 1 and not info.chunked else 'file'
+            return info
+    return info
 
-    # 3. Locate the Dropzone / Repo upload URL and file_identifier in the JS initialization
-    for script in soup.find_all("script"):
-        text = script.string or ""
-        if "Input.File.init" in text:
-            m = re.search(
-                r"Input\.File\.init\(\s*['\"][^'\"]+['\"],\s*['\"]([^'\"]+)['\"],\s*['\"]([^'\"]*)['\"],\s*['\"]([^'\"]+)['\"]",
-                text,
-            )
-            if m:
-                raw_upload_url = m.group(1)
-                file_identifier = m.group(3)
-                if raw_upload_url:
-                    upload_url = urllib.parse.urljoin(base_url, raw_upload_url)
-                break
 
-    return StudentUploadFormInfo(
-        upload_url=upload_url,
-        form_action=form_action,
-        input_name=input_name,
-        file_identifier=file_identifier,
-        hidden_inputs=hidden_inputs,
-    )
+def _student_upload_js_arguments(text: str, start: int) -> List[str]:
+    """Split a literal JS call while respecting strings and nested JSON."""
+    args, depth, quote, escaped, token_start = [], 0, None, False, start
+    for index in range(start, len(text)):
+        char = text[index]
+        if quote:
+            if escaped:
+                escaped = False
+            elif char == '\\':
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in ('"', "'", '`'):
+            quote = char
+        elif char in '([{':
+            depth += 1
+        elif char == ')' and depth == 0:
+            args.append(text[token_start:index].strip())
+            return args
+        elif char in ')]}':
+            depth -= 1
+        elif char == ',' and depth == 0:
+            args.append(text[token_start:index].strip())
+            token_start = index + 1
+    return []
+
+
+@safe_parser(context_name='student_submission_navigation')
+def parse_student_submission_navigation(
+    html_content: str, ref_id: str, ass_id: str, base_url: str = settings.ilias_base_url,
+) -> Dict[str, str]:
+    """Read the current user's controller links for this assignment only."""
+    soup = BeautifulSoup(html_content, 'lxml')
+    links = {}
+    for element in soup.select('a[href], button[data-action]'):
+        url = urllib.parse.urljoin(base_url, element.get('href') or element.get('data-action', ''))
+        query = {key.lower(): value for key, value in urllib.parse.parse_qs(urllib.parse.urlparse(url).query).items()}
+        if query.get('ref_id') != [ref_id] or query.get('ass_id') != [ass_id]:
+            continue
+        controller = query.get('cmdclass', [''])[0].lower()
+        command = query.get('cmd', [''])[0].lower()
+        if controller == 'ilassignmentpresentationgui':
+            links.setdefault('presentation', url)
+        elif controller == 'ilexsubmissionfilegui' and command in ('submissionscreen', 'uploadform'):
+            links.setdefault('submission' if command == 'submissionscreen' else 'upload', url)
+    return links
+
+
+@safe_parser(context_name='student_upload_errors')
+def parse_student_upload_errors(html_content: str) -> Optional[str]:
+    soup = BeautifulSoup(html_content, 'lxml')
+    messages = []
+    for element in soup.select('.alert-danger, .ilFailureMessage, .c-input__error, .ilFormError'):
+        if element.find_parent(['template']) or element.find_parent(class_=re.compile(r'\bmodal(?:-dialog)?\b')):
+            continue
+        message = element.get_text(' ', strip=True)
+        if message and message not in messages:
+            messages.append(message)
+    return '\n'.join(messages) or None
 

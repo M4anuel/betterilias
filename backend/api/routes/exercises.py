@@ -1,4 +1,6 @@
+from backend.i18n import t
 import logging
+import httpx
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form
 
@@ -22,7 +24,8 @@ from backend.schemas import (
     AssignmentOrderUpdateRequest,
     SaveTAAssignmentRequest,
 )
-from backend.services.ilias_client import IliasClient
+from backend.services.ilias_client import IliasClient, StudentUploadError, SessionExpiredError
+from backend.scrapers.dumper import ScrapingParsingError
 
 router = APIRouter(prefix="/exercises", tags=["Exercises & Grading"])
 
@@ -85,13 +88,19 @@ async def upload_student_assignment_file(
     Upload a file as student submission for an exercise assignment in ILIAS.
     """
     content = await file.read()
-    return await client.upload_student_assignment_file(
-        exercise_ref_id=exercise_id,
-        ass_id=ass_id,
-        filename=file.filename or "submission_file",
-        file_bytes=content,
-        content_type=file.content_type or "application/octet-stream",
-    )
+    try:
+        return await client.upload_student_assignment_file(
+            exercise_ref_id=exercise_id,
+            ass_id=ass_id,
+            filename=file.filename or "submission_file",
+            file_bytes=content,
+            content_type=file.content_type or "application/octet-stream",
+        )
+    except StudentUploadError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=t('upload.network_error')) from exc
 
 
 @router.delete("/{exercise_id}/assignment/{ass_id}/submission/{delivered_id}", response_model=StudentAssignmentDetail)
@@ -293,6 +302,8 @@ async def save_ta_assignment(
     """
     try:
         return await client.save_ta_assignment(ref_id=exercise_id, data=req)
+    except (SessionExpiredError, ScrapingParsingError):
+        raise
     except ValueError as e:
         logger.error(f"Validation error saving assignment in exercise {exercise_id}: {e}")
         raise HTTPException(
@@ -303,7 +314,7 @@ async def save_ta_assignment(
         logger.exception(f"Unexpected error saving assignment in exercise {exercise_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save assignment: {str(e)}",
+            detail=t('Failed to save assignment: {p0}', p0=str(e)),
         )
 
 
@@ -320,7 +331,7 @@ async def delete_ta_assignment(
     if not success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to delete assignment on ILIAS."
+            detail=t('Failed to delete assignment on ILIAS.')
         )
     return {"success": True, "ass_id": ass_id}
 
@@ -348,13 +359,16 @@ async def upload_ta_instruction_file(
     Upload an instruction file to an assignment.
     """
     content = await file.read()
-    return await client.upload_instruction_file(
-        ref_id=exercise_id,
-        ass_id=ass_id,
-        filename=file.filename or "instruction_file",
-        file_bytes=content,
-        content_type=file.content_type or "application/octet-stream",
-    )
+    try:
+        return await client.upload_instruction_file(
+            ref_id=exercise_id,
+            ass_id=ass_id,
+            filename=file.filename or "instruction_file",
+            file_bytes=content,
+            content_type=file.content_type or "application/octet-stream",
+        )
+    except StudentUploadError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
 
 @router.delete("/{exercise_id}/ta/assignments/{ass_id}/instruction-files/{file_id}")
@@ -371,6 +385,6 @@ async def delete_ta_instruction_file(
     if not success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to delete instruction file."
+            detail=t('Failed to delete instruction file.')
         )
     return {"success": True, "file_id": file_id}

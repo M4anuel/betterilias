@@ -19,18 +19,16 @@ from backend.schemas import (
 DUMP_DIR = Path(r"C:\Users\manue\Downloads\betterilias\betterilias\htmlfromilias\CreateExercises")
 
 def test_parse_ta_assignments_list():
-    dump_file = DUMP_DIR / "edit view of exercises.html"
-    if not dump_file.exists():
-        pytest.skip("Dump file not found")
+    dump_file = Path(__file__).parent / 'fixtures' / 'ta_assignments_list.html'
 
     html = dump_file.read_text(encoding="utf-8", errors="ignore")
-    parsed = parse_ta_assignments_list(html, exercise_ref_id="2978156")
+    parsed = parse_ta_assignments_list(html, exercise_ref_id="3114495")
 
-    assert parsed.exercise_ref_id == "2978156"
+    assert parsed.exercise_ref_id == "3114495"
     assert len(parsed.assignments) == 12
     first = parsed.assignments[0]
-    assert first.ass_id == "37179"
-    assert "bung 1" in first.title or "Übung 1" in first.title
+    assert first.ass_id == "39067"
+    assert first.title
     assert first.order_val == 10
     assert first.type_name == "Team Upload"
     assert first.type_id == 4
@@ -38,9 +36,7 @@ def test_parse_ta_assignments_list():
 
 
 def test_parse_ta_assignment_form():
-    dump_file = DUMP_DIR / "add_assignment_type_upload.html"
-    if not dump_file.exists():
-        pytest.skip("Dump file not found")
+    dump_file = Path(__file__).parent / 'fixtures' / 'ta_create_upload.html'
 
     html = dump_file.read_text(encoding="utf-8", errors="ignore")
     parsed = parse_ta_assignment_form(html, exercise_ref_id="2978156", ass_id=None)

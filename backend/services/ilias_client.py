@@ -1,7 +1,9 @@
 import asyncio
+from backend.i18n import t
 import logging
 import re
 import urllib.parse
+from contextlib import nullcontext
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from bs4 import BeautifulSoup
@@ -9,11 +11,17 @@ import httpx
 
 from backend.auth.session import SessionManager, session_manager
 from backend.config import settings
+from backend.services.assignment_multipart import encode_assignment_form
+from backend.scrapers.dumper import dump_failed_html
 from backend.schemas import RepositoryResponse
 from backend.scrapers.repository import parse_repository
 from backend.schemas import MembershipFormResponse, MembershipRequest, MembershipResult
 from backend.scrapers.membership import membership_link, parse_membership, prepare_membership_form
 from backend.scrapers.materials import _extract_breadcrumbs
+from backend.scrapers.submissions import parse_student_submission_navigation, parse_student_upload_errors, parse_native_file_upload_form
+from backend.scrapers.exercise_editor import (
+    build_ta_assignment_payload, validate_ta_assignment_request, parse_ta_assignment_error,
+)
 from backend.schemas import (
     AuthStatus,
     CourseLogsResponse,
@@ -76,6 +84,13 @@ class SessionExpiredError(Exception):
     pass
 
 
+class StudentUploadError(Exception):
+    """An upload failed or could not be confirmed; never report it as success."""
+    def __init__(self, message: str, status_code: int = 502):
+        super().__init__(message)
+        self.status_code = status_code
+
+
 class IliasClient:
     """High-level async client for interacting with Uni Bern ILIAS."""
 
@@ -113,14 +128,14 @@ class IliasClient:
     def _ensure_authenticated(self):
         """Check if cookies exist."""
         if not self.session_manager.has_cookies():
-            raise SessionExpiredError("No active ILIAS session found. Please log in.")
+            raise SessionExpiredError(t('No active ILIAS session found. Please log in.'))
 
     def _check_response_for_session_loss(self, response: httpx.Response, requested_url: str):
         """Detect if ILIAS redirected to a login page, expired session, or unauthorized error."""
         # 1. HTTP 401 Unauthorized or 403 Forbidden
         if response.status_code in (401, 403):
             raise SessionExpiredError(
-                f"HTTP {response.status_code} Unauthorized for {requested_url}"
+                t('HTTP {p0} Unauthorized for {p1}', p0=response.status_code, p1=requested_url)
             )
 
         # 2. Redirect to login or IDP endpoints
@@ -136,7 +151,7 @@ class IliasClient:
         ]
         if any(token in final_url for token in login_url_tokens):
             raise SessionExpiredError(
-                f"Session expired or unauthorized. Redirected to login ({response.url}) from {requested_url}."
+                t('Session expired or unauthorized. Redirected to login ({p0}) from {p1}.', p0=response.url, p1=requested_url)
             )
 
         # 3. HTML text & link markers
@@ -150,14 +165,14 @@ class IliasClient:
             or "shib_login.php" in text_lower
         ):
             raise SessionExpiredError(
-                f"Session expired: ILIAS login prompt detected for {requested_url}."
+                t('Session expired: ILIAS login prompt detected for {p0}.', p0=requested_url)
             )
 
         # Check for HTML login form or startup section
         if "<input" in response.text and 'name="username"' in response.text and 'name="password"' in response.text:
-            raise SessionExpiredError("Session expired: ILIAS login form encountered.")
+            raise SessionExpiredError(t('Session expired: ILIAS login form encountered.'))
         if "ilstartupsection" in text_lower or "ilstartupframe" in text_lower:
-            raise SessionExpiredError("Session expired: ILIAS startup screen encountered.")
+            raise SessionExpiredError(t('Session expired: ILIAS startup screen encountered.'))
 
         # 4. Check for positive indicators of an authenticated ILIAS session FIRST
         soup = BeautifulSoup(response.text, "html.parser")
@@ -193,7 +208,7 @@ class IliasClient:
         ]
         if "kein zugriffsrecht" in og_title_content or any(phrase in text_lower for phrase in unauth_phrases):
             raise SessionExpiredError(
-                f"Session expired or unauthorized detected for {requested_url}."
+                t('Session expired or unauthorized detected for {p0}.', p0=requested_url)
             )
 
     async def get_auth_status(self) -> AuthStatus:
@@ -204,7 +219,7 @@ class IliasClient:
                 authenticated=False,
                 client_id=settings.ilias_client_id,
                 cookies_present=False,
-                message="No cookies stored.",
+                message=t('No cookies stored.'),
             )
 
         is_valid, user_or_msg = await self.session_manager.verify_session()
@@ -406,9 +421,9 @@ class IliasClient:
         base = urllib.parse.urlparse(settings.ilias_base_url)
         target = urllib.parse.urlparse(url)
         if (target.scheme, target.netloc) != (base.scheme, base.netloc):
-            raise ValueError('Ungültiges ILIAS-Kursziel')
+            raise ValueError(t('Ungültiges ILIAS-Kursziel'))
         if urllib.parse.parse_qs(target.query).get('ref_id') != [ref_id]:
-            raise ValueError('Die Kursaktion gehört nicht zum ausgewählten Kurs')
+            raise ValueError(t('Die Kursaktion gehört nicht zum ausgewählten Kurs'))
 
     async def _prepare_course_membership(self, client, ref_id: str, action: str):
         root_url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilRepositoryGUI&ref_id={ref_id}"
@@ -430,7 +445,7 @@ class IliasClient:
                 listing.raise_for_status()
                 link = membership_link(BeautifulSoup(listing.text, 'lxml'), ref_id, action)
         if not link:
-            raise ValueError('ILIAS bietet diese Kursaktion aktuell nicht an. Die Anmeldung wird möglicherweise über KSL verwaltet.')
+            raise ValueError(t('ILIAS bietet diese Kursaktion aktuell nicht an. Die Anmeldung wird möglicherweise über KSL verwaltet.'))
         self._validate_membership_url(link, ref_id)
         response = await client.get(link)
         self._check_response_for_session_loss(response, link)
@@ -447,7 +462,7 @@ class IliasClient:
         available = bool(prepared and prepared.supported)
         message = prepared.message if prepared else ''
         if not available:
-            message = 'Bitte schliesse diese Kursaktion direkt in ILIAS ab.'
+            message = t('Bitte schliesse diese Kursaktion direkt in ILIAS ab.')
         return MembershipFormResponse(
             action=action, available=available, message=message,
             fields=prepared.fields if available else [], ilias_url=source,
@@ -459,15 +474,15 @@ class IliasClient:
             # Fetch fresh form tokens and recheck that ILIAS still allows the action.
             prepared, _ = await self._prepare_course_membership(client, ref_id, request.action)
             if not prepared or not prepared.supported:
-                raise ValueError('Diese Kursaktion muss direkt in ILIAS abgeschlossen werden.')
+                raise ValueError(t('Diese Kursaktion muss direkt in ILIAS abgeschlossen werden.'))
             allowed = {f.name for f in prepared.fields}
             if set(request.values) - allowed:
-                raise ValueError('Unbekannte Felder in der Kursanmeldung')
+                raise ValueError(t('Unbekannte Felder in der Kursanmeldung'))
             payload = dict(prepared.payload)
             for field in prepared.fields:
                 value = request.values.get(field.name, '')
                 if field.required and not value:
-                    raise ValueError(f'Bitte fülle das Feld «{field.label}» aus.')
+                    raise ValueError(t('Bitte fülle das Feld «{p0}» aus.', p0=field.label))
                 if field.field_type == 'checkbox':
                     if value:
                         payload[field.name] = field.value
@@ -492,10 +507,10 @@ class IliasClient:
             state = parse_membership(BeautifulSoup(root.text, 'lxml'), ref_id)
             expected = request.action == 'join'
             if state.is_enrolled is not expected and success is None:
-                raise ValueError('ILIAS hat die Kursaktion nicht bestätigt. Bitte prüfe den Kurs in ILIAS.')
+                raise ValueError(t('ILIAS hat die Kursaktion nicht bestätigt. Bitte prüfe den Kurs in ILIAS.'))
             return MembershipResult(
                 success=True, is_enrolled=state.is_enrolled,
-                message=success.get_text(' ', strip=True) if success else ('Kurs beigetreten.' if expected else 'Kurs verlassen.'),
+                message=success.get_text(' ', strip=True) if success else (t('Kurs beigetreten.') if expected else t('Kurs verlassen.')),
             )
 
     async def get_session_materials(
@@ -637,7 +652,7 @@ class IliasClient:
             if last_resp:
                 return parse_exercise_submissions(last_resp.text, exercise_ref_id=ref_id)
 
-            raise ValueError(f"Failed to fetch exercise with ref_id {ref_id}")
+            raise ValueError(t('Failed to fetch exercise with ref_id {p0}', p0=ref_id))
 
     async def get_exercise_overview(self, ref_id: str, mode: str = "all") -> ExerciseOverviewResponse:
         """Fetch and parse exercise overview and sub-assignments (showOverview) with mode=all by default."""
@@ -673,15 +688,18 @@ class IliasClient:
             self._check_response_for_session_loss(resp, url)
             return parse_exercise_info(resp.text, ref_id=ref_id)
 
-    async def get_student_assignment_detail(self, ref_id: str, ass_id: str) -> StudentAssignmentDetail:
+    async def get_student_assignment_detail(
+        self, ref_id: str, ass_id: str, *, presentation_url: Optional[str] = None,
+        http_client: Optional[httpx.AsyncClient] = None,
+    ) -> StudentAssignmentDetail:
         """Fetch and parse the student assignment presentation screen, team details, and submitted files screen."""
         self._ensure_authenticated()
         base_node = self._get_exercise_base_node(ref_id)
-        url = (
+        url = presentation_url or (
             f"{settings.ilias_base_url}/ilias.php?"
             f"baseClass=ilexercisehandlergui&cmdNode={base_node}:5n&cmdClass=ilAssignmentPresentationGUI&ref_id={ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
         )
-        async with self.session_manager.get_http_client() as client:
+        async with (nullcontext(http_client) if http_client is not None else self.session_manager.get_http_client()) as client:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
             self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
@@ -696,11 +714,14 @@ class IliasClient:
                 )
                 try:
                     team_resp = await client.get(team_url)
+                    self._check_response_for_session_loss(team_resp, team_url)
                     if team_resp.status_code == 200:
                         team_screen = parse_team_management_screen(team_resp.text, base_url=settings.ilias_base_url)
                         if team_screen.members:
                             detail.team_member_details = team_screen.members
                             detail.team_members = [m.login for m in team_screen.members]
+                except SessionExpiredError:
+                    raise
                 except Exception as te:
                     logger.debug(f"Could not fetch team management screen for {ref_id}/{ass_id}: {te}")
 
@@ -727,13 +748,16 @@ class IliasClient:
             )
             try:
                 sub_resp = await client.get(sub_url)
+                self._check_response_for_session_loss(sub_resp, sub_url)
                 if sub_resp.status_code == 200:
                     sub_files, last_sub = parse_student_submitted_files_screen(sub_resp.text, base_url=settings.ilias_base_url)
+                    detail.submitted_files = sub_files
                     if sub_files:
-                        detail.submitted_files = sub_files
                         detail.submission_status = "submitted"
                         if last_sub:
                             detail.last_submission = last_sub
+            except SessionExpiredError:
+                raise
             except Exception as e:
                 logger.debug(f"Could not fetch student submission screen: {e}")
 
@@ -747,105 +771,102 @@ class IliasClient:
         file_bytes: bytes,
         content_type: str = "application/octet-stream",
     ) -> StudentAssignmentDetail:
-        """
-        Uploads a student submission file for an exercise assignment in ILIAS.
-        Follows the ILIAS upload pipeline:
-        1. Fetch the uploadForm to get current cmdNode, upload endpoint and file field identifiers.
-        2. POST the file payload to Repo Standard Upload Handler (Dropzone backend endpoint).
-        3. Extract the returned file token/id from the JSON response.
-        4. Submit the addUpload form to ILIAS with the token.
-        5. Verify and return the refreshed assignment details.
-        """
+        """Follow live assignment links and reproduce ILIAS's two-stage upload."""
+        import uuid
+
         self._ensure_authenticated()
-        base_node = self._get_exercise_base_node(exercise_ref_id)
+
+        def validated_url(url: str) -> str:
+            expected = urllib.parse.urlparse(settings.ilias_base_url)
+            target = urllib.parse.urlparse(url)
+            query = urllib.parse.parse_qs(target.query)
+            if ((target.scheme, target.netloc) != (expected.scheme, expected.netloc)
+                    or query.get('ref_id') != [exercise_ref_id] or query.get('ass_id') != [ass_id]):
+                raise StudentUploadError(t('upload.invalid_target'))
+            return url
+
+        def check_response(response: httpx.Response, url: str):
+            self._check_response_for_session_loss(response, url)
+            if not response.is_success:
+                raise StudentUploadError(t('upload.http_error', status=response.status_code))
+
         async with self.session_manager.get_http_client() as client:
-            # 1. Fetch the upload form page to dynamically extract endpoints & fields
-            upload_form_url = (
-                f"{settings.ilias_base_url}/ilias.php?"
-                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=uploadForm"
-                f"&ref_id={exercise_ref_id}&ass_id={ass_id}&from_overview=1"
-            )
-            if exercise_ref_id not in self._exercise_cmd_nodes:
+            # Controller nodes belong to the current user's navigation context,
+            # not to the course's folder path. Never gate discovery on the shared cache.
+            exercise_url = f"{settings.ilias_base_url}/goto.php?" + urllib.parse.urlencode({'target': f'exc_{exercise_ref_id}'})
+            response = await client.get(exercise_url)
+            check_response(response, exercise_url)
+            links = parse_student_submission_navigation(response.text, exercise_ref_id, ass_id, str(response.url))
+            presentation_url = links.get('presentation')
+            if presentation_url:
+                response = await client.get(validated_url(presentation_url))
+                check_response(response, presentation_url)
+                links.update(parse_student_submission_navigation(response.text, exercise_ref_id, ass_id, str(response.url)))
+            if 'upload' not in links and 'submission' in links:
+                response = await client.get(validated_url(links['submission']))
+                check_response(response, links['submission'])
+                links.update(parse_student_submission_navigation(response.text, exercise_ref_id, ass_id, str(response.url)))
+            presentation_url = presentation_url or links.get('presentation')
+            if not links.get('upload'):
+                raise StudentUploadError(parse_student_upload_errors(response.text) or t('upload.unavailable'), 409)
+
+            form_resp = await client.get(validated_url(links['upload']))
+            check_response(form_resp, links['upload'])
+            if error := parse_student_upload_errors(form_resp.text):
+                raise StudentUploadError(error, 400)
+            form = parse_student_upload_form(form_resp.text, base_url=str(form_resp.url))
+            if not all((form.upload_url, form.form_action, form.token_input_name, form.file_identifier)):
+                raise StudentUploadError(t('upload.form_missing'))
+            upload_url, form_action = validated_url(form.upload_url), validated_url(form.form_action)
+            if form.disabled or (form.max_files is not None and form.current_files >= form.max_files):
+                raise StudentUploadError(t('upload.unavailable'), 409)
+            if form.max_size is not None and len(file_bytes) > form.max_size:
+                raise StudentUploadError(t('upload.too_large', limit=form.max_size), 400)
+            if form.chunked and (not form.chunk_size or form.chunk_size <= 0):
+                raise StudentUploadError(t('upload.form_missing'))
+
+            # ILIAS/Dropzone sends file[0] for multi-file inputs, file for single
+            # or chunked inputs. A successful HTTP response alone is insufficient.
+            chunk_size = form.chunk_size if form.chunked else max(1, len(file_bytes))
+            chunk_count = max(1, (len(file_bytes) + chunk_size - 1) // chunk_size)
+            upload_id, file_token = str(uuid.uuid4()), None
+            for index in range(chunk_count):
+                chunk_data = {}
+                if form.chunked:
+                    chunk_data = {'dzuuid': upload_id, 'dzchunkindex': str(index),
+                                  'dztotalfilesize': str(len(file_bytes)), 'dzchunksize': str(chunk_size),
+                                  'dztotalchunkcount': str(chunk_count), 'dzchunkbyteoffset': str(index * chunk_size)}
+                upload_resp = await client.post(upload_url, data=chunk_data,
+                    files={form.file_field: (filename, file_bytes[index * chunk_size:(index + 1) * chunk_size], content_type)},
+                    headers={'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Referer': str(form_resp.url)})
+                check_response(upload_resp, upload_url)
                 try:
-                    pres_detail = await self.get_student_assignment_detail(exercise_ref_id, ass_id)
-                    if pres_detail.upload_form_url:
-                        upload_form_url = pres_detail.upload_form_url
-                    base_node = self._get_exercise_base_node(exercise_ref_id)
-                except Exception as pe:
-                    logger.debug(f"Could not pre-fetch presentation detail: {pe}")
+                    result = upload_resp.json()
+                except ValueError as exc:
+                    raise StudentUploadError(t('upload.invalid_response')) from exc
+                if not isinstance(result, dict):
+                    raise StudentUploadError(t('upload.invalid_response'))
+                if type(result.get('status')) is not int or result['status'] != 1:
+                    message = result.get('message')
+                    raise StudentUploadError(message if isinstance(message, str) and message.strip() else t('upload.rejected'), 400)
+                file_token = result.get(form.file_identifier)
+            if not isinstance(file_token, str) or not file_token.strip():
+                raise StudentUploadError(t('upload.invalid_response'))
 
-            form_resp = await client.get(upload_form_url)
-            self._check_response_for_session_loss(form_resp, upload_form_url)
+            # This is the dynamic hidden input populated by ILIAS's file widget.
+            # Do not also send a scalar, bare [], or another copy of the binary.
+            save_data = {**form.hidden_inputs, form.token_input_name: file_token}
+            save_resp = await client.post(form_action, data=save_data, headers={'Referer': str(form_resp.url)})
+            check_response(save_resp, form_action)
+            if error := parse_student_upload_errors(save_resp.text):
+                raise StudentUploadError(error, 400)
 
-            # Default fallback parameters with dynamic base_node
-            repo_upload_url = (
-                f"{settings.ilias_base_url}/ilias.php?"
-                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:5n:d2:d1:yt&cmdClass=ilRepoStandardUploadHandlerGUI&cmd=upload"
-                f"&ref_id={exercise_ref_id}&ass_id={ass_id}&from_overview=1"
-            )
-            form_action = (
-                f"{settings.ilias_base_url}/ilias.php?"
-                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:5n:d2:d1&cmdClass=ilExSubmissionFileGUI&cmd=addUpload"
-                f"&ref_id={exercise_ref_id}&ass_id={ass_id}&from_overview=1"
-            )
-            input_name = "form/input_0/input_1"
-            file_identifier = "filename"
-            hidden_inputs = {}
-
-            if form_resp.status_code == 200:
-                parsed_info = parse_student_upload_form(form_resp.text, base_url=settings.ilias_base_url)
-                if parsed_info.upload_url:
-                    repo_upload_url = parsed_info.upload_url
-                if parsed_info.form_action:
-                    form_action = parsed_info.form_action
-                if parsed_info.input_name:
-                    input_name = parsed_info.input_name
-                if parsed_info.file_identifier:
-                    file_identifier = parsed_info.file_identifier
-                if parsed_info.hidden_inputs:
-                    hidden_inputs = parsed_info.hidden_inputs
-
-            # 2. Upload file to Repo Standard Upload Handler (Dropzone endpoint)
-            logger.info(f"Uploading student assignment file {filename} to Repo Upload Handler: {repo_upload_url}")
-            upload_files = {
-                "file": (filename, file_bytes, content_type),
-            }
-            upload_resp = await client.post(repo_upload_url, files=upload_files)
-            logger.info(f"Repo Upload Handler response status: {upload_resp.status_code}, body: {upload_resp.text[:300]}")
-
-            file_token = filename
-            if upload_resp.status_code == 200:
-                try:
-                    res_json = upload_resp.json()
-                    file_token = (
-                        res_json.get(file_identifier)
-                        or res_json.get("filename")
-                        or res_json.get("resource_id")
-                        or res_json.get("id")
-                        or filename
-                    )
-                    logger.info(f"Obtained file token: {file_token}")
-                except Exception as e:
-                    logger.warning(f"Could not parse upload handler response as JSON: {e}")
-
-            # 3. Submit the addUpload form with the file token
-            save_data = {
-                f"{input_name}[]": str(file_token),
-                input_name: str(file_token),
-                "cmd[addUpload]": "Save",
-            }
-            for k, v in hidden_inputs.items():
-                save_data[k] = v
-
-            logger.info(f"Submitting addUpload form to {form_action} with data: {save_data}")
-            save_resp = await client.post(
-                form_action,
-                data=save_data,
-                files={"form/input_0/input_1[]": (filename, file_bytes, content_type)},
-            )
-            logger.info(f"Student file addUpload response status: {save_resp.status_code}")
-
-        return await self.get_student_assignment_detail(exercise_ref_id, ass_id)
+            detail = await self.get_student_assignment_detail(
+                exercise_ref_id, ass_id, presentation_url=presentation_url, http_client=client)
+            expected_names = {filename, file_token} if form.file_identifier == 'filename' else {filename}
+            if not any(item.filename in expected_names and item.download_url for item in detail.submitted_files):
+                raise StudentUploadError(t('upload.unconfirmed'), 409)
+            return detail
 
     async def delete_student_assignment_file(
         self,
@@ -1482,7 +1503,7 @@ class IliasClient:
                 # If HTTP was 200/302 and no explicit error message, consider it successful
                 if post_resp.status_code in [200, 302]:
                     success = True
-                    message = "Bewertung erfolgreich gespeichert."
+                    message = t('Bewertung erfolgreich gespeichert.')
 
             return GradeSubmissionResponse(
                 success=success,
@@ -1511,7 +1532,7 @@ class IliasClient:
         if resp.status_code >= 400:
             await resp.aclose()
             await client.aclose()
-            raise ValueError(f"ILIAS returned error {resp.status_code} for download {full_url}")
+            raise ValueError(t('ILIAS returned error {p0} for download {p1}', p0=resp.status_code, p1=full_url))
 
         filtered_headers = {
             "Content-Type": resp.headers.get("content-type", "application/octet-stream"),
@@ -1586,7 +1607,7 @@ class IliasClient:
     # ---------------------------------------------------------
     # TA Exercise Editor & Assignment Management
     # ---------------------------------------------------------
-    async def get_ta_assignments_list(self, ref_id: str) -> TAAssignmentListResponse:
+    async def get_ta_assignments_list(self, ref_id: str, *, http_client: Optional[httpx.AsyncClient] = None) -> TAAssignmentListResponse:
         """
         Fetch and parse the TA assignments editor list (ilExAssignmentEditorGUI&cmd=listAssignments).
         """
@@ -1597,7 +1618,7 @@ class IliasClient:
             f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=listAssignments"
             f"&ref_id={ref_id}&mode=all&from_overview=1"
         )
-        async with self.session_manager.get_http_client() as client:
+        async with (nullcontext(http_client) if http_client is not None else self.session_manager.get_http_client()) as client:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
             self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
@@ -1630,180 +1651,110 @@ class IliasClient:
             return parse_ta_assignments_list(resp.text, exercise_ref_id=ref_id)
 
     async def get_ta_assignment_detail(
-        self, ref_id: str, ass_id: Optional[str] = None, type_id: int = 1
+        self, ref_id: str, ass_id: Optional[str] = None, type_id: int = 1, *,
+        http_client: Optional[httpx.AsyncClient] = None,
     ) -> TAAssignmentDetailResponse:
         """
         Fetch assignment details form (editAssignment or addAssignment).
         """
         self._ensure_authenticated()
-        base_node = self._get_exercise_base_node(ref_id)
-        if ass_id:
-            url = (
-                f"{settings.ilias_base_url}/ilias.php?"
-                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=editAssignment"
-                f"&ref_id={ref_id}&ass_id={ass_id}&mode=all&from_overview=1"
-            )
-            async with self.session_manager.get_http_client() as client:
+        async with (nullcontext(http_client) if http_client is not None else self.session_manager.get_http_client()) as client:
+            current = await self.get_ta_assignments_list(ref_id, http_client=client)
+            if ass_id:
+                item = next((item for item in current.assignments if item.ass_id == ass_id), None)
+                if item is None or not item.edit_url:
+                    raise ValueError(t('editor.assignment_missing'))
+                url = item.edit_url
                 resp = await client.get(url)
                 self._check_response_for_session_loss(resp, url)
-                self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
-                detail = parse_ta_assignment_form(resp.text, exercise_ref_id=ref_id, ass_id=ass_id)
+            else:
+                if not current.add_action_url:
+                    raise ValueError(t('editor.form_missing'))
+                if type_id not in current.available_types:
+                    raise ValueError(t('editor.type_unavailable'))
+                add_payload = {'type': str(type_id)}
+                if current.add_submit_command:
+                    add_payload[current.add_submit_command] = ''
+                resp = await client.post(current.add_action_url, data=add_payload)
+                self._check_response_for_session_loss(resp, current.add_action_url)
+            if not resp.is_success:
+                raise ValueError(t('editor.http_error', status=resp.status_code))
+            if error := parse_ta_assignment_error(resp.text):
+                raise ValueError(error)
+            self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
+            detail = parse_ta_assignment_form(resp.text, exercise_ref_id=ref_id, ass_id=ass_id)
+            detail.available_types = current.available_types
+            detail.existing_assignment_ids = [item.ass_id for item in current.assignments]
+            if ass_id:
                 try:
-                    files = await self.get_ta_instruction_files(ref_id, ass_id)
+                    files = await self.get_ta_instruction_files(ref_id, ass_id, http_client=client)
                     detail.instruction_files = files
+                except SessionExpiredError:
+                    raise
                 except Exception as fe:
                     logger.debug(f"Could not load instruction files for {ass_id}: {fe}")
-                return detail
-        else:
-            # For new assignment, submit toolbar addAssignment POST to retrieve the full creation form
-            list_res = await self.get_ta_assignments_list(ref_id)
-            rtoken = list_res.rtoken
-            add_url = (
-                f"{settings.ilias_base_url}/ilias.php?"
-                f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=post&fallbackCmd=addAssignment"
-                f"&ref_id={ref_id}&mode=all&from_overview=1"
-            )
-            if rtoken:
-                add_url = f"{add_url}&rtoken={rtoken}"
-            async with self.session_manager.get_http_client() as client:
-                resp = await client.post(add_url, data={"type": str(type_id), "cmd[addAssignment]": ""})
-                self._check_response_for_session_loss(resp, add_url)
-                if resp.status_code != 200 or "cmd[saveAssignment]" not in resp.text:
-                    fallback_url = (
-                        f"{settings.ilias_base_url}/ilias.php?"
-                        f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=addAssignment"
-                        f"&ref_id={ref_id}&ass_type={type_id}&mode=all&from_overview=1"
-                    )
-                    if rtoken:
-                        fallback_url = f"{fallback_url}&rtoken={rtoken}"
-                    resp = await client.get(fallback_url)
-                    self._check_response_for_session_loss(resp, fallback_url)
-
-                self._cache_exercise_cmd_nodes_from_html(ref_id, resp.text, url=str(resp.url))
-                detail = parse_ta_assignment_form(resp.text, exercise_ref_id=ref_id, ass_id=None)
-                detail.type_id = type_id
-                return detail
+            return detail
 
     async def save_ta_assignment(
         self, ref_id: str, data: SaveTAAssignmentRequest
     ) -> TAAssignmentDetailResponse:
-        """
-        Create or update an exercise assignment.
-        """
+        """Submit a fresh native form and verify the exact created/updated object."""
         self._ensure_authenticated()
-        existing = await self.get_ta_assignment_detail(
-            ref_id, ass_id=data.ass_id, type_id=data.type_id
-        )
-        base_node = self._get_exercise_base_node(ref_id)
-
-        action_url = existing.form_action or (
-            f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs&cmdClass=ilExAssignmentEditorGUI&cmd=post"
-            f"&ref_id={ref_id}&mode=all&from_overview=1&ass_type={data.type_id}"
-        )
-        if existing.rtoken and "rtoken=" not in action_url:
-            action_url = f"{action_url}&rtoken={existing.rtoken}"
-        if data.ass_id and "ass_id=" not in action_url:
-            action_url = f"{action_url}&ass_id={data.ass_id}"
-
-        # Initialize payload with genuine hidden inputs from form (e.g. ilfilehash, type)
-        payload: Dict[str, str] = {}
-        for k, v in existing.hidden_inputs.items():
-            payload[k] = v
-
-        payload["title"] = data.title
-        payload["type"] = str(data.type_id)
-        payload["instruction"] = data.instruction_html or ""
-        payload["cmd[saveAssignment]"] = "Save"
-
-        if data.mandatory:
-            payload["mandatory"] = "1"
-        else:
-            payload.pop("mandatory", None)
-
-        if data.start_time and data.start_time.strip():
-            payload["start_time"] = data.start_time.strip()
-        else:
-            payload.pop("start_time", None)
-
-        # In ILIAS:
-        # deadline_mode = "0" -> Fixed Date (deadline enabled)
-        # deadline_mode = "-1" -> No Deadline
-        if data.deadline_mode != -1 and data.deadline and data.deadline.strip():
-            payload["deadline_mode"] = "0"
-            payload["deadline"] = data.deadline.strip()
-            if data.has_grace_period and data.deadline2 and data.deadline2.strip():
-                payload["deadline2"] = data.deadline2.strip()
-            else:
-                payload.pop("deadline2", None)
-        else:
-            payload["deadline_mode"] = "-1"
-            payload.pop("deadline", None)
-            payload.pop("deadline2", None)
-
-        if data.max_file_enabled and data.max_file is not None:
-            payload["max_file_tgl"] = "1"
-            payload["max_file"] = str(data.max_file)
-        else:
-            payload.pop("max_file_tgl", None)
-            payload.pop("max_file", None)
-
+        validate_ta_assignment_request(data)
         async with self.session_manager.get_http_client() as client:
-            resp = await client.post(action_url, data=payload)
-            self._check_response_for_session_loss(resp, action_url)
+            existing = await self.get_ta_assignment_detail(
+                ref_id, ass_id=data.ass_id, type_id=data.type_id, http_client=client)
+            payload = build_ta_assignment_payload(existing, data)
+            expected_command = 'cmd[updateAssignment]' if data.ass_id else 'cmd[saveAssignment]'
+            if existing.submit_command != expected_command:
+                raise ValueError(t('editor.form_missing'))
+            action = existing.form_action
+            target, origin = urllib.parse.urlparse(action), urllib.parse.urlparse(settings.ilias_base_url)
+            query = urllib.parse.parse_qs(target.query)
+            if ((target.scheme, target.netloc) != (origin.scheme, origin.netloc)
+                    or query.get('ref_id') != [ref_id]):
+                raise ValueError(t('editor.invalid_target'))
+            if data.ass_id and query.get('ass_id') != [data.ass_id]:
+                raise ValueError(t('editor.invalid_target'))
 
-            # Check if ILIAS returned an actual error alert (ignoring modal dialog templates)
-            soup_resp = BeautifulSoup(resp.text, "lxml")
-            real_alert = None
-            for alert in soup_resp.select(".ilAdminRow .alert-danger, .ilFailureMessage, .alert-danger"):
-                if alert.find_parent("dialog") or alert.find_parent(class_=re.compile(r"modal", re.I)):
-                    continue
-                real_alert = alert
-                break
+            # Reproduce native empty file controls too: PHP distinguishes an
+            # empty multipart upload from a missing $_FILES entry.
+            # Hidden checkbox subforms still participate in native validation;
+            # include their enabled file inputs just as a browser does.
+            if existing.file_inputs:
+                body, content_type = encode_assignment_form(payload, existing.file_inputs)
+                response = await client.post(action, content=body, headers={'Content-Type': content_type})
+            else:
+                response = await client.post(action, data=payload)
+            self._check_response_for_session_loss(response, action)
+            if not response.is_success:
+                dump_failed_html(response.text, 'ta_assignment_save', extra_info={
+                    'ref_id': ref_id, 'status': response.status_code,
+                    'field_names': sorted(payload), 'file_inputs': existing.file_inputs})
+                raise ValueError(t('editor.http_error', status=response.status_code))
+            if error := parse_ta_assignment_error(response.text):
+                dump_failed_html(response.text, 'ta_assignment_save', extra_info={
+                    'ref_id': ref_id, 'field_names': sorted(payload), 'file_inputs': existing.file_inputs})
+                logger.error('ILIAS rejected assignment save: %s', error)
+                raise ValueError(t('ILIAS Fehler: {p0}', p0=error))
 
-            if real_alert:
-                for hidden in real_alert.select(".ilAccHeadingHidden"):
-                    hidden.decompose()
-                err_msg = " ".join(real_alert.get_text().split()).strip()
-
-                # Also collect any specific input field error messages
-                field_errors = []
-                for fe in soup_resp.select(".has-error, .help-block.alert, .help-block, .il-form-input-error"):
-                    if fe.find_parent("dialog") or fe.find_parent(class_=re.compile(r"modal", re.I)):
-                        continue
-                    txt = " ".join(fe.get_text().split()).strip()
-                    if txt and txt not in field_errors and txt not in err_msg:
-                        field_errors.append(txt)
-                if field_errors:
-                    err_msg += f" (Felder: {'; '.join(field_errors)})"
-
-                if err_msg:
-                    logger.error(f"Failed to save assignment in ILIAS: {err_msg}")
-                    raise ValueError(f"ILIAS Fehler: {err_msg}")
-
-            # Identify the assignment ID
-            created_or_edited_id = data.ass_id
-            if not created_or_edited_id:
-                # 1. Search for ass_id in response URL
-                m_ass = re.search(r"ass_id=(\d+)", str(resp.url))
-                if m_ass:
-                    created_or_edited_id = m_ass.group(1)
+            saved_id = data.ass_id
+            if not saved_id:
+                before = set(existing.existing_assignment_ids)
+                redirected = urllib.parse.parse_qs(urllib.parse.urlparse(str(response.url)).query).get('ass_id', [None])[0]
+                if redirected and redirected not in before:
+                    saved_id = redirected
                 else:
-                    # 2. Check updated assignments list to find new assignment by title
-                    updated_list = await self.get_ta_assignments_list(ref_id)
-                    for item in updated_list.assignments:
-                        if item.title.strip().lower() == data.title.strip().lower():
-                            created_or_edited_id = item.ass_id
-                            break
-                    if not created_or_edited_id and updated_list.assignments:
-                        created_or_edited_id = updated_list.assignments[-1].ass_id
-
-            if created_or_edited_id:
-                return await self.get_ta_assignment_detail(
-                    ref_id, ass_id=created_or_edited_id, type_id=data.type_id
-                )
-
-            saved = parse_ta_assignment_form(resp.text, exercise_ref_id=ref_id, ass_id=created_or_edited_id)
+                    updated = await self.get_ta_assignments_list(ref_id, http_client=client)
+                    matches = [item for item in updated.assignments if item.ass_id not in before
+                               and item.title.strip() == data.title.strip() and item.type_id == data.type_id]
+                    if len(matches) == 1:
+                        saved_id = matches[0].ass_id
+            if not saved_id:
+                raise ValueError(t('editor.save_unconfirmed'))
+            saved = await self.get_ta_assignment_detail(ref_id, ass_id=saved_id, type_id=data.type_id, http_client=client)
+            if saved.title.strip() != data.title.strip() or saved.type_id != data.type_id:
+                raise ValueError(t('editor.save_unconfirmed'))
             return saved
 
     async def delete_ta_assignment(self, ref_id: str, ass_id: str) -> bool:
@@ -1837,7 +1788,7 @@ class IliasClient:
             return del_resp.status_code == 200
 
     async def get_ta_instruction_files(
-        self, ref_id: str, ass_id: str
+        self, ref_id: str, ass_id: str, *, http_client: Optional[httpx.AsyncClient] = None,
     ) -> List[TAInstructionFileItem]:
         """
         Fetch list of uploaded instruction files for an assignment.
@@ -1849,7 +1800,7 @@ class IliasClient:
             f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs:z6&cmdClass=ilResourceCollectionGUI&cmd=index"
             f"&ref_id={ref_id}&ass_id={ass_id}&from_overview=1"
         )
-        async with self.session_manager.get_http_client() as client:
+        async with (nullcontext(http_client) if http_client is not None else self.session_manager.get_http_client()) as client:
             resp = await client.get(url)
             self._check_response_for_session_loss(resp, url)
             return parse_instruction_files(resp.text, base_url=settings.ilias_base_url)
@@ -1862,26 +1813,66 @@ class IliasClient:
         file_bytes: bytes,
         content_type: str = "application/octet-stream",
     ) -> List[TAInstructionFileItem]:
-        """
-        Upload an instruction file to an assignment (ilResourceCollectionGUI&cmd=postUpload).
-        """
+        """Discover the native upload handler, send its token, and verify the new attachment."""
         self._ensure_authenticated()
-        base_node = self._get_exercise_base_node(ref_id)
-        upload_url = (
-            f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:cs:z6&cmdClass=ilResourceCollectionGUI&cmd=postUpload"
-            f"&ref_id={ref_id}&ass_id={ass_id}&from_overview=1"
-        )
-        files = {
-            "form/input_0[]": (filename, file_bytes, content_type),
-            "form/input_0": (filename, file_bytes, content_type),
-            "files[]": (filename, file_bytes, content_type),
-            "file": (filename, file_bytes, content_type),
-        }
         async with self.session_manager.get_http_client() as client:
-            resp = await client.post(upload_url, files=files)
-            self._check_response_for_session_loss(resp, upload_url)
-        return await self.get_ta_instruction_files(ref_id, ass_id)
+            base_node = self._get_exercise_base_node(ref_id)
+            page_url = (f'{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui'
+                        f'&cmdNode={base_node}:cs:z6&cmdClass=ilResourceCollectionGUI&cmd=index'
+                        f'&ref_id={ref_id}&ass_id={ass_id}&from_overview=1')
+
+            def check(response: httpx.Response):
+                self._check_response_for_session_loss(response, str(response.url))
+                if not response.is_success:
+                    raise StudentUploadError(t('upload.http_error', status=response.status_code))
+
+            def target(url: str) -> str:
+                parsed = urllib.parse.urlparse(url)
+                origin = urllib.parse.urlparse(settings.ilias_base_url)
+                query = urllib.parse.parse_qs(parsed.query)
+                if ((parsed.scheme, parsed.netloc) != (origin.scheme, origin.netloc)
+                        or query.get('ref_id') != [ref_id] or query.get('ass_id') != [ass_id]):
+                    raise StudentUploadError(t('upload.invalid_target'))
+                return url
+
+            page = await client.get(page_url)
+            check(page)
+            before = {item.file_id for item in parse_instruction_files(page.text)}
+            form = parse_native_file_upload_form(page.text, str(page.url), command='postUpload')
+            if not form.upload_url or not form.form_action or not form.token_input_name or not form.file_identifier or form.disabled:
+                raise StudentUploadError(t('upload.form_missing'))
+            if form.max_size and len(file_bytes) > form.max_size:
+                raise StudentUploadError(t('upload.too_large', limit=form.max_size), 400)
+            if form.max_files and form.current_files >= form.max_files:
+                raise StudentUploadError(t('upload.unavailable'), 400)
+            upload_url, action = target(form.upload_url), target(form.form_action)
+            if form.chunked:
+                # Never silently truncate uploads when the native handler requires chunks.
+                raise StudentUploadError(t('upload.form_missing'))
+            uploaded = await client.post(upload_url,
+                files={form.file_field: (filename, file_bytes, content_type)},
+                headers={'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Referer': str(page.url)})
+            check(uploaded)
+            try:
+                result = uploaded.json()
+            except ValueError as exc:
+                raise StudentUploadError(t('upload.invalid_response')) from exc
+            if not isinstance(result, dict):
+                raise StudentUploadError(t('upload.invalid_response'))
+            if type(result.get('status')) is not int or result['status'] != 1:
+                message = result.get('message')
+                raise StudentUploadError(message if isinstance(message, str) and message.strip() else t('upload.rejected'), 400)
+            token = result.get(form.file_identifier)
+            if not isinstance(token, str) or not token.strip():
+                raise StudentUploadError(t('upload.invalid_response'))
+            saved = await client.post(action, data={**form.hidden_inputs, form.token_input_name: token})
+            check(saved)
+            if error := parse_student_upload_errors(saved.text):
+                raise StudentUploadError(error, 400)
+            updated = await self.get_ta_instruction_files(ref_id, ass_id, http_client=client)
+            if not any(item.file_id not in before and item.filename == filename and item.download_url for item in updated):
+                raise StudentUploadError(t('upload.unconfirmed'), 409)
+            return updated
 
     async def delete_instruction_file(
         self, ref_id: str, ass_id: str, file_id: str

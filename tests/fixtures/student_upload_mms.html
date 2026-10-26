@@ -1,0 +1,54 @@
+<!-- Minimal upload form extracted from the supplied KW Way To Exercise Student example. -->
+<form action="https://ilias.unibe.ch/ilias.php?baseClass=ilexercisehandlergui&amp;cmdNode=dc:o5:5n:d2:d1&amp;cmdClass=ilExSubmissionFileGUI&amp;cmd=addUpload&amp;ref_id=3803739&amp;ass_id=53188&amp;from_overview=1" class="c-form c-form--horizontal" enctype="multipart/form-data" method="post">
+<div class="c-form__header">
+<div class="c-form__actions"><button class="btn btn-default" data-action="">Save</button>
+</div>
+<div class="c-form__required">
+<span class="asterisk">*</span><span class="small"> Required</span>
+</div>
+</div>
+<fieldset class="c-input" data-il-ui-component="section-field-input" data-il-ui-input-name="form/input_0" tabindex="0">
+<label><h2>Upload File</h2>
+<span aria-label="Required" class="asterisk">*</span></label>
+<div class="c-input__field">
+<fieldset class="c-input" data-il-ui-component="file-field-input" data-il-ui-input-name="form/input_0/input_1" id="il_ui_fw_6ac6ba5556a7d8_08424849" tabindex="0">
+<label>Files<span aria-label="Required" class="asterisk">*</span></label>
+<div class="c-input__field">
+<div class="ui-input-file">
+<div class="ui-input-file-input-list">
+<template></template>
+</div>
+<div class="ui-input-file-input-dropzone">
+<button class="btn btn-link dz-clickable" data-action="#" id="il_ui_fw_6ac6ba55569e31_61592182">Select the files from your computer</button>
+<span class="ui-input-file-input-error-msg" data-dz-error-msg=""></span>
+</div>
+<div class="help-block">
+        Maximum upload size: 1000 MB
+        |
+        Max Number of Files: 20
+    </div>
+</div>
+</div>
+</fieldset>
+</div>
+</fieldset>
+<div class="c-form__footer">
+<div class="c-form__required">
+<span class="asterisk">*</span><span class="small"> Required</span>
+</div>
+<div class="c-form__actions"><button class="btn btn-default" data-action="">Save</button>
+</div>
+</div>
+</form>
+<script>il.UI.Input.File.init('il_ui_fw_6ac6ba5556a7d8_08424849',
+'ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1:yt&cmdClass=ilRepoStandardUploadHandlerGUI&cmd=upload&ref_id=3803739&ass_id=53188&from_overview=1',
+'ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:5n:d2:d1:yt&cmdClass=ilRepoStandardUploadHandlerGUI&cmd=remove&ref_id=3803739&ass_id=53188&from_overview=1',
+'filename',
+0,
+20,
+1000000000,
+'',
+false,
+{"invalid_mime":"Files of type '%s' are not allowed","invalid_size":"File exceeds the maximum size of %s.","invalid_amount":"You cannot upload this many files, please remove some in order to continue.","general_error":"An error occurred! You can check the JavaScript console of your browser for more information and\/or contact your ILIAS system administration about this incident."},
+false,
+900000000);</script>
