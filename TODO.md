@@ -36,7 +36,7 @@ build validation, and English fallback for partial languages.
 
 ## Comprehensive ILIAS Object Support & Course Management
 
-**Status:** Inventory of all 30 native ILIAS object types extracted from course authoring views (`htmlfromilias/ActualListOfAllSubjects/Ilias Course Formatting/`). Core learning objects (`file`, `fold`, `exc`, `xoct`, `sess`) are fully supported; remaining objects are catalogued below with current status and integration roadmap.
+**Status:** Inventory of all 30 native ILIAS object types extracted from course authoring views (`htmlfromilias/ActualListOfAllSubjects/Ilias Course Formatting/`). Complete technical specification documented in [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECIFICATION.md). Core learning objects (`file`, `fold`, `exc`, `xoct`, `sess`) are fully supported; remaining objects are catalogued below with current status and integration roadmap.
 
 ### Object Inventory & Current Support Status
 
