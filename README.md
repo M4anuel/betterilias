@@ -242,6 +242,40 @@ pytest tests/test_unibe_real_dumps.py -v
 
 ---
 
+## Localisation
+
+The app and both extension popups support German and English. Select a language
+in the app settings or the extension popup. Each saves its preference locally;
+the initial language follows the browser, with English as the fallback.
+ILIAS course titles, instructions, dates, names and other supplied content keep
+their original language. Generated course headings carry translation keys so
+cached headings can switch language without changing course layout identifiers.
+
+Shared messages live in `locales/en.json` and `locales/de.json`. Keys identify
+source messages; `{name}` placeholders interpolate values without translating
+user content. Add new keys to English and all fully supported languages.
+Register languages in `locales/languages.json` with `name`, `locale`, and
+`support: "full"` or `"partial"`. Partial languages fall back to English for
+missing or empty entries in the frontend, backend and extensions.
+
+`npm run build` in `frontend/` validates catalogues and placeholder consistency,
+then regenerates both extensions' `i18n.js` and `_locales/` packages. Missing
+entries in fully supported languages fail the build; partial languages emit
+warnings. Reload installed extensions after updating their packaged files.
+Run `npm run check:locales` or `npm run test:i18n` in `frontend/` for focused checks.
+
+The app and extensions send `Accept-Language` on API requests. The backend
+negotiates regional tags and quality values, isolates the language per request,
+and returns `Content-Language`. Direct downloads include `?lang=...`. HTTP
+requests without a supported preference use English; standalone parser/CLI
+calls retain their existing German default.
+
+Backend localisation tests are in `tests/test_localisation.py`. To run browser
+checks after building the frontend, set `BETTERILIAS_BROWSER_TESTS=1` and run
+`python -m pytest tests/test_localisation_browser.py`. Set
+`BETTERILIAS_BROWSER_CHANNEL=chrome` to use an installed Chrome instead of
+Playwright's bundled Chromium.
+
 ## 🤖 AI Maintenance Protocol
 
 When Uni Bern updates the ILIAS version and an HTML parser breaks:

@@ -4,23 +4,24 @@ Unchecked items are unfinished; completed work is listed separately below.
 
 ## Localisation
 
-**Status:** Only the text inventory has been saved. The language selector,
-translation catalogues, and build validation are not implemented yet.
+**Status:** Implemented with shared German/English catalogues, saved language
+selection in the app and both extensions, request-scoped server messages,
+build validation, and English fallback for partial languages.
 
-- [ ] Add a language setting with German and English support.
-- [ ] Move hardcoded user-facing text into translation files (for example,
+- [x] Add a language setting with German and English support.
+- [x] Move hardcoded user-facing text into translation files (for example,
   `translations.ts`) and look up the selected language when rendering it.
   Cover the app, user-facing server messages, and both Chrome and Firefox
   extension popups. Keep course titles and other content supplied by ILIAS
   as provided.
-- [ ] Give each language an explicit fully supported or partially supported flag.
-- [ ] Check translation completeness at compile/build time:
+- [x] Give each language an explicit fully supported or partially supported flag.
+- [x] Check translation completeness at compile/build time:
   - Fully supported languages must contain every translation key; missing entries
     must fail the build.
   - Partially supported languages may report warnings for missing entries, but
     must still build and run. Use English for missing translations without
     crashing the app or server.
-- [ ] Verify language selection, translation coverage, build failures for
+- [x] Verify language selection, translation coverage, build failures for
   incomplete fully supported languages, and English fallback for partial ones.
 
 ## ILIAS content and formatting
@@ -102,3 +103,12 @@ translation catalogues, and build validation are not implemented yet.
 
 - [x] Correct and grade exercise submissions.
 - [x] Connect a phone using a QR code in the desktop app's top-right settings menu.
+- [x] Follow live assignment upload links and ILIAS file-field encoding; validate upload responses and confirm the new file, with GTI/MMS regression fixtures.
+- [x] Create and edit TA assignments using native form defaults, conditional fields and the correct save/update commands; preserve drafts while selecting the submission type.
+- [x] Recognise the native TA list's layout table and unnamed creation button; cover the full list markup through parser, API and browser tests.
+- [x] Encode empty TA file controls with explicit empty filenames, including optional subforms; compare with browser FormData and retain rejected HTML for diagnosis.
+- [x] Confirm assignment creation works (user verified); preserve ILIAS instruction HTML, restore existing instructions, indicate active formatting, and add HTML editing and a link dialog.
+- [x] Follow the native instruction-file upload handler and verify the new attachment; parse the filename column and retain failed queued files for retry. Live attachment upload confirmed by the user.
+- [x] Show the fixed submission type explanation in an edit-only info tooltip; preserve live caret formatting when toggling bold and italic independently.
+- [x] Preserve formatted instructions in student assignment dialogs and show team controls only for assignments with native Team Upload support; verify rendered styles in light and dark mode.
+- [x] Localise known ILIAS assignment status, requirement, type and deadline messages in overviews and dialogs; document localisation requirements in AGENTS.md.

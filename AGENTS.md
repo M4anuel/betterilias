@@ -89,7 +89,10 @@ python start.py --help  # or verify python start.py syntax
   * Word "Ilias" / Primary Accent: `#0AACA5`
 * **Full Dark Mode Support:** Every new component, modal, drawer, or badge must support both light mode and dark mode (`dark:...` classes in Tailwind CSS).
 
-### 3.5 Browser Extension Parity
+### 3.5 Localisation
+* Localise every user-facing label, hint, tooltip, accessibility label and application-generated error using the existing `t(...)` helpers and shared `locales/en.json` / `locales/de.json` catalogues. Translate known ILIAS interface messages (including deadline/status text); preserve lecturer content, titles, names and dates. Verify both languages and run `npm.cmd --prefix frontend run check:locales` when adding or changing strings.
+
+### 3.6 Browser Extension Parity
 * If changes are made to the session sync endpoint (`POST /api/auth/sync`), cookie handling, or extension popup UX:
   * Update **both** the Chrome extension (`extension/`) and the Firefox extension (`extension-firefox/`).
   * In Firefox, remember that content scripts run in an Xray sandbox: write to `window.wrappedJSObject.localStorage` and dispatch custom DOM events (`BETTERILIAS_SESSION_SYNCED`) so the page React app detects the session.
