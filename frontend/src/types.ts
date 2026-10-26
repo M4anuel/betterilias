@@ -241,7 +241,7 @@ export interface SubmissionItem {
   feedback?: string;
   notice?: string;
   feedback_mail_url?: string;
-  first_added_surname?: string | null;
+  feedback_recipient_surname?: string | null;
   team_log_url?: string;
   evaluation_by_file_url?: string;
   can_grade?: boolean;

@@ -57,14 +57,14 @@ async def get_exercise_info(
 async def get_submissions(
     exercise_id: str,
     ass_id: Optional[str] = Query(None, description="Optional assignment ID to filter by specific assignment"),
-    include_team_order: bool = Query(False, description="Resolve original team surname order from team logs"),
+    include_ilias_order: bool = Query(False, description="Resolve ILIAS surname order from evaluation-by-file recipients"),
     client: IliasClient = Depends(get_ilias_client)
 ):
     """
     Fetch the list of student submissions for an exercise (TA grading view).
     """
-    if include_team_order:
-        return await client.get_exercise_submissions(ref_id=exercise_id, ass_id=ass_id, include_team_order=True)
+    if include_ilias_order:
+        return await client.get_exercise_submissions(ref_id=exercise_id, ass_id=ass_id, include_ilias_order=True)
     return await client.get_exercise_submissions(ref_id=exercise_id, ass_id=ass_id)
 
 

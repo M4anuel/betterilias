@@ -398,7 +398,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       .then((result) => {
         if (!cancelled) setTeamOrder({
           source,
-          names: Object.fromEntries(result.submissions.map((s) => [s.member_id, s.first_added_surname || null])),
+          names: Object.fromEntries(result.submissions.map((s) => [s.member_id, s.feedback_recipient_surname || null])),
           error: false,
         });
       })
@@ -1814,10 +1814,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
           {taSortField === 'ilias' && (
             <div role="status" className="text-xs text-slate-500 dark:text-slate-400">
-              {!teamSortNames ? t('Team-Reihenfolge wird geladen…') : teamOrder?.error ? (
-                <>{t('Team-Reihenfolge konnte nicht geladen werden.')} <button type="button" className="underline" onClick={() => setTeamOrderRetry((value) => value + 1)}>{t('Erneut versuchen')}</button></>
+              {!teamSortNames ? t('ILIAS-Reihenfolge wird geladen…') : teamOrder?.error ? (
+                <>{t('ILIAS-Reihenfolge konnte nicht geladen werden.')} <button type="button" className="underline" onClick={() => setTeamOrderRetry((value) => value + 1)}>{t('Erneut versuchen')}</button></>
               ) : taSubmissionsData?.submissions.some((s) => !teamSortNames[s.member_id]) ? (
-                t('Teams ohne protokollierten Beitritt stehen am Ende.')
+                t('Abgaben ohne ermittelbaren Feedback-Empfänger stehen am Ende.')
               ) : null}
             </div>
           )}

@@ -231,10 +231,10 @@ export const api = {
     return res.json();
   },
 
-  async getExerciseSubmissions(exerciseId: string, assId?: string, includeTeamOrder = false): Promise<ExerciseSubmissionsResponse> {
+  async getExerciseSubmissions(exerciseId: string, assId?: string, includeIliasOrder = false): Promise<ExerciseSubmissionsResponse> {
     const params = new URLSearchParams();
     if (assId) params.set('ass_id', assId);
-    if (includeTeamOrder) params.set('include_team_order', 'true');
+    if (includeIliasOrder) params.set('include_ilias_order', 'true');
     const query = params.size ? `?${params}` : '';
     const res = await sessionFetch(`${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/submissions${query}`);
     if (!res.ok) {

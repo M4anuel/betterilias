@@ -20,11 +20,11 @@ def test_original_team_sort_is_lazy_and_reversible(local_site, language, label, 
     errors = []
     submissions = [
         dict(member_id='1', student_name='Alpha, Anna', team_id='101', team_members=['Alpha, Anna', 'Zulu, Zoe'],
-             first_added_surname='Zulu', submission_status='submitted', files=[]),
+             feedback_recipient_surname='Zulu', submission_status='submitted', files=[]),
         dict(member_id='2', student_name='Bravo, Ben', team_id='102', team_members=['Bravo, Ben', 'Example, Eve'],
-             first_added_surname='Example', submission_status='submitted', files=[]),
+             feedback_recipient_surname='Example', submission_status='submitted', files=[]),
         dict(member_id='3', student_name='Unknown team', team_id='103', team_members=[],
-             first_added_surname=None, submission_status='submitted', files=[]),
+             feedback_recipient_surname=None, submission_status='submitted', files=[]),
     ]
 
     def respond(route):
@@ -38,13 +38,13 @@ def test_original_team_sort_is_lazy_and_reversible(local_site, language, label, 
         elif url.path == '/api/exercises/200/overview':
             data = dict(exercise_ref_id='200', title='Exercises', has_ta_access=True, assignments=[], breadcrumbs=[])
         elif url.path == '/api/exercises/200/submissions':
-            enriched = parse_qs(url.query).get('include_team_order') == ['true']
+            enriched = parse_qs(url.query).get('include_ilias_order') == ['true']
             if enriched:
                 enriched_requests.append(url.query)
             rows = [dict(s) for s in submissions]
             if not enriched:
                 for s in rows:
-                    s.pop('first_added_surname')
+                    s.pop('feedback_recipient_surname')
             data = dict(exercise=dict(ref_id='200', title='Exercises', total_participants=3, submitted_count=3, graded_count=0),
                         active_assignment_id='55', available_assignments=[dict(ass_id='55', title='One', url='#')], submissions=rows)
         else:

@@ -145,7 +145,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
-                title={t('Nachname des zuerst hinzugefügten Teammitglieds')}
+                title={t('Nachname des Empfängers unter „Korrektur per Datei“')}
                 onClick={() => onSetSortField('ilias')}
                 className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border text-xs font-semibold transition cursor-pointer ${
                   sortField === 'ilias'

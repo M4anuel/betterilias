@@ -101,7 +101,7 @@ build validation, and English fallback for partial languages.
 
 ## Completed
 
-- [x] Add ILIAS default grading sort by the surname of the first student added to each team, using team log addition events and ignoring team creation.
+- [x] Sort the ILIAS default grading order by the feedback recipient surname shown under Evaluation by file; replace the incorrect first-added-team-member lookup.
 
 - [x] Highlight invalid assignment inputs, show localised errors beside each field, and scroll/focus the first invalid input on submission; clear errors as values are corrected.
 
