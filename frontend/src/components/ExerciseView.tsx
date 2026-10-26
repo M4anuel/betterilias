@@ -40,7 +40,7 @@ import {
 } from '../types';
 import { api } from '../lib/api';
 import { navigationGuard, useNavigationGuard } from '../lib/navigationGuard';
-import { cache } from '../lib/cache';
+import { cache, EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX } from '../lib/cache';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { StudentAssignmentModal } from './StudentAssignmentModal';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
@@ -480,7 +480,17 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   }, [overviewData?.breadcrumbs, overviewData?.title, exerciseRefId, courseBreadcrumbs]);
 
   // 1. Load Overview (defaults to mode=all so all 11+ assignments are fetched!)
-  const loadOverview = useCallback(() => {
+  const loadOverview = useCallback((forceRefresh = false) => {
+    const cached = cache.getCachedExerciseOverview(exerciseRefId);
+    if (cached && !overviewData) {
+      setOverviewData(cached);
+    }
+    // ILIAS Saver: If fresh within TTL and not a forced manual refresh, skip revalidation!
+    if (cached && !forceRefresh && cache.isIliasSaverFresh(EXERCISE_OVERVIEW_PREFIX + exerciseRefId)) {
+      setIsLoadingOverview(false);
+      setIsRevalidatingOverview(false);
+      return;
+    }
     setOverviewData((current) => {
       if (!current) {
         setIsLoadingOverview(true);
@@ -548,7 +558,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   // 3. Load TA Submissions when in ta_grading tab (Cached + Race condition protection)
   const loadTaSubmissions = useCallback(
-    (assId?: string, isInitialLoad = false) => {
+    (assId?: string, isInitialLoad = false, forceRefresh = false) => {
       const cacheKey = assId || 'default';
       // 1. Instant serve from memory ref cache or localStorage cache (0ms)
       let cached: ExerciseSubmissionsResponse | null = submissionsCacheRef.current[cacheKey] || null;
@@ -577,6 +587,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           }
           return updated;
         });
+      }
+
+      const storageKey = `${EXERCISE_SUBMISSIONS_PREFIX}${exerciseRefId}_${assId || 'default'}`;
+      if (cached && !forceRefresh && cache.isIliasSaverFresh(storageKey)) {
+        setIsLoadingTaSubmissions(false);
+        return;
       }
 
       // 2. Network revalidation with sequence ID to prevent out-of-order responses
@@ -1258,9 +1274,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   };
 
   const handleRefresh = useCallback(() => {
-    loadOverview();
+    loadOverview(true);
     if (activeTab === 'ta_grading') {
-      loadTaSubmissions(selectedTaAssId || undefined, false);
+      loadTaSubmissions(selectedTaAssId || undefined, false, true);
     } else if (activeTab === 'info') {
       setIsLoadingInfo(true);
       api

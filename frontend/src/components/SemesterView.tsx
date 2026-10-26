@@ -36,6 +36,7 @@ interface SemesterViewProps {
   lastOpenedCourseId: string | null;
   coursesList: CourseItem[];
   isLoading: boolean;
+  onManualRefresh?: () => void;
 }
 
 export const SemesterView: React.FC<SemesterViewProps> = ({
@@ -46,6 +47,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
   lastOpenedCourseId,
   coursesList,
   isLoading,
+  onManualRefresh,
 }) => {
   useLanguage();
   // Find last opened course object if available
@@ -229,6 +231,20 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
               >
                 <SlidersHorizontal className="h-4 w-4" />
               </button>
+
+              {/* Manual Refresh Button */}
+              {onManualRefresh && (
+                <button
+                  type="button"
+                  onClick={onManualRefresh}
+                  disabled={isLoading}
+                  className="rounded-xl border border-slate-200 bg-white p-1.5 text-slate-500 shadow-xs hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition cursor-pointer disabled:opacity-50"
+                  title={t("Übersicht aktualisieren")}
+                  aria-label={t("Übersicht aktualisieren")}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                </button>
+              )}
             </div>
 
             {/* View Mode Toggle: Cards vs. List */}
