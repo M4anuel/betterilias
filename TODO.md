@@ -36,10 +36,56 @@ translation catalogues, and build validation are not implemented yet.
 ## Media & Podcast Streaming
 
 - [ ] Native In-App Opencast Podcast Player with Dual-Stream Support:
-  - [ ] Synchronized playback for presenter camera feed (with mainAudio) and presentation slides feed.
+  - [ ] Synchronized playback for presenter camera feed (with `mainAudio`) and presentation slides feed.
   - [ ] Viewing layouts: Picture-in-Picture (PiP), Side-by-Side (desktop split), and one-click screen swap.
-  - [ ] Slide chapter navigation using Opencast frameList thumbnails and timestamps.
-  - [ ] Fast on-demand stream resolution for podcast episode IDs (eid).
+  - [ ] Slide chapter navigation using Opencast `frameList` thumbnails and timestamps.
+  - [ ] Fast on-demand stream resolution for podcast episode IDs (`eid`).
+
+### Technical Specification & Findings for Podcast Streaming
+*(Reference dump inspected under `htmlfromilias/PodcastStreaming/`)*
+
+1. **Episode URL & Player Initialization:**
+   - Episodes in ILIAS point to:
+     `https://ilias.unibe.ch/ilias.php?baseClass=ilobjplugindispatchgui&cmdClass=xoctPlayerGUI&cmd=streamVideo&ref_id=<ref_id>&eid=<eid>`
+   - Requesting this page with authenticated session cookies returns an HTML payload containing:
+     `il.Opencast.Paella.player.init(<config_json>);`
+
+2. **Stream Structure & Audio Track Mapping:**
+   - `<config_json>.streams` provides two synchronized MP4 streams:
+     - **Stream 0 — Presenter Camera:** `content: "presenter"`, `role: "mainAudio"`. Contains the lecturer camera feed **and the primary AAC audio track** from the lecture hall microphone. Multiple qualities available (1080p, 720p, 480p).
+     - **Stream 1 — Presentation/Slides:** `content: "presentation"`, `role: null`. Contains the projector / slides screen capture. Muted / video-only.
+   - **Stream Synchronization:** Both streams start at timestamp `t = 0.000` and have identical duration (`<config_json>.metadata.duration` in ms).
+   - **CDN & Range Requests:** Streams are hosted on `https://dist.opencast.unibe.ch/...mp4`. They support standard HTTP byte-range requests (`HTTP 206 Partial Content`) and do **not** require cookies, credentials, or special CORS headers.
+
+3. **Slide Timestamps & Thumbnails (`frameList`):**
+   - `<config_json>.frameList` contains an array of slide change events:
+     ```json
+     [
+       { "id": "frame_0", "time": 0, "url": "https://dist.opencast.unibe.ch/.../frame_0.jpg", "mimetype": "image/jpeg" },
+       { "id": "frame_119", "time": 119, "url": "https://dist.opencast.unibe.ch/.../frame_119.jpg", "mimetype": "image/jpeg" }
+     ]
+     ```
+   - Can be used directly in the UI as a chapter scrubber or slide sidebar.
+
+4. **Frontend Dual-Video Sync Architecture:**
+   - Use two HTML5 `<video>` elements:
+     - Master video: Presenter (with sound unmuted).
+     - Slave video: Presentation (muted to avoid potential audio conflicts/echo).
+   - Sync logic:
+     ```ts
+     const syncPlayback = () => {
+       if (Math.abs(presentationRef.current.currentTime - presenterRef.current.currentTime) > 0.3) {
+         presentationRef.current.currentTime = presenterRef.current.currentTime;
+       }
+     };
+     presenterRef.current.onplay = () => presentationRef.current?.play();
+     presenterRef.current.onpause = () => presentationRef.current?.pause();
+     presenterRef.current.onseeking = syncPlayback;
+     presenterRef.current.ontimeupdate = syncPlayback;
+     ```
+   - Layout modes:
+     - **Picture-in-Picture (Default):** Presentation full container width; presenter camera floating card in the bottom corner with a 1-click swap button.
+     - **Side-by-Side:** 70% slides / 30% camera or 50/50 split on desktop screens.
 
 ## Teaching assistant tools
 
