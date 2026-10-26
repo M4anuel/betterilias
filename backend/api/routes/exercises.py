@@ -241,14 +241,41 @@ async def upload_feedback_file(
     Upload a feedback/evaluation file for a student submission in ILIAS.
     """
     content = await file.read()
-    return await client.upload_submission_feedback_file(
-        exercise_ref_id=exercise_id,
-        member_id=member_id,
-        filename=file.filename or "feedback_file",
-        file_bytes=content,
-        content_type=file.content_type or "application/octet-stream",
-        ass_id=ass_id,
-    )
+    try:
+        return await client.upload_submission_feedback_file(
+            exercise_ref_id=exercise_id,
+            member_id=member_id,
+            filename=file.filename or "feedback_file",
+            file_bytes=content,
+            content_type=file.content_type or "application/octet-stream",
+            ass_id=ass_id,
+        )
+    except StudentUploadError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=t('upload.network_error')) from exc
+
+
+@router.delete("/{exercise_id}/submissions/{member_id}/feedback-files/{file_id}", response_model=FeedbackFilesResponse)
+async def delete_feedback_file(
+    exercise_id: str,
+    member_id: str,
+    file_id: str,
+    ass_id: Optional[str] = Query(None, description="Optional assignment ID"),
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Delete a feedback/evaluation file from a student submission in ILIAS.
+    """
+    try:
+        return await client.delete_submission_feedback_file(
+            exercise_ref_id=exercise_id,
+            member_id=member_id,
+            file_id=file_id,
+            ass_id=ass_id,
+        )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=t('upload.network_error')) from exc
 
 
 

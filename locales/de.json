@@ -980,5 +980,11 @@
   "video.unsupported": "Ihr Browser unterstützt das Video-Tag nicht.",
   "embedded.ilias_content": "Eingebetteter Inhalt (ILIAS)",
   "embedded.open_in_ilias": "In ILIAS öffnen →",
-  "aktuell aktiv": "aktuell aktiv"
+  "aktuell aktiv": "aktuell aktiv",
+  "Dateien verwalten": "Dateien verwalten",
+  "Verwalten": "Verwalten",
+  "Möchten Sie diese Korrekturdatei wirklich löschen?": "Möchten Sie diese Korrekturdatei wirklich löschen?",
+  "Fehler beim Löschen der Korrekturdatei": "Fehler beim Löschen der Korrekturdatei",
+  "Korrekturdatei löschen": "Korrekturdatei löschen",
+  "Failed to delete feedback file": "Korrekturdatei konnte nicht gelöscht werden"
 }

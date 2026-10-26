@@ -1566,21 +1566,29 @@ class IliasClient:
         return file_generator(), filtered_headers, resp.status_code
 
     async def get_submission_feedback_files(
-        self, exercise_ref_id: str, member_id: str, ass_id: Optional[str] = None
+        self,
+        exercise_ref_id: str,
+        member_id: str,
+        ass_id: Optional[str] = None,
+        *,
+        http_client: Optional[httpx.AsyncClient] = None,
     ) -> FeedbackFilesResponse:
         """
         Fetch the ILIAS ilResourceCollectionGUI page for feedback files and parse existing files and upload URL.
         """
         self._ensure_authenticated()
-        client = self.session_manager.get_http_client()
+        base_node = self._get_exercise_base_node(exercise_ref_id)
         url = (
             f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd:z6&cmdClass=ilResourceCollectionGUI"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:o5:dd:z6&cmdClass=ilResourceCollectionGUI"
             f"&ref_id={exercise_ref_id}&ass_id={ass_id or 0}&vw=1&member_id={member_id}&part_id=0"
         )
         logger.info(f"Fetching feedback files page: {url}")
-        resp = await client.get(url)
-        return parse_feedback_files(resp.text, base_url=settings.ilias_base_url)
+        async with (nullcontext(http_client) if http_client is not None else self.session_manager.get_http_client()) as client:
+            resp = await client.get(url)
+            self._check_response_for_session_loss(resp, url)
+            self._cache_exercise_cmd_nodes_from_html(exercise_ref_id, resp.text, url=str(resp.url))
+            return parse_feedback_files(resp.text, base_url=settings.ilias_base_url)
 
     async def upload_submission_feedback_file(
         self,
@@ -1590,29 +1598,94 @@ class IliasClient:
         file_bytes: bytes,
         content_type: str = "application/octet-stream",
         ass_id: Optional[str] = None,
+        *,
+        http_client: Optional[httpx.AsyncClient] = None,
     ) -> FeedbackFilesResponse:
         """
-        Upload a feedback file to ILIAS for this submission.
+        Upload a feedback file to ILIAS for this submission following the native 2-step Dropzone + postUpload flow.
         """
         self._ensure_authenticated()
-        client = self.session_manager.get_http_client()
-
-        upload_url = (
+        base_node = self._get_exercise_base_node(exercise_ref_id)
+        page_url = (
             f"{settings.ilias_base_url}/ilias.php?"
-            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd:z6&cmdClass=ilResourceCollectionGUI&cmd=postUpload"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:o5:dd:z6&cmdClass=ilResourceCollectionGUI"
             f"&ref_id={exercise_ref_id}&ass_id={ass_id or 0}&vw=1&member_id={member_id}&part_id=0"
         )
-        logger.info(f"Uploading feedback file {filename} to {upload_url}")
-        files = {
-            "form/input_0[]": (filename, file_bytes, content_type),
-            "form/input_0": (filename, file_bytes, content_type),
-            "files[]": (filename, file_bytes, content_type),
-            "file": (filename, file_bytes, content_type),
-        }
-        resp = await client.post(upload_url, files=files)
-        logger.info(f"Upload response status: {resp.status_code}")
+        logger.info(f"Uploading feedback file {filename} for member {member_id} at {page_url}")
 
-        return await self.get_submission_feedback_files(exercise_ref_id, member_id, ass_id)
+        async with (nullcontext(http_client) if http_client is not None else self.session_manager.get_http_client()) as client:
+            page = await client.get(page_url)
+            self._check_response_for_session_loss(page, page_url)
+            self._cache_exercise_cmd_nodes_from_html(exercise_ref_id, page.text, url=str(page.url))
+
+            form = parse_native_file_upload_form(page.text, str(page.url), command='postUpload')
+            if not form.upload_url or not form.form_action or not form.token_input_name or not form.file_identifier or form.disabled:
+                raise StudentUploadError(t('upload.form_missing'))
+            if form.max_size and len(file_bytes) > form.max_size:
+                raise StudentUploadError(t('upload.too_large', limit=form.max_size), 400)
+
+            # Step 1: Upload the file payload via Repo standard Dropzone handler
+            uploaded = await client.post(
+                form.upload_url,
+                files={form.file_field: (filename, file_bytes, content_type)},
+                headers={'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Referer': str(page.url)},
+            )
+            self._check_response_for_session_loss(uploaded, form.upload_url)
+            try:
+                result = uploaded.json()
+            except ValueError as exc:
+                raise StudentUploadError(t('upload.invalid_response')) from exc
+            if not isinstance(result, dict) or type(result.get('status')) is not int or result['status'] != 1:
+                message = result.get('message') if isinstance(result, dict) else None
+                raise StudentUploadError(message if isinstance(message, str) and message.strip() else t('upload.rejected'), 400)
+
+            token = result.get(form.file_identifier)
+            if not isinstance(token, str) or not token.strip():
+                raise StudentUploadError(t('upload.invalid_response'))
+
+            # Step 2: Submit the postUpload form with the returned resource token
+            saved = await client.post(
+                form.form_action,
+                data={**form.hidden_inputs, form.token_input_name: token},
+                headers={'Referer': str(page.url)},
+            )
+            self._check_response_for_session_loss(saved, form.form_action)
+            if error := parse_student_upload_errors(saved.text):
+                raise StudentUploadError(error, 400)
+
+            parsed = parse_feedback_files(saved.text, base_url=settings.ilias_base_url)
+            if any(f.title == filename for f in parsed.files):
+                return parsed
+            return await self.get_submission_feedback_files(exercise_ref_id, member_id, ass_id, http_client=client)
+
+    async def delete_submission_feedback_file(
+        self,
+        exercise_ref_id: str,
+        member_id: str,
+        file_id: str,
+        ass_id: Optional[str] = None,
+        *,
+        http_client: Optional[httpx.AsyncClient] = None,
+    ) -> FeedbackFilesResponse:
+        """
+        Delete a feedback/evaluation file from a student submission (ilResourceCollectionGUI&cmd=remove).
+        """
+        self._ensure_authenticated()
+        base_node = self._get_exercise_base_node(exercise_ref_id)
+        remove_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode={base_node}:o5:dd:z6&cmdClass=ilResourceCollectionGUI&cmd=remove"
+            f"&ref_id={exercise_ref_id}&ass_id={ass_id or 0}&vw=1&member_id={member_id}&part_id=0"
+        )
+        logger.info(f"Deleting feedback file {file_id} at {remove_url}")
+        async with (nullcontext(http_client) if http_client is not None else self.session_manager.get_http_client()) as client:
+            resp = await client.post(
+                remove_url,
+                data={"interruptive_items[]": file_id, "cmd": "Delete"},
+                headers={'Referer': remove_url},
+            )
+            self._check_response_for_session_loss(resp, remove_url)
+            return await self.get_submission_feedback_files(exercise_ref_id, member_id, ass_id=ass_id, http_client=client)
 
 
 
