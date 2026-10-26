@@ -1,9 +1,11 @@
+import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ArrowLeft,
   Save,
   Loader2,
   AlertCircle,
+  Info,
   CheckCircle2,
   FileText,
   Users,
@@ -13,16 +15,10 @@ import {
   Upload,
   Trash2,
   Download,
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
-  List,
-  ListOrdered,
-  Link as LinkIcon,
-  RotateCcw,
   X,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { InstructionEditor } from './InstructionEditor';
 import { TAAssignmentDetailResponse, TAInstructionFileItem, SaveTAAssignmentRequest } from '../types';
 
 interface TAExerciseEditorViewProps {
@@ -40,6 +36,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   onBack,
   onSaved,
 }) => {
+  useLanguage();
   const [currentAssId, setCurrentAssId] = useState<string | null>(assId);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -49,6 +46,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   // Form state
   const [title, setTitle] = useState('');
   const [typeId, setTypeId] = useState<number>(initialTypeId);
+  const [availableTypes, setAvailableTypes] = useState<Record<string, string>>({ '1': 'Upload', '4': 'Team Upload' });
   const [mandatory, setMandatory] = useState(true);
   const [instructionHtml, setInstructionHtml] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -68,11 +66,22 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Rich Text Editor reference
-  const editorRef = useRef<HTMLDivElement>(null);
 
   // Track if initial load happened so typeId changes don't wipe user inputs
   const loadedAssIdRef = useRef<string | null | undefined>(undefined);
+
+  // Read the native type catalogue without creating anything or resetting the draft.
+  useEffect(() => {
+    if (assId) return;
+    let active = true;
+    api.getTAAssignments(exerciseRefId).then((data) => {
+      if (active && data.available_types && Object.keys(data.available_types).length) {
+        setAvailableTypes(data.available_types);
+        setTypeId((selected) => Object.hasOwn(data.available_types!, String(selected)) ? selected : Number(Object.keys(data.available_types!)[0]));
+      }
+    }).catch((err) => { if (active) setError(err?.message || t('Fehler beim Laden der Übungsliste')); });
+    return () => { active = false; };
+  }, [exerciseRefId, assId]);
 
   // Load existing assignment details
   const loadDetail = useCallback(async () => {
@@ -94,6 +103,9 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       );
       setTitle(data.title || '');
       setTypeId(data.type_id || initialTypeId);
+      if (data.available_types && Object.keys(data.available_types).length) {
+        setAvailableTypes({ ...data.available_types, [data.type_id]: data.type_name });
+      }
       setMandatory(data.mandatory);
       setInstructionHtml(data.instruction_html || '');
       setStartTime(data.start_time || '');
@@ -106,11 +118,8 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       setMaxFile(data.max_file ?? null);
       setInstructionFiles(data.instruction_files || []);
 
-      if (editorRef.current) {
-        editorRef.current.innerHTML = data.instruction_html || '';
-      }
     } catch (err: any) {
-      setError(err?.message || 'Fehler beim Laden der Übungsdetails');
+      setError(err?.message || t("Fehler beim Laden der Übungsdetails"));
     } finally {
       setIsLoading(false);
     }
@@ -119,27 +128,6 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   useEffect(() => {
     loadDetail();
   }, [loadDetail]);
-
-  // Sync editor content
-  const handleEditorInput = () => {
-    if (editorRef.current) {
-      setInstructionHtml(editorRef.current.innerHTML);
-    }
-  };
-
-  const executeEditorCommand = (command: string, value: string | undefined = undefined) => {
-    document.execCommand(command, false, value);
-    if (editorRef.current) {
-      setInstructionHtml(editorRef.current.innerHTML);
-    }
-  };
-
-  const handleInsertLink = () => {
-    const url = prompt('URL für den Link eingeben:', 'https://');
-    if (url) {
-      executeEditorCommand('createLink', url);
-    }
-  };
 
   // Format file size helper
   const formatFileSize = (bytes: number): string => {
@@ -152,22 +140,22 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      setError('Bitte geben Sie einen Titel für die Übung an.');
+      setError(t("Bitte geben Sie einen Titel für die Übung an."));
       return;
     }
 
     if (deadlineMode === 0 && !deadline.trim()) {
-      setError('Bitte wählen Sie ein Abgabedatum aus oder stellen Sie den Modus auf "Kein Abgabetermin".');
+      setError(t("Bitte wählen Sie ein Abgabedatum aus oder stellen Sie den Modus auf \"Kein Abgabetermin\"."));
       return;
     }
 
     if (startTime && deadlineMode === 0 && deadline.trim() && startTime > deadline) {
-      setError('Die Startzeit darf nicht nach dem Abgabetermin liegen.');
+      setError(t("Die Startzeit darf nicht nach dem Abgabetermin liegen."));
       return;
     }
 
     if (hasGracePeriod && deadlineMode === 0 && deadline2.trim() && deadline.trim() && deadline2 < deadline) {
-      setError('Die Nachfrist darf nicht vor dem regulären Abgabetermin liegen.');
+      setError(t("Die Nachfrist darf nicht vor dem regulären Abgabetermin liegen."));
       return;
     }
 
@@ -201,27 +189,34 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       if (pendingFiles.length > 0 && newAssId) {
         setIsUploadingFile(true);
         let updatedList = res.instruction_files || instructionFiles;
+        const remaining: File[] = [];
+        let uploadError: unknown;
         for (const file of pendingFiles) {
           try {
             updatedList = await api.uploadTAInstructionFile(exerciseRefId, newAssId, file);
-          } catch (uploadErr) {
-            console.error('Failed to upload pending file:', uploadErr);
+            setInstructionFiles(updatedList);
+          } catch (err) {
+            remaining.push(file);
+            uploadError = err;
           }
         }
-        setInstructionFiles(updatedList);
-        setPendingFiles([]);
+        setPendingFiles(remaining);
         setIsUploadingFile(false);
+        if (remaining.length) {
+          setError(t('editor.attachments_failed') + ' ' + (uploadError instanceof Error ? uploadError.message : ''));
+          return;
+        }
       } else if (res.instruction_files) {
         setInstructionFiles(res.instruction_files);
       }
 
-      setSuccessMsg('Übung erfolgreich gespeichert.');
+      setSuccessMsg(t("Übung erfolgreich gespeichert."));
       setTimeout(() => setSuccessMsg(null), 3000);
       if (newAssId) {
         onSaved(newAssId);
       }
     } catch (err: any) {
-      setError(err?.message || 'Fehler beim Speichern der Übung');
+      setError(err?.message || t("Fehler beim Speichern der Übung"));
     } finally {
       setIsSaving(false);
     }
@@ -238,7 +233,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
         newFiles.push(files[i]);
       }
       setPendingFiles((prev) => [...prev, ...newFiles]);
-      setSuccessMsg(`${newFiles.length} Datei(en) hinzugefügt. Sie werden beim Erstellen der Übung hochgeladen.`);
+      setSuccessMsg(t("{p0} Datei(en) hinzugefügt. Sie werden beim Erstellen der Übung hochgeladen.", { p0: newFiles.length }));
       setTimeout(() => setSuccessMsg(null), 3000);
       return;
     }
@@ -251,12 +246,13 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         updatedList = await api.uploadTAInstructionFile(exerciseRefId, currentAssId, file);
+        setInstructionFiles(updatedList);
       }
       setInstructionFiles(updatedList);
-      setSuccessMsg('Anweisungsdatei(en) erfolgreich hochgeladen.');
+      setSuccessMsg(t("Anweisungsdatei(en) erfolgreich hochgeladen."));
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
-      setError(err?.message || 'Fehler beim Hochladen der Datei');
+      setError(err?.message || t("Fehler beim Hochladen der Datei"));
     } finally {
       setIsUploadingFile(false);
     }
@@ -270,17 +266,17 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   // Delete an existing instruction file
   const handleDeleteFile = async (fileId: string) => {
     if (!currentAssId) return;
-    if (!confirm('Möchten Sie diese Anweisungsdatei wirklich entfernen?')) return;
+    if (!confirm(t("Möchten Sie diese Anweisungsdatei wirklich entfernen?"))) return;
 
     setIsDeletingFileId(fileId);
     setError(null);
     try {
       await api.deleteTAInstructionFile(exerciseRefId, currentAssId, fileId);
       setInstructionFiles((prev) => prev.filter((f) => f.file_id !== fileId));
-      setSuccessMsg('Datei erfolgreich gelöscht.');
+      setSuccessMsg(t("Datei erfolgreich gelöscht."));
       setTimeout(() => setSuccessMsg(null), 2500);
     } catch (err: any) {
-      setError(err?.message || 'Fehler beim Löschen der Datei');
+      setError(err?.message || t("Fehler beim Löschen der Datei"));
     } finally {
       setIsDeletingFileId(null);
     }
@@ -316,18 +312,18 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
             type="button"
             onClick={onBack}
             className="flex items-center justify-center p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-            title="Zurück zur Übungsverwaltung"
-            aria-label="Zurück zur Übungsverwaltung"
+            title={t("Zurück zur Übungsverwaltung")}
+            aria-label={t("Zurück zur Übungsverwaltung")}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-              {currentAssId ? `Übung bearbeiten` : `Neue Übung erstellen`}
+              {currentAssId ? t("Übung bearbeiten") : t("Neue Übung erstellen")}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {currentAssId ? `ID: ${currentAssId} • ` : ''}
-              Konfigurieren Sie Titel, Art der Einreichung, Termine und Arbeitsanweisungen
+              {t("Konfigurieren Sie Titel, Art der Einreichung, Termine und Arbeitsanweisungen")}
             </p>
           </div>
         </div>
@@ -338,12 +334,12 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
             onClick={onBack}
             className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer"
           >
-            Abbrechen
+            {t("Abbrechen")}
           </button>
           <button
             type="button"
             onClick={handleSave}
-            disabled={isSaving || isLoading}
+            disabled={isSaving || isLoading || isUploadingFile}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-xs cursor-pointer disabled:opacity-50"
           >
             {isSaving ? (
@@ -351,14 +347,14 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
             ) : (
               <Save className="h-4 w-4" />
             )}
-            <span>{currentAssId ? 'Änderungen speichern' : 'Übung erstellen'}</span>
+            <span>{currentAssId ? t("Änderungen speichern") : t("Übung erstellen")}</span>
           </button>
         </div>
       </div>
 
       {/* Notifications */}
       {error && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-sm">
+        <div role="alert" className="flex items-center gap-3 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-sm">
           <AlertCircle className="h-5 w-5 shrink-0" />
           <span>{error}</span>
         </div>
@@ -374,7 +370,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       {isLoading ? (
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-16 text-center border border-slate-200 dark:border-slate-800">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-indigo-500" />
-          <p className="text-sm font-medium text-slate-500">Übungsdetails werden geladen...</p>
+          <p className="text-sm font-medium text-slate-500">{t("Übungsdetails werden geladen...")}</p>
         </div>
       ) : (
         <form onSubmit={handleSave} className="space-y-6">
@@ -382,21 +378,21 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-5">
             <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
               <FileText className="h-4 w-4 text-indigo-500" />
-              <span>Grunddaten</span>
+              <span>{t("Grunddaten")}</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Titel */}
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                  <span>Titel der Übung *</span>
-                  <span className="text-[11px] text-slate-400">Erforderlich</span>
+                  <span>{t("Titel der Übung *")}</span>
+                  <span className="text-[11px] text-slate-400">{t("Erforderlich")}</span>
                 </label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="z.B. Übungsblatt 01: Einführung in Algorithmen"
+                  placeholder={t("z.B. Übungsblatt 01: Einführung in Algorithmen")}
                   required
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium"
                 />
@@ -404,28 +400,39 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
 
               {/* Art der Einreichung (Selectable without wiping other keys!) */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Art der Einreichung
-                </label>
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="assignment-type" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    {t("Art der Einreichung")}
+                  </label>
+                  {currentAssId && <span className="relative group inline-flex">
+                    <button type="button" aria-label={t('editor.type_fixed')} aria-describedby="assignment-type-info"
+                      className="rounded-full text-slate-500 dark:text-slate-400 hover:text-teal-700 dark:hover:text-teal-300 focus-visible:outline-2 focus-visible:outline-teal-500">
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                    <span id="assignment-type-info" role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-60 -translate-x-1/2 rounded-lg bg-slate-900 p-2 text-xs text-white shadow-lg dark:bg-slate-700 group-hover:block group-focus-within:block">
+                      {t('editor.type_fixed')}
+                    </span>
+                  </span>}
+                </div>
                 <select
+                  id="assignment-type"
                   value={typeId}
+                  disabled={Boolean(currentAssId)}
                   onChange={(e) => setTypeId(parseInt(e.target.value, 10))}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium cursor-pointer"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <option value={1}>Datei-Upload (Einzelabgabe)</option>
-                  <option value={4}>Team-Upload (Gruppenarbeit)</option>
-                  <option value={2}>Blog</option>
-                  <option value={3}>Portfolio</option>
+                  {Object.entries(availableTypes).map(([id, label]) => (
+                    <option key={id} value={id}>
+                      {id === '1' ? t('Datei-Upload (Einzelabgabe)') : id === '4' ? t('Team-Upload (Gruppenarbeit)') : label}
+                    </option>
+                  ))}
                 </select>
-                <p className="text-[11px] text-slate-400">
-                  Kann hier jederzeit geändert werden, ohne Ihre Eingaben zurückzusetzen.
-                </p>
               </div>
 
               {/* Pflichtabgabe */}
               <div className="space-y-1.5 flex flex-col justify-center">
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Verpflichtung
+                  {t("Verpflichtung")}
                 </label>
                 <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 cursor-pointer">
                   <input
@@ -435,7 +442,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                     className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
                   />
                   <span className="text-xs font-medium text-slate-800 dark:text-slate-200">
-                    Verpflichtende Übung (Teilnahme erforderlich)
+                    {t("Verpflichtende Übung (Teilnahme erforderlich)")}
                   </span>
                 </label>
               </div>
@@ -446,7 +453,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-5">
             <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
               <Calendar className="h-4 w-4 text-indigo-500" />
-              <span>Termine & Fristen</span>
+              <span>{t("Termine & Fristen")}</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -454,7 +461,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5 text-slate-400" />
-                  <span>Startzeit (Ab wann bearbeitbar)</span>
+                  <span>{t("Startzeit (Ab wann bearbeitbar)")}</span>
                 </label>
                 <input
                   type="datetime-local"
@@ -467,7 +474,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               {/* Deadline Mode (0 = Fixed Date, -1 = No Deadline) */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Abgabetermin-Modus
+                  {t("Abgabetermin-Modus")}
                 </label>
                 <div className="flex items-center gap-3 pt-1">
                   <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
@@ -479,7 +486,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                       onChange={() => setDeadlineMode(-1)}
                       className="text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span>Kein Abgabetermin</span>
+                    <span>{t("Kein Abgabetermin")}</span>
                   </label>
                   <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
                     <input
@@ -490,7 +497,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                       onChange={() => setDeadlineMode(0)}
                       className="text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span>Festes Abgabedatum</span>
+                    <span>{t("Festes Abgabedatum")}</span>
                   </label>
                 </div>
               </div>
@@ -498,11 +505,12 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               {/* Deadline DateTime */}
               {deadlineMode === 0 && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <label htmlFor="assignment-deadline" className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Abgabetermin (Deadline)</span>
+                    <span>{t("Abgabetermin (Deadline)")}</span>
                   </label>
                   <input
+                    id="assignment-deadline"
                     type="datetime-local"
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
@@ -521,14 +529,14 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                       onChange={(e) => setHasGracePeriod(e.target.checked)}
                       className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
                     />
-                    <span>Nachfrist gewähren</span>
+                    <span>{t("Nachfrist gewähren")}</span>
                   </label>
                   {hasGracePeriod && (
                     <input
                       type="datetime-local"
                       value={deadline2}
                       onChange={(e) => setDeadline2(e.target.value)}
-                      placeholder="Nachfrist bis..."
+                      placeholder={t("Nachfrist bis...")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium"
                     />
                   )}
@@ -544,7 +552,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                     onChange={(e) => setMaxFileEnabled(e.target.checked)}
                     className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
                   />
-                  <span>Maximale Anzahl an Einreichungsdateien begrenzen</span>
+                  <span>{t("Maximale Anzahl an Einreichungsdateien begrenzen")}</span>
                 </label>
                 {maxFileEnabled && (
                   <div className="max-w-xs">
@@ -556,7 +564,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                       onChange={(e) =>
                         setMaxFile(e.target.value ? parseInt(e.target.value, 10) : null)
                       }
-                      placeholder="z.B. 1 oder 5"
+                      placeholder={t("z.B. 1 oder 5")}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-medium"
                     />
                   </div>
@@ -570,92 +578,14 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <FileText className="h-4 w-4 text-indigo-500" />
-                <span>Arbeitsanweisungen</span>
+                <span>{t("Arbeitsanweisungen")}</span>
               </h2>
               <span className="text-[11px] text-slate-400">
-                Wird als formatiertes HTML in ILIAS gespeichert
+                {t("Wird als formatiertes HTML in ILIAS gespeichert")}
               </span>
             </div>
 
-            {/* Formatting Toolbar */}
-            <div className="flex items-center gap-1 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700/80 flex-wrap">
-              <button
-                type="button"
-                onClick={() => executeEditorCommand('bold')}
-                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-                title="Fett"
-                aria-label="Fett formatieren"
-              >
-                <Bold className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => executeEditorCommand('italic')}
-                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-                title="Kursiv"
-                aria-label="Kursiv formatieren"
-              >
-                <Italic className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => executeEditorCommand('underline')}
-                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-                title="Unterstrichen"
-                aria-label="Unterstrichen formatieren"
-              >
-                <UnderlineIcon className="h-4 w-4" />
-              </button>
-              <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1" />
-              <button
-                type="button"
-                onClick={() => executeEditorCommand('insertUnorderedList')}
-                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-                title="Aufzählungsliste"
-                aria-label="Aufzählung einfügen"
-              >
-                <List className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => executeEditorCommand('insertOrderedList')}
-                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-                title="Nummerierte Liste"
-                aria-label="Nummerierte Liste einfügen"
-              >
-                <ListOrdered className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleInsertLink}
-                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-                title="Link einfügen"
-                aria-label="Link einfügen"
-              >
-                <LinkIcon className="h-4 w-4" />
-              </button>
-              <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1" />
-              <button
-                type="button"
-                onClick={() => executeEditorCommand('removeFormat')}
-                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-                title="Formatierung entfernen"
-                aria-label="Formatierung entfernen"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Editable Content Container */}
-            <div
-              ref={editorRef}
-              contentEditable
-              onInput={handleEditorInput}
-              role="textbox"
-              aria-multiline="true"
-              aria-label="Arbeitsanweisungen formatierter Text"
-              className="min-h-[160px] p-4 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 leading-relaxed font-normal"
-            />
+            <InstructionEditor value={instructionHtml} onChange={setInstructionHtml} />
           </div>
 
           {/* Section 4: Instruction Files (Arbeitsanweisungs-Dateien direkt auf dieser Seite!) */}
@@ -664,14 +594,14 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               <div>
                 <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Paperclip className="h-4 w-4 text-indigo-500" />
-                  <span>Arbeitsanweisungs-Dateien (Anhänge für Studierende)</span>
+                  <span>{t("Arbeitsanweisungs-Dateien (Anhänge für Studierende)")}</span>
                 </h2>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Begleitmaterialien, Vorlagen oder Aufgabenbeschreibungen direkt anheften (bleibt auf dieser Seite!)
+                  {t("Begleitmaterialien, Vorlagen oder Aufgabenbeschreibungen direkt anheften (bleibt auf dieser Seite!)")}
                 </p>
               </div>
               <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                {totalFilesCount} {totalFilesCount === 1 ? 'Datei' : 'Dateien'}
+                {totalFilesCount} {totalFilesCount === 1 ? t("Datei") : t("Dateien")}
               </span>
             </div>
 
@@ -703,7 +633,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                           target="_blank"
                           rel="noreferrer"
                           className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 transition"
-                          title="Datei herunterladen"
+                          title={t("Datei herunterladen")}
                         >
                           <Download className="h-3.5 w-3.5" />
                         </a>
@@ -713,7 +643,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                         onClick={() => handleDeleteFile(f.file_id)}
                         disabled={isDeletingFileId === f.file_id}
                         className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 transition cursor-pointer"
-                        title="Datei entfernen"
+                        title={t("Datei entfernen")}
                       >
                         {isDeletingFileId === f.file_id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -739,7 +669,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                             {pf.name}
                           </p>
                           <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
-                            Wird beim Speichern hochgeladen
+                            {t("Wird beim Speichern hochgeladen")}
                           </span>
                         </div>
                         <p className="text-[10px] text-slate-400">{formatFileSize(pf.size)}</p>
@@ -750,7 +680,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                       type="button"
                       onClick={() => handleRemovePendingFile(idx)}
                       className="p-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/40 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
-                      title="Aus Warteschlange entfernen"
+                      title={t("Aus Warteschlange entfernen")}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -781,7 +711,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               {isUploadingFile ? (
                 <div className="flex flex-col items-center gap-2 text-indigo-600 dark:text-indigo-400">
                   <Loader2 className="h-8 w-8 animate-spin" />
-                  <p className="text-xs font-semibold">Anweisungsdatei(en) werden hochgeladen...</p>
+                  <p className="text-xs font-semibold">{t("Anweisungsdatei(en) werden hochgeladen...")}</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2 text-center">
@@ -790,10 +720,10 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                      Dateien hierher ziehen oder <span className="text-indigo-600 dark:text-indigo-400 underline">durchsuchen</span>
+                      {t("Dateien hierher ziehen oder")} <span className="text-indigo-600 dark:text-indigo-400 underline">{t("durchsuchen")}</span>
                     </p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      PDF, ZIP, Word oder andere Anweisungsdateien anhängen
+                      {t("PDF, ZIP, Word oder andere Anweisungsdateien anhängen")}
                     </p>
                   </div>
                 </div>
@@ -808,7 +738,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               onClick={onBack}
               className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer"
             >
-              Abbrechen
+              {t("Abbrechen")}
             </button>
             <button
               type="submit"
@@ -820,7 +750,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              <span>{currentAssId ? 'Änderungen speichern' : 'Übung erstellen'}</span>
+              <span>{currentAssId ? t("Änderungen speichern") : t("Übung erstellen")}</span>
             </button>
           </div>
         </form>

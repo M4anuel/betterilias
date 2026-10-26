@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ArrowLeft,
@@ -34,6 +35,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
   onBack,
   onEditAssignment,
 }) => {
+  useLanguage();
   const [assignments, setAssignments] = useState<TAAssignmentListItem[]>([]);
   const [initialOrders, setInitialOrders] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -63,7 +65,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
       });
       setInitialOrders(ordersMap);
     } catch (err: any) {
-      setError(err?.message || 'Fehler beim Laden der Übungsliste');
+      setError(err?.message || t("Fehler beim Laden der Übungsliste"));
     } finally {
       setIsLoading(false);
     }
@@ -137,10 +139,10 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
         newOrdersMap[a.ass_id] = a.order_val;
       });
       setInitialOrders(newOrdersMap);
-      setSaveSuccessMsg('Reihenfolge erfolgreich gespeichert.');
+      setSaveSuccessMsg(t("Reihenfolge erfolgreich gespeichert."));
       setTimeout(() => setSaveSuccessMsg(null), 3500);
     } catch (err: any) {
-      setError(err?.message || 'Fehler beim Speichern der Reihenfolge');
+      setError(err?.message || t("Fehler beim Speichern der Reihenfolge"));
     } finally {
       setIsSavingOrder(false);
     }
@@ -155,7 +157,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
       setAssignments((prev) => prev.filter((a) => a.ass_id !== deleteTarget.ass_id));
       setDeleteTarget(null);
     } catch (err: any) {
-      setError(err?.message || 'Übung konnte nicht gelöscht werden');
+      setError(err?.message || t("Übung konnte nicht gelöscht werden"));
     } finally {
       setIsDeleting(false);
     }
@@ -182,18 +184,18 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
             type="button"
             onClick={onBack}
             className="flex items-center justify-center p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-            title="Zurück zu den Übungsblättern"
-            aria-label="Zurück zu den Übungsblättern"
+            title={t("Zurück zu den Übungsblättern")}
+            aria-label={t("Zurück zu den Übungsblättern")}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-              Übungen verwalten & bearbeiten
+              {t("Übungen verwalten & bearbeiten")}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {exerciseTitle ? `${exerciseTitle} • ` : ''}
-              Reihenfolge anpassen, neue Übungen erstellen oder bestehende bearbeiten
+              {t("Reihenfolge anpassen, neue Übungen erstellen oder bestehende bearbeiten")}
             </p>
           </div>
         </div>
@@ -205,7 +207,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-xs cursor-pointer"
           >
             <Plus className="h-4 w-4" />
-            <span>Neue Übung erstellen</span>
+            <span>{t("Neue Übung erstellen")}</span>
           </button>
         </div>
       </div>
@@ -231,8 +233,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
           <div className="flex items-center gap-2.5">
             <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
             <div className="text-xs">
-              <span className="font-bold">Ungespeicherte Reihenfolge:</span> Die Reihenfolge der
-              Übungen wurde geändert.
+              <span className="font-bold">{t("Ungespeicherte Reihenfolge:")}</span> {t("Die Reihenfolge der Übungen wurde geändert.")}
             </div>
           </div>
           <div className="flex items-center gap-2 self-end sm:self-auto">
@@ -243,7 +244,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-medium transition cursor-pointer"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              <span>Zurücksetzen</span>
+              <span>{t("Zurücksetzen")}</span>
             </button>
             <button
               type="button"
@@ -256,7 +257,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
               ) : (
                 <Save className="h-3.5 w-3.5" />
               )}
-              <span>Reihenfolge speichern</span>
+              <span>{t("Reihenfolge speichern")}</span>
             </button>
           </div>
         </div>
@@ -268,14 +269,14 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Übungen durchsuchen..."
+            placeholder={t("Übungen durchsuchen...")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-          {filteredAssignments.length} von {assignments.length} Übungen
+          {filteredAssignments.length} {t("von")} {assignments.length} {t("Übungen")}
         </div>
       </div>
 
@@ -284,25 +285,25 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
         {isLoading ? (
           <div className="p-12 text-center text-slate-500 dark:text-slate-400">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-indigo-500" />
-            <p className="text-sm font-medium">Übungen werden geladen...</p>
+            <p className="text-sm font-medium">{t("Übungen werden geladen...")}</p>
           </div>
         ) : filteredAssignments.length === 0 ? (
           <div className="p-12 text-center text-slate-500 dark:text-slate-400">
             <FileText className="h-8 w-8 mx-auto mb-3 opacity-40" />
-            <p className="text-sm font-medium">Keine Übungen gefunden.</p>
+            <p className="text-sm font-medium">{t("Keine Übungen gefunden.")}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
-                  <th className="py-3 px-4 w-28 text-center">Reihenfolge</th>
-                  <th className="py-3 px-4">Titel & Art</th>
-                  <th className="py-3 px-4">Startzeit</th>
-                  <th className="py-3 px-4">Abgabetermin</th>
-                  <th className="py-3 px-4 text-center">Pflicht</th>
-                  <th className="py-3 px-4 text-center">Dateien</th>
-                  <th className="py-3 px-4 text-right">Aktionen</th>
+                  <th className="py-3 px-4 w-28 text-center">{t("Reihenfolge")}</th>
+                  <th className="py-3 px-4">{t("Titel & Art")}</th>
+                  <th className="py-3 px-4">{t("Startzeit")}</th>
+                  <th className="py-3 px-4">{t("Abgabetermin")}</th>
+                  <th className="py-3 px-4 text-center">{t("Pflicht")}</th>
+                  <th className="py-3 px-4 text-center">{t("Dateien")}</th>
+                  <th className="py-3 px-4 text-right">{t("Aktionen")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -327,8 +328,8 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                                 ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
                                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer'
                             }`}
-                            title="Nach oben verschieben"
-                            aria-label="Nach oben verschieben"
+                            title={t("Nach oben verschieben")}
+                            aria-label={t("Nach oben verschieben")}
                           >
                             <ArrowUp className="h-3.5 w-3.5" />
                           </button>
@@ -341,8 +342,8 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                             }
                             onBlur={handleSortByOrderInput}
                             className="w-12 text-center py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
-                            title="Reihenfolgenummer eingeben"
-                            aria-label={`Reihenfolge für ${assignment.title}`}
+                            title={t("Reihenfolgenummer eingeben")}
+                            aria-label={t("Reihenfolge für {p0}", { p0: assignment.title })}
                           />
 
                           <button
@@ -354,8 +355,8 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                                 ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
                                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer'
                             }`}
-                            title="Nach unten verschieben"
-                            aria-label="Nach unten verschieben"
+                            title={t("Nach unten verschieben")}
+                            aria-label={t("Nach unten verschieben")}
                           >
                             <ArrowDown className="h-3.5 w-3.5" />
                           </button>
@@ -381,7 +382,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                             <span>{assignment.type_name}</span>
                           </span>
                           <span className="text-[10px] text-slate-400 font-mono">
-                            ID: {assignment.ass_id}
+                            {t("ID:")} {assignment.ass_id}
                           </span>
                         </div>
                       </td>
@@ -406,7 +407,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                             <span>{assignment.deadline}</span>
                           </div>
                         ) : (
-                          <span className="text-slate-400">Keine</span>
+                          <span className="text-slate-400">{t("Keine")}</span>
                         )}
                       </td>
 
@@ -415,10 +416,10 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                         {assignment.mandatory ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
                             <CheckCircle2 className="h-3 w-3" />
-                            <span>Ja</span>
+                            <span>{t("Ja")}</span>
                           </span>
                         ) : (
-                          <span className="text-slate-400 text-[11px]">Nein</span>
+                          <span className="text-slate-400 text-[11px]">{t("Nein")}</span>
                         )}
                       </td>
 
@@ -430,7 +431,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                             <span>{assignment.instruction_files_count}</span>
                           </span>
                         ) : assignment.has_work_instructions ? (
-                          <span className="text-slate-500 dark:text-slate-400" title="Text vorhanden">
+                          <span className="text-slate-500 dark:text-slate-400" title={t("Text vorhanden")}>
                             <FileText className="h-3.5 w-3.5 inline opacity-60" />
                           </span>
                         ) : (
@@ -445,8 +446,8 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                             type="button"
                             onClick={() => onEditAssignment(assignment.ass_id, assignment.type_id)}
                             className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition cursor-pointer"
-                            title="Übung bearbeiten"
-                            aria-label={`Übung ${assignment.title} bearbeiten`}
+                            title={t("Übung bearbeiten")}
+                            aria-label={t("Übung {p0} bearbeiten", { p0: assignment.title })}
                           >
                             <Edit3 className="h-3.5 w-3.5" />
                           </button>
@@ -454,8 +455,8 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                             type="button"
                             onClick={() => setDeleteTarget(assignment)}
                             className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 transition cursor-pointer"
-                            title="Übung löschen"
-                            aria-label={`Übung ${assignment.title} löschen`}
+                            title={t("Übung löschen")}
+                            aria-label={t("Übung {p0} löschen", { p0: assignment.title })}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -479,15 +480,15 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                 <Trash2 className="h-6 w-6" />
               </div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                Übung unwiderruflich löschen?
+                {t("Übung unwiderruflich löschen?")}
               </h2>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
-              Möchten Sie die Übung{' '}
+              {t("Möchten Sie die Übung")}{' '}
               <strong className="text-slate-900 dark:text-slate-100 font-semibold">
                 &ldquo;{deleteTarget.title}&rdquo;
               </strong>{' '}
-              wirklich löschen? Alle zugehörigen Einreichungen und Dateien in ILIAS werden gelöscht.
+              {t("wirklich löschen? Alle zugehörigen Einreichungen und Dateien in ILIAS werden gelöscht.")}
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
@@ -496,7 +497,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                 disabled={isDeleting}
                 className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition cursor-pointer"
               >
-                Abbrechen
+                {t("Abbrechen")}
               </button>
               <button
                 type="button"
@@ -505,7 +506,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
               >
                 {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                <span>Übung endgültig löschen</span>
+                <span>{t("Übung endgültig löschen")}</span>
               </button>
             </div>
           </div>

@@ -1,3 +1,4 @@
+import { t, useLanguage, assignmentStatusText } from '../lib/i18n';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   ArrowLeft,
@@ -60,6 +61,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   onNavigateFolder,
   onNotifyChange,
 }) => {
+  const language = useLanguage();
   // Top Navigation Tab: 'assignments' | 'info' | 'ta_grading'
   const [activeTab, setActiveTab] = useState<'assignments' | 'info' | 'ta_grading'>('assignments');
   const [taManagementMode, setTaManagementMode] = useState<'none' | 'list' | 'editor'>('none');
@@ -137,7 +139,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         : [
             {
               id: 'to_grade',
-              label: 'Zu bewerten',
+              get label() { return t("Zu bewerten"); },
               color: 'indigo',
               gradeStatus: ['not_graded'],
               submissionStatus: 'submitted',
@@ -147,7 +149,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       return [
         {
           id: 'to_grade',
-          label: 'Zu bewerten',
+          get label() { return t("Zu bewerten"); },
           color: 'indigo',
           gradeStatus: ['not_graded'],
           submissionStatus: 'submitted',
@@ -295,17 +297,17 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const sortFieldLabel = useMemo(() => {
     switch (taSortField) {
       case 'time':
-        return 'Abgabezeit';
+        return t("Abgabezeit");
       case 'name':
-        return 'Name';
+        return t("Name");
       case 'status':
-        return 'Status';
+        return t("Status");
       case 'mark':
-        return 'Note / Punkte';
+        return t('Note / Punkte');
       default:
-        return 'Abgabezeit';
+        return t("Abgabezeit");
     }
-  }, [taSortField]);
+  }, [taSortField, language]);
 
   // Process breadcrumbs from overviewData to show full course -> intermediate folder(s) -> exercise hierarchy
   const processedBreadcrumbs = useMemo(() => {
@@ -376,7 +378,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       .catch((err) => {
         setOverviewData((current) => {
           if (!current) {
-            setOverviewError(err.message || 'Übersicht konnte nicht geladen werden.');
+            setOverviewError(err.message || t("Übersicht konnte nicht geladen werden."));
           }
           return current;
         });
@@ -478,7 +480,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   id: `new-sub-${freshSub.member_id}-${Date.now()}`,
                   type: 'file',
                   title: freshSub.student_name,
-                  subtitle: 'Neue Abgabe eingereicht',
+                  subtitle: t("Neue Abgabe eingereicht"),
                 });
               } else if (
                 freshSub.submission_time &&
@@ -489,7 +491,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   id: `updated-sub-${freshSub.member_id}-${Date.now()}`,
                   type: 'file',
                   title: freshSub.student_name,
-                  subtitle: `Abgabe aktualisiert (${freshSub.submission_time})`,
+                  subtitle: t("Abgabe aktualisiert ({p0})", { p0: freshSub.submission_time }),
                 });
               }
             }
@@ -590,7 +592,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       setFileUploadSuccessId(memberId);
       setTimeout(() => setFileUploadSuccessId(null), 3500);
     } catch (err: any) {
-      alert(`Fehler beim Hochladen der Korrekturdatei: ${err.message}`);
+      alert(t("Fehler beim Hochladen der Korrekturdatei: {p0}", { p0: err.message }));
     } finally {
       setUploadingMemberId(null);
     }
@@ -969,7 +971,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       setSavedSuccessId(memberId);
       setTimeout(() => setSavedSuccessId(null), 2500);
     } catch (err: any) {
-      alert(`Fehler beim Speichern: ${err.message}`);
+      alert(t("Fehler beim Speichern: {p0}", { p0: err.message }));
     } finally {
       setSavingMemberId(null);
     }
@@ -1053,7 +1055,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-2xs cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Zurück zur Vorlesung</span>
+            <span>{t("Zurück zur Vorlesung")}</span>
           </button>
           <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
           <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 overflow-x-auto py-0.5">
@@ -1061,7 +1063,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               type="button"
               onClick={onBack}
               className="font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition truncate max-w-[180px] cursor-pointer"
-              title="Zurück zum Kurs"
+              title={t("Zurück zum Kurs")}
             >
               {courseNickname}
             </button>
@@ -1072,14 +1074,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   type="button"
                   onClick={() => (onNavigateFolder ? onNavigateFolder(b.ref_id) : onBack())}
                   className="font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition truncate max-w-[180px] cursor-pointer"
-                  title={`Zum Ordner ${b.title}`}
+                  title={t("Zum Ordner {p0}", { p0: b.title })}
                 >
                   {b.title}
                 </button>
               </React.Fragment>
             ))}
             <span className="text-slate-400 dark:text-slate-600">›</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 shrink-0">{overviewData?.title || 'Übungen'}</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 shrink-0">{overviewData?.title || t("Übungen")}</span>
           </div>
         </div>
 
@@ -1089,7 +1091,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           onClick={handleRefresh}
           disabled={isLoadingOverview && !overviewData}
           className="flex items-center gap-1.5 rounded-lg p-1.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition disabled:opacity-50 cursor-pointer self-start sm:self-auto"
-          title="Neu laden"
+          title={t("Neu laden")}
         >
           <RefreshCw
             className={`h-4 w-4 ${
@@ -1098,7 +1100,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 : ''
             }`}
           />
-          <span className="text-xs font-semibold">Aktualisieren</span>
+          <span className="text-xs font-semibold">{t("Aktualisieren")}</span>
         </button>
       </div>
 
@@ -1113,17 +1115,17 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                    {overviewData?.title || 'Übungsübersicht'}
+                    {overviewData?.title || t("Übungsübersicht")}
                   </h1>
                   {isRevalidatingOverview && (
                     <span className="flex items-center gap-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800 animate-pulse">
                       <RefreshCw className="h-2.5 w-2.5 animate-spin" />
-                      Aktualisiert...
+                      {t("Aktualisiert...")}
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                  {(overviewData?.assignments || []).length} Übungsblätter verfügbar
+                  {(overviewData?.assignments || []).length} {t("Übungsblätter verfügbar")}
                   {ongoingCount > 0 && ` • ${ongoingCount} aktuell aktiv`}
                 </p>
               </div>
@@ -1142,7 +1144,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               }`}
             >
               <FileText className="h-3.5 w-3.5" />
-              <span>Übungsblätter</span>
+              <span>{t("Übungsblätter")}</span>
               <span className="rounded-full bg-slate-200/80 dark:bg-slate-700 px-1.5 py-0.2 text-[10px]">
                 {(overviewData?.assignments || []).length}
               </span>
@@ -1161,7 +1163,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               }`}
             >
               <Info className="h-3.5 w-3.5" />
-              <span>Informationen</span>
+              <span>{t("Informationen")}</span>
             </button>
 
             {/* Tutor Abgaben & Noten Tab: ONLY shown if tutor access is detected! */}
@@ -1179,7 +1181,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 }`}
               >
                 <Award className="h-3.5 w-3.5" />
-                <span>Abgaben & Noten (Tutor)</span>
+                <span>{t("Abgaben & Noten (Tutor)")}</span>
               </button>
             )}
           </div>
@@ -1234,7 +1236,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
-                Alle ({(overviewData?.assignments || []).length})
+                {t("Alle (")}{(overviewData?.assignments || []).length})
               </button>
 
               <button
@@ -1247,7 +1249,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 }`}
               >
                 <Zap className="h-3 w-3" />
-                <span>Laufend ({ongoingCount})</span>
+                <span>{t("Laufend (")}{ongoingCount})</span>
               </button>
 
               <button
@@ -1259,7 +1261,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                     : 'bg-sky-50 dark:bg-sky-950/50 text-sky-800 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60'
                 }`}
               >
-                Zukünftig ({(overviewData?.assignments || []).filter((a) => !a.is_ongoing && !a.is_ended).length})
+                {t("Zukünftig (")}{(overviewData?.assignments || []).filter((a) => !a.is_ongoing && !a.is_ended).length})
               </button>
 
               <button
@@ -1271,7 +1273,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
-                Beendet ({(overviewData?.assignments || []).filter((a) => a.is_ended).length})
+                {t("Beendet (")}{(overviewData?.assignments || []).filter((a) => a.is_ended).length})
               </button>
             </div>
 
@@ -1281,7 +1283,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                 <input
                   type="text"
-                  placeholder="Übungsblatt suchen..."
+                  placeholder={t("Übungsblatt suchen...")}
                   value={assignmentSearchQuery}
                   onChange={(e) => setAssignmentSearchQuery(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden transition"
@@ -1294,10 +1296,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   type="button"
                   onClick={() => setTaManagementMode('list')}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 font-bold text-xs transition cursor-pointer shrink-0 shadow-2xs"
-                  title="Übungen verwalten & bearbeiten (Tutor)"
+                  title={t("Übungen verwalten & bearbeiten (Tutor)")}
                 >
                   <Edit3 className="h-3.5 w-3.5" />
-                  <span>Übungen verwalten</span>
+                  <span>{t("Übungen verwalten")}</span>
                 </button>
               )}
             </div>
@@ -1307,19 +1309,19 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           {isLoadingOverview && !overviewData ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
               <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
-              <p className="text-xs font-semibold">Lade Übungsblätter...</p>
+              <p className="text-xs font-semibold">{t("Lade Übungsblätter...")}</p>
             </div>
           ) : overviewError ? (
             <div className="rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/30 p-6 text-center space-y-2">
               <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 mx-auto" />
-              <h3 className="text-sm font-bold text-red-900 dark:text-red-200">Fehler beim Laden</h3>
+              <h3 className="text-sm font-bold text-red-900 dark:text-red-200">{t("Fehler beim Laden")}</h3>
               <p className="text-xs text-red-600 dark:text-red-300">{overviewError}</p>
             </div>
           ) : filteredAssignments.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center text-slate-400 dark:text-slate-500 space-y-2">
               <Layers className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto" />
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Keine Übungsblätter gefunden</p>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500">Keine Einträge für die gewählte Filterung vorhanden.</p>
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{t("Keine Übungsblätter gefunden")}</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">{t("Keine Einträge für die gewählte Filterung vorhanden.")}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1343,15 +1345,15 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           {isOngoing ? (
                             <span className="flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/70 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
                               <Zap className="h-3 w-3 fill-emerald-600 dark:fill-emerald-400" />
-                              <span>Laufend</span>
+                              <span>{t("Laufend")}</span>
                             </span>
                           ) : isEnded ? (
                             <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                              Beendet
+                              {t("Beendet")}
                             </span>
                           ) : (
                             <span className="rounded-full bg-sky-50 dark:bg-sky-950/60 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-                              Zukünftig
+                              {t("Zukünftig")}
                             </span>
                           )}
 
@@ -1364,13 +1366,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                               }`}
                             >
-                              {assignment.requirement}
+                              {assignmentStatusText(assignment.requirement)}
                             </span>
                           )}
 
                           {assignment.ass_type && (
                             <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-400">
-                              {assignment.ass_type}
+                              {assignmentStatusText(assignment.ass_type)}
                             </span>
                           )}
                         </div>
@@ -1385,10 +1387,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             }`}
                           >
                             {assignment.status === 'not_submitted'
-                              ? 'Noch keine Abgabe'
+                              ? t("Noch keine Abgabe")
                               : assignment.status === 'not_graded'
-                              ? 'Nicht bewertet'
-                              : assignment.status}
+                              ? t("Nicht bewertet")
+                              : assignmentStatusText(assignment.status)}
                           </span>
                         )}
                       </div>
@@ -1403,13 +1405,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         {assignment.time_remaining && (
                           <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
                             <Clock className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />
-                            <span>{assignment.time_remaining}</span>
+                            <span>{assignmentStatusText(assignment.time_remaining)}</span>
                           </div>
                         )}
                         {assignment.edit_until && (
                           <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                             <Calendar className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
-                            <span>Frist: {assignment.edit_until}</span>
+                            <span>{t("Frist:")} {assignmentStatusText(assignment.edit_until)}</span>
                           </div>
                         )}
                       </div>
@@ -1429,7 +1431,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           }
                           className="flex items-center gap-1.5 rounded-xl bg-slate-900 dark:bg-slate-800 px-4 py-1.5 text-xs font-bold text-white dark:text-slate-100 hover:bg-slate-800 dark:hover:bg-slate-700 transition shadow-2xs cursor-pointer ml-auto border dark:border-slate-700"
                         >
-                          <span>Details & Abgabe</span>
+                          <span>{t("Details & Abgabe")}</span>
                           <span>→</span>
                         </button>
                       )}
@@ -1450,7 +1452,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           {isLoadingInfo && !infoData ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
               <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
-              <p className="text-xs font-semibold">Lade Kriterien & Informationen...</p>
+              <p className="text-xs font-semibold">{t("Lade Kriterien & Informationen...")}</p>
             </div>
           ) : infoData && infoData.sections.length > 0 ? (
             <div className="space-y-4">
@@ -1475,7 +1477,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           ) : (
             <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center text-slate-400 dark:text-slate-500">
               <Info className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-              <p className="text-xs font-semibold">Keine zusätzlichen Informationen verfügbar.</p>
+              <p className="text-xs font-semibold">{t("Keine zusätzlichen Informationen verfügbar.")}</p>
             </div>
           )}
         </div>
@@ -1497,7 +1499,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   htmlFor="ta-assignment-select"
                   className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block"
                 >
-                  Zu korrigierendes Übungsblatt auswählen
+                  {t("Zu korrigierendes Übungsblatt auswählen")}
                 </label>
                 <div className="mt-1 relative max-w-xl">
                   <select
@@ -1521,14 +1523,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               {isLoadingTaSubmissions && taSubmissionsData && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-semibold animate-pulse">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
-                  <span>Wird synchronisiert...</span>
+                  <span>{t("Wird synchronisiert...")}</span>
                 </div>
               )}
               {taSubmissionsData?.exercise && (
                 <>
                   <div className="px-3.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-center">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                      Abgaben
+                      {t("Abgaben")}
                     </span>
                     <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                       {taSubmissionsData.exercise.submitted_count}
@@ -1536,7 +1538,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   </div>
                   <div className="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800/80 text-center">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 dark:text-indigo-300 block">
-                      Bewertet
+                      {t("Bewertet")}
                     </span>
                     <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">
                       {taSubmissionsData.exercise.graded_count}
@@ -1552,7 +1554,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             {/* Left: Quick-Filters collection */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 hidden sm:inline">
-                Schnellfilter:
+                {t("Schnellfilter:")}
               </span>
               {quickFilters.map((qf) => {
                 const isActive =
@@ -1569,7 +1571,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       qf.color,
                       isActive
                     )}`}
-                    title={`Schnellfilter: ${qf.label} (Klicken zum ${isActive ? 'Deaktivieren' : 'Aktivieren'})`}
+                    title={t("Schnellfilter: {p0} (Klicken zum {p1})", { p0: qf.label, p1: isActive ? t('Deaktivieren') : t('Aktivieren') })}
                   >
                     {qf.id === 'to_grade' && <Clock className="h-3.5 w-3.5 shrink-0" />}
                     <span>{qf.label}</span>
@@ -1586,7 +1588,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               {/* Submission Radio Group */}
               <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
-                  Abgabe:
+                  {t("Abgabe:")}
                 </span>
                 <button
                   type="button"
@@ -1596,9 +1598,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
-                  title="Alle Abgaben anzeigen"
+                  title={t("Alle Abgaben anzeigen")}
                 >
-                  Alle ({filterCounts.total})
+                  {t("Alle (")}{filterCounts.total})
                 </button>
                 <button
                   type="button"
@@ -1608,9 +1610,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       ? 'bg-sky-600 text-white shadow-2xs font-bold'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
-                  title="Nur eingereichte Abgaben anzeigen"
+                  title={t("Nur eingereichte Abgaben anzeigen")}
                 >
-                  Eingereicht ({filterCounts.submitted})
+                  {t("Eingereicht (")}{filterCounts.submitted})
                 </button>
                 <button
                   type="button"
@@ -1620,16 +1622,16 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       ? 'bg-slate-700 dark:bg-slate-600 text-white shadow-2xs font-bold'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
-                  title="Nur noch nicht eingereichte anzeigen"
+                  title={t("Nur noch nicht eingereichte anzeigen")}
                 >
-                  Nicht eingereicht ({filterCounts.notSubmitted})
+                  {t("Nicht eingereicht (")}{filterCounts.notSubmitted})
                 </button>
               </div>
 
               {/* Grade Status Multi-Select Group */}
               <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
-                  Bewertung:
+                  {t("Bewertung:")}
                 </span>
                 <button
                   type="button"
@@ -1642,9 +1644,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
-                  title="Alle Bewertungsstufen zulassen"
+                  title={t("Alle Bewertungsstufen zulassen")}
                 >
-                  Beliebig
+                  {t("Beliebig")}
                 </button>
                 <button
                   type="button"
@@ -1654,9 +1656,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       ? 'bg-amber-600 text-white shadow-2xs font-bold'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
-                  title="Offene / noch nicht bewertete Abgaben filtern"
+                  title={t("Offene / noch nicht bewertete Abgaben filtern")}
                 >
-                  Offen ({filterCounts.notGraded})
+                  {t("Offen (")}{filterCounts.notGraded})
                 </button>
                 <button
                   type="button"
@@ -1666,9 +1668,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       ? 'bg-emerald-600 text-white shadow-2xs font-bold'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
-                  title="Bestandene Abgaben filtern"
+                  title={t("Bestandene Abgaben filtern")}
                 >
-                  Bestanden ({filterCounts.passed})
+                  {t("Bestanden (")}{filterCounts.passed})
                 </button>
                 <button
                   type="button"
@@ -1678,9 +1680,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       ? 'bg-rose-600 text-white shadow-2xs font-bold'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
-                  title="Nicht bestandene Abgaben filtern"
+                  title={t("Nicht bestandene Abgaben filtern")}
                 >
-                  Nicht bestanden ({filterCounts.failed})
+                  {t("Nicht bestanden (")}{filterCounts.failed})
                 </button>
               </div>
             </div>
@@ -1692,7 +1694,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                   <input
                     type="text"
-                    placeholder="Student / Team..."
+                    placeholder={t("Student / Team...")}
                     value={taSearchQuery}
                     onChange={(e) => setTaSearchQuery(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800 pl-8 pr-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-hidden transition"
@@ -1700,7 +1702,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 </div>
                 {/* Greyed-out sorting indication under search */}
                 <div className="flex items-center gap-1 px-1 text-[10px] text-slate-400 dark:text-slate-500">
-                  <span>Sortiert:</span>
+                  <span>{t("Sortiert:")}</span>
                   <span className="text-slate-500 dark:text-slate-400 font-semibold">{sortFieldLabel}</span>
                   <span className="font-bold">{taSortOrder === 'asc' ? '↑' : '↓'}</span>
                 </div>
@@ -1711,7 +1713,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 type="button"
                 onClick={() => setIsSettingsModalOpen(true)}
                 className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 transition shadow-2xs cursor-pointer shrink-0"
-                title="Filter-, Sortier- & Kursansicht-Einstellungen öffnen"
+                title={t("Filter-, Sortier- & Kursansicht-Einstellungen öffnen")}
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -1722,11 +1724,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           {isLoadingTaSubmissions && !taSubmissionsData ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
               <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
-              <p className="text-xs font-semibold">Lade Abgaben zur Bewertung...</p>
+              <p className="text-xs font-semibold">{t("Lade Abgaben zur Bewertung...")}</p>
             </div>
           ) : filteredTaSubmissions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center text-slate-400 dark:text-slate-500">
-              <p className="text-xs font-semibold">Keine Abgaben für diesen Filter gefunden.</p>
+              <p className="text-xs font-semibold">{t("Keine Abgaben für diesen Filter gefunden.")}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -1792,7 +1794,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
                             {sub.team_id && (
                               <span className="rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                                Team #{sub.team_id}
+                                {t("Team #")}{sub.team_id}
                               </span>
                             )}
                           </div>
@@ -1802,18 +1804,18 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             {sub.submission_time ? (
                               <span className="flex items-center gap-1 font-medium text-slate-600 dark:text-slate-400">
                                 <Clock className="h-3 w-3 text-sky-500 dark:text-sky-400" />
-                                <span>Abgabe: {sub.submission_time}</span>
+                                <span>{t("Abgabe:")} {sub.submission_time}</span>
                               </span>
                             ) : hasSubmitted ? (
                               <span className="flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
                                 <CheckCircle2 className="h-3 w-3 text-emerald-500 dark:text-emerald-400" />
-                                <span>Eingereicht</span>
+                                <span>{t("Eingereicht")}</span>
                               </span>
                             ) : (
-                              <span className="text-slate-400 dark:text-slate-500">Keine Abgabe eingereicht</span>
+                              <span className="text-slate-400 dark:text-slate-500">{t("Keine Abgabe eingereicht")}</span>
                             )}
                             {sub.graded_on && (
-                              <span className="text-slate-400 dark:text-slate-500">• Bewertet: {sub.graded_on}</span>
+                              <span className="text-slate-400 dark:text-slate-500">{t("• Bewertet:")} {sub.graded_on}</span>
                             )}
                           </div>
                         </div>
@@ -1828,11 +1830,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             className="flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition shadow-2xs border border-indigo-200 dark:border-indigo-800"
                           >
                             <Download className="h-3.5 w-3.5" />
-                            <span>Abgabe herunterladen</span>
+                            <span>{t("Abgabe herunterladen")}</span>
                           </a>
                         ) : (
                           <span className="rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                            Keine Datei
+                            {t("Keine Datei")}
                           </span>
                         )}
 
@@ -1841,10 +1843,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           type="button"
                           onClick={() => setDetailModalSubmission(sub)}
                           className="flex items-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-700 dark:hover:text-indigo-300 hover:border-indigo-200 dark:hover:border-indigo-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 transition shadow-2xs cursor-pointer"
-                          title="Alle ILIAS-Spalten & Details anzeigen / bearbeiten"
+                          title={t("Alle ILIAS-Spalten & Details anzeigen / bearbeiten")}
                         >
                           <Info className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                          <span className="hidden sm:inline">Details</span>
+                          <span className="hidden sm:inline">{t("Details")}</span>
                         </button>
                       </div>
                     </div>
@@ -1854,7 +1856,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       {/* Left: Status Toggle & Grade */}
                       <div className="w-full md:w-56 shrink-0 space-y-2">
                         <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                          Bewertung & Status
+                          {t("Bewertung & Status")}
                         </label>
 
                         {/* Status Pills */}
@@ -1868,7 +1870,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
                             }`}
                           >
-                            <span>Bestanden</span>
+                            <span>{t("Bestanden")}</span>
                             {edit.status === 'passed' && <Check className="h-3 w-3" />}
                           </button>
 
@@ -1881,7 +1883,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-950/30'
                             }`}
                           >
-                            <span>Nicht bestanden</span>
+                            <span>{t("Nicht bestanden")}</span>
                             {edit.status === 'failed' && <Check className="h-3 w-3" />}
                           </button>
 
@@ -1894,7 +1896,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                             }`}
                           >
-                            <span>Nicht bewertet</span>
+                            <span>{t("Nicht bewertet")}</span>
                             {edit.status === 'not_graded' && <Check className="h-3 w-3" />}
                           </button>
                         </div>
@@ -1906,14 +1908,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               type="text"
                               value={edit.mark}
                               onChange={(e) => handleMarkChange(sub.member_id, e.target.value)}
-                              placeholder="Note / Punkte (optional)"
+                              placeholder={t("Note / Punkte (optional)")}
                               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden"
                             />
                           </div>
                         ) : edit.mark ? (
                           <div className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
                             <Award className="h-3 w-3 text-amber-500 dark:text-amber-400" />
-                            <span>Note/Pkt: <strong className="font-semibold">{edit.mark}</strong></span>
+                            <span>{t("Note/Pkt:")} <strong className="font-semibold">{edit.mark}</strong></span>
                           </div>
                         ) : null}
                       </div>
@@ -1934,7 +1936,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                                 }`}
                               >
-                                Kommentar {edit.feedback ? '•' : ''}
+                                {t("Kommentar")} {edit.feedback ? '•' : ''}
                               </button>
                               <button
                                 type="button"
@@ -1947,13 +1949,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                                 }`}
                               >
-                                Tutor-Notiz {edit.notice ? '•' : ''}
+                                {t("Tutor-Notiz")} {edit.notice ? '•' : ''}
                               </button>
                             </div>
                             <span className="text-[10px] text-slate-400 dark:text-slate-500">
                               {(rowTabState[sub.member_id] || 'feedback') === 'feedback'
-                                ? 'Für Studierende sichtbar'
-                                : 'Nur intern für Tutoren'}
+                                ? t("Für Studierende sichtbar")
+                                : t("Nur intern für Tutoren")}
                             </span>
                           </div>
 
@@ -1962,7 +1964,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               rows={3}
                               value={edit.feedback}
                               onChange={(e) => handleFeedbackChange(sub.member_id, e.target.value)}
-                              placeholder="Korrektur-Kommentar für Studierende eingeben..."
+                              placeholder={t("Korrektur-Kommentar für Studierende eingeben...")}
                               className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 font-sans"
                             />
                           ) : (
@@ -1970,7 +1972,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               rows={3}
                               value={edit.notice}
                               onChange={(e) => handleNoticeChange(sub.member_id, e.target.value)}
-                              placeholder="Interne Notiz für Tutoren (wird nicht an Studierende gesendet)..."
+                              placeholder={t("Interne Notiz für Tutoren (wird nicht an Studierende gesendet)...")}
                               className="w-full rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/30 p-2.5 text-xs text-slate-800 dark:text-amber-200 placeholder-slate-400 dark:placeholder-amber-400/60 focus:border-amber-500 focus:outline-hidden focus:ring-1 focus:ring-amber-500 font-sans"
                             />
                           )}
@@ -1979,11 +1981,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
-                              Korrektur per Datei
+                              {t("Korrektur per Datei")}
                             </span>
                             {edit.feedback && (
                               <span className="text-[10px] text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
-                                Kommentar hinterlegt
+                                {t("Kommentar hinterlegt")}
                               </span>
                             )}
                           </div>
@@ -2022,16 +2024,16 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               {fileUploadSuccessId === sub.member_id ? (
                                 <span className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
                                   <Check className="h-3.5 w-3.5" />
-                                  <span>Korrekturdatei erfolgreich hochgeladen!</span>
+                                  <span>{t("Korrekturdatei erfolgreich hochgeladen!")}</span>
                                 </span>
                               ) : draggingMemberId === sub.member_id ? (
                                 <span className="font-semibold text-indigo-700 dark:text-indigo-300">
-                                  Datei hier loslassen zum Hochladen...
+                                  {t("Datei hier loslassen zum Hochladen...")}
                                 </span>
                               ) : sub.evaluation_by_file_url ? (
-                                <span>Korrekturdatei per Drag & Drop hierher ziehen oder Button nutzen.</span>
+                                <span>{t("Korrekturdatei per Drag & Drop hierher ziehen oder Button nutzen.")}</span>
                               ) : (
-                                <span className="text-slate-500 dark:text-slate-400">Keine separate Datei-Rückmeldung in ILIAS konfiguriert.</span>
+                                <span className="text-slate-500 dark:text-slate-400">{t("Keine separate Datei-Rückmeldung in ILIAS konfiguriert.")}</span>
                               )}
                             </div>
 
@@ -2049,7 +2051,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                     ) : (
                                       <Upload className="h-3.5 w-3.5" />
                                     )}
-                                    <span>{uploadingMemberId === sub.member_id ? 'Lädt...' : 'Datei hochladen'}</span>
+                                    <span>{uploadingMemberId === sub.member_id ? t("Lädt...") : t("Datei hochladen")}</span>
                                   </label>
                                   <input
                                     id={`row-upload-${sub.member_id}`}
@@ -2063,9 +2065,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                     target="_blank"
                                     rel="noreferrer"
                                     className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700"
-                                    title="In ILIAS öffnen"
+                                    title={t("In ILIAS öffnen")}
                                   >
-                                    <span>ILIAS</span>
+                                    <span>{t("ILIAS")}</span>
                                     <ExternalLink className="h-3 w-3 opacity-60" />
                                   </a>
                                 </>
@@ -2079,7 +2081,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               type="text"
                               value={edit.notice}
                               onChange={(e) => handleNoticeChange(sub.member_id, e.target.value)}
-                              placeholder="Tutor-Notiz (intern)..."
+                              placeholder={t("Tutor-Notiz (intern)...")}
                               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden"
                             />
                           </div>
@@ -2088,11 +2090,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">
-                              Korrektur per E-Mail
+                              {t("Korrektur per E-Mail")}
                             </span>
                             {edit.feedback && (
                               <span className="text-[10px] text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
-                                Kommentar hinterlegt
+                                {t("Kommentar hinterlegt")}
                               </span>
                             )}
                           </div>
@@ -2100,9 +2102,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           <div className="rounded-xl border border-sky-100 dark:border-sky-900/60 bg-sky-50/50 dark:bg-sky-950/30 p-2.5 flex items-center justify-between gap-3">
                             <div className="text-xs text-sky-900 dark:text-sky-200">
                               {sub.feedback_mail_url ? (
-                                <span>Feedback direkt per ILIAS-Mail an die/den Studierende(n) senden.</span>
+                                <span>{t("Feedback direkt per ILIAS-Mail an die/den Studierende(n) senden.")}</span>
                               ) : (
-                                <span className="text-slate-500 dark:text-slate-400">Kein Mail-Link für diese Abgabe hinterlegt.</span>
+                                <span className="text-slate-500 dark:text-slate-400">{t("Kein Mail-Link für diese Abgabe hinterlegt.")}</span>
                               )}
                             </div>
                             {sub.feedback_mail_url && (
@@ -2113,7 +2115,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700 transition shrink-0 shadow-2xs"
                               >
                                 <Mail className="h-3.5 w-3.5" />
-                                <span>Mail verfassen</span>
+                                <span>{t("Mail verfassen")}</span>
                               </a>
                             )}
                           </div>
@@ -2124,7 +2126,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               type="text"
                               value={edit.notice}
                               onChange={(e) => handleNoticeChange(sub.member_id, e.target.value)}
-                              placeholder="Tutor-Notiz (intern)..."
+                              placeholder={t("Tutor-Notiz (intern)...")}
                               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden"
                             />
                           </div>
@@ -2137,7 +2139,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           type="button"
                           onClick={() => handleSaveSubmission(sub.member_id)}
                           disabled={isSaving || isLoadingTaSubmissions}
-                          title={isLoadingTaSubmissions ? 'Aktualisierung läuft... Bitte warten' : 'Speichern'}
+                          title={isLoadingTaSubmissions ? t("Aktualisierung läuft... Bitte warten") : t("Speichern")}
                           className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer ${
                             isSaved
                               ? 'bg-emerald-600'
@@ -2149,28 +2151,28 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           {isSaving ? (
                             <>
                               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                              <span>Speichern...</span>
+                              <span>{t("Speichern...")}</span>
                             </>
                           ) : isLoadingTaSubmissions ? (
                             <>
                               <RefreshCw className="h-3.5 w-3.5 animate-spin text-slate-300 dark:text-slate-500" />
-                              <span>Lädt...</span>
+                              <span>{t("Lädt...")}</span>
                             </>
                           ) : isSaved ? (
                             <>
                               <Check className="h-3.5 w-3.5 text-white" />
-                              <span>Gespeichert!</span>
+                              <span>{t("Gespeichert!")}</span>
                             </>
                           ) : (
                             <>
                               <Save className="h-3.5 w-3.5" />
-                              <span>Speichern</span>
+                              <span>{t("Speichern")}</span>
                             </>
                           )}
                         </button>
                         {edit.isDirty && (
                           <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                            Ungespeichert
+                            {t("Ungespeichert")}
                           </span>
                         )}
                       </div>

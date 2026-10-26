@@ -1,3 +1,4 @@
+import { t, useLanguage, assignmentStatusText } from '../lib/i18n';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   X,
@@ -35,6 +36,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
   assignmentTitle,
   onClose,
 }) => {
+  useLanguage();
   const [detail, setDetail] = useState<StudentAssignmentDetail | null>(() => {
     return cache.getCachedStudentAssignment(exerciseRefId, assId);
   });
@@ -83,7 +85,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
         setCurrentUserId(res.current_user_id);
       }
     } catch (err: any) {
-      showTeamFeedback('error', `Kurs-Teilnehmerliste konnte nicht geladen werden: ${err.message}`);
+      showTeamFeedback('error', t("Kurs-Teilnehmerliste konnte nicht geladen werden: {p0}", { p0: err.message }));
     } finally {
       setIsLoadingCandidates(false);
     }
@@ -104,11 +106,11 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       const updated = await api.createStudentTeam(exerciseRefId, assId);
       setDetail(updated);
       cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
-      showTeamFeedback('success', 'Team erfolgreich erstellt! Du kannst jetzt Mitglieder aus dem Kurs hinzufügen.');
+      showTeamFeedback('success', t("Team erfolgreich erstellt! Du kannst jetzt Mitglieder aus dem Kurs hinzufügen."));
       setIsAddMemberOpen(true);
       loadCandidates(true);
     } catch (err: any) {
-      showTeamFeedback('error', `Team konnte nicht erstellt werden: ${err.message}`);
+      showTeamFeedback('error', t("Team konnte nicht erstellt werden: {p0}", { p0: err.message }));
     } finally {
       setIsCreatingTeam(false);
     }
@@ -128,9 +130,9 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
         next.delete(candidate.user_id);
         return next;
       });
-      showTeamFeedback('success', `${candidate.full_name} (${candidate.login}) wurde zum Team hinzugefügt.`);
+      showTeamFeedback('success', t("{p0} ({p1}) wurde zum Team hinzugefügt.", { p0: candidate.full_name, p1: candidate.login }));
     } catch (err: any) {
-      showTeamFeedback('error', `Mitglied konnte nicht hinzugefügt werden: ${err.message}`);
+      showTeamFeedback('error', t("Mitglied konnte nicht hinzugefügt werden: {p0}", { p0: err.message }));
     } finally {
       setAddingSingleUserId(null);
     }
@@ -149,9 +151,9 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       setDetail(updated);
       cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
       setSelectedCandidateIds(new Set());
-      showTeamFeedback('success', `${ids.length} ${ids.length === 1 ? 'Person wurde' : 'Personen wurden'} zum Team hinzugefügt.`);
+      showTeamFeedback('success', ids.length === 1 ? t('One person was added to the team.') : t('{count} people were added to the team.', { count: ids.length }));
     } catch (err: any) {
-      showTeamFeedback('error', `Mitglieder konnten nicht hinzugefügt werden: ${err.message}`);
+      showTeamFeedback('error', t("Mitglieder konnten nicht hinzugefügt werden: {p0}", { p0: err.message }));
     } finally {
       setIsAddingMembers(false);
     }
@@ -171,9 +173,9 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       setDetail(updated);
       cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
       setManualUserLogin('');
-      showTeamFeedback('success', `"${cleaned}" wurde zum Team hinzugefügt.`);
+      showTeamFeedback('success', t("\"{p0}\" wurde zum Team hinzugefügt.", { p0: cleaned }));
     } catch (err: any) {
-      showTeamFeedback('error', `Benutzer "${cleaned}" konnte nicht hinzugefügt werden: ${err.message}`);
+      showTeamFeedback('error', t("Benutzer \"{p0}\" konnte nicht hinzugefügt werden: {p1}", { p0: cleaned, p1: err.message }));
     } finally {
       setIsAddingMembers(false);
     }
@@ -181,11 +183,11 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
 
   const handleRemoveTeamMember = async (member: TeamMemberInfo) => {
     if (!member.user_id) {
-      showTeamFeedback('error', 'Benutzer-ID für dieses Teammitglied nicht verfügbar. Bitte lade die Ansicht neu.');
+      showTeamFeedback('error', t("Benutzer-ID für dieses Teammitglied nicht verfügbar. Bitte lade die Ansicht neu."));
       return;
     }
     const label = member.name || member.login || member.user_id;
-    if (!window.confirm(`Möchtest du "${label}" wirklich aus dem Team entfernen?`)) {
+    if (!window.confirm(t("Möchtest du \"{p0}\" wirklich aus dem Team entfernen?", { p0: label }))) {
       return;
     }
 
@@ -195,9 +197,9 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       const updated = await api.removeStudentTeamMembers(exerciseRefId, assId, [member.user_id]);
       setDetail(updated);
       cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
-      showTeamFeedback('success', `"${label}" wurde aus dem Team entfernt.`);
+      showTeamFeedback('success', t("\"{p0}\" wurde aus dem Team entfernt.", { p0: label }));
     } catch (err: any) {
-      showTeamFeedback('error', `Mitglied konnte nicht entfernt werden: ${err.message}`);
+      showTeamFeedback('error', t("Mitglied konnte nicht entfernt werden: {p0}", { p0: err.message }));
     } finally {
       setRemovingMemberId(null);
     }
@@ -207,8 +209,8 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
     const memberCount = resolvedTeamMembers.length;
     const confirmMsg =
       memberCount > 1
-        ? `Möchtest du das gesamte Team (${memberCount} Mitglieder) wirklich auflösen?\n\nHinweis: Da ILIAS ein Team erst löschen lässt, wenn nur noch 1 Person darin ist, entfernt BetterIlias zuerst automatisch alle anderen Teammitglieder und löst danach das Team auf.`
-        : 'Möchtest du dein Team wirklich auflösen?';
+        ? t("Möchtest du das gesamte Team ({p0} Mitglieder) wirklich auflösen?\n\nHinweis: Da ILIAS ein Team erst löschen lässt, wenn nur noch 1 Person darin ist, entfernt BetterIlias zuerst automatisch alle anderen Teammitglieder und löst danach das Team auf.", { p0: memberCount })
+        : t("Möchtest du dein Team wirklich auflösen?");
 
     if (!window.confirm(confirmMsg)) {
       return;
@@ -222,9 +224,9 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
       setIsAddMemberOpen(false);
       setSelectedCandidateIds(new Set());
-      showTeamFeedback('success', 'Das Team wurde erfolgreich aufgelöst.');
+      showTeamFeedback('success', t("Das Team wurde erfolgreich aufgelöst."));
     } catch (err: any) {
-      showTeamFeedback('error', `Team konnte nicht aufgelöst werden: ${err.message}`);
+      showTeamFeedback('error', t("Team konnte nicht aufgelöst werden: {p0}", { p0: err.message }));
     } finally {
       setIsDeletingTeam(false);
     }
@@ -351,9 +353,12 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
         detail.manage_team_url ||
         detail.delete_team_url)
   );
+  const isTeamUpload = detail?.is_team_upload ?? Boolean(
+    detail?.create_team_url || detail?.manage_team_url || detail?.delete_team_url || detail?.team_status_text
+  );
 
   const canCreateTeam = Boolean(
-    detail &&
+    detail && isTeamUpload &&
       !hasTeam &&
       !detail.is_ended &&
       (detail.create_team_url ||
@@ -375,19 +380,17 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       if (lastUpdated) {
         setDetail(lastUpdated);
         cache.setCachedStudentAssignment(exerciseRefId, assId, lastUpdated);
-        if (lastUpdated.submitted_files && lastUpdated.submitted_files.length > 0) {
-          setUploadSuccessMessage(
-            fileList.length === 1
-              ? `"${fileList[0].name}" erfolgreich eingereicht.`
-              : `${fileList.length} Dateien erfolgreich eingereicht.`
-          );
-        } else {
-          alert('Die Datei wurde übertragen, aber ILIAS hat sie noch nicht in der Übersicht gelistet. Bitte in Kürze erneut prüfen.');
-        }
+        // The backend confirms the uploaded file, rather than accepting any
+        // pre-existing submission as evidence that this upload succeeded.
+        setUploadSuccessMessage(
+          fileList.length === 1
+            ? t('upload.file_submitted', { filename: fileList[0].name })
+            : t("{p0} Dateien erfolgreich eingereicht.", { p0: fileList.length })
+        );
         setTimeout(() => setUploadSuccessMessage(null), 4000);
       }
     } catch (err: any) {
-      alert(`Fehler beim Hochladen der Abgabe: ${err.message}`);
+      alert(t("Fehler beim Hochladen der Abgabe: {p0}", { p0: err.message }));
     } finally {
       setIsUploading(false);
     }
@@ -430,7 +433,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
   const [deletingDeliveredId, setDeletingDeliveredId] = useState<string | null>(null);
 
   const handleDeleteStudentFile = async (deliveredId: string, filename: string) => {
-    if (!window.confirm(`Möchtest du die Datei "${filename}" wirklich löschen?`)) {
+    if (!window.confirm(t("Möchtest du die Datei \"{p0}\" wirklich löschen?", { p0: filename }))) {
       return;
     }
 
@@ -439,10 +442,10 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       const updated = await api.deleteStudentAssignmentFile(exerciseRefId, assId, deliveredId);
       setDetail(updated);
       cache.setCachedStudentAssignment(exerciseRefId, assId, updated);
-      setUploadSuccessMessage(`"${filename}" erfolgreich gelöscht.`);
+      setUploadSuccessMessage(t("\"{p0}\" erfolgreich gelöscht.", { p0: filename }));
       setTimeout(() => setUploadSuccessMessage(null), 4000);
     } catch (err: any) {
-      alert(`Fehler beim Löschen der Abgabe: ${err.message}`);
+      alert(t("Fehler beim Löschen der Abgabe: {p0}", { p0: err.message }));
     } finally {
       setDeletingDeliveredId(null);
     }
@@ -480,7 +483,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       .catch((err) => {
         if (active) {
           if (!cached) {
-            setErrorMessage(err.message || 'Übungsdetails konnten nicht geladen werden.');
+            setErrorMessage(err.message || t("Übungsdetails konnten nicht geladen werden."));
           }
           setIsLoading(false);
         }
@@ -514,7 +517,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
               <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 truncate">
                 {detail?.title || assignmentTitle}
               </h2>
-              <p className="text-xs text-slate-400 dark:text-slate-500">Übungsblatt & Einreichung</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">{t("Übungsblatt & Einreichung")}</p>
             </div>
           </div>
 
@@ -522,7 +525,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
             type="button"
             onClick={onClose}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
-            title="Schließen (Esc)"
+            title={t("Schließen (Esc)")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -533,19 +536,19 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
           {isLoading && !detail ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400">
               <RefreshCw className="h-6 w-6 animate-spin text-indigo-600" />
-              <p className="text-xs font-semibold">Lade Details zur Aufgabe...</p>
+              <p className="text-xs font-semibold">{t("Lade Details zur Aufgabe...")}</p>
             </div>
           ) : errorMessage ? (
             <div className="rounded-2xl border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/30 p-6 text-center space-y-2">
               <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 mx-auto" />
-              <h3 className="text-sm font-bold text-red-900 dark:text-red-200">Fehler beim Laden</h3>
+              <h3 className="text-sm font-bold text-red-900 dark:text-red-200">{t("Fehler beim Laden")}</h3>
               <p className="text-xs text-red-600 dark:text-red-400">{errorMessage}</p>
               <button
                 type="button"
                 onClick={onClose}
                 className="mt-2 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 transition"
               >
-                Schließen
+                {t("Schließen")}
               </button>
             </div>
           ) : detail ? (
@@ -556,7 +559,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                     <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-200">
-                      Terminplan & Fristen
+                      {t("Terminplan & Fristen")}
                     </h3>
                   </div>
                   {detail.time_remaining && (
@@ -567,7 +570,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                           : 'bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
                       }`}
                     >
-                      {detail.time_remaining}
+                      {assignmentStatusText(detail.time_remaining)}
                     </span>
                   )}
                 </div>
@@ -577,7 +580,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                       <Clock className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
                       <span>
-                        <strong className="text-slate-800 dark:text-slate-100">Start:</strong> {detail.start_time}
+                        <strong className="text-slate-800 dark:text-slate-100">{t("Start:")}</strong> {detail.start_time}
                       </span>
                     </div>
                   )}
@@ -585,7 +588,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                       <Clock className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
                       <span>
-                        <strong className="text-slate-800 dark:text-slate-100">Abgabefrist:</strong> {detail.ended_on}
+                        <strong className="text-slate-800 dark:text-slate-100">{t("Abgabefrist:")}</strong> {assignmentStatusText(detail.ended_on)}
                       </span>
                     </div>
                   )}
@@ -596,7 +599,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
               {detail.instructions && (
                 <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-2">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    Arbeitsanweisung
+                    {t("Arbeitsanweisung")}
                   </h3>
                   <div
                     className="ilias-rich-content text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans"
@@ -610,7 +613,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                 <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2">
                     <Download className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                    <span>Aufgaben-Materialien & Vorlagen</span>
+                    <span>{t("Aufgaben-Materialien & Vorlagen")}</span>
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {detail.exercise_files.map((file, idx) => (
@@ -634,17 +637,17 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
               )}
 
               {/* Team Management & Gruppenmitglieder */}
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-3.5">
+              {isTeamUpload && <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xs space-y-3.5">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      Team & Gruppenmitglieder
+                      {t("Team & Gruppenmitglieder")}
                     </h3>
                     {hasTeam && (
                       <span className="rounded-full bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800">
                         {resolvedTeamMembers.length}{' '}
-                        {resolvedTeamMembers.length === 1 ? 'Mitglied' : 'Mitglieder'}
+                        {resolvedTeamMembers.length === 1 ? t("Mitglied") : t("Mitglieder")}
                       </span>
                     )}
                   </div>
@@ -663,7 +666,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         ) : (
                           <PlusCircle className="h-3.5 w-3.5" />
                         )}
-                        <span>{isCreatingTeam ? 'Wird erstellt...' : 'Team erstellen'}</span>
+                        <span>{isCreatingTeam ? t("Wird erstellt...") : t("Team erstellen")}</span>
                       </button>
                     )}
 
@@ -680,7 +683,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         >
                           <UserPlus className="h-3.5 w-3.5" />
                           <span>
-                            {isAddMemberOpen ? 'Suche schließen' : 'Mitglieder hinzufügen'}
+                            {isAddMemberOpen ? t("Suche schließen") : t("Mitglieder hinzufügen")}
                           </span>
                         </button>
 
@@ -689,7 +692,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                           onClick={handleDeleteTeam}
                           disabled={isDeletingTeam}
                           className="flex items-center gap-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 px-3 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition border border-rose-200 dark:border-rose-800/80 cursor-pointer disabled:opacity-60"
-                          title="Team vollständig auflösen"
+                          title={t("Team vollständig auflösen")}
                         >
                           {isDeletingTeam ? (
                             <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -699,9 +702,9 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                           <span>
                             {isDeletingTeam
                               ? resolvedTeamMembers.length > 1
-                                ? 'Entferne Mitglieder & löse auf...'
-                                : 'Wird aufgelöst...'
-                              : 'Team auflösen'}
+                                ? t("Entferne Mitglieder & löse auf...")
+                                : t("Wird aufgelöst...")
+                              : t("Team auflösen")}
                           </span>
                         </button>
                       </>
@@ -767,7 +770,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                                 </span>
                                 {member.is_self && (
                                   <span className="rounded-md bg-indigo-600/10 dark:bg-indigo-400/15 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 shrink-0">
-                                    Du
+                                    {t("Du")}
                                   </span>
                                 )}
                               </div>
@@ -785,14 +788,14 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                               onClick={() => handleRemoveTeamMember(member)}
                               disabled={isRemoving || isDeletingTeam}
                               className="flex items-center gap-1 rounded-lg bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-900/60 px-2 py-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition shrink-0 cursor-pointer disabled:opacity-50"
-                              title="Aus dem Team entfernen"
+                              title={t("Aus dem Team entfernen")}
                             >
                               {isRemoving ? (
                                 <RefreshCw className="h-3 w-3 animate-spin" />
                               ) : (
                                 <UserMinus className="h-3 w-3" />
                               )}
-                              <span>Entfernen</span>
+                              <span>{t("Entfernen")}</span>
                             </button>
                           )}
                         </div>
@@ -803,11 +806,11 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                   <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="space-y-0.5">
                       <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        {detail.team_status_text || 'Noch keinem Team zugeordnet.'}
+                        {detail.team_status_text || t("Noch keinem Team zugeordnet.")}
                       </p>
                       {canCreateTeam && (
                         <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                          Erstelle ein Team, um gemeinsam mit anderen Kursmitgliedern abzugeben.
+                          {t("Erstelle ein Team, um gemeinsam mit anderen Kursmitgliedern abzugeben.")}
                         </p>
                       )}
                     </div>
@@ -820,10 +823,10 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div>
                         <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                          Kursmitglieder suchen & zum Team hinzufügen
+                          {t("Kursmitglieder suchen & zum Team hinzufügen")}
                         </h4>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                          Wähle Studierende aus dem aktuellen Kurs aus oder gib ihren ILIAS-Benutzernamen ein.
+                          {t("Wähle Studierende aus dem aktuellen Kurs aus oder gib ihren ILIAS-Benutzernamen ein.")}
                         </p>
                       </div>
                       {selectedCandidateIds.size > 0 && (
@@ -838,7 +841,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                           ) : (
                             <UserPlus className="h-3.5 w-3.5" />
                           )}
-                          <span>Ausgewählte hinzufügen ({selectedCandidateIds.size})</span>
+                          <span>{t("Ausgewählte hinzufügen (")}{selectedCandidateIds.size})</span>
                         </button>
                       )}
                     </div>
@@ -850,7 +853,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         type="search"
                         value={candidateSearchQuery}
                         onChange={(e) => setCandidateSearchQuery(e.target.value)}
-                        placeholder="Nach Vorname, Nachname oder ILIAS-Login suchen..."
+                        placeholder={t("Nach Vorname, Nachname oder ILIAS-Login suchen...")}
                         className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-9 pr-3 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500"
                       />
                     </div>
@@ -859,7 +862,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     {isLoadingCandidates ? (
                       <div className="flex items-center justify-center gap-2 py-8 text-xs text-slate-500 dark:text-slate-400">
                         <RefreshCw className="h-4 w-4 animate-spin text-indigo-600" />
-                        <span>Lade Kursteilnehmer aus ILIAS...</span>
+                        <span>{t("Lade Kursteilnehmer aus ILIAS...")}</span>
                       </div>
                     ) : filteredCandidates.length > 0 ? (
                       <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
@@ -912,7 +915,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                                 {isAlreadyMember ? (
                                   <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
                                     <Check className="h-3 w-3" />
-                                    <span>Im Team</span>
+                                    <span>{t("Im Team")}</span>
                                   </span>
                                 ) : (
                                   <button
@@ -929,7 +932,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                                     ) : (
                                       <UserPlus className="h-3 w-3" />
                                     )}
-                                    <span>Hinzufügen</span>
+                                    <span>{t("Hinzufügen")}</span>
                                   </button>
                                 )}
                               </div>
@@ -939,7 +942,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                       </div>
                     ) : (
                       <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-4 text-center text-xs text-slate-400 dark:text-slate-500">
-                        Keine passenden Kursteilnehmer für „{candidateSearchQuery}“ gefunden.
+                        {t("Keine passenden Kursteilnehmer für „")}{candidateSearchQuery}{t("“ gefunden.")}
                       </div>
                     )}
 
@@ -952,7 +955,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         type="text"
                         value={manualUserLogin}
                         onChange={(e) => setManualUserLogin(e.target.value)}
-                        placeholder="Oder direkt per ILIAS-Login hinzufügen (z. B. m.mustermann1)..."
+                        placeholder={t("Oder direkt per ILIAS-Login hinzufügen (z. B. m.mustermann1)...")}
                         className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                       />
                       <button
@@ -960,13 +963,12 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         disabled={!manualUserLogin.trim() || isAddingMembers}
                         className="rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white px-3 py-1.5 text-xs font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
                       >
-                        Per Login hinzufügen
+                        {t("Per Login hinzufügen")}
                       </button>
                     </form>
                   </div>
                 )}
-              </div>
-
+              </div>}
               {/* Submission Status & Uploaded Files */}
               <div
                 onDragOver={handleDragOverSubmission}
@@ -981,17 +983,17 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      Eigene Einreichung
+                      {t("Eigene Einreichung")}
                     </h3>
                     {detail.submitted_files && detail.submitted_files.length > 0 ? (
                       <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
                         <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                        <span>Abgegeben</span>
+                        <span>{t("Abgegeben")}</span>
                       </span>
                     ) : detail.submission_status === 'late' ? (
                       <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800">
                         <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-                        <span>Verspätet eingereicht</span>
+                        <span>{t("Verspätet eingereicht")}</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200/80 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
@@ -999,7 +1001,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         <span>
                           {detail.submission_status && detail.submission_status !== 'not_submitted'
                             ? detail.submission_status
-                            : 'Noch keine Abgabe'}
+                            : t("Noch keine Abgabe")}
                         </span>
                       </span>
                     )}
@@ -1019,7 +1021,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         ) : (
                           <Upload className="h-3.5 w-3.5" />
                         )}
-                        <span>{isUploading ? 'Wird hochgeladen...' : 'Abgabe einreichen'}</span>
+                        <span>{isUploading ? t("Wird hochgeladen...") : t("Abgabe einreichen")}</span>
                       </label>
                       <input
                         id={`student-upload-${assId}`}
@@ -1044,7 +1046,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                   <div className="space-y-3">
                     {detail.last_submission && (
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                        Letzte Einreichung: {detail.last_submission}
+                        {t("Letzte Einreichung:")} {detail.last_submission}
                       </p>
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1073,10 +1075,10 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                                 href={downloadTarget}
                                 download={subFile.filename}
                                 className="flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-2.5 py-1 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-700 dark:hover:text-indigo-300 hover:border-indigo-200 dark:hover:border-indigo-700 transition shadow-2xs shrink-0"
-                                title="Abgabe direkt herunterladen"
+                                title={t("Abgabe direkt herunterladen")}
                               >
                                 <Download className="h-3.5 w-3.5" />
-                                <span>Download</span>
+                                <span>{t("Download")}</span>
                               </a>
                               {subFile.delivered_id && (
                                 <button
@@ -1084,7 +1086,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                                   onClick={() => handleDeleteStudentFile(subFile.delivered_id!, subFile.filename)}
                                   disabled={deletingDeliveredId === subFile.delivered_id}
                                   className="flex items-center justify-center rounded-lg bg-white dark:bg-slate-700 border border-rose-200 dark:border-rose-900/60 p-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:border-rose-300 transition shadow-2xs shrink-0 cursor-pointer disabled:opacity-50"
-                                  title="Abgabe löschen"
+                                  title={t("Abgabe löschen")}
                                 >
                                   {deletingDeliveredId === subFile.delivered_id ? (
                                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -1111,8 +1113,8 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         <Upload className="h-3.5 w-3.5 shrink-0" />
                         <span>
                           {isDraggingFile
-                            ? 'Datei hier loslassen zum Hochladen...'
-                            : 'Weitere Datei per Drag & Drop hierher ziehen oder klicken zum Hinzufügen'}
+                            ? t("Datei hier loslassen zum Hochladen...")
+                            : t("Weitere Datei per Drag & Drop hierher ziehen oder klicken zum Hinzufügen")}
                         </span>
                       </label>
                     )}
@@ -1141,13 +1143,13 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     </div>
                     <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
                       {isUploading
-                        ? 'Abgabe wird zu ILIAS hochgeladen...'
+                        ? t("Abgabe wird zu ILIAS hochgeladen...")
                         : isDraggingFile
-                        ? 'Datei jetzt loslassen, um sie einzureichen'
-                        : 'Datei per Drag & Drop hierher ziehen oder klicken'}
+                        ? t("Datei jetzt loslassen, um sie einzureichen")
+                        : t("Datei per Drag & Drop hierher ziehen oder klicken")}
                     </p>
                     <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
-                      Noch keine Dateien eingereicht • Direkter Upload nach ILIAS
+                      {t("Noch keine Dateien eingereicht • Direkter Upload nach ILIAS")}
                     </p>
                   </label>
                 ) : (
@@ -1157,13 +1159,13 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     </div>
                     <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                       {canCreateTeam
-                        ? 'Bitte erstelle zuerst ein Team, um eine Datei einzureichen'
-                        : 'Keine Dateien für diese Aufgabe eingereicht'}
+                        ? t("Bitte erstelle zuerst ein Team, um eine Datei einzureichen")
+                        : t("Keine Dateien für diese Aufgabe eingereicht")}
                     </p>
                     <p className="text-[11px] text-slate-400 dark:text-slate-500">
                       {canCreateTeam
-                        ? 'Für diese Gruppenaufgabe ist vor dem Datei-Upload ein Team erforderlich.'
-                        : 'Die Bearbeitungsfrist für diese Aufgabe ist abgelaufen.'}
+                        ? t("Für diese Gruppenaufgabe ist vor dem Datei-Upload ein Team erforderlich.")
+                        : t("Die Bearbeitungsfrist für diese Aufgabe ist abgelaufen.")}
                     </p>
                   </div>
                 )}
@@ -1175,7 +1177,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                   <div className="flex items-center gap-2">
                     <Award className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                     <h3 className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200">
-                      Bewertung durch Tutor
+                      {t("Bewertung durch Tutor")}
                     </h3>
                   </div>
 
@@ -1192,15 +1194,15 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                       {detail.passed_status === 'passed' ? (
                         <>
                           <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                          <span>Bestanden</span>
+                          <span>{t("Bestanden")}</span>
                         </>
                       ) : detail.passed_status === 'failed' ? (
                         <>
                           <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-                          <span>Nicht bestanden</span>
+                          <span>{t("Nicht bestanden")}</span>
                         </>
                       ) : (
-                        <span>Nicht bewertet</span>
+                        <span>{t("Nicht bewertet")}</span>
                       )}
                     </span>
                   )}
@@ -1208,7 +1210,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
 
                 {detail.mark && (
                   <p className="text-xs text-amber-900 dark:text-amber-200 font-semibold">
-                    Note / Punkte: <span className="font-mono">{detail.mark}</span>
+                    {t("Note / Punkte:")} <span className="font-mono">{detail.mark}</span>
                   </p>
                 )}
 
@@ -1218,7 +1220,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                   </div>
                 ) : (
                   <p className="text-xs text-amber-800/70 dark:text-amber-400/70 italic">
-                    Noch kein Feedback-Kommentar hinterlegt.
+                    {t("Noch kein Feedback-Kommentar hinterlegt.")}
                   </p>
                 )}
               </div>
@@ -1228,13 +1230,13 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
 
         {/* Modal Footer */}
         <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-6 py-3.5 bg-slate-50/70 dark:bg-slate-800/80 shrink-0">
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">Drücke Esc zum Schließen</span>
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">{t("Drücke Esc zum Schließen")}</span>
           <button
             type="button"
             onClick={onClose}
             className="rounded-xl bg-slate-900 dark:bg-slate-800 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:hover:bg-slate-700 transition cursor-pointer"
           >
-            Schließen
+            {t("Schließen")}
           </button>
         </div>
       </div>

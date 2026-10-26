@@ -1,3 +1,4 @@
+import { t, useLanguage, assignmentStatusText } from '../lib/i18n';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   X,
@@ -41,6 +42,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
   initialTitle,
   onClose,
 }) => {
+  useLanguage();
   // Mode: 'ta' (Teaching Assistant / Grading) or 'student' (My Submission & Feedback)
   const [activeMode, setActiveMode] = useState<'ta' | 'student'>('ta');
 
@@ -110,7 +112,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
           })
           .catch((subErr) => {
             if (!isMounted) return;
-            setErrorMessage(subErr.message || 'Übung konnte nicht geladen werden.');
+            setErrorMessage(subErr.message || t("Übung konnte nicht geladen werden."));
           });
       })
       .finally(() => {
@@ -152,7 +154,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
         }
       } catch (err: any) {
         console.error('Failed to load exercise content:', err);
-        setErrorMessage(err.message || 'Fehler beim Laden der Aufgabendaten.');
+        setErrorMessage(err.message || t("Fehler beim Laden der Aufgabendaten."));
       } finally {
         setIsLoadingContent(false);
       }
@@ -252,7 +254,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
       setSavedSuccessId(memberId);
       setTimeout(() => setSavedSuccessId(null), 2500);
     } catch (err: any) {
-      alert(`Fehler beim Speichern: ${err.message}`);
+      alert(t("Fehler beim Speichern: {p0}", { p0: err.message }));
     } finally {
       setSavingMemberId(null);
     }
@@ -326,7 +328,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
   }, [submissionsData, overviewData]);
 
   const modalTitle =
-    submissionsData?.exercise.title || overviewData?.title || initialTitle || 'Übungen & Abgaben';
+    submissionsData?.exercise.title || overviewData?.title || initialTitle || t("Übungen & Abgaben");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-5 backdrop-blur-xs animate-in fade-in duration-200">
@@ -340,9 +342,9 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700 border border-indigo-200">
-                  ILIAS Übungseinheit
+                  {t("ILIAS Übungseinheit")}
                 </span>
-                <span className="text-xs text-slate-400">Ref: {exerciseRefId}</span>
+                <span className="text-xs text-slate-400">{t("Ref:")} {exerciseRefId}</span>
               </div>
               <h2 className="text-lg font-black text-slate-900 tracking-tight">{modalTitle}</h2>
             </div>
@@ -361,7 +363,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                 }`}
               >
                 <GraduationCap className="h-4 w-4 text-indigo-600" />
-                <span>Tutor-Korrektur</span>
+                <span>{t("Tutor-Korrektur")}</span>
               </button>
               <button
                 type="button"
@@ -373,14 +375,14 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                 }`}
               >
                 <Sparkles className="h-4 w-4 text-emerald-600" />
-                <span>Meine Abgabe & Feedback</span>
+                <span>{t("Meine Abgabe & Feedback")}</span>
               </button>
             </div>
 
             <button
               onClick={onClose}
               className="rounded-xl p-2 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 transition cursor-pointer"
-              title="Schließen"
+              title={t("Schließen")}
             >
               <X className="h-5 w-5" />
             </button>
@@ -391,7 +393,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
         {availableAssignments.length > 0 && (
           <div className="border-b border-slate-200 bg-white px-6 py-2.5 flex items-center gap-2 overflow-x-auto scrollbar-thin">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 shrink-0 mr-1">
-              Aufgabe:
+              {t("Aufgabe:")}
             </span>
             {availableAssignments.map((ass) => {
               const isSelected = (selectedAssId && ass.ass_id === selectedAssId) || ass.is_selected;
@@ -414,7 +416,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                   <span>{ass.title}</span>
                   {ass.edit_until && (
                     <span className="rounded bg-white/80 px-1.5 py-0.2 text-[10px] font-semibold text-slate-500 border border-slate-200/60">
-                      {ass.edit_until}
+                      {assignmentStatusText(ass.edit_until)}
                     </span>
                   )}
                 </button>
@@ -435,7 +437,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
           {isLoadingContent ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400">
               <RefreshCw className="h-8 w-8 animate-spin text-indigo-500" />
-              <p className="text-xs font-semibold">Lade Aufgabendaten aus ILIAS...</p>
+              <p className="text-xs font-semibold">{t("Lade Aufgabendaten aus ILIAS...")}</p>
             </div>
           ) : activeMode === 'ta' ? (
             /* ========================================================
@@ -451,7 +453,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Student, Login, Team (z.B. 39146) oder Feedback durchsuchen..."
+                    placeholder={t("Student, Login, Team (z.B. 39146) oder Feedback durchsuchen...")}
                     className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 shadow-2xs"
                   />
                   {searchQuery && (
@@ -475,7 +477,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                         : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                     }`}
                   >
-                    Alle ({counts.total})
+                    {t("Alle (")}{counts.total})
                   </button>
                   <button
                     type="button"
@@ -486,7 +488,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                         : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
                     }`}
                   >
-                    Offen ({counts.notGraded})
+                    {t("Offen (")}{counts.notGraded})
                   </button>
                   <button
                     type="button"
@@ -497,7 +499,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                         : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
                     }`}
                   >
-                    Bestanden ({counts.passed})
+                    {t("Bestanden (")}{counts.passed})
                   </button>
                   <button
                     type="button"
@@ -508,7 +510,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                         : 'bg-red-50 text-red-800 border border-red-200 hover:bg-red-100'
                     }`}
                   >
-                    Nicht bestanden ({counts.failed})
+                    {t("Nicht bestanden (")}{counts.failed})
                   </button>
 
                   <div className="h-4 w-px bg-slate-300 mx-1" />
@@ -521,10 +523,10 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                         ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
                         : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
                     }`}
-                    title="Zusätzliche Spalten anzeigen"
+                    title={t("Zusätzliche Spalten anzeigen")}
                   >
                     <SlidersHorizontal className="h-3.5 w-3.5" />
-                    <span>Spalten</span>
+                    <span>{t("Spalten")}</span>
                   </button>
                 </div>
               </div>
@@ -532,7 +534,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
               {/* Submissions List */}
               {filteredSubmissions.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-400">
-                  <p className="text-xs font-semibold">Keine Abgaben für diesen Filter gefunden.</p>
+                  <p className="text-xs font-semibold">{t("Keine Abgaben für diesen Filter gefunden.")}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -568,7 +570,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 </span>
                                 {sub.team_id && (
                                   <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200">
-                                    Team {sub.team_id}
+                                    {t("Team")} {sub.team_id}
                                   </span>
                                 )}
                                 {showOptionalColumns && sub.login && (
@@ -581,7 +583,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 {sub.submission_time && (
                                   <span className="flex items-center gap-1">
                                     <Clock className="h-3 w-3" />
-                                    <span>Abgabe: {sub.submission_time}</span>
+                                    <span>{t("Abgabe:")} {sub.submission_time}</span>
                                   </span>
                                 )}
                               </div>
@@ -597,11 +599,11 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 className="flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-600 hover:text-white transition shadow-2xs border border-indigo-200"
                               >
                                 <Download className="h-3.5 w-3.5" />
-                                <span>Abgabe herunterladen</span>
+                                <span>{t("Abgabe herunterladen")}</span>
                               </a>
                             ) : (
                               <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-400">
-                                Keine Datei
+                                {t("Keine Datei")}
                               </span>
                             )}
 
@@ -611,10 +613,10 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 target="_blank"
                                 rel="noreferrer"
                                 className="flex items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition"
-                                title="Feedback Mail an Studierende senden"
+                                title={t("Feedback Mail an Studierende senden")}
                               >
                                 <Mail className="h-3.5 w-3.5" />
-                                <span className="hidden md:inline">Mail</span>
+                                <span className="hidden md:inline">{t("Mail")}</span>
                               </a>
                             )}
 
@@ -624,10 +626,10 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 target="_blank"
                                 rel="noreferrer"
                                 className="flex items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition"
-                                title="Team Log einsehen"
+                                title={t("Team Log einsehen")}
                               >
                                 <Users className="h-3.5 w-3.5" />
-                                <span className="hidden md:inline">Log</span>
+                                <span className="hidden md:inline">{t("Log")}</span>
                               </a>
                             )}
                           </div>
@@ -638,7 +640,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                           {/* Left: Status Toggle & Grade */}
                           <div className="w-full md:w-56 shrink-0 space-y-2">
                             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                              Bewertung & Status
+                              {t("Bewertung & Status")}
                             </label>
 
                             {/* Status Pills */}
@@ -652,7 +654,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     : 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50'
                                 }`}
                               >
-                                <span>Bestanden</span>
+                                <span>{t("Bestanden")}</span>
                                 {edit.status === 'passed' && <Check className="h-3 w-3" />}
                               </button>
 
@@ -665,7 +667,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     : 'bg-white text-slate-700 border-slate-200 hover:bg-red-50'
                                 }`}
                               >
-                                <span>Nicht bestanden</span>
+                                <span>{t("Nicht bestanden")}</span>
                                 {edit.status === 'failed' && <Check className="h-3 w-3" />}
                               </button>
 
@@ -678,7 +680,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
                                 }`}
                               >
-                                <span>Nicht bewertet</span>
+                                <span>{t("Nicht bewertet")}</span>
                                 {edit.status === 'not_graded' && <Check className="h-3 w-3" />}
                               </button>
                             </div>
@@ -689,7 +691,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 type="text"
                                 value={edit.mark}
                                 onChange={(e) => handleMarkChange(sub.member_id, e.target.value)}
-                                placeholder="Note / Punkte (optional)"
+                                placeholder={t("Note / Punkte (optional)")}
                                 className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden"
                               />
                             </div>
@@ -698,13 +700,13 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                           {/* Middle: Inline Evaluation Statement Textarea */}
                           <div className="flex-1 space-y-1">
                             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                              Evaluation Statement (Korrektur-Kommentar für Studierende)
+                              {t("Evaluation Statement (Korrektur-Kommentar für Studierende)")}
                             </label>
                             <textarea
                               rows={3}
                               value={edit.feedback}
                               onChange={(e) => handleFeedbackChange(sub.member_id, e.target.value)}
-                              placeholder="Feedback / Korrektur-Notizen für den/die Studierende eingeben..."
+                              placeholder={t("Feedback / Korrektur-Notizen für den/die Studierende eingeben...")}
                               className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 font-sans"
                             />
                           </div>
@@ -726,23 +728,23 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                               {isSaving ? (
                                 <>
                                   <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                                  <span>Speichern...</span>
+                                  <span>{t("Speichern...")}</span>
                                 </>
                               ) : isSaved ? (
                                 <>
                                   <Check className="h-3.5 w-3.5 text-white" />
-                                  <span>Gespeichert!</span>
+                                  <span>{t("Gespeichert!")}</span>
                                 </>
                               ) : (
                                 <>
                                   <Save className="h-3.5 w-3.5" />
-                                  <span>Speichern</span>
+                                  <span>{t("Speichern")}</span>
                                 </>
                               )}
                             </button>
                             {edit.isDirty && (
                               <span className="text-[10px] font-semibold text-amber-600">
-                                Ungespeichert
+                                {t("Ungespeichert")}
                               </span>
                             )}
                           </div>
@@ -766,7 +768,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-indigo-600" />
                         <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
-                          Terminplan & Fristen
+                          {t("Terminplan & Fristen")}
                         </h3>
                       </div>
                       {studentDetail.time_remaining && (
@@ -777,7 +779,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                               : 'bg-emerald-100 text-emerald-800'
                           }`}
                         >
-                          {studentDetail.time_remaining}
+                          {assignmentStatusText(studentDetail.time_remaining)}
                         </span>
                       )}
                     </div>
@@ -786,7 +788,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                       {studentDetail.start_time && (
                         <div className="rounded-xl bg-white p-3 border border-indigo-100/60 shadow-2xs">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                            Startzeit
+                            {t("Startzeit")}
                           </span>
                           <span className="font-semibold text-slate-800">{studentDetail.start_time}</span>
                         </div>
@@ -794,9 +796,9 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                       {studentDetail.ended_on && (
                         <div className="rounded-xl bg-white p-3 border border-indigo-100/60 shadow-2xs">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                            Abgabefrist
+                            {t("Abgabefrist")}
                           </span>
-                          <span className="font-semibold text-slate-800">{studentDetail.ended_on}</span>
+                          <span className="font-semibold text-slate-800">{assignmentStatusText(studentDetail.ended_on)}</span>
                         </div>
                       )}
                     </div>
@@ -807,11 +809,10 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-2">
                       <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                         <FileText className="h-4 w-4 text-slate-500" />
-                        <span>Arbeitsanweisung</span>
+                        <span>{t("Arbeitsanweisung")}</span>
                       </h3>
-                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
-                        {studentDetail.instructions}
-                      </p>
+                      <div className="ilias-rich-content text-xs text-slate-600 dark:text-slate-300 leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: studentDetail.instructions }} />
                     </div>
                   )}
 
@@ -820,7 +821,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3">
                       <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                         <Download className="h-4 w-4 text-indigo-600" />
-                        <span>Übungsunterlagen & Aufgabenstellung</span>
+                        <span>{t("Übungsunterlagen & Aufgabenstellung")}</span>
                       </h3>
                       <div className="space-y-2">
                         {studentDetail.exercise_files.map((f, i) => (
@@ -840,7 +841,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                               className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition shadow-2xs"
                             >
                               <Download className="h-3 w-3" />
-                              <span>Herunterladen</span>
+                              <span>{t("Herunterladen")}</span>
                             </a>
                           </div>
                         ))}
@@ -849,27 +850,27 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                   )}
 
                   {/* Team Card */}
-                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3">
+                  {(studentDetail.is_team_upload ?? Boolean(studentDetail.create_team_url || studentDetail.manage_team_url || studentDetail.delete_team_url || studentDetail.team_status_text)) && <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                         <Users className="h-4 w-4 text-indigo-600" />
-                        <span>Team</span>
+                        <span>{t("Team")}</span>
                       </h3>
                       {studentDetail.team_members.length > 0 && selectedAssId && (
                         <button
                           type="button"
                           onClick={async () => {
-                            if (!window.confirm('Möchtest du das Team wirklich auflösen?')) return;
+                            if (!window.confirm(t("Möchtest du das Team wirklich auflösen?"))) return;
                             try {
                               const updated = await api.deleteStudentTeam(exerciseRefId, selectedAssId);
                               setStudentDetail(updated);
                             } catch (err: any) {
-                              alert(err.message || 'Fehler beim Auflösen des Teams');
+                              alert(err.message || t("Fehler beim Auflösen des Teams"));
                             }
                           }}
                           className="text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer"
                         >
-                          <span>Team auflösen</span>
+                          <span>{t("Team auflösen")}</span>
                         </button>
                       )}
                     </div>
@@ -887,7 +888,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                       </div>
                     ) : (
                       <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500 flex items-center justify-between">
-                        <span>{studentDetail.team_status_text || 'Sie gehören noch keinem Team an.'}</span>
+                        <span>{studentDetail.team_status_text || t("Sie gehören noch keinem Team an.")}</span>
                         {studentDetail.create_team_url && selectedAssId && (
                           <button
                             type="button"
@@ -896,23 +897,22 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 const updated = await api.createStudentTeam(exerciseRefId, selectedAssId);
                                 setStudentDetail(updated);
                               } catch (err: any) {
-                                alert(err.message || 'Fehler beim Erstellen des Teams');
+                                alert(err.message || t("Fehler beim Erstellen des Teams"));
                               }
                             }}
                             className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 shadow-2xs cursor-pointer"
                           >
-                            Team erstellen
+                            {t("Team erstellen")}
                           </button>
                         )}
                       </div>
                     )}
-                  </div>
-
+                  </div>}
                   {/* Submission Card */}
                   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      <span>Meine Einreichung</span>
+                      <span>{t("Meine Einreichung")}</span>
                     </h3>
 
                     {studentDetail.submitted_files.length > 0 ? (
@@ -929,18 +929,18 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                               className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
                             >
                               <Download className="h-3 w-3" />
-                              <span>Abgabe anzeigen</span>
+                              <span>{t("Abgabe anzeigen")}</span>
                             </a>
                           </div>
                         ))}
                         {studentDetail.last_submission && (
                           <p className="text-[11px] text-slate-400">
-                            Letzte Abgabe: {studentDetail.last_submission}
+                            {t("Letzte Abgabe:")} {studentDetail.last_submission}
                           </p>
                         )}
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-400">Bisher keine Abgabe eingereicht.</p>
+                      <p className="text-xs text-slate-400">{t("Bisher keine Abgabe eingereicht.")}</p>
                     )}
                   </div>
 
@@ -950,10 +950,10 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                       <div className="flex items-center justify-between">
                         <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          <span>Bewertung & Feedback des Tutors</span>
+                          <span>{t("Bewertung & Feedback des Tutors")}</span>
                         </h3>
                         <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white shadow-2xs">
-                          {studentDetail.passed_status === 'passed' ? 'Bestanden' : 'Bewertet'}
+                          {studentDetail.passed_status === 'passed' ? t("Bestanden") : t("Bewertet")}
                         </span>
                       </div>
 
@@ -967,7 +967,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                 </>
               ) : (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-400">
-                  <p className="text-xs font-semibold">Keine Detaildaten für diese Aufgabe gefunden.</p>
+                  <p className="text-xs font-semibold">{t("Keine Detaildaten für diese Aufgabe gefunden.")}</p>
                 </div>
               )}
             </div>
