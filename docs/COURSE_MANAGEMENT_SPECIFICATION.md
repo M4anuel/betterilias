@@ -1,5 +1,45 @@
 # BetterIlias — Lecture & Folder Management Specification
 
+## Implementation status and native-form corrections
+
+The initial authoring implementation provides permission detection, the searchable
+30-object Add Object catalogue, folder creation, and course/folder file uploads.
+Only Folder and File are currently enabled, subject to the live container's
+creation permissions. Exercise creation and management actions below remain
+planned; their controls are not presented as working features.
+
+The saved native folder form offers **Default** (`dtpl_0`) and **Hidden folder**
+(`dtpl_5`). The latter is not a column layout. BetterIlias reads the available
+templates and selected default from each fresh form rather than assuming a layout.
+
+The saved file form uses a two-step flow: upload the file to the live
+`ilObjFileUploadHandlerGUI` URL, then submit the returned `file_id` with the
+parallel title/description/resource-ID arrays and selected license to the fresh
+form action. Multi-file uploads are processed individually so partial successes
+remain visible. Neither creation POST is retried automatically. A fresh parent
+listing must contain a new matching object reference before success is reported;
+uncertain results stop the queue and direct the user to inspect ILIAS.
+
+Implemented routes (numeric parent `ref_id`):
+
+| Method | Endpoint | Purpose |
+| :--- | :--- | :--- |
+| GET | `/api/materials/{ref_id}/authoring-context` | Current creation types and management/page-edit indicators; native URLs and tokens stay on the server. |
+| GET | `/api/materials/{ref_id}/folders/options` | Live native folder templates and default selection. |
+| POST | `/api/materials/{ref_id}/folders` | JSON `title`, `description`, optional `template_id`; returns verified material items. |
+| GET | `/api/materials/{ref_id}/files/options` | Live license choices and default selection. |
+| POST | `/api/materials/{ref_id}/files` | Multipart `file` and `license`; one queued file per request, returning verified material items. |
+
+The shared frontend catalogue is `frontend/src/lib/iliasObjects.ts`; supported
+creation types are separate from ILIAS's allowed types. The authoring scraper and
+service are isolated in `backend/scrapers/authoring.py` and
+`backend/services/authoring.py` for future exercise creation and management.
+Regression fixtures under `tests/fixtures/authoring` are sanitized excerpts of
+the source page saves. Navigation guards are being implemented separately.
+
+The sections below describe the target design; the status and corrections above
+take precedence where they differ from the initial proposal.
+
 ## 1. Executive Summary & Core Principles
 
 This specification defines the architecture, workflows, API contracts, and user experience for course authoring and folder management in **BetterIlias**. It allows lecturers and teaching assistants (TAs) to create, edit, organize, move, and delete course contents directly within BetterIlias, without leaving the modern web interface.

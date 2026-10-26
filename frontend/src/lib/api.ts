@@ -1,6 +1,7 @@
 import { t, getLanguage } from './i18n';
 import {
   AuthStatus,
+  AuthoringContext, AuthoringResult, FileLicense,
   CourseLogsResponse,
   CourseMaterialsResponse,
   DashboardResponse,
@@ -58,6 +59,52 @@ async function sessionFetch(input: string, init?: RequestInit): Promise<Response
 }
 
 export const api = {
+  async getAuthoringContext(refId: string): Promise<AuthoringContext> {
+    const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/authoring-context`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(t('authoring.load_failed'));
+    return res.json();
+  },
+  async getFileCreationOptions(refId: string): Promise<{ licenses: FileLicense[] }> {
+    const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/files/options`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('authoring.load_failed'));
+    return res.json();
+  },
+  async getFolderCreationOptions(refId: string): Promise<{ templates: FileLicense[] }> {
+    const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/folders/options`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('authoring.load_failed'));
+    return res.json();
+  },
+  async createFolder(refId: string, values: { title: string; description: string; template_id: string }): Promise<AuthoringResult> {
+    const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/folders`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values),
+    });
+    if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('authoring.uncertain'));
+    return res.json();
+  },
+  uploadCourseFile(refId: string, file: File, license: string, onProgress: (progress: number) => void): Promise<AuthoringResult> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_BASE}/materials/${encodeURIComponent(refId)}/files`);
+      xhr.setRequestHeader('Accept-Language', getLanguage());
+      const sessionId = cache.getSessionId();
+      if (sessionId) xhr.setRequestHeader('X-Session-Id', sessionId);
+      xhr.upload.onprogress = event => { if (event.lengthComputable) onProgress(Math.round(event.loaded / event.total * 100)); };
+      xhr.onerror = () => reject(new Error(t('authoring.uncertain')));
+      xhr.onabort = () => reject(new Error(t('authoring.uncertain')));
+      xhr.onload = () => {
+        let data;
+        try { data = JSON.parse(xhr.responseText); } catch { reject(new Error(t('authoring.uncertain'))); return; }
+        if (xhr.status === 401) window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
+        if (xhr.status >= 200 && xhr.status < 300) {
+          window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
+          resolve(data);
+        } else reject(new Error(apiError(data) || t('authoring.uncertain')));
+      };
+      const body = new FormData();
+      body.append('file', file); body.append('license', license);
+      xhr.send(body);
+    });
+  },
   async prepareMobileSession(): Promise<{ session_id: string }> {
     const res = await sessionFetch(`${API_BASE}/auth/mobile-session`, { method: 'POST', cache: 'no-store' });
     if (!res.ok) {

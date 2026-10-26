@@ -1,5 +1,7 @@
 from backend.i18n import t
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status, File, Form, UploadFile
+from backend.schemas import AuthoringContext, AuthoringResult, CreateFolderRequest
+from backend.services.authoring import AuthoringError
 from fastapi.responses import StreamingResponse
 from typing import List, Optional, Literal
 
@@ -10,6 +12,46 @@ from backend.schemas import RepositoryResponse
 from backend.schemas import MembershipFormResponse, MembershipRequest, MembershipResult
 
 router = APIRouter(tags=["Materials"])
+
+
+@router.get('/materials/{ref_id}/authoring-context', response_model=AuthoringContext)
+async def get_authoring_context(ref_id: str = Path(pattern=r'^\d+$'), client: IliasClient = Depends(get_ilias_client)):
+    return await client.get_authoring_context(ref_id)
+
+
+@router.get('/materials/{ref_id}/files/options')
+async def get_file_creation_options(ref_id: str = Path(pattern=r'^\d+$'), client: IliasClient = Depends(get_ilias_client)):
+    try:
+        return await client.get_file_creation_options(ref_id)
+    except AuthoringError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@router.get('/materials/{ref_id}/folders/options')
+async def get_folder_creation_options(ref_id: str = Path(pattern=r'^\d+$'), client: IliasClient = Depends(get_ilias_client)):
+    try:
+        return await client.get_folder_creation_options(ref_id)
+    except AuthoringError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@router.post('/materials/{ref_id}/folders', response_model=AuthoringResult)
+async def create_folder(request: CreateFolderRequest, ref_id: str = Path(pattern=r'^\d+$'), client: IliasClient = Depends(get_ilias_client)):
+    try:
+        return await client.create_folder(ref_id, request)
+    except AuthoringError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@router.post('/materials/{ref_id}/files', response_model=AuthoringResult)
+async def upload_course_file(ref_id: str = Path(pattern=r'^\d+$'), file: UploadFile = File(...),
+                             license: str = Form(...), client: IliasClient = Depends(get_ilias_client)):
+    try:
+        return await client.upload_course_file(ref_id, file, license)
+    except AuthoringError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    finally:
+        await file.close()
 
 
 @router.get("/repository/{ref_id}", response_model=RepositoryResponse)

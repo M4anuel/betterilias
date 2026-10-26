@@ -47,7 +47,14 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
   * Edit title, instructions, deadlines, grace period, mandatory status, and file limits; choose the submission type during creation. ILIAS fixes the type after creation.
   * Format instructions with active toolbar indicators, edit HTML, and insert links with display text and window options.
   * Attach instruction files directly, verify uploads, and retain failed queued attachments for retry.
-  * Creating new exercise containers and folders remains planned; see [TODO.md](TODO.md).
+  * Creating new exercise containers remains planned; see [TODO.md](TODO.md).
+
+* **Course & Folder Authoring:**
+  * Authors can create folders and upload course files from the course or folder header. Permissions are checked against the current native ILIAS page before every creation.
+  * The searchable Add Object dialog lists all 30 native object types in six categories. Folder and file creation are enabled where ILIAS permits them; remaining types are marked as coming soon.
+  * Folder creation supports title, description and the native folder templates (Default or Hidden folder where offered).
+  * Multi-file selection and drag-and-drop provide a queue, per-file upload progress and a license selector. Each file follows the native temporary-upload and metadata-save flow; successful files remain marked as saved if a later upload fails.
+  * Saves are confirmed against a fresh container listing. Uncertain outcomes stop the queue and link to ILIAS for inspection before another attempt.
 
 * **TA Grading Automation & Correction Mode:**
   * **Participant & Submission Overview:** View student submissions, grading status, and uploaded files filtered by assignment.

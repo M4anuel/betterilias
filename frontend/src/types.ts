@@ -148,7 +148,19 @@ export interface MembershipResult {
   message: string;
 }
 
+export interface AuthoringContext {
+  ref_id: string;
+  can_create: boolean;
+  can_manage: boolean;
+  can_edit_page: boolean;
+  creatable_types: string[];
+}
+
+export interface FileLicense { value: string; label: string; selected: boolean }
+export interface AuthoringResult { success: boolean; items: MaterialItem[] }
+
 export interface CourseMaterialsResponse {
+  authoring?: AuthoringContext;
   container_ref_id: string;
   is_enrolled?: boolean;
   membership?: CourseMembership;

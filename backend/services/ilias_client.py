@@ -12,6 +12,7 @@ import httpx
 from backend.auth.session import SessionManager, session_manager
 from backend.config import settings
 from backend.services.assignment_multipart import encode_assignment_form
+from backend.services.authoring import AuthoringMixin
 from backend.scrapers.dumper import dump_failed_html
 from backend.schemas import RepositoryResponse
 from backend.scrapers.repository import parse_repository
@@ -98,7 +99,7 @@ class StudentUploadError(Exception):
         self.status_code = status_code
 
 
-class IliasClient:
+class IliasClient(AuthoringMixin):
     """High-level async client for interacting with Uni Bern ILIAS."""
 
     # Class-level cache of course participants per exercise_ref_id for enriching team member names
