@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
@@ -544,3 +544,20 @@ def test_video_stream_info_endpoint():
         assert data["mp4_url"] == "https://dist.opencast.unibe.ch/static/test.mp4"
         assert data["title"] == "Variables in R"
         assert data["duration"] == 465
+
+def test_pdf_info_endpoint():
+    mock_pdf_bytes = b"%PDF-1.4\n1 0 obj\n<< /Type /Pages /Count 1 >>\nendobj\n2 0 obj\n<< /Type /Page /MediaBox [ 0 0 842 595 ] >>\nendobj\n%%EOF"
+    mock_resp = MagicMock()
+    mock_resp.content = mock_pdf_bytes
+    mock_resp.status_code = 200
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_resp)
+
+    with patch("backend.auth.session.SessionManager.get_http_client") as mock_cm:
+        mock_cm.return_value.__aenter__.return_value = mock_client
+        res = client.get("/api/pdf/info?url=https%3A%2F%2Filias.unibe.ch%2Ftest.pdf")
+        assert res.status_code == 200
+        data = res.json()
+        assert round(data["aspect_ratio"], 2) == 1.42
+        assert data["pages"] == 1

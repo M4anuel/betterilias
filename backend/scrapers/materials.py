@@ -145,7 +145,8 @@ def _clean_rich_html(raw_html: str, container_ref_id: str = "") -> str:
                     el["data"] = src
                 else:
                     el["src"] = src
-                el["frameborder"] = "0" 
+                el["frameborder"] = "0"
+                el["scrolling"] = "no" 
 
                 el_classes = el.get("class", [])
                 if isinstance(el_classes, str):

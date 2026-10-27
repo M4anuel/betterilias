@@ -125,10 +125,11 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
         cleanedAttrs = cleanedAttrs.replace(/class=["'][^"']*["']/i, '');
       }
 
+      const cleanPdfUrl = fullSrc.split('#')[0];
       if (tag.toLowerCase() === 'embed') {
-        return `<embed class="${combinedClass}" src="${fullSrc}" ${cleanedAttrs.trim()} />`;
+        return `<embed class="${combinedClass}" src="${fullSrc}" data-pdf-src="${cleanPdfUrl}" ${cleanedAttrs.trim()} />`;
       }
-      return `<iframe class="${combinedClass}" src="${fullSrc}" frameborder="0" ${cleanedAttrs.trim()}>${inner}</iframe>`;
+      return `<iframe class="${combinedClass}" src="${fullSrc}" data-pdf-src="${cleanPdfUrl}" scrolling="no" frameborder="0" ${cleanedAttrs.trim()}>${inner}</iframe>`;
     }
   );
 
@@ -136,7 +137,8 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
     /<object(\s+[^>]*?)data=["']([^"']*\.pdf[^"']*)["']([^>]*)>([\s\S]*?)<\/object>/gi,
     (_match, _preAttrs, src) => {
       const fullSrc = formatPdfUrl(src);
-      return `<iframe class="pdf-embed" src="${fullSrc}" frameborder="0"></iframe>`;
+      const cleanPdfUrl = fullSrc.split('#')[0];
+      return `<iframe class="pdf-embed" src="${fullSrc}" data-pdf-src="${cleanPdfUrl}" scrolling="no" frameborder="0"></iframe>`;
     }
   );
 
@@ -238,6 +240,51 @@ export const CourseView: React.FC<CourseViewProps> = ({
   const [isScanningTree, setIsScanningTree] = useState(false);
   const [searchCategoryFilter, setSearchCategoryFilter] = useState<'all' | 'file' | 'fold' | 'mcst' | 'exc'>('all');
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+
+  // Dynamically inspect embedded PDFs to adapt to any weird aspect ratio and handle scrolling
+  useEffect(() => {
+    const iframes = document.querySelectorAll<HTMLIFrameElement>('iframe.pdf-embed[data-pdf-src]');
+    iframes.forEach(async (iframe) => {
+      const src = iframe.getAttribute('data-pdf-src');
+      if (!src) return;
+      const cacheKey = `pdf_aspect_${src}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed.aspect_ratio) {
+            iframe.style.aspectRatio = `${parsed.aspect_ratio}`;
+          }
+          if (parsed.pages > 1) {
+            iframe.setAttribute('scrolling', 'auto');
+            iframe.style.overflow = 'auto';
+          } else {
+            iframe.setAttribute('scrolling', 'no');
+            iframe.style.overflow = 'hidden';
+          }
+          return;
+        } catch {
+          // ignore
+        }
+      }
+      try {
+        const info = await api.getPdfInfo(src);
+        if (info && info.aspect_ratio) {
+          iframe.style.aspectRatio = `${info.aspect_ratio}`;
+          if (info.pages > 1) {
+            iframe.setAttribute('scrolling', 'auto');
+            iframe.style.overflow = 'auto';
+          } else {
+            iframe.setAttribute('scrolling', 'no');
+            iframe.style.overflow = 'hidden';
+          }
+          sessionStorage.setItem(cacheKey, JSON.stringify(info));
+        }
+      } catch {
+        // default remains
+      }
+    });
+  }, [materialsData]);
 
   // Per-course dynamic blocks customization & ordering
   const [blockOrder, setBlockOrder] = useState<string[]>(() => {

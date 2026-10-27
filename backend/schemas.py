@@ -579,3 +579,8 @@ class FeedbackFilesResponse(BaseModel):
     files: List[FeedbackFileItem] = Field(default_factory=list)
     upload_url: Optional[str] = None
 
+class PdfInfoResponse(BaseModel):
+    width: Optional[float] = None
+    height: Optional[float] = None
+    aspect_ratio: float = 2.16
+    pages: int = 1

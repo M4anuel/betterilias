@@ -342,15 +342,23 @@
   .ilias-rich-content iframe[src*="pdf"] {
     width: 100% !important;
     max-width: 100% !important;
-    aspect-ratio: 2.18;
+    aspect-ratio: 2.16;
     min-height: 240px;
     max-height: 85vh;
     height: auto !important;
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
+    overflow: hidden !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
     background: transparent;
     display: block;
+  }
+  .ilias-rich-content iframe.pdf-embed::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
   .dark .ilias-rich-content iframe[src*=".pdf"],
   .dark .ilias-rich-content embed[type*="pdf"],
@@ -360,7 +368,15 @@
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
+    overflow: hidden !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
     background: transparent;
+  }
+  .dark .ilias-rich-content iframe.pdf-embed::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 
   /* BetterIlias Native Video Player Container */

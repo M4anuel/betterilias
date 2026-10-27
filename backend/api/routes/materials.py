@@ -1,6 +1,8 @@
 from backend.i18n import t
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status, File, Form, UploadFile
-from backend.schemas import AuthoringContext, AuthoringResult, CreateFolderRequest
+import re, logging
+from backend.schemas import AuthoringContext, AuthoringResult, CreateFolderRequest, PdfInfoResponse
+logger = logging.getLogger(__name__)
 from backend.schemas import ManagementResponse, ManageSelection, DeleteReview, DeleteMaterialsRequest, SaveMaterialOrderRequest
 from backend.services.authoring import AuthoringError
 from fastapi.responses import StreamingResponse
@@ -209,3 +211,50 @@ async def download_material_file(
             detail=t('Failed to stream download: {p0}', p0=str(e))
         )
 
+@router.get("/pdf/info", response_model=PdfInfoResponse)
+async def get_pdf_info(
+    url: str = Query(..., description="PDF URL to inspect"),
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Fetch PDF metadata (MediaBox, Rotate, Count) to determine exact aspect ratio
+    and page count so embedded course PDFs fit any aspect ratio without letterboxing.
+    """
+    full_url = url.split("#")[0]
+    if not full_url.startswith("http"):
+        full_url = f"https://ilias.unibe.ch/{full_url.lstrip('/')}"
+
+    try:
+        async with client.session_manager.get_http_client() as http:
+            resp = await http.get(full_url, headers={"Range": "bytes=0-32767"}, follow_redirects=True)
+            content = resp.content
+            if b"/MediaBox" not in content and len(content) < 131072:
+                resp = await http.get(full_url, follow_redirects=True)
+                content = resp.content[:262144]
+
+            mb = re.search(rb'/MediaBox\s*\[\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*\]', content)
+            if not mb:
+                mb = re.search(rb'/CropBox\s*\[\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*\]', content)
+
+            if mb:
+                x0, y0, x1, y1 = [float(v) for v in mb.groups()]
+                w = abs(x1 - x0)
+                h = abs(y1 - y0)
+                rot = re.search(rb'/Rotate\s*(\d+)', content)
+                if rot and int(rot.group(1)) % 360 in (90, 270):
+                    w, h = h, w
+
+                count_m = re.search(rb'/Type\s*/Pages\b[^\>]*?/Count\s+(\d+)', content)
+                pages = int(count_m.group(1)) if count_m else 1
+
+                if w > 0 and h > 0:
+                    return PdfInfoResponse(
+                        width=round(w, 2),
+                        height=round(h, 2),
+                        aspect_ratio=round(w / h, 4),
+                        pages=pages
+                    )
+    except Exception as e:
+        logger.warning(f"Failed to inspect PDF dimensions for {url}: {e}")
+
+    return PdfInfoResponse(aspect_ratio=2.16, pages=1)

@@ -684,4 +684,10 @@ export const api = {
     if (!res.ok) throw new Error(t("Anweisungsdatei konnte nicht gelöscht werden"));
     return res.json();
   },
+
+  async getPdfInfo(url: string): Promise<{ width?: number; height?: number; aspect_ratio: number; pages: number }> {
+    const res = await sessionFetch(`${API_BASE}/pdf/info?url=${encodeURIComponent(url)}`);
+    if (!res.ok) return { aspect_ratio: 2.16, pages: 1 };
+    return res.json().catch(() => ({ aspect_ratio: 2.16, pages: 1 }));
+  },
 };
