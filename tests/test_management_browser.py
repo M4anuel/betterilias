@@ -10,8 +10,9 @@ from tests.test_localisation_browser import local_site
 pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '1', reason='Opt-in Chromium tests')
 
 
+@pytest.mark.parametrize('viewport', [(320, 740), (1280, 800)])
 @pytest.mark.parametrize('language,scheme,uncertain', [('en', 'light', False), ('de', 'dark', False), ('en', 'light', True)])
-def test_unified_management_order_review_delete_and_empty_parent(local_site, language, scheme, uncertain):
+def test_unified_management_order_review_delete_and_empty_parent(local_site, language, scheme, uncertain, viewport):
     from pathlib import Path
     playwright = pytest.importorskip('playwright.sync_api')
     tr = json.loads((Path(__file__).resolve().parents[1] / 'locales' / f'{language}.json').read_text(encoding='utf8')).__getitem__
@@ -74,7 +75,7 @@ def test_unified_management_order_review_delete_and_empty_parent(local_site, lan
 
     with playwright.sync_playwright() as p:
         browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
-        page = browser.new_page(locale=language, color_scheme=scheme)
+        page = browser.new_page(locale=language, color_scheme=scheme, viewport=dict(width=viewport[0], height=viewport[1]))
         page.add_init_script(f"localStorage.setItem('betterilias_language', '{language}');")
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))

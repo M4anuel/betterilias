@@ -41,7 +41,7 @@ export const CourseMembershipModal: React.FC<Props> = ({ refId, title, action, o
     }
   };
   const label = action === 'join' ? t("Kurs beitreten") : t("Kurs verlassen");
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+  return <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
     <section role="dialog" aria-modal="true" aria-labelledby="membership-title"
       className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl space-y-4"
       onKeyDown={(event) => {

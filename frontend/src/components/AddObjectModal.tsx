@@ -130,7 +130,7 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
     } finally { setBusy(false); }
   }
   return <dialog ref={dialog} aria-labelledby="add-object-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}
-    className="m-auto w-[min(48rem,95vw)] max-h-[90vh] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0 text-slate-900 dark:text-slate-100 shadow-xl backdrop:bg-black/50">
+    className="m-auto w-[min(48rem,95vw)] max-h-[90dvh] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0 text-slate-900 dark:text-slate-100 shadow-xl backdrop:bg-black/50">
     <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 p-5">
       <h2 id="add-object-title" className="text-lg font-bold">{t(step === 'catalogue' ? 'authoring.add' : step === 'fold' ? 'authoring.create' : 'authoring.upload')}</h2>
       <button disabled={busy} onClick={onClose} aria-label={t('authoring.close')} className={buttonClass}><X size={18} /></button>

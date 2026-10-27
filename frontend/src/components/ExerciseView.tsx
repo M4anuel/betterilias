@@ -1328,7 +1328,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const ongoingCount = (overviewData?.assignments || []).filter((a) => a.is_ongoing).length;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
       {/* Top Header with Breadcrumbs & Sync Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <CompactBreadcrumbs
@@ -1385,7 +1385,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
       {/* Main Title Row & Navigation Tabs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
             <Layers className="h-5 w-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
@@ -1399,7 +1399,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         </div>
 
         {/* Navigation Bar / Tabs */}
-        <div className="flex items-center gap-1 rounded-2xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200/60 dark:border-slate-700/60 self-start md:self-auto">
+        <div className="flex items-center gap-1 max-w-full overflow-x-auto shrink-0 rounded-2xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200/60 dark:border-slate-700/60 self-start md:self-auto [&>button]:shrink-0">
           <button
             type="button"
             onClick={() => switchTab('assignments')}

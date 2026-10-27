@@ -1,11 +1,12 @@
 import { t, useLanguage } from '../lib/i18n';
 import React from 'react';
-import { Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library } from 'lucide-react';
+import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library } from 'lucide-react';
 import { CourseItem } from '../types';
 import { cache } from '../lib/cache';
 import { CourseIcon } from './CourseIcon';
 
 interface SidebarProps {
+  isMobile?: boolean;
   courses: CourseItem[];
   selectedCourseId: string | null;
   onSelectCourse: (refId: string) => void;
@@ -19,6 +20,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  isMobile,
   courses,
   selectedCourseId,
   onSelectCourse,
@@ -32,7 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   useLanguage();
   return (
     <aside
-      className={`relative flex flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 transition-all duration-200 ease-in-out shrink-0 select-none ${
+      className={`relative flex h-full min-h-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 transition-all duration-200 ease-in-out shrink-0 select-none ${
         isCollapsed ? 'w-16' : 'w-64'
       }`}
     >
@@ -47,15 +49,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onToggleCollapse}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer"
+            aria-label={isMobile ? t("Schliessen") : isCollapsed ? t("Seitenleiste ausklappen") : t("Seitenleiste einklappen")}
             title={isCollapsed ? t("Seitenleiste ausklappen") : t("Seitenleiste einklappen")}
           >
-            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            {isMobile ? <X className="h-5 w-5" /> : isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
       {/* Main navigation items */}
-      <nav className="flex-1 overflow-y-auto p-2 space-y-1">
+      <nav aria-label={t("Meine Vorlesungen")} className="min-h-0 flex-1 overflow-y-auto p-2 space-y-1">
         {/* Semester / Overview Button */}
         {(() => {
           const isSemesterSelected = selectedCourseId === null && !isRepositorySelected;
@@ -129,6 +132,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   ? { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }
                   : undefined
               }
+              aria-label={course.title}
+              aria-current={isSelected ? "page" : undefined}
               title={course.title}
             >
               <div

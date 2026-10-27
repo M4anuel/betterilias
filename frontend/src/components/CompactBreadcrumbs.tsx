@@ -55,7 +55,7 @@ export const CompactBreadcrumbs: React.FC<CompactBreadcrumbsProps> = ({
       </button>
     </React.Fragment>;
   };
-  return <nav aria-label={t("Breadcrumb")} className="flex items-center text-xs text-slate-600 dark:text-slate-300 overflow-x-auto py-1">
+  return <nav aria-label={t("Breadcrumb")} className="flex min-w-0 max-w-full flex-1 items-center text-xs text-slate-600 dark:text-slate-300 overflow-x-auto py-1">
     {expanded || ancestors.length === 0 ? <button type="button" onClick={() => onNavigateRepository('1')} aria-label={t("Magazin öffnen")} className="shrink-0"><Home className="h-3.5 w-3.5" /></button> : null}
     {ancestors.length > 0 && <>
       {!expanded ? <button type="button" onClick={() => setExpanded(true)} aria-expanded={false} aria-label={t("Vollständigen Pfad anzeigen")} className="flex items-center shrink-0 hover:underline">
