@@ -2,6 +2,7 @@ import { t, getLanguage } from './i18n';
 import {
   AuthStatus,
   AuthoringContext, AuthoringResult, FileLicense,
+  ManagementResponse, DeleteReview,
   CourseLogsResponse,
   CourseMaterialsResponse,
   DashboardResponse,
@@ -73,6 +74,31 @@ async function sessionFetch(input: string, init?: RequestInit): Promise<Response
 }
 
 export const api = {
+  async getManagement(refId: string): Promise<ManagementResponse> {
+    const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/management`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('management.load_failed'));
+    return res.json();
+  },
+  async reviewDeletion(refId: string, item_ids: string[]): Promise<DeleteReview> {
+    const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/deletion-review`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_ids }),
+    });
+    if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('management.inspection_incomplete'));
+    return res.json();
+  },
+  async deleteMaterials(refId: string, item_ids: string[], revision: string): Promise<{ success: boolean; deleted_ids: string[] }> {
+    const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/batch/delete`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_ids, revision }),
+    });
+    if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('management.delete_uncertain'));
+    return res.json();
+  },
+  async saveMaterialOrder(refId: string, item_ids: string[], revision: string): Promise<void> {
+    const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/order`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_ids, revision }),
+    });
+    if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('management.order_uncertain'));
+  },
   async getAuthoringContext(refId: string): Promise<AuthoringContext> {
     const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/authoring-context`, { cache: 'no-store' });
     if (!res.ok) throw new Error(t('authoring.load_failed'));

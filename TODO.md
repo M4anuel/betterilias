@@ -93,7 +93,11 @@ build validation, and English fallback for partial languages.
   - [ ] Support creating weblinks (`ilObjLinkResourceGUI&new_type=webr`).
   - [ ] Support creating item groups (`ilObjItemGroupGUI&new_type=itgr`).
   - [ ] Support creating exercises (`ilObjExerciseGUI&new_type=exc`).
-- [ ] Support deleting course objects with native confirmation (`select_and_deleting.html` via `ilObjectTableGUI&cmd=delete`).
+- [x] Support deleting course files/folders through live native repository confirmation, recursive folder review, stale-review checks and verified removal. `select_and_deleting.html` is page-element deletion, a separate protocol.
+- [x] Provide one course/folder management mode with scoped creation, selection, reviewed deletion and native shared ordering; keep creation controls out of normal browsing.
+- [x] Integrate the native Sorting form with drag/drop, accessible move buttons, protected drafts and verified saves.
+- [x] Design the unified Add content catalogue around materials/activities versus text/layout; document the two ILIAS storage models in `docs/UNIFIED_MANAGEMENT_PLAN.md`.
+- [ ] Add native page-element editing adapters to the unified catalogue; currently use an explicitly labelled ILIAS editor handoff.
 - [ ] Support course page customization & resource placement (`edit_page.html` via `ilPCResourcesGUI`).
 
 ## Media & Podcast Streaming
@@ -172,6 +176,8 @@ build validation, and English fallback for partial languages.
   - [x] Handle both in-app navigation (tab switching, breadcrumbs, back/forward history, Mouse 4 & 5) and browser-level actions (tab close, window close, page reload via window.beforeunload).
 
 ## Completed
+
+- [x] Implement the unified course/folder management foundation: live permissions, existing creation flows, reviewed file/folder deletion, recursive contents inspection, native shared ordering, current-course mode continuity and authoritative empty-parent cache refresh. Keep full layout editing, moving/copying and evacuation as explicit follow-ups.
 
 - [x] Simplify file upload activity to circular spinners with transfer/saving labels, removing bars and percentages while retaining confirmed-file counts and reduced-motion support.
 

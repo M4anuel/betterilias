@@ -36,6 +36,9 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
             body = dict(active_semester='HS2026', available_semesters=[], courses=[], grouped_by_category={})
         elif path.endswith('/authoring-context'):
             body = context
+        elif path.endswith('/management'):
+            body = dict(ref_id='42', authoring=context, items=[dict(item, can_delete=True) for item in items],
+                        can_sort=False, order=[], order_revision='', editor_url='https://ilias.unibe.ch/ilias.php?ref_id=42&cmd=editPageFrame')
         elif path.endswith('/folders/options'):
             pending_folder_options.append(route)
             return
@@ -81,6 +84,8 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
             ''')
             page.route('**/api/**', respond)
             page.goto(base + '/?course=42')
+            playwright.expect(page.get_by_role('button', name=tr('authoring.add'), exact=True)).to_have_count(0)
+            page.get_by_role('button', name=tr('management.enter'), exact=True).click()
             page.get_by_role('button', name=tr('authoring.add'), exact=True).click()
             dialog = page.get_by_role('dialog')
             playwright.expect(dialog.locator('section button')).to_have_count(30)
