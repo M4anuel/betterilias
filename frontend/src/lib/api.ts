@@ -104,6 +104,8 @@ export const api = {
       const sessionId = cache.getSessionId();
       if (sessionId) xhr.setRequestHeader('X-Session-Id', sessionId);
       xhr.upload.onprogress = event => { if (event.lengthComputable) onProgress(Math.round(event.loaded / event.total * 100)); };
+      // The body is transferred, but ILIAS still has to receive, save and verify it.
+      xhr.upload.onload = () => onProgress(100);
       xhr.onerror = () => reject(new Error(t('authoring.uncertain')));
       xhr.onabort = () => reject(new Error(t('authoring.uncertain')));
       xhr.onload = () => {
