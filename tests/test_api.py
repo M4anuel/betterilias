@@ -435,6 +435,38 @@ def test_extension_sync_endpoint(tmp_path, monkeypatch):
         assert logout_res.json()["success"] is True
 
 
+def test_extension_sync_cookie_sanitization(tmp_path, monkeypatch):
+    from backend.config import settings
+    from backend.auth.session import SessionManager
+    monkeypatch.setattr(settings, "sessions_dir", str(tmp_path / ".sessions"))
+
+    with patch("backend.auth.session.SessionManager.verify_session", new_callable=AsyncMock, return_value=(True, "Test User")):
+        payload = {
+            "cookies": {
+                "PHPSESSID": "valid_sess_xyz",
+                "ilClientId": "ilias3_unibe",
+                "_shibsession_default": "valid_shib_token",
+                "preferences|{}": "corrupt_data",
+                "invalid<cookie>": "bad",
+                "normal_il_key": "ok",
+            },
+            "source": "chrome_extension"
+        }
+        response = client.post("/api/auth/sync", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        session_id = data["session_id"]
+        
+        # Verify saved cookies on disk
+        mgr = SessionManager(session_id=session_id)
+        saved_cookies = mgr.load_cookies()
+        assert "PHPSESSID" in saved_cookies
+        assert "_shibsession_default" in saved_cookies
+        assert "preferences|{}" not in saved_cookies
+        assert "invalid<cookie>" not in saved_cookies
+
+
 
 
 def test_team_management_api_endpoints():

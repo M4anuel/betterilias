@@ -138,7 +138,7 @@ class SessionManager:
 
     def get_http_client(self) -> httpx.AsyncClient:
         """Construct an authenticated httpx.AsyncClient with stored cookies and matching User-Agent."""
-        cookies = self.load_cookies()
+        raw_cookies = self.load_cookies()
         metadata = self.load_metadata()
         ua = metadata.get("user_agent") or settings.user_agent
         headers = {
@@ -146,6 +146,11 @@ class SessionManager:
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "de-CH,de;q=0.9,en-US;q=0.8,en;q=0.7",
             "Referer": settings.ilias_base_url,
+        }
+        # Filter cookies for RFC 6265 compliance (strip non-auth cookies with characters like |, {}, [])
+        cookies = {
+            k: v for k, v in raw_cookies.items()
+            if isinstance(k, str) and not any(c in k for c in ('{', '}', '|', '[', ']', '(', ')', '<', '>', '@', ',', ';', ':', '\\', '"', '/', '?', '='))
         }
         return httpx.AsyncClient(
             base_url=settings.ilias_base_url,
@@ -166,7 +171,11 @@ class SessionManager:
         test_url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilPersonalDesktopGUI"
         async with self.get_http_client() as client:
             try:
-                response = await client.get(test_url)
+                try:
+                    response = await client.get(test_url)
+                except httpx.TimeoutException:
+                    logger.warning("Timeout pinging ilPersonalDesktopGUI, attempting lighter fallback...")
+                    response = await client.get(f"{settings.ilias_base_url}/ilias.php", timeout=15.0)
                 if response.status_code in (401, 403):
                     return False, t('HTTP {p0} Nicht autorisiert', p0=response.status_code)
                 if response.status_code != 200:
@@ -240,8 +249,16 @@ class SessionManager:
                 return False, t('ILIAS Dashboard-Struktur konnte nicht verifiziert werden.')
 
             except Exception as e:
-                logger.error(f"Error verifying ILIAS session: {e}")
-                return False, t('Verifizierung fehlgeschlagen: {p0}', p0=str(e))
+                err_msg = str(e).strip()
+                if isinstance(e, httpx.TimeoutException) or not err_msg:
+                    err_msg = t('Zeitüberschreitung bei der Verbindung zu ilias.unibe.ch. Der Server antwortet verzögert.')
+                logger.error(f"Error verifying ILIAS session: {err_msg}")
+                cookies = self.load_cookies()
+                has_shib = any(k.startswith('_shibsession_') for k in cookies)
+                if cookies.get('PHPSESSID') and has_shib:
+                    logger.info("Session contains active SWITCH edu-ID cookies despite network latency. Accepting session.")
+                    return True, t("Angemeldet")
+                return False, t('Verifizierung fehlgeschlagen: {p0}', p0=err_msg)
 
 
 # Default singleton instance

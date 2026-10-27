@@ -175,3 +175,4 @@ test('invalidateManagedMaterials clears both materials and management caches', (
   assert.equal(cache.getCachedManagement(refId), null);
   assert.equal(localStorage.getItem(`ilias_materials_cache_${refId}`), null);
 });
+

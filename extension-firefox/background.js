@@ -3,6 +3,13 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 let syncDebounceTimeout = null;
 let isSyncing = false;
+let lastAttemptTime = 0;
+
+function isIliasAuthCookie(name) {
+  if (!name || typeof name !== 'string') return false;
+  if (name.includes('|') || name.includes('{') || name.includes('}') || name.includes('[') || name.includes(']')) return false;
+  return name === 'PHPSESSID' || name.startsWith('_shibsession_') || name === 'ilClientId' || name.startsWith('il_');
+}
 
 async function getStoredSettings() {
   try {
@@ -48,7 +55,9 @@ async function fetchCookies() {
     try {
       const list = await browserAPI.cookies.getAll(query);
       for (const cookie of list) {
-        if (cookie.name && cookie.value) cookies.set(cookie.name, cookie.value);
+        if (cookie.name && cookie.value && isIliasAuthCookie(cookie.name)) {
+          cookies.set(cookie.name, cookie.value);
+        }
       }
     } catch (_) { /* Query support differs between browsers. */ }
   }
@@ -101,6 +110,10 @@ function updateBadge(status) {
 
 async function checkAndAutoSync(force = false) {
   if (isSyncing) return { status: 'in_progress' };
+  if (!force && Date.now() - lastAttemptTime < 15000) {
+    return { status: 'cooldown' };
+  }
+  lastAttemptTime = Date.now();
   isSyncing = true;
   try {
     const settings = await getStoredSettings();
@@ -176,24 +189,19 @@ async function checkAndAutoSync(force = false) {
   }
 }
 
-function scheduleSyncDebounced(delay = 1500) {
+function scheduleSyncDebounced(delay = 2500) {
   if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
   syncDebounceTimeout = setTimeout(() => {
     checkAndAutoSync(false);
   }, delay);
 }
 
-// 1. Listen for ILIAS cookie changes
+// 1. Listen for ILIAS cookie changes (strictly auth cookies, never media/preferences)
 if (browserAPI.cookies && browserAPI.cookies.onChanged) {
   browserAPI.cookies.onChanged.addListener((changeInfo) => {
-    const domain = changeInfo?.cookie?.domain || '';
     const name = changeInfo?.cookie?.name || '';
-    if (
-      domain.includes('unibe.ch') ||
-      name === 'PHPSESSID' ||
-      name.startsWith('_shibsession_')
-    ) {
-      scheduleSyncDebounced(1500);
+    if (name === 'PHPSESSID' || name.startsWith('_shibsession_')) {
+      scheduleSyncDebounced(2500);
     }
   });
 }

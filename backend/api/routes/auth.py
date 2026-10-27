@@ -61,8 +61,25 @@ async def sync_extension_cookies(
     Synchronize ILIAS session cookies from the Chrome Extension.
     Creates or updates an isolated tenant session and verifies it with ILIAS.
     """
-    cookies = payload.cookies
-    if not cookies or not cookies.get("PHPSESSID"):
+    raw_cookies = payload.cookies
+    if not raw_cookies or not isinstance(raw_cookies, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=t('PHPSESSID cookie is missing from the submitted payload.')
+        )
+
+    # Sanitize cookies: retain only legitimate ILIAS auth/session cookies
+    # and filter out invalid/corrupt keys containing RFC 6265 separators (e.g. preferences|{})
+    cookies: Dict[str, str] = {}
+    for k, v in raw_cookies.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            continue
+        if any(c in k for c in ('{', '}', '|', '[', ']', '(', ')', '<', '>', '@', ',', ';', ':', '\\', '"', '/', '?', '=')):
+            continue
+        if k in ("PHPSESSID", "ilClientId") or k.startswith("_shibsession_") or k.startswith("il_"):
+            cookies[k] = v
+
+    if not cookies.get("PHPSESSID"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=t('PHPSESSID cookie is missing from the submitted payload.')
