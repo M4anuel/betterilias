@@ -1,5 +1,9 @@
 # Unified course and folder management
 
+The current feature-by-feature record is the
+[ILIAS support inventory](ILIAS_SUPPORT_MATRIX.md), covering both repository
+objects and page elements.
+
 ## Refined implementation brief
 
 Build one permission-aware **Manage this page** mode for the current course or

@@ -6,6 +6,10 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
 
 ## 🚀 Key Features
 
+For the audited status of every repository object, page element and management
+operation, see the [ILIAS support inventory](docs/ILIAS_SUPPORT_MATRIX.md).
+It distinguishes native workflows from rendering, external links and planned work.
+
 * **Authentication & Multi-Tenant Session Sync:**
   * **BetterIlias Companion Extension (Manifest V3):** 1-click session cookie synchronization (`PHPSESSID`, `ilClientId`) directly from the Uni Bern ILIAS portal (`ilias.unibe.ch`) to the backend via `POST /api/auth/sync`. Supports light and dark mode out-of-the-box. Available for both **Google Chrome / Chromium** (`extension/`) and **Mozilla Firefox** (`extension-firefox/`).
   * **Multi-Tenant Architecture:** Isolated session storage keyed by `session_id`, forwarded seamlessly via `X-Session-ID` request headers, cookies, or query parameters. Allows multiple users/students to access a shared host independently.

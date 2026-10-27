@@ -1,5 +1,9 @@
 # BetterIlias — Lecture & Folder Management Specification
 
+For current per-object and per-page-element behavior, use the audited
+[ILIAS support inventory](ILIAS_SUPPORT_MATRIX.md). This document includes
+target-design sections that are not all implemented.
+
 ## Implementation status and native-form corrections
 
 The current implementation extends the foundation below with a single
