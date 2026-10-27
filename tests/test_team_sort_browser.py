@@ -10,11 +10,12 @@ from tests.test_localisation_browser import local_site
 pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '1', reason='Requires a frontend build and Chromium')
 
 
+@pytest.mark.parametrize('width', [320, 1280])
 @pytest.mark.parametrize(('language', 'label', 'settings'), [
     ('en', 'ILIAS default order', 'Open filter, sorting & course view settings'),
     ('de', 'ILIAS-Standardsortierung', 'Filter-, Sortier- & Kursansicht-Einstellungen öffnen'),
 ])
-def test_original_team_sort_is_lazy_and_reversible(local_site, language, label, settings):
+def test_original_team_sort_is_lazy_and_reversible(local_site, language, label, settings, width):
     playwright = pytest.importorskip('playwright.sync_api')
     enriched_requests = []
     errors = []
@@ -53,13 +54,14 @@ def test_original_team_sort_is_lazy_and_reversible(local_site, language, label, 
 
     with playwright.sync_playwright() as p:
         browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
-        page = browser.new_page(locale='en-GB', color_scheme='dark' if language == 'de' else 'light')
+        page = browser.new_page(locale='en-GB', viewport=dict(width=width, height=740), color_scheme='dark' if language == 'de' else 'light')
         page.add_init_script(f"localStorage.setItem('betterilias_language', '{language}')")
         page.set_default_timeout(10000)
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.route('**/api/**', respond)
         page.goto(local_site + '/?course=42&exercise=200&tab=submissions')
         playwright.expect(page.get_by_text('Alpha, Anna', exact=True)).to_be_visible()
+        assert page.locator('main').evaluate('(e) => e.scrollWidth <= e.clientWidth + 1')
         assert enriched_requests == []
         page.get_by_title(settings, exact=True).click()
         page.get_by_role('button', name=label, exact=True).click()

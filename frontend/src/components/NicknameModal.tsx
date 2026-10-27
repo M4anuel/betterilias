@@ -171,7 +171,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
+      className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
       onMouseDown={(e) => {
         backdropMouseDownRef.current = e.target === e.currentTarget;
       }}
@@ -198,6 +198,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label={t("Schliessen")}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition cursor-pointer"
           >
             <X className="h-5 w-5" />
@@ -257,7 +258,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                     onDragStart={() => handleDragStart(index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnd={handleDragEnd}
-                    className={`flex items-center gap-2.5 rounded-xl border border-teal-200 dark:border-teal-800/80 bg-teal-50/70 dark:bg-teal-950/30 px-3.5 py-2.5 transition ${
+                    className={`flex flex-wrap items-center gap-2.5 rounded-xl border border-teal-200 dark:border-teal-800/80 bg-teal-50/70 dark:bg-teal-950/30 px-3.5 py-2.5 transition ${
                       draggedIndex === index
                         ? 'opacity-40 border-dashed border-teal-400'
                         : 'hover:border-teal-300 dark:hover:border-teal-700'
@@ -265,7 +266,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                   >
                     {/* Drag handle */}
                     <div
-                      className="cursor-grab active:cursor-grabbing text-teal-600/70 dark:text-teal-400/70 p-0.5 hover:text-teal-900 dark:hover:text-teal-100"
+                      className="hidden sm:block cursor-grab active:cursor-grabbing text-teal-600/70 dark:text-teal-400/70 p-0.5 hover:text-teal-900 dark:hover:text-teal-100"
                       title={t("Reihenfolge & Abschnitte anpassen")}
                     >
                       <GripVertical className="h-4 w-4" />
@@ -285,11 +286,11 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                         );
                         setHasCustomOrder(true);
                       }}
-                      className="flex-1 rounded-lg border border-teal-200/90 dark:border-teal-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-teal-900 dark:text-teal-100 placeholder:text-teal-400/60 focus:outline-hidden focus:ring-2 focus:ring-teal-500/30"
+                      className="min-w-0 basis-[calc(100%-3rem)] sm:basis-0 flex-1 rounded-lg border border-teal-200/90 dark:border-teal-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-teal-900 dark:text-teal-100 placeholder:text-teal-400/60 focus:outline-hidden focus:ring-2 focus:ring-teal-500/30"
                     />
 
                     {/* Move Up / Move Down buttons */}
-                    <div className="flex items-center gap-0.5">
+                    <div className="flex flex-1 justify-end items-center gap-0.5">
                       <button
                         type="button"
                         onClick={() => handleMoveUp(index)}
@@ -442,7 +443,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                           [course.ref_id]: e.target.value,
                         })
                       }
-                      className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[var(--accent)]/30 transition"
+                      className="min-w-0 flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[var(--accent)]/30 transition"
                     />
                   </div>
 
@@ -452,7 +453,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                       <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
                         {t("Icon auswählen")}
                       </div>
-                      <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+                      <div className="grid grid-cols-4 sm:grid-cols-10 gap-1.5">
                         <button
                           type="button"
                           title={t("Automatisch nach Fach und Fakultät")}

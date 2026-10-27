@@ -517,7 +517,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl">
             <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400 mb-4">
               <div className="p-2.5 rounded-xl bg-rose-100 dark:bg-rose-950/50">

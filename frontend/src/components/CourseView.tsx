@@ -163,6 +163,30 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
     }
   }
   cleaned = cleaned.replace(/<h[1-6][^>]*>\s*<\/h[1-6]>/gi, '').trim();
+  if (cleaned.includes('<table') || cleaned.includes('pdf-embed')) {
+    const document = new DOMParser().parseFromString(cleaned, 'text/html');
+    document.querySelectorAll('table').forEach(table => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'ilc_table_StandardTable_wrapper';
+      wrapper.tabIndex = 0;
+      wrapper.setAttribute('role', 'region');
+      wrapper.setAttribute('aria-label', t('media.scroll_table'));
+      table.before(wrapper);
+      wrapper.append(table);
+    });
+    document.querySelectorAll<HTMLElement>('[data-pdf-src]').forEach(pdf => {
+      const href = pdf.dataset.pdfSrc;
+      if (!href || !/^https?:\/\//i.test(href)) return;
+      const link = document.createElement('a');
+      link.href = href;
+      link.target = '_blank';
+      link.rel = 'noreferrer';
+      link.className = 'inline-flex items-center py-2 text-sm font-semibold';
+      link.textContent = t('media.open_pdf');
+      pdf.after(link);
+    });
+    cleaned = document.body.innerHTML;
+  }
   return cleaned;
 }
 
@@ -1941,7 +1965,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
       {/* Top Header with Breadcrumbs & Sync Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <CompactBreadcrumbs
@@ -1996,7 +2020,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
         context={materialsData.authoring} title={materialsData.title || courseNickname} courseRefId={courseRefId}
         onRefresh={onManualRefresh} onOpenFolder={onNavigateFolder} /> : <>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
             {isInsideSubfolder && (
               <button
@@ -2018,7 +2042,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
         </div>
 
         {/* Search & Actions Bar */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 min-w-0 w-full md:w-auto">
           {membership?.can_leave && <button type="button" onClick={() => onManageMembership('leave')}
             className="rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800">{t("Kurs verlassen")}</button>}
           <button
@@ -2031,7 +2055,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             <span className="hidden sm:inline">{t("Reihenfolge")}</span>
           </button>
 
-          <div className="relative w-full md:w-72">
+          <div className="relative min-w-0 w-full md:w-72">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
             <input
               type="text"

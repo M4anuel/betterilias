@@ -117,7 +117,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+      className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
       onMouseDown={(e) => {
         backdropMouseDownRef.current = e.target === e.currentTarget;
       }}
@@ -129,7 +129,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150 transition-colors"
+        className="w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-150 transition-colors"
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}

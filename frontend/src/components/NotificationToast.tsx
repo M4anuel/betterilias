@@ -81,7 +81,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
     <div
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
-      className="fixed bottom-6 right-6 z-50 w-80 sm:w-96 rounded-2xl bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white shadow-2xl border border-slate-200/90 dark:border-slate-700/80 backdrop-blur-md overflow-hidden transition-colors animate-in slide-in-from-bottom-5 duration-200"
+      className="notification-toast fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] sm:w-96 rounded-2xl bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white shadow-2xl border border-slate-200/90 dark:border-slate-700/80 backdrop-blur-md overflow-hidden transition-colors animate-in slide-in-from-bottom-5 duration-200"
       role="alert"
     >
       {/* Toast Content */}

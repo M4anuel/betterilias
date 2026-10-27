@@ -17,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   authStatus,
   onHomeClick,
   onToggleSidebar,
+  isSidebarCollapsed,
   onLogout,
   onOpenExtensionInfo,
 }) => {
@@ -24,10 +25,13 @@ export const Header: React.FC<HeaderProps> = ({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90 transition-colors">
+    <header className="sticky top-0 z-40 flex min-h-16 shrink-0 w-full items-center justify-between border-b border-slate-200 bg-white/90 px-2 sm:px-4 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90 transition-colors">
       <div className="flex items-center gap-2 sm:gap-3">
         <button
           onClick={onToggleSidebar}
+          aria-label={t("Sidebar umschalten")}
+          aria-expanded={!isSidebarCollapsed}
+          aria-controls="course-navigation"
           className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer"
           title={t("Sidebar umschalten")}
         >
@@ -42,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
           <img
             src="/logo.png"
             alt={t("BetterIlias Logo")}
-            className="h-9 w-9 object-contain shrink-0 rounded-lg drop-shadow-2xs"
+            className="hidden min-[360px]:block h-9 w-9 object-contain shrink-0 rounded-lg drop-shadow-2xs"
           />
           <div>
             <div className="flex items-center gap-1.5">
@@ -80,6 +84,8 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Settings Menu Button */}
         <button
           onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+          aria-label={t("Design & Einstellungen")}
+          aria-expanded={isSettingsOpen}
           className={`rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer border ${
             isSettingsOpen
               ? 'border-slate-300 bg-slate-100 dark:border-slate-700 dark:bg-slate-800'

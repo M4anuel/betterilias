@@ -4,24 +4,30 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Mobile usability
 
+Implementation: responsive phone/tablet navigation, visible-viewport overlays,
+safe-area spacing, touch targets, contained rich-content tables, PDF fallback links,
+and narrow-screen exercise tabs are implemented. Automated phone workflow checks
+cover navigation/settings, authoring, uploads/retry and reviewed management.
+Real-device and live ILIAS acceptance remains tracked below.
+
 Goal: complete everyday student and supported TA workflows comfortably on a
 phone, including portrait/landscape use and the on-screen keyboard.
 
-- [ ] Audit core screens at 320–430 CSS px and tablet widths; remove page-wide
+- [x] Audit core screens at 320–430 CSS px and tablet widths; remove page-wide
   horizontal overflow while allowing contained scrolling for wide tables/media.
-- [ ] Adapt the header, sidebar, breadcrumbs, search and settings for narrow
+- [x] Adapt the header, sidebar, breadcrumbs, search and settings for narrow
   screens; keep navigation and current-course context accessible without hover.
-- [ ] Make dialogs, drawers and menus fit the visible viewport, including safe
+- [x] Make dialogs, drawers and menus fit the visible viewport, including safe
   areas and the on-screen keyboard; keep focused inputs and primary actions
   reachable and preserve drafts when rotating or resizing.
-- [ ] Provide comfortably spaced touch targets (aim for at least 44×44 CSS px),
+- [x] Provide comfortably spaced touch targets (aim for at least 44×44 CSS px),
   visible focus states and tap-accessible explanations/actions currently exposed
   through hover. Retain keyboard and screen-reader access.
-- [ ] Adapt course blocks, session cards, PDFs and video layouts to small screens;
+- [x] Adapt course blocks, session cards, PDFs and video layouts to small screens;
   preserve readable lecturer content and provide usable media fallback actions.
-- [ ] Support phone file selection, upload status/retry and submission management;
+- [x] Support phone file selection, upload status/retry and submission management;
   provide tap controls for ordering wherever drag-and-drop is offered.
-- [ ] Adapt TA grading, assignment editors and course-management selection/review
+- [x] Adapt TA grading, assignment editors and course-management selection/review
   flows so fields, feedback and destructive confirmations remain usable on phones.
 - [ ] Validate login/session sharing, browsing/search, student submission and
   supported TA/management flows in German/English and light/dark mode. Add focused

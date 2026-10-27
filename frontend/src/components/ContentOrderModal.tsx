@@ -215,13 +215,13 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+      className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
       onMouseDown={handleBackdropMouseDown}
       onMouseUp={handleBackdropMouseUp}
     >
       <div
         ref={modalRef}
-        className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150 transition-colors"
+        className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-150 transition-colors"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4 bg-slate-50/80 dark:bg-slate-800/80">
@@ -262,7 +262,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
               return (
                 <div
                   key={blockId}
-                  className={`flex items-center justify-between p-3 rounded-2xl border transition shadow-2xs ${
+                  className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-3 rounded-2xl border transition shadow-2xs ${
                     isHidden
                       ? 'border-slate-200/50 dark:border-slate-800/50 bg-slate-50/60 dark:bg-slate-900/60 opacity-60'
                       : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
@@ -290,7 +290,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
                   </div>
 
                   {/* Move and Visibility Controls */}
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center justify-end gap-1 shrink-0">
                     {/* Toggle Visibility */}
                     <button
                       type="button"

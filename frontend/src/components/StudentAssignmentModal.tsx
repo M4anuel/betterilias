@@ -512,7 +512,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-150"
+      className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-150"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           handleSafeClose();
@@ -520,7 +520,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       }}
     >
       <div
-        className="relative w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8 flex flex-col max-h-[90vh] transition-colors"
+        className="relative w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8 flex flex-col max-h-[90dvh] transition-colors"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}

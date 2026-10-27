@@ -41,7 +41,8 @@ def test_native_browser_and_backend_send_the_same_empty_uploads():
         assert part.get_content_type() == encoded[name].get_content_type() == 'application/octet-stream'
 
 
-def test_create_team_assignment_preserves_draft_and_recovers_from_rejection(local_site):
+@pytest.mark.parametrize('width', [320, 1280])
+def test_create_team_assignment_preserves_draft_and_recovers_from_rejection(local_site, width):
     playwright = pytest.importorskip('playwright.sync_api')
     drafts, errors = [], []
     created = False
@@ -79,7 +80,7 @@ def test_create_team_assignment_preserves_draft_and_recovers_from_rejection(loca
 
     with playwright.sync_playwright() as p:
         browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
-        page = browser.new_page(locale='en-GB')
+        page = browser.new_page(locale='en-GB', viewport=dict(width=width, height=740), has_touch=width < 768)
         page.set_default_timeout(10000)
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.route('**/api/**', respond)

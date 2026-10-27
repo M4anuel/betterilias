@@ -271,10 +271,10 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
   return (
     <div
       onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+      className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
     >
       <div
-        className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-colors"
+        className="flex max-h-[92dvh] w-full max-w-3xl flex-col rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-colors"
         role="dialog"
         aria-modal="true"
         aria-labelledby="submission-modal-title"

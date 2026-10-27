@@ -139,7 +139,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl backdrop-blur-md transition-all dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150"
+      className="settings-panel absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl backdrop-blur-md transition-all dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150"
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">

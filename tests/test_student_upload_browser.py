@@ -11,8 +11,9 @@ from backend.scrapers.submissions import parse_student_assignment_detail
 pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '1', reason='Requires a frontend build and Chromium')
 
 
+@pytest.mark.parametrize('width', [320, 1280])
 @pytest.mark.parametrize('team_upload', [False, True])
-def test_upload_rejection_then_verified_success(local_site, team_upload):
+def test_upload_rejection_then_verified_success(local_site, team_upload, width):
     playwright = pytest.importorskip('playwright.sync_api')
     attempts, alerts, errors = [], [], []
     course = dict(ref_id='42', title='Course', url='', item_type='crs')
@@ -54,7 +55,7 @@ def test_upload_rejection_then_verified_success(local_site, team_upload):
 
     with playwright.sync_playwright() as p:
         browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
-        page = browser.new_page(locale='en-GB')
+        page = browser.new_page(locale='en-GB', viewport=dict(width=width, height=740), has_touch=width < 768)
         page.set_default_timeout(10000)
         page.on('pageerror', lambda error: errors.append(str(error)))
         def accept_alert(dialog):

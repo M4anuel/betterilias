@@ -633,3 +633,75 @@
   }
 }
 
+
+/* Shared viewport constraints for navigation and authoring/submission overlays. */
+.app-shell { height: 100dvh; }
+main { overflow-wrap: anywhere; }
+:where(button, a, input, select, textarea, [contenteditable]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.mobile-navigation {
+  position: fixed;
+  inset: var(--visible-top, 0px) auto auto 0;
+  margin: 0;
+  width: min(20rem, calc(100vw - 2.75rem));
+  max-width: none;
+  height: var(--visible-height, 100dvh);
+  max-height: none;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.mobile-navigation aside { width: 100%; }
+.app-overlay {
+  top: var(--visible-top, 0px);
+  bottom: auto;
+  height: var(--visible-height, 100dvh);
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+.app-overlay > div {
+  min-width: 0;
+  max-height: 100%;
+  margin-top: 0;
+  margin-bottom: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.app-overlay > div > .flex-1 { min-height: 0; }
+dialog:not(.mobile-navigation) {
+  position: fixed;
+  top: calc(var(--visible-top, 0px) + var(--visible-height, 100dvh) / 2);
+  bottom: auto;
+  margin-top: 0;
+  margin-bottom: 0;
+  transform: translateY(-50%);
+  max-height: calc(var(--visible-height, 100dvh) - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ilias-rich-content { min-width: 0; overflow-wrap: anywhere; }
+.ilias-rich-content img { max-width: 100%; height: auto; }
+.ilias-rich-content pre, .ilias-rich-content mjx-container { max-width: 100%; overflow-x: auto; }
+.notification-toast { bottom: max(1rem, env(safe-area-inset-bottom)); }
+
+@media (max-width: 767px) {
+  header { padding-top: env(safe-area-inset-top); min-height: calc(4rem + env(safe-area-inset-top)); padding-left: max(0.5rem, env(safe-area-inset-left)); padding-right: max(0.5rem, env(safe-area-inset-right)); }
+  .settings-panel { position: fixed; top: calc(var(--visible-top, 0px) + 4.25rem + env(safe-area-inset-top)); right: max(0.5rem, env(safe-area-inset-right)); max-height: calc(var(--visible-height, 100dvh) - 5rem - env(safe-area-inset-top)); }
+  main { padding-bottom: env(safe-area-inset-bottom); }
+  /* Prevent Safari's focus zoom while retaining the user's ability to pinch zoom. */
+  input:not([type=checkbox]):not([type=radio]), select, textarea, [contenteditable=true] { font-size: 16px; max-width: 100%; }
+  button, a.inline-flex, a.flex, select, input:not([type=checkbox]):not([type=radio]) { min-height: 44px; }
+  button { min-width: 44px; }
+  input[type=checkbox], input[type=radio] { width: 24px; height: 24px; flex-shrink: 0; }
+  main, .app-overlay { overflow-wrap: anywhere; }
+  .app-overlay { padding-left: max(0.5rem, env(safe-area-inset-left)); padding-right: max(0.5rem, env(safe-area-inset-right)); }
+  .app-overlay > div { border-radius: 1rem; }
+  .app-overlay .p-6 { padding: 1rem; }
+  .app-overlay .px-6 { padding-left: 1rem; padding-right: 1rem; }
+  .app-overlay > div > .flex:not(.flex-col), .app-overlay > div > form > .flex { flex-wrap: wrap; }
+  .ilias-rich-content .pdf-embed { height: 60dvh !important; min-height: min(16rem, 60dvh); max-height: 70dvh; }
+}
+@media (hover: none) {
+  /* Keep secondary actions visible when there is no pointer hover. */
+  .group .group-hover\:opacity-100 { opacity: 1; }
+}

@@ -1171,6 +1171,8 @@
   "Erfolgreich gespeichert — wird aus der Liste gefiltert": "Saved successfully — filtering out of list",
   "Einreichung": "Submission",
   "Bewertung gespeichert:": "Grade saved:",
+  "media.open_pdf": "Open PDF in a new tab",
+  "media.scroll_table": "Scrollable table",
   "Automatische Synchronisation:": "Automatic synchronisation:",
   "Abschnitt hinzufügen": "Add section",
   "Abschnittsname": "Section name",

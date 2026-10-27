@@ -331,8 +331,8 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
     submissionsData?.exercise.title || overviewData?.title || initialTitle || t("Übungen & Abgaben");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-5 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="flex h-full max-h-[92vh] w-full max-w-6xl flex-col rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+    <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-5 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="flex h-full max-h-[92dvh] w-full max-w-6xl flex-col rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/90 px-6 py-4">
           <div className="flex items-center gap-3">

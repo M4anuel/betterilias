@@ -20,6 +20,7 @@ import {
 } from './types';
 import { api } from './lib/api';
 import { cache, MATERIALS_CACHE_PREFIX } from './lib/cache';
+import { useMobileViewport } from './lib/useMobileViewport';
 import { theme } from './lib/theme';
 import { navigationGuard } from './lib/navigationGuard';
 
@@ -86,6 +87,15 @@ export function parseStateFromUrl(defaultSemester: string): NavigationState {
 
 export const App: React.FC = () => {
   const language = useLanguage();
+  const isMobile = useMobileViewport();
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const mobileNavigation = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = mobileNavigation.current;
+    if (isMobile && mobileNavigationOpen) dialog?.showModal();
+    else dialog?.close();
+    if (!isMobile) setMobileNavigationOpen(false);
+  }, [isMobile, mobileNavigationOpen]);
   // --- Auth & Session State ---
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
@@ -788,6 +798,10 @@ export const App: React.FC = () => {
 
   // --- Toggle Sidebar ---
   const handleToggleSidebar = () => {
+    if (isMobile) {
+      setMobileNavigationOpen(open => !open);
+      return;
+    }
     const next = !isSidebarCollapsed;
     setIsSidebarCollapsed(next);
     cache.setSidebarCollapsed(next);
@@ -836,36 +850,44 @@ export const App: React.FC = () => {
     materialsData !== null && materialsData.container_ref_id === currentContainerId;
   const effectiveMaterialsData = isMatchingContainer ? materialsData : null;
 
+  const sidebar = <Sidebar
+    courses={allCourses}
+    selectedCourseId={selectedCourseId}
+    onSelectCourse={refId => { handleSelectCourse(refId); setMobileNavigationOpen(false); }}
+    onSelectSemesterOverview={() => { handleNavigateHome(); setMobileNavigationOpen(false); }}
+    onSelectRepository={() => { handleNavigateRepository('1'); setMobileNavigationOpen(false); }}
+    isRepositorySelected={repositoryId !== null}
+    isCollapsed={isMobile ? false : isSidebarCollapsed}
+    onToggleCollapse={isMobile ? () => setMobileNavigationOpen(false) : handleToggleSidebar}
+    onOpenNicknameModal={() => { setMobileNavigationOpen(false); setIsNicknameModalOpen(true); }}
+    nicknamesVersion={nicknamesVersion}
+    isMobile={isMobile}
+  />;
+
   return (
-    <div className="flex h-screen w-screen flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden text-slate-900 dark:text-slate-100 font-sans transition-colors duration-150">
+    <div className="app-shell flex w-full flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden text-slate-900 dark:text-slate-100 font-sans transition-colors duration-150">
       {/* Top Header */}
       <Header
         authStatus={authStatus}
         onHomeClick={handleNavigateHome}
         onToggleSidebar={handleToggleSidebar}
-        isSidebarCollapsed={isSidebarCollapsed}
+        isSidebarCollapsed={isMobile ? !mobileNavigationOpen : isSidebarCollapsed}
         onLogout={handleLogout}
         onOpenExtensionInfo={() => setIsExtensionModalOpen(true)}
       />
 
       {/* Main Workspace Layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Left Sidebar */}
-        <Sidebar
-          courses={allCourses}
-          selectedCourseId={selectedCourseId}
-          onSelectCourse={handleSelectCourse}
-          onSelectSemesterOverview={handleNavigateHome}
-          onSelectRepository={() => handleNavigateRepository('1')}
-          isRepositorySelected={repositoryId !== null}
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapse={handleToggleSidebar}
-          onOpenNicknameModal={() => setIsNicknameModalOpen(true)}
-          nicknamesVersion={nicknamesVersion}
-        />
+        {isMobile ? <dialog ref={mobileNavigation} id="course-navigation" aria-label={t("Meine Vorlesungen")}
+          className="mobile-navigation border-0 bg-white p-0 text-slate-900 dark:bg-slate-900 dark:text-slate-100 backdrop:bg-slate-900/60"
+          onCancel={() => setMobileNavigationOpen(false)}
+          onClick={event => { if (event.target === event.currentTarget) setMobileNavigationOpen(false); }}>
+          {sidebar}
+        </dialog> : <div id="course-navigation" className="flex shrink-0">{sidebar}</div>}
 
         {/* Center Content Area */}
-        <main className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50">
+        <main className="min-w-0 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50">
           {authStatus && !authStatus.authenticated && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-2xs dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
               <div className="flex items-center gap-2">

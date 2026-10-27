@@ -208,7 +208,7 @@ function DeleteReviewDialog({ review, busy, onCancel, onConfirm }: {
   const folders = review.items.some(item => item.item_type === 'fold');
   useEffect(() => { dialog.current?.showModal(); }, []);
   return <dialog ref={dialog} aria-labelledby="delete-materials-title" onCancel={e => { e.preventDefault(); if (!busy) onCancel(); }}
-    className="m-auto max-h-[90vh] w-[min(36rem,95vw)] space-y-4 rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-black/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+    className="m-auto max-h-[90dvh] w-[min(36rem,95vw)] space-y-4 rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-black/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
     <h2 id="delete-materials-title" className="text-lg font-bold">{t('management.delete_title')}</h2>
     <p className="text-sm text-slate-600 dark:text-slate-300">{t('management.delete_warning')}</p>
     <div className="max-h-64 overflow-auto rounded-lg bg-slate-50 p-4 text-sm dark:bg-slate-800"><ReviewTree items={review.items} /></div>
