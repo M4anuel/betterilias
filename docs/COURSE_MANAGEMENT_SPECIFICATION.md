@@ -1,12 +1,31 @@
 # BetterIlias — Lecture & Folder Management Specification
 
+For current per-object and per-page-element behavior, use the audited
+[ILIAS support inventory](ILIAS_SUPPORT_MATRIX.md). This document includes
+target-design sections that are not all implemented.
+
 ## Implementation status and native-form corrections
+
+The current implementation extends the foundation below with a single
+**Manage this page** mode: creation controls are hidden outside it; files and
+folders can be selected, reviewed and deleted through live native confirmation;
+shared ordering uses the native Sorting form. Recursive folder reviews are
+rechecked before deletion, and changed/uncertain outcomes are never replayed
+automatically. Deleting the last item explicitly refreshes the empty cache.
+
+The updated user-goal design, refined implementation brief, protocol mapping,
+implemented scope and future page-element/move/copy adapters are in
+[`UNIFIED_MANAGEMENT_PLAN.md`](UNIFIED_MANAGEMENT_PLAN.md). That plan supersedes
+the earlier proposed controls below. In particular, `select_and_deleting.html`
+contains page-element deletion, not repository-object confirmation. Page-element
+editing currently has an explicit ILIAS editor handoff in the unified Add
+content catalogue; it is not presented as implemented native editing.
 
 The initial authoring implementation provides permission detection, the searchable
 30-object Add Object catalogue, folder creation, and course/folder file uploads.
-Only Folder and File are currently enabled, subject to the live container's
-creation permissions. Exercise creation and management actions below remain
-planned; their controls are not presented as working features.
+Only Folder and File are currently enabled for creation, subject to the live
+container's permissions. Exercise creation, moving/copying and full page-element
+editing remain planned; deletion and ordering are implemented as described above.
 
 The saved native folder form offers **Default** (`dtpl_0`) and **Hidden folder**
 (`dtpl_5`). The latter is not a column layout. BetterIlias reads the available

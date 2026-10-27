@@ -502,6 +502,15 @@ export const cache = {
   },
 
   // --- Course Materials Cache (Instant Serving) ---
+  invalidateManagedMaterials(refIds: string[]) {
+    for (const refId of new Set(refIds)) {
+      try {
+        localStorage.removeItem(MATERIALS_CACHE_PREFIX + refId);
+        localStorage.removeItem(CACHE_TS_PREFIX + MATERIALS_CACHE_PREFIX + refId);
+      } catch { /* A fresh request still updates the visible page when storage is unavailable. */ }
+    }
+  },
+
   getCachedMaterials(refId: string): CourseMaterialsResponse | null {
     try {
       const raw = localStorage.getItem(MATERIALS_CACHE_PREFIX + refId);

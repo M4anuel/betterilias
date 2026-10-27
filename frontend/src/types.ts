@@ -159,6 +159,29 @@ export interface AuthoringContext {
 export interface FileLicense { value: string; label: string; selected: boolean }
 export interface AuthoringResult { success: boolean; items: MaterialItem[] }
 
+export interface ManagementResponse {
+  ref_id: string;
+  authoring: AuthoringContext;
+  items: (MaterialItem & { can_delete: boolean })[];
+  can_sort: boolean;
+  order: string[];
+  order_revision: string;
+  editor_url?: string;
+}
+
+export interface DeleteReviewItem {
+  ref_id: string;
+  title: string;
+  item_type: string;
+  children: DeleteReviewItem[];
+}
+
+export interface DeleteReview {
+  items: DeleteReviewItem[];
+  revision: string;
+  descendants: number;
+}
+
 export interface CourseMaterialsResponse {
   authoring?: AuthoringContext;
   container_ref_id: string;

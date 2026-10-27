@@ -124,6 +124,8 @@ export const App: React.FC = () => {
     }
     return null;
   });
+  const [isManagingCourse, setIsManagingCourse] = useState(false);
+  useEffect(() => { setIsManagingCourse(false); }, [selectedCourseId]);
   const [currentContainerId, setCurrentContainerId] = useState<string | null>(() => {
     if (initialRepositoryParam) return null;
     if (initialFolderParam) return initialFolderParam;
@@ -898,6 +900,8 @@ export const App: React.FC = () => {
               onManageMembership={(refId, title, action) => setMembershipDialog({ refId, title, action })} />
           ) : selectedCourseId && currentContainerId ? (
             <CourseView
+              managementMode={isManagingCourse}
+              onManagementModeChange={setIsManagingCourse}
               key={`${selectedCourseId}_${currentContainerId}`}
               courseRefId={selectedCourseId}
               courseNickname={currentNickname}

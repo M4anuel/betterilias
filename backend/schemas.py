@@ -192,6 +192,50 @@ class AuthoringContext(BaseModel):
     can_edit_page: bool = False
     creatable_types: List[str] = Field(default_factory=list)
     creation_urls: Dict[str, str] = Field(default_factory=dict, exclude=True)
+    manage_url: Optional[str] = Field(default=None, exclude=True)
+    sorting_url: Optional[str] = Field(default=None, exclude=True)
+    page_editor_url: Optional[str] = Field(default=None, exclude=True)
+    content_url: Optional[str] = Field(default=None, exclude=True)
+
+
+class ManagedMaterial(MaterialItem):
+    can_delete: bool = False
+
+
+class ManagementResponse(BaseModel):
+    ref_id: str
+    authoring: AuthoringContext
+    items: List[ManagedMaterial] = Field(default_factory=list)
+    can_sort: bool = False
+    order: List[str] = Field(default_factory=list)
+    order_revision: str = ''
+    editor_url: Optional[str] = None
+
+
+class ManageSelection(BaseModel):
+    item_ids: List[str] = Field(min_length=1, max_length=100)
+
+
+class DeleteReviewItem(BaseModel):
+    ref_id: str
+    title: str
+    item_type: str
+    children: List['DeleteReviewItem'] = Field(default_factory=list)
+
+
+class DeleteReview(BaseModel):
+    items: List[DeleteReviewItem]
+    revision: str
+    descendants: int
+
+
+class DeleteMaterialsRequest(ManageSelection):
+    revision: str = Field(min_length=64, max_length=64)
+
+
+class SaveMaterialOrderRequest(BaseModel):
+    item_ids: List[str] = Field(min_length=1, max_length=500)
+    revision: str = Field(min_length=64, max_length=64)
 
 
 class CreateFolderRequest(BaseModel):

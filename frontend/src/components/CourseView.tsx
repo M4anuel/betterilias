@@ -31,7 +31,8 @@ import { CourseMaterialsResponse, MaterialItem, CourseContentBlock, CourseMember
 import { CourseIcon } from './CourseIcon';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { PodcastModal } from './PodcastModal';
-import { CourseAuthoring } from './AddObjectModal';
+import { CourseManagement } from './CourseManagement';
+import { navigationGuard } from '../lib/navigationGuard';
 import { SessionDrawer } from './SessionDrawer';
 import { ContentOrderModal } from './ContentOrderModal';
 import { ExerciseView } from './ExerciseView';
@@ -164,6 +165,8 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
 }
 
 interface CourseViewProps {
+  managementMode: boolean;
+  onManagementModeChange: (enabled: boolean) => void;
   courseRefId: string;
   courseNickname: string;
   materialsData: CourseMaterialsResponse | null;
@@ -185,6 +188,8 @@ interface CourseViewProps {
 }
 
 export const CourseView: React.FC<CourseViewProps> = ({
+  managementMode: isManaging,
+  onManagementModeChange: setIsManaging,
   courseRefId,
   courseNickname,
   materialsData,
@@ -1887,7 +1892,11 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
         {/* Sync / Refresh status */}
         <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-          {materialsData?.authoring && <CourseAuthoring key={materialsData.container_ref_id} context={materialsData.authoring} onRefresh={onManualRefresh} />}
+          {materialsData?.authoring && (materialsData.authoring.can_create || materialsData.authoring.can_manage || materialsData.authoring.can_edit_page) &&
+            <button aria-pressed={isManaging} onClick={() => { if (navigationGuard.confirmNavigation()) setIsManaging(!isManaging); }}
+              className="rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200 dark:hover:bg-teal-900/40">
+              {t(isManaging ? 'management.done' : 'management.enter')}
+            </button>}
           {isRevalidating ? (
             <div className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:text-blue-300">
               <RefreshCw className="h-3 w-3 animate-spin" />
@@ -1912,6 +1921,9 @@ export const CourseView: React.FC<CourseViewProps> = ({
       </div>
 
       {/* Main Title Row & Search */}
+      {isManaging && materialsData?.authoring && (materialsData.authoring.can_create || materialsData.authoring.can_manage || materialsData.authoring.can_edit_page) ? <CourseManagement key={materialsData.container_ref_id}
+        context={materialsData.authoring} title={materialsData.title || courseNickname} courseRefId={courseRefId}
+        onRefresh={onManualRefresh} onOpenFolder={onNavigateFolder} /> : <>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
@@ -2152,6 +2164,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
       </div>
 
+      </>}
       {/* Opencast Podcast Modal */}
       {activePodcast && (
         <PodcastModal

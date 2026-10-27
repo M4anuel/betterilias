@@ -6,6 +6,10 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
 
 ## 🚀 Key Features
 
+For the audited status of every repository object, page element and management
+operation, see the [ILIAS support inventory](docs/ILIAS_SUPPORT_MATRIX.md).
+It distinguishes native workflows from rendering, external links and planned work.
+
 * **Authentication & Multi-Tenant Session Sync:**
   * **BetterIlias Companion Extension (Manifest V3):** 1-click session cookie synchronization (`PHPSESSID`, `ilClientId`) directly from the Uni Bern ILIAS portal (`ilias.unibe.ch`) to the backend via `POST /api/auth/sync`. Supports light and dark mode out-of-the-box. Available for both **Google Chrome / Chromium** (`extension/`) and **Mozilla Firefox** (`extension-firefox/`).
   * **Multi-Tenant Architecture:** Isolated session storage keyed by `session_id`, forwarded seamlessly via `X-Session-ID` request headers, cookies, or query parameters. Allows multiple users/students to access a shared host independently.
@@ -50,12 +54,15 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
   * Creating new exercise containers remains planned; see [TODO.md](TODO.md).
 
 * **Course & Folder Authoring:**
-  * Authors can create folders and upload course files from the course or folder header. Permissions are checked against the current native ILIAS page before every creation.
-  * The searchable Add Object dialog lists all 30 native object types in six categories. Folder and file creation are enabled where ILIAS permits them; remaining types are marked as coming soon.
+  * Authors enter **Manage this page** from the course/folder header. One management mode holds content creation, selection, deletion and shared ordering; Add content stays hidden during normal browsing. The mode follows folder navigation within the current course.
+  * The searchable **Add content** catalogue lists all 30 repository object types under Materials and activities. Folder/file creation are enabled where ILIAS permits them; other object types are marked as coming soon. The Text and layout category explains page elements and provides an explicit handoff to ILIAS's editor until native adapters are available.
   * Folder creation supports title, description and the native folder templates (Default or Hidden folder where offered).
   * Localized file selection and drag-and-drop provide a queue, per-file upload progress and short explanations for license choices. Up to three files upload concurrently through the native temporary-upload and metadata-save flow.
   * Circular activity indicators accompany transfer and ILIAS saving/verification status, without percentages. Only confirmed saves count toward the completed-file total.
   * Saves are confirmed against a fresh container listing, including ILIAS file titles that omit the extension. An uncertain outcome is shown for the affected file while the remaining uploads continue; successful files remain marked as saved.
+  * Single/bulk file and folder deletion follows fresh native confirmation forms. Folder reviews list nested contents and require cascade acknowledgement; changed contents abort deletion. Uncertain outcomes are never replayed automatically.
+  * Drag rows or use accessible move buttons, then save the order through ILIAS's native Sorting form. Drafts are protected on navigation, and material caches are refreshed after confirmed changes, including an emptied folder.
+  * See the [unified management plan](docs/UNIFIED_MANAGEMENT_PLAN.md) for the refined brief, user goals, native protocol mapping and remaining layout/move/copy work.
 
 * **TA Grading Automation & Correction Mode:**
   * **Participant & Submission Overview:** View student submissions, grading status, and uploaded files filtered by assignment.

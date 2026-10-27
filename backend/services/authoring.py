@@ -37,11 +37,18 @@ class AuthoringMixin:
         self._ensure_authenticated()
         async with self.session_manager.get_http_client() as client:
             response = await self._authoring_container(client, ref_id)
-            return parse_authoring_context(response.text, ref_id)
+            context = parse_authoring_context(response.text, ref_id)
+            if not context.creation_urls and context.manage_url:
+                response = await self._authoring_get(client, context.manage_url)
+                context = parse_authoring_context(response.text, ref_id)
+            return context
 
     async def _creation_context(self, client, ref_id, object_type):
         container = await self._authoring_container(client, ref_id)
         context = parse_authoring_context(container.text, ref_id)
+        if object_type not in context.creation_urls and context.manage_url:
+            container = await self._authoring_get(client, context.manage_url)
+            context = parse_authoring_context(container.text, ref_id)
         if object_type not in context.creation_urls:
             raise AuthoringError('authoring.permission_denied', 403)
         response = await self._authoring_get(client, context.creation_urls[object_type])

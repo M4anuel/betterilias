@@ -36,12 +36,12 @@ build validation, and English fallback for partial languages.
 
 ## Comprehensive ILIAS Object Support & Course Management
 
-**Status:** Inventory of all 30 native ILIAS object types extracted from course authoring views (`htmlfromilias/ActualListOfAllSubjects/Ilias Course Formatting/`). Complete technical specification documented in [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECIFICATION.md). Core learning objects (`file`, `fold`, `exc`, `xoct`, `sess`) are fully supported; remaining objects are catalogued below with current status and integration roadmap.
+**Status:** The 30 repository types found in the supplied course-authoring views are catalogued below. The authoritative, implementation-audited record is [`docs/ILIAS_SUPPORT_MATRIX.md`](docs/ILIAS_SUPPORT_MATRIX.md): it covers all 30 types, all 15 page-element insertion choices, additional rendering cases and management operations. Checked rows here indicate some implemented handling, not complete support for every native operation. Design specifications remain in [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECIFICATION.md).
 
 ### Object Inventory & Current Support Status
 
 #### 1. Content (`Inhalt`)
-- [x] `file` — **File** (`Datei`): Fully supported. Dedicated file card/row, download link, PDF preview embed, and file size parsing.
+- [x] `file` — **File** (`Datei`): Native reading/downloads, existing PDF embeds, file properties, course upload and reviewed deletion. General rename/version management remains unsupported.
 - [x] `webr` — **Weblink** (`Weblink`): Partially supported. Detected by `_detect_material_type`, opens external link in a new tab.
 - [ ] `copa` — **Content Page** (`Inhaltsseite`): Needs parser to extract rich HTML page content directly into BetterIlias rather than redirecting.
 - [ ] `glo` — **Glossary** (`Glossar`): Needs glossary term extraction, search, and letter index navigation.
@@ -52,25 +52,25 @@ build validation, and English fallback for partial languages.
 - [ ] `xds2` — **Literature Ordering (DigiSem)** (`Digitale Seminarbibliothek`): Needs status display and direct link handling.
 
 #### 2. Video and Audio (`Video und Audio`)
-- [x] `xoct` — **Video- & Audioseries (Opencast/Tobira)** (`Video- & Audioserie`): Supported. In-app Opencast podcast player modal with dual-stream audio/slides support.
+- [x] `xoct` — **Video- & Audioseries (Opencast/Tobira)** (`Video- & Audioserie`): Episode discovery/filtering/search and limited embedded MP4 playback with ILIAS fallback. Episode stream actions open ILIAS; synchronized dual-stream audio/slides playback is still pending below.
 - [ ] `xvid` — **Interactive Video** (`Interaktives Video`): Needs interactive video player supporting embedded questions and jump markers.
 - [ ] `mep` — **Media Pool** (`Medienpool`): Needs media gallery viewer (audio/video/image assets).
 
 #### 3. Organisation (`Organisation`)
 - [x] `fold` — **Folder** (`Ordner`): Fully supported for browsing. Multi-column row layout, nested navigation, breadcrumbs, search, and file counts.
 - [x] `sess` — **Session** (`Sitzung`): Supported. Identified with calendar badge, scheduled date/time, and room/location details.
-- [ ] `itgr` — **Item Group** (`Objektgruppe`): Needs container/section divider styling to group related materials logically under a title.
+- [ ] `itgr` — **Item Group** (`Objektgruppe`): Existing page resource groups render as grouped materials, but the repository object has no dedicated creation/settings/resource-assignment workflow.
 - [ ] `lso` — **Learning Sequence** (`Lernsequenz`): Needs sequential step-by-step progress viewer.
 
 #### 4. Communication & Collaboration (`Kommunikation und Zusammenarbeit`)
 - [x] `frm` — **Forum** (`Forum`): Partially supported. Forum card representation and direct navigation to ILIAS forum threads.
-- [x] `grp` — **Group** (`Gruppe`): Partially supported. Group membership parsed; needs dedicated group workspace view.
+- [x] `grp` — **Group** (`Gruppe`): Recognized and browsable as a repository container; no dedicated group workspace or group-membership management.
 - [ ] `blog` — **Blog** (`Blog`): Needs blog post timeline and comments feed.
 - [ ] `wiki` — **Wiki** (`Wiki`): Needs wiki page viewer, page history, and internal wiki linking.
 - [ ] `xpdl` — **Texteditor (Etherpad)** (`Texteditor / Etherpad`): Needs collaborative live editor embed.
 
 #### 5. Performance & Assessment (`Leistungsüberprüfung`)
-- [x] `exc` — **Exercise** (`Übung`): Fully supported. Student submission uploads with drag-and-drop, TA assignment management (create, edit, delete), feedback files, and grading.
+- [x] `exc` — **Exercise** (`Übung`): Native supported workflows inside existing exercises: student submissions, supported teams, TA assignment management, instruction/feedback files and grading. Creating/deleting the repository exercise container remains pending.
 - [x] `tst` — **Test** (`Test`): Partially supported. Detected in backend; links to ILIAS test environment.
 - [ ] `qpl` — **Question Pool for Tests** (`Fragenpool für Tests`): Needs question pool browser for instructors/TAs.
 - [ ] `prtt` — **Portfolio Template** (`Portfoliovorlage`): Needs portfolio template preview.
@@ -93,7 +93,11 @@ build validation, and English fallback for partial languages.
   - [ ] Support creating weblinks (`ilObjLinkResourceGUI&new_type=webr`).
   - [ ] Support creating item groups (`ilObjItemGroupGUI&new_type=itgr`).
   - [ ] Support creating exercises (`ilObjExerciseGUI&new_type=exc`).
-- [ ] Support deleting course objects with native confirmation (`select_and_deleting.html` via `ilObjectTableGUI&cmd=delete`).
+- [x] Support deleting course files/folders through live native repository confirmation, recursive folder review, stale-review checks and verified removal. `select_and_deleting.html` is page-element deletion, a separate protocol.
+- [x] Provide one course/folder management mode with scoped creation, selection, reviewed deletion and native shared ordering; keep creation controls out of normal browsing.
+- [x] Integrate the native Sorting form with drag/drop, accessible move buttons, protected drafts and verified saves.
+- [x] Design the unified Add content catalogue around materials/activities versus text/layout; document the two ILIAS storage models in `docs/UNIFIED_MANAGEMENT_PLAN.md`.
+- [ ] Add native page-element editing adapters to the unified catalogue; currently use an explicitly labelled ILIAS editor handoff.
 - [ ] Support course page customization & resource placement (`edit_page.html` via `ilPCResourcesGUI`).
 
 ## Media & Podcast Streaming
@@ -172,6 +176,10 @@ build validation, and English fallback for partial languages.
   - [x] Handle both in-app navigation (tab switching, breadcrumbs, back/forward history, Mouse 4 & 5) and browser-level actions (tab close, window close, page reload via window.beforeunload).
 
 ## Completed
+
+- [x] Audit and consolidate the current handling of all 30 course-catalogue repository types and all 15 saved page-element insertion choices in `docs/ILIAS_SUPPORT_MATRIX.md`; distinguish native workflows, structured rendering, links, generic HTML and catalogue-only entries.
+
+- [x] Implement the unified course/folder management foundation: live permissions, existing creation flows, reviewed file/folder deletion, recursive contents inspection, native shared ordering, current-course mode continuity and authoritative empty-parent cache refresh. Keep full layout editing, moving/copying and evacuation as explicit follow-ups.
 
 - [x] Simplify file upload activity to circular spinners with transfer/saving labels, removing bars and percentages while retaining confirmed-file counts and reduced-motion support.
 

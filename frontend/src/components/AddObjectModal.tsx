@@ -13,22 +13,22 @@ type CompletionKey = 'authoring.created' | 'authoring.files_saved';
 const fieldClass = 'w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-2 text-slate-900 dark:text-slate-100';
 const buttonClass = 'rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 disabled:opacity-50';
 
-export function CourseAuthoring({ context, onRefresh }: { context: AuthoringContext; onRefresh: () => void }) {
+export function CourseAuthoring({ context, onRefresh, editorUrl }: { context: AuthoringContext; onRefresh: () => void; editorUrl?: string }) {
   useLanguage();
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<CompletionKey | ''>('');
-  if (!context.can_create) return null;
+  if (!context.can_create && !editorUrl) return null;
   return <>
     {notice && <span role="status" className="text-xs text-emerald-700 dark:text-emerald-300">{t(notice)}</span>}
     <button className="flex items-center gap-1 rounded-lg bg-[#0AACA5] px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-teal-400"
       onClick={() => { setNotice(''); setOpen(true); }}><Plus size={16} />{t('authoring.add')}</button>
-    {open && <AddObjectModal refId={context.ref_id} onClose={() => setOpen(false)} onRefresh={onRefresh}
+    {open && <AddObjectModal refId={context.ref_id} editorUrl={editorUrl} onClose={() => setOpen(false)} onRefresh={onRefresh}
       onComplete={key => { setNotice(key); setOpen(false); onRefresh(); }} />}
   </>;
 }
 
-function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
-  refId: string; onClose: () => void; onComplete: (key: CompletionKey) => void; onRefresh: () => void;
+function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
+  refId: string; onClose: () => void; onComplete: (key: CompletionKey) => void; onRefresh: () => void; editorUrl?: string;
 }) {
   useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -36,6 +36,7 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
   const [context, setContext] = useState<AuthoringContext | null>(null);
   const [step, setStep] = useState<'catalogue' | 'fold' | 'file'>('catalogue');
   const [search, setSearch] = useState('');
+  const [category, setCategory] = useState<'materials' | 'page'>('materials');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [templates, setTemplates] = useState<FileLicense[] | null>(null);
@@ -139,6 +140,19 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
       {(uncertain || hasFailedUploads) && <a className="block text-teal-700 dark:text-teal-300 underline" target="_blank" rel="noreferrer"
         href={`https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&ref_id=${encodeURIComponent(refId)}`}>{t('authoring.open_ilias')}</a>}
       {step === 'catalogue' ? <>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t('management.content_kind')}>
+          <button className={`${buttonClass} ${category === 'materials' ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40' : ''}`} aria-pressed={category === 'materials'} onClick={() => setCategory('materials')}>{t('management.materials')}</button>
+          <button className={`${buttonClass} ${category === 'page' ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40' : ''}`} aria-pressed={category === 'page'} onClick={() => setCategory('page')}>{t('management.page_elements')}</button>
+        </div>
+        {category === 'page' ? <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-300">{t('management.page_explanation')}</p>
+          <ul className="grid gap-2 text-sm sm:grid-cols-2">
+            {(['text', 'media', 'tables', 'sections', 'accordions', 'columns', 'resources', 'code', 'lists', 'maps', 'interactive', 'snippets'] as const).map(type =>
+              <li key={type} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">{t(`management.elements.${type}`)}</li>)}
+          </ul>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{t('management.editor_handoff')}</p>
+          {editorUrl ? <a href={editorUrl} target="_blank" rel="noreferrer" className="inline-flex rounded-lg bg-[#0AACA5] px-4 py-2 text-sm font-semibold text-slate-950">{t('management.open_editor')}</a> : <p className="text-sm text-slate-500 dark:text-slate-400">{t('management.editor_unavailable')}</p>}
+        </div> : <>
         <label className="block">{t('authoring.search')}<input autoFocus className={fieldClass} value={search} onChange={e => setSearch(e.target.value)} /></label>
         {objectCategories.map(category => {
           const types = category.types.filter(type => t(`objects.${type}`).toLocaleLowerCase().includes(search.toLocaleLowerCase()));
@@ -159,6 +173,7 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
           </section>;
         })}
         {!objectCategories.some(category => category.types.some(type => t(`objects.${type}`).toLocaleLowerCase().includes(search.toLocaleLowerCase()))) && <p>{t('authoring.empty')}</p>}
+        </>}
       </> : <form id="object-creation-form" onSubmit={event => { event.preventDefault(); void save(); }} className="space-y-4">
         <fieldset disabled={busy || uncertain} className="min-w-0 space-y-4">
           {step === 'fold' ? <>
