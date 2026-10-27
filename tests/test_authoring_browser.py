@@ -126,9 +126,10 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
             page.wait_for_function('window.testUploadRequests.length === 3')
             # Drive real XHR upload event handlers deterministically while responses wait.
             page.evaluate("window.testUploadRequests[0].upload.dispatchEvent(new ProgressEvent('progress', { lengthComputable: true, loaded: 25, total: 100 }))")
-            first_progress = dialog.get_by_role('progressbar', name=tr('authoring.file_progress').replace('{name}', 'first.pdf'))
-            playwright.expect(first_progress).to_have_attribute('aria-valuenow', '25')
-            playwright.expect(first_progress).to_have_attribute('aria-valuetext', tr('authoring.transferring') + ' 25%')
+            first_progress = dialog.get_by_role('status', name=tr('authoring.file_progress').replace('{name}', 'first.pdf'))
+            playwright.expect(first_progress).to_have_text(tr('authoring.transferring'))
+            playwright.expect(first_progress.locator('svg')).to_be_visible()
+            playwright.expect(dialog.get_by_text('25%', exact=True)).to_have_count(0)
             page.evaluate("window.testUploadRequests.forEach(xhr => xhr.upload.dispatchEvent(new ProgressEvent('load')))")
             playwright.expect(dialog.get_by_text(tr('authoring.processing'), exact=True)).to_have_count(3)
             assert first_progress.get_attribute('aria-valuenow') is None
@@ -136,7 +137,7 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
             playwright.expect(dialog.get_by_text(tr('authoring.queue_saved').replace('{saved}', '0').replace('{total}', '4'), exact=True)).to_be_visible()
             # Reduced motion leaves a static activity indicator, while preserving status.
             page.emulate_media(reduced_motion='reduce')
-            assert first_progress.locator('.upload-progress-processing').evaluate("e => getComputedStyle(e).animationName") == 'none'
+            assert first_progress.locator('svg').evaluate("e => getComputedStyle(e).animationName") == 'none'
             page.emulate_media(reduced_motion='no-preference')
             Path('.pytest_cache').mkdir(exist_ok=True)
             dialog.screenshot(path=f'.pytest_cache/upload-progress-{language}.png')

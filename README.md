@@ -54,7 +54,7 @@ A modern, high-performance REST API bridge, scraper engine, and React 19 web app
   * The searchable Add Object dialog lists all 30 native object types in six categories. Folder and file creation are enabled where ILIAS permits them; remaining types are marked as coming soon.
   * Folder creation supports title, description and the native folder templates (Default or Hidden folder where offered).
   * Localized file selection and drag-and-drop provide a queue, per-file upload progress and short explanations for license choices. Up to three files upload concurrently through the native temporary-upload and metadata-save flow.
-  * Gradient progress bars show the measured file transfer, then switch to an activity indicator while ILIAS saves and verifies the upload. Only confirmed saves count toward the completed-file total.
+  * Circular activity indicators accompany transfer and ILIAS saving/verification status, without percentages. Only confirmed saves count toward the completed-file total.
   * Saves are confirmed against a fresh container listing, including ILIAS file titles that omit the extension. An uncertain outcome is shown for the affected file while the remaining uploads continue; successful files remain marked as saved.
 
 * **TA Grading Automation & Correction Mode:**

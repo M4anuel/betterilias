@@ -173,6 +173,8 @@ build validation, and English fallback for partial languages.
 
 ## Completed
 
+- [x] Simplify file upload activity to circular spinners with transfer/saving labels, removing bars and percentages while retaining confirmed-file counts and reduced-motion support.
+
 - [x] Replace native upload bars with gradient progress tracks, distinguish measured transfer from indeterminate ILIAS saving/verification, respect reduced motion, and count only confirmed files as saved.
 
 - [x] Keep license dropdown choices compact and show the selected explanation underneath in smaller, muted text.

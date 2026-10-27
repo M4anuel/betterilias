@@ -199,7 +199,6 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
                   </div>
                 </li>;
               })}</ul>
-              {busy && <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{t('authoring.progress_hint')}</p>}
             </div>}
             <label className="block">{t('authoring.license')}<select required disabled={!licenses} aria-describedby="file-license-description" className={`${fieldClass} text-sm`} value={license} onChange={e => setLicense(e.target.value)}>
               {licenses?.map(option => {

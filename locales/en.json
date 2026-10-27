@@ -1002,7 +1002,6 @@
   "authoring.queue_saved": "{saved} of {total} saved",
   "authoring.transferring": "Transferring file…",
   "authoring.processing": "Saving and verifying in ILIAS…",
-  "authoring.progress_hint": "The percentage measures file transfer. Saving and verification in ILIAS finish afterwards.",
   "authoring.change_object": "Choose another object",
   "authoring.browse_files": "Choose files",
   "authoring.drop_files": "Drop files here or choose them from your computer.",
