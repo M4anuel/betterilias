@@ -125,24 +125,41 @@ def _clean_rich_html(raw_html: str, container_ref_id: str = "") -> str:
             </div>'''
                 ocpc.replace_with(BeautifulSoup(card_html, 'html.parser').div)
 
-        # Check remaining iframes
-        for ifr in soup.find_all("iframe"):
-            src = ifr.get("src", "")
+        # Check iframes, embed, and object tags
+        for el in soup.find_all(["iframe", "embed", "object"]):
+            src = el.get("src") or el.get("data") or ""
             if ".pdf" in src.lower():
-                if not src.startswith("http") and src.startswith("/"):
-                    ifr["src"] = f"https://ilias.unibe.ch{src}"
-                ifr_classes = ifr.get("class", [])
-                if "pdf-embed" not in ifr_classes:
-                    ifr["class"] = ifr_classes + ["pdf-embed"]
-            elif not src.startswith("http"):
+                if not src.startswith("http"):
+                    if src.startswith("/"):
+                        src = f"https://ilias.unibe.ch{src}"
+                    else:
+                        src = f"https://ilias.unibe.ch/{src}"
+
+                pdf_params = "toolbar=0&navpanes=0&scrollbar=0&pagemode=none&view=FitH"
+                if "#" not in src:
+                    src = f"{src}#{pdf_params}"
+                elif "toolbar=" not in src:
+                    src = f"{src}&{pdf_params}"
+
+                if el.name == "object":
+                    el["data"] = src
+                else:
+                    el["src"] = src
+
+                el_classes = el.get("class", [])
+                if isinstance(el_classes, str):
+                    el_classes = el_classes.split()
+                if "pdf-embed" not in el_classes:
+                    el["class"] = el_classes + ["pdf-embed"]
+            elif el.name == "iframe" and not src.startswith("http"):
                 if src.startswith("/"):
-                    ifr["src"] = f"https://ilias.unibe.ch{src}"
+                    el["src"] = f"https://ilias.unibe.ch{src}"
                 else:
                     fb_html = '''<div class="p-4 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 text-xs">
   <span>Eingebetteter Inhalt (ILIAS)</span>
   <a href="https://ilias.unibe.ch" target="_blank" rel="noreferrer" class="text-sky-600 font-bold hover:underline">In ILIAS öffnen →</a>
 </div>'''
-                    ifr.replace_with(BeautifulSoup(fb_html, "html.parser").div)
+                    el.replace_with(BeautifulSoup(fb_html, "html.parser").div)
 
         # Wrap tables in responsive scroll wrapper
         for tbl in soup.find_all("table"):

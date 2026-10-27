@@ -30,7 +30,7 @@ build validation, and English fallback for partial languages.
   - [x] Multi-column layouts (2-column flex rows rendered side-by-side).
   - [x] Section divider titles and accent colors (#d81e5b / #fb7185) preserved sequentially without merging.
   - [x] Embedded Opencast video playback directly in BetterIlias with fallback link to exact ILIAS folder.
-  - [x] Full-height PDF embed containers.
+  - [x] Clean, responsive PDF embed containers fitting width without viewer chrome or empty void margins.
   - [x] Responsive table wrappers and optimal reading measure (~68ch max width for prose).
 - [ ] Continue preserving custom lecturer layouts and edge cases.
 
