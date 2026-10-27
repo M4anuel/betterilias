@@ -19,6 +19,12 @@ export interface CourseItem {
   faculty?: string;
 }
 
+export interface SidebarOrderItem {
+  id: string;
+  type: 'course' | 'section';
+  title?: string;
+}
+
 export interface DashboardResponse {
   courses: CourseItem[];
   fetched_at: string;

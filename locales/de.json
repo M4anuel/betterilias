@@ -1171,6 +1171,15 @@
   "Erfolgreich gespeichert — wird aus der Liste gefiltert": "Erfolgreich gespeichert — wird aus der Liste gefiltert",
   "Einreichung": "Einreichung",
   "Bewertung gespeichert:": "Bewertung gespeichert:",
-  "media.open_pdf": "PDF in neuem Tab ?ffnen",
-  "media.scroll_table": "Scrollbare Tabelle"
+  "media.open_pdf": "PDF in neuem Tab öffnen",
+  "media.scroll_table": "Scrollbare Tabelle",
+  "Automatische Synchronisation:": "Automatische Synchronisation:",
+  "Abschnitt hinzufügen": "Abschnitt hinzufügen",
+  "Abschnittsname": "Abschnittsname",
+  "Hilfsassistenz (TA)": "Hilfsassistenz (TA)",
+  "+ TA (Teaching Assistant)": "+ TA (Teaching Assistant)",
+  "Auf Fachbereiche zurücksetzen": "Auf Fachbereiche zurücksetzen",
+  "Reihenfolge & Abschnitte anpassen": "Reihenfolge & Abschnitte anpassen",
+  "Abschnitt entfernen": "Abschnitt entfernen",
+  "Sonstige": "Sonstige"
 }

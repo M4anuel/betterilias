@@ -94,8 +94,8 @@ python start.py --help  # or verify python start.py syntax
 
 ### 3.6 Mobile Usability
 * Treat phones and tablets as supported devices for every new or changed workflow, including TA and course-management tools.
-* Check 320?430 CSS px portrait widths, tablet widths and short landscape viewports. Prevent page-wide horizontal overflow; keep wide tables, code and media in labelled, keyboard-accessible scrolling regions.
-* Keep navigation, course context, search and secondary actions accessible by tap without hover. Aim for 44?44 CSS px touch targets, clear focus states and accessible names; offer tap controls alongside drag-and-drop.
+* Check 320-430 CSS px portrait widths, tablet widths and short landscape viewports. Prevent page-wide horizontal overflow; keep wide tables, code and media in labelled, keyboard-accessible scrolling regions.
+* Keep navigation, course context, search and secondary actions accessible by tap without hover. Aim for 44 x 44 CSS px touch targets, clear focus states and accessible names; offer tap controls alongside drag-and-drop.
 * Fit dialogs, menus and primary actions to the visible viewport and safe areas. Account for the on-screen keyboard and Safari input zoom; preserve mounted form drafts across resizing and rotation. Reuse shared viewport/overlay styles and maintain focus/escape behavior.
 * Support native phone file pickers, upload feedback/retry and usable PDF/video fallback links. Preserve lecturer content while adapting its layout.
 * Verify German/English and light/dark modes. Add focused browser regressions for changed mobile workflows; record which checks use emulation and which use real iOS Safari/Android Chrome. Do not claim physical-device or live ILIAS validation from mocked tests.

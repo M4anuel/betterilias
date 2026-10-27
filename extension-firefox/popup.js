@@ -3,14 +3,20 @@ const { t, languages, getLanguage, setLanguage } = BetterIliasI18n;
 document.addEventListener('DOMContentLoaded', async () => {
   const byId = id => document.getElementById(id);
   const badge = byId('ilias-status-badge'), subtitle = byId('ilias-status-sub');
+  const autoSyncBadge = byId('auto-sync-badge');
   const feedback = byId('feedback-box'), sync = byId('sync-btn'), language = byId('language');
   let syncing = false;
   try {
-    const stored = await browserAPI.storage.local.get(['serverUrl', 'frontendUrl', 'language']);
+    const stored = await browserAPI.storage.local.get(['serverUrl', 'frontendUrl', 'language', 'autoSyncEnabled']);
     for (const [key, id] of [['serverUrl', 'server-url'], ['frontendUrl', 'frontend-url']]) {
       if (stored[key]) byId(id).value = stored[key];
     }
     if (stored.language) setLanguage(stored.language);
+    if (autoSyncBadge) {
+      const isAuto = stored.autoSyncEnabled !== false;
+      autoSyncBadge.textContent = isAuto ? t('Aktiv') : t('Deaktivieren');
+      autoSyncBadge.className = `status-badge ${isAuto ? 'badge-success' : 'badge-warning'}`;
+    }
   } catch (error) { console.warn('Could not load settings:', error); }
   const serverUrl = () => (byId('server-url').value || 'http://localhost:8000').replace(/\/+$/, '');
   const frontendUrl = () => (byId('frontend-url').value || 'http://localhost:5173').replace(/\/+$/, '');
@@ -94,7 +100,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!data.success || !data.authenticated) {
         showFeedback(data.message || t('Sitzung konnte auf ILIAS nicht verifiziert werden.'), 'error'); return;
       }
-      await browserAPI.storage.local.set({ sessionId: data.session_id });
+      const shibKey = Object.keys(cookies).find(k => k.startsWith('_shibsession_')) || '';
+      await browserAPI.storage.local.set({
+        sessionId: data.session_id,
+        lastSyncSignature: `${cookies.PHPSESSID}:${cookies[shibKey] || ''}`,
+        lastSyncTime: Date.now(),
+        userName: data.user_name || null,
+      });
+      try {
+        const action = browserAPI.action || browserAPI.browserAction;
+        if (action?.setBadgeText) {
+          action.setBadgeText({ text: '✓' });
+          action.setBadgeBackgroundColor({ color: '#0AACA5' });
+        }
+      } catch (_) {}
       const user = data.user_name || t('Benutzer');
       showFeedback(t('Erfolgreich synchronisiert als "{user}"!', { user }));
       badge.textContent = t('Synchronisiert'); badge.className = 'status-badge badge-success';

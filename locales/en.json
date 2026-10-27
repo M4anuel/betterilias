@@ -1172,5 +1172,14 @@
   "Einreichung": "Submission",
   "Bewertung gespeichert:": "Grade saved:",
   "media.open_pdf": "Open PDF in a new tab",
-  "media.scroll_table": "Scrollable table"
+  "media.scroll_table": "Scrollable table",
+  "Automatische Synchronisation:": "Automatic synchronisation:",
+  "Abschnitt hinzufügen": "Add section",
+  "Abschnittsname": "Section name",
+  "Hilfsassistenz (TA)": "Teaching Assistant (TA)",
+  "+ TA (Teaching Assistant)": "+ TA (Teaching Assistant)",
+  "Auf Fachbereiche zurücksetzen": "Reset to default subjects",
+  "Reihenfolge & Abschnitte anpassen": "Customize order & sections",
+  "Abschnitt entfernen": "Remove section",
+  "Sonstige": "Other"
 }
