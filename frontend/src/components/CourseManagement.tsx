@@ -31,13 +31,31 @@ export function CourseManagement({ context, title, courseRefId, onRefresh, onOpe
   const refId = context.ref_id;
   const load = useCallback(async () => {
     const response = await api.getManagement(refId);
+    cache.setCachedManagement(refId, response);
     setData(response); setOrder(response.order); setSelected([]); setUncertain(false);
   }, [refId]);
   useEffect(() => {
     let active = true;
+    const cached = cache.getCachedManagement(refId);
+    if (cached) {
+      setData(cached);
+      setOrder(cached.order);
+      setLoading(false);
+    }
+    const isSaverFresh = cache.isIliasSaverFresh(`ilias_management_${refId}`);
+    if (cached && isSaverFresh) {
+      return;
+    }
     api.getManagement(refId).then(response => {
-      if (active) { setData(response); setOrder(response.order); }
-    }).catch(e => { if (active) setError(e instanceof Error ? e.message : t('management.load_failed')); })
+      if (active) {
+        cache.setCachedManagement(refId, response);
+        setData(response);
+        setOrder(prev => {
+          const isDirty = cached && JSON.stringify(prev) !== JSON.stringify(cached.order);
+          return isDirty ? prev : response.order;
+        });
+      }
+    }).catch(e => { if (active && !cached) setError(e instanceof Error ? e.message : t('management.load_failed')); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [refId]);

@@ -9,6 +9,8 @@ import {
   RepositoryLocation,
   RepositoryResponse,
   SidebarOrderItem,
+  ManagementResponse,
+  TAAssignmentListResponse,
 } from '../types';
 import { getDefaultCourseIcon } from './courseIcons';
 import { getCurrentSemester } from './semesterUtils';
@@ -55,6 +57,8 @@ export const EXERCISE_SUBMISSIONS_PREFIX = 'ilias_exercise_submissions_';
 export const EXERCISE_INFO_PREFIX = 'ilias_exercise_info_';
 export const STUDENT_ASSIGNMENT_PREFIX = 'ilias_student_assignment_';
 export const CACHE_TS_PREFIX = 'ilias_ts_';
+export const MANAGEMENT_CACHE_PREFIX = 'ilias_management_';
+export const TA_ASSIGNMENTS_CACHE_PREFIX = 'ilias_ta_assignments_';
 export const ILIAS_SAVER_ENABLED_KEY = 'betterilias_saver_enabled';
 export const ILIAS_SAVER_TTL_KEY = 'betterilias_saver_ttl';
 const SESSION_ID_KEY = 'betterilias_session_id';
@@ -86,7 +90,7 @@ export const cache = {
   clearSessionContent() {
     try {
       const prefixes = ['ilias_materials_cache_', 'ilias_semester_cache_', 'ilias_podcast_cache_', CACHE_TS_PREFIX,
-        EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX, EXERCISE_INFO_PREFIX, STUDENT_ASSIGNMENT_PREFIX, 'ilias_repository_'];
+        EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX, EXERCISE_INFO_PREFIX, STUDENT_ASSIGNMENT_PREFIX, 'ilias_repository_', MANAGEMENT_CACHE_PREFIX, TA_ASSIGNMENTS_CACHE_PREFIX];
       for (const key of Object.keys(localStorage)) {
         if (prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
       }
@@ -801,6 +805,60 @@ export const cache = {
     } catch (e) {
       console.warn('Storage quota exceeded for student assignment cache', e);
     }
+  },
+
+  // --- Course Management Cache ---
+  getCachedManagement(refId: string): ManagementResponse | null {
+    try {
+      const raw = localStorage.getItem(`${MANAGEMENT_CACHE_PREFIX}${refId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedManagement(refId: string, data: ManagementResponse) {
+    try {
+      const key = `${MANAGEMENT_CACHE_PREFIX}${refId}`;
+      localStorage.setItem(key, JSON.stringify(data));
+      this.setCacheTimestamp(key);
+    } catch (e) {
+      console.warn('Storage quota exceeded for management cache', e);
+    }
+  },
+
+  invalidateCachedManagement(refId: string) {
+    try {
+      localStorage.removeItem(`${MANAGEMENT_CACHE_PREFIX}${refId}`);
+      localStorage.removeItem(`${CACHE_TS_PREFIX}${MANAGEMENT_CACHE_PREFIX}${refId}`);
+    } catch {}
+  },
+
+  // --- TA Assignments List Cache ---
+  getCachedTAAssignments(exerciseRefId: string): TAAssignmentListResponse | null {
+    try {
+      const raw = localStorage.getItem(`${TA_ASSIGNMENTS_CACHE_PREFIX}${exerciseRefId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedTAAssignments(exerciseRefId: string, data: TAAssignmentListResponse) {
+    try {
+      const key = `${TA_ASSIGNMENTS_CACHE_PREFIX}${exerciseRefId}`;
+      localStorage.setItem(key, JSON.stringify(data));
+      this.setCacheTimestamp(key);
+    } catch (e) {
+      console.warn('Storage quota exceeded for TA assignments cache', e);
+    }
+  },
+
+  invalidateCachedTAAssignments(exerciseRefId: string) {
+    try {
+      localStorage.removeItem(`${TA_ASSIGNMENTS_CACHE_PREFIX}${exerciseRefId}`);
+      localStorage.removeItem(`${CACHE_TS_PREFIX}${TA_ASSIGNMENTS_CACHE_PREFIX}${exerciseRefId}`);
+    } catch {}
   },
 };
 
