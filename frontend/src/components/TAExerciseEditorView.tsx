@@ -45,6 +45,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   onSaved,
 }) => {
   const language = useLanguage();
+  const [savedResult, setSavedResult] = useState<{ id: string; created: boolean; title: string } | null>(null);
   const [currentAssId, setCurrentAssId] = useState<string | null>(assId);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -294,7 +295,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       setSuccessMsg(t("Übung erfolgreich gespeichert."));
       setTimeout(() => setSuccessMsg(null), 3000);
       if (newAssId) {
-        onSaved(newAssId, { created: !assId, title: title.trim() });
+        setSavedResult({ id: newAssId, created: !assId, title: title.trim() });
       }
     } catch (err: any) {
       setError(err?.message || t("Fehler beim Speichern der Übung"));
@@ -404,6 +405,14 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
     isPending: isSaving || isUploadingFile || Boolean(isDeletingFileId),
     message: t("Sie haben ungespeicherte Änderungen. Möchten Sie die Seite wirklich verlassen und Ihre Änderungen verwerfen?"),
   });
+
+  // Navigate only after React has committed the clean draft and finished saving.
+  // Otherwise the navigation guard can reject a successful save on slower devices.
+  useEffect(() => {
+    if (!savedResult || isSaving || isUploadingFile || isDirty) return;
+    setSavedResult(null);
+    onSaved(savedResult.id, { created: savedResult.created, title: savedResult.title });
+  }, [savedResult, isSaving, isUploadingFile, isDirty, onSaved]);
 
   const handleSafeBack = () => {
     if (navigationGuard.confirmNavigation()) {
