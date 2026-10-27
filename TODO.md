@@ -4,6 +4,32 @@ Unfinished work only. Current behavior and limitations are recorded in the
 [support inventory](docs/ILIAS_SUPPORT_MATRIX.md). Design details belong in the
 linked feature plans; completed changes remain in Git history.
 
+## Mobile usability
+
+Goal: complete everyday student and supported TA workflows comfortably on a
+phone, including portrait/landscape use and the on-screen keyboard.
+
+- [ ] Audit core screens at 320–430 CSS px and tablet widths; remove page-wide
+  horizontal overflow while allowing contained scrolling for wide tables/media.
+- [ ] Adapt the header, sidebar, breadcrumbs, search and settings for narrow
+  screens; keep navigation and current-course context accessible without hover.
+- [ ] Make dialogs, drawers and menus fit the visible viewport, including safe
+  areas and the on-screen keyboard; keep focused inputs and primary actions
+  reachable and preserve drafts when rotating or resizing.
+- [ ] Provide comfortably spaced touch targets (aim for at least 44×44 CSS px),
+  visible focus states and tap-accessible explanations/actions currently exposed
+  through hover. Retain keyboard and screen-reader access.
+- [ ] Adapt course blocks, session cards, PDFs and video layouts to small screens;
+  preserve readable lecturer content and provide usable media fallback actions.
+- [ ] Support phone file selection, upload status/retry and submission management;
+  provide tap controls for ordering wherever drag-and-drop is offered.
+- [ ] Adapt TA grading, assignment editors and course-management selection/review
+  flows so fields, feedback and destructive confirmations remain usable on phones.
+- [ ] Validate login/session sharing, browsing/search, student submission and
+  supported TA/management flows in German/English and light/dark mode. Add focused
+  mobile browser regressions and check representative iOS Safari/Android Chrome
+  behavior, including keyboard, scrolling, rotation and media playback.
+
 ## Course and folder management
 
 Design: [unified management plan](docs/UNIFIED_MANAGEMENT_PLAN.md).
