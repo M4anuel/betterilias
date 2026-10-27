@@ -4,7 +4,12 @@ The current feature-by-feature record is the
 [ILIAS support inventory](ILIAS_SUPPORT_MATRIX.md), covering both repository
 objects and page elements.
 
-## Refined implementation brief
+This document owns the management design and native-protocol findings. Open
+implementation tasks live in [TODO](../TODO.md); exact API schemas come from the
+running backend's `/docs`. It incorporates the useful material from the retired
+`COURSE_MANAGEMENT_SPECIFICATION.md`, without its superseded UI/API proposals.
+
+## Design goals
 
 Build one permission-aware **Manage this page** mode for the current course or
 folder. Start with user goals: provide material, explain it, organize it, and
@@ -80,6 +85,48 @@ Native behavior was cross-checked against ILIAS release 10 source:
 and [container ordering/page editing](https://github.com/ILIAS-eLearning/ILIAS/blob/release_10/components/ILIAS/Container/classes/class.ilContainerGUI.php).
 These establish the protocol, but runtime URLs, CSRF tokens, commands and input
 names must always come from the active user's pages.
+
+### Creation-form findings
+
+The saved folder form uses `form/input_0/input_1` for title,
+`form/input_0/input_2` for description, and `form/input_3` for a template choice.
+The observed templates are **Default** (`dtpl_0`) and **Hidden folder**
+(`dtpl_5`); the latter is not a columns setting. Read available templates and
+the selected default from the fresh form rather than fixing these values in
+the client. Personal display choices are separate from repository templates.
+
+The saved file form uses a temporary `ilObjFileUploadHandlerGUI` upload, followed
+by a metadata save containing the returned `file_id`, parallel
+title/description/resource-ID fields and the selected license. A successful
+temporary upload alone does not prove repository creation. Confirm a new
+reference in the parent listing, accounting for display titles that omit file
+extensions and full filenames available in action menus. Files have independent
+outcomes; an uncertain save must not stall the remaining queue or be replayed.
+
+Creation support and native permission are separate: the catalogue can describe
+all 30 types, while only implemented adapters permitted by the live container
+are enabled. Native URLs, tokens and hidden form fields stay on the server.
+
+## Future adapters
+
+These are design requirements, not implemented controls. Capture fresh native
+forms and establish verification before adding each operation.
+
+| User goal | Intended workflow and acceptance boundary |
+| --- | --- |
+| Create an exercise | Create the exercise repository container, then open the existing BetterIlias assignment editor; assignment creation alone does not create a container. |
+| Add a weblink or item group | Extend the common Add content catalogue with a native creation adapter and verified parent refresh. |
+| Rename or describe an object | Offer title/description editing from management, preserving unrelated settings from the native edit form. |
+| Move, copy or reference existing material | Select objects and a permitted destination in a folder picker. Follow the native cut/copy/link and paste workflow; distinguish creating another reference from copying the resource. Verify source and destination and report partial outcomes. |
+| Keep a folder's contents before deleting it | Optional evacuation moves children to the parent, verifies every move and rechecks the emptied folder. Stop on partial/uncertain moves; never proceed automatically to deletion. |
+| Download selected material | Use a native advertised batch-download/ZIP action; do not assume every object type supports it. |
+| Recover deleted objects | Offer trash inspection/restore only where the current installation and permissions expose it. Never promise recoverability. |
+| Compose a page | Implement text/media/table/layout adapters through the same goal-based Add content entry. Capture actual COPage submissions; separate placement/removal of an element from creation/deletion of its referenced repository resource. |
+
+Destination pickers and destructive reviews must account for pagination,
+unsupported container types and incomplete trees. A partial listing is not
+evidence that a folder is empty. Future controls retain localized hints, keyboard
+access, dark mode, navigation guards and current-container scope.
 
 ## Deletion safeguards
 
