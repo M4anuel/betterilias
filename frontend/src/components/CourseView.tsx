@@ -127,7 +127,7 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
       if (tag.toLowerCase() === 'embed') {
         return `<embed class="${combinedClass}" src="${fullSrc}" ${cleanedAttrs.trim()} />`;
       }
-      return `<iframe class="${combinedClass}" src="${fullSrc}" ${cleanedAttrs.trim()}>${inner}</iframe>`;
+      return `<iframe class="${combinedClass}" src="${fullSrc}" frameborder="0" ${cleanedAttrs.trim()}>${inner}</iframe>`;
     }
   );
 
@@ -135,7 +135,7 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
     /<object(\s+[^>]*?)data=["']([^"']*\.pdf[^"']*)["']([^>]*)>([\s\S]*?)<\/object>/gi,
     (_match, _preAttrs, src) => {
       const fullSrc = formatPdfUrl(src);
-      return `<iframe class="pdf-embed" src="${fullSrc}"></iframe>`;
+      return `<iframe class="pdf-embed" src="${fullSrc}" frameborder="0"></iframe>`;
     }
   );
 
