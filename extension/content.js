@@ -44,7 +44,16 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     // Ignore context errors
   }
 
-  // 2. Listen for runtime messages from the extension popup
+  // 2. Ask background service worker to check and auto-sync immediately if logged in
+  try {
+    browserAPI.runtime.sendMessage({ type: 'CHECK_AND_AUTO_SYNC' }, (response) => {
+      if (response && response.sessionId) {
+        applySessionToPage(response.sessionId);
+      }
+    });
+  } catch (_) {}
+
+  // 3. Listen for runtime messages from the extension popup or background worker
   browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message && message.type === 'BETTERILIAS_SESSION_SYNCED' && message.sessionId) {
       try {
@@ -57,7 +66,7 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     return true;
   });
 
-  // 3. Inform web app that the companion extension is installed
+  // 4. Inform web app that the companion extension is installed
   try {
     window.postMessage({ type: 'BETTERILIAS_EXTENSION_INSTALLED', version: '1.0.0' }, '*');
   } catch (_) {}

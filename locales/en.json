@@ -1170,5 +1170,14 @@
   "Filter aufheben": "Clear filter",
   "Erfolgreich gespeichert — wird aus der Liste gefiltert": "Saved successfully — filtering out of list",
   "Einreichung": "Submission",
-  "Bewertung gespeichert:": "Grade saved:"
+  "Bewertung gespeichert:": "Grade saved:",
+  "Automatische Synchronisation:": "Automatic synchronisation:",
+  "Abschnitt hinzufügen": "Add section",
+  "Abschnittsname": "Section name",
+  "Hilfsassistenz (TA)": "Teaching Assistant (TA)",
+  "+ TA (Teaching Assistant)": "+ TA (Teaching Assistant)",
+  "Auf Fachbereiche zurücksetzen": "Reset to default subjects",
+  "Reihenfolge & Abschnitte anpassen": "Customize order & sections",
+  "Abschnitt entfernen": "Remove section",
+  "Sonstige": "Other"
 }

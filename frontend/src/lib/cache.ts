@@ -8,6 +8,7 @@ import {
   BreadcrumbItem,
   RepositoryLocation,
   RepositoryResponse,
+  SidebarOrderItem,
 } from '../types';
 import { getDefaultCourseIcon } from './courseIcons';
 import { getCurrentSemester } from './semesterUtils';
@@ -46,6 +47,7 @@ const SELECTED_SEMESTER_KEY = 'ilias_selected_semester';
 const SEMESTER_START_KEY = 'ilias_semester_start';
 const LAST_OPENED_KEY = 'ilias_last_opened_course';
 const SIDEBAR_COLLAPSED_KEY = 'ilias_sidebar_collapsed';
+const SIDEBAR_ORDER_KEY = 'ilias_sidebar_order';
 export const MATERIALS_CACHE_PREFIX = 'ilias_materials_cache_';
 export const SEMESTER_CACHE_PREFIX = 'ilias_semester_cache_';
 export const EXERCISE_OVERVIEW_PREFIX = 'ilias_exercise_overview_';
@@ -395,6 +397,41 @@ export const cache = {
       localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? 'true' : 'false');
     } catch (e) {
       console.error('Failed to save sidebar state', e);
+    }
+  },
+
+  // --- Sidebar Custom Order & Sections ---
+  getSidebarOrder(): SidebarOrderItem[] | null {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_ORDER_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  setSidebarOrder(order: SidebarOrderItem[] | null) {
+    try {
+      if (order && order.length > 0) {
+        localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(order));
+      } else {
+        localStorage.removeItem(SIDEBAR_ORDER_KEY);
+      }
+    } catch (e) {
+      console.error('Failed to save sidebar order', e);
+    }
+  },
+
+  clearSidebarOrder() {
+    try {
+      localStorage.removeItem(SIDEBAR_ORDER_KEY);
+    } catch (e) {
+      console.error('Failed to clear sidebar order', e);
     }
   },
 
