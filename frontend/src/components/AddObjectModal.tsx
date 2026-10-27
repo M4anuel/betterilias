@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { FileText, FolderPlus, Layers, Plus, Upload, X } from 'lucide-react';
+import { Check, CircleAlert, FileText, FolderPlus, Layers, Plus, Upload, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { t, useLanguage } from '../lib/i18n';
 import { objectCategories, supportedCreationTypes } from '../lib/iliasObjects';
 import { useNavigationGuard } from '../lib/navigationGuard';
 import { describeFileLicense } from '../lib/fileLicenses';
+import { FileUploadProgress, type FileUploadState } from './FileUploadProgress';
 import type { AuthoringContext, FileLicense } from '../types';
 
-type QueueItem = { id: number; file: File; status: 'pending' | 'saving' | 'saved' | 'failed'; progress: number; error?: string };
+type QueueItem = { id: number; file: File; status: FileUploadState; progress: number; error?: string };
 type CompletionKey = 'authoring.created' | 'authoring.files_saved';
 const fieldClass = 'w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-2 text-slate-900 dark:text-slate-100';
 const buttonClass = 'rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 disabled:opacity-50';
@@ -175,14 +176,31 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh }: {
               <input ref={fileInput} type="file" multiple hidden aria-label={t('authoring.browse_files')} onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('authoring.select_limit')}</p>
-            <ul className="space-y-2">{queue.map(item => <li key={item.id} className="rounded-lg bg-slate-100 dark:bg-slate-800 p-3">
-              <div className="flex items-center justify-between gap-2"><span className="min-w-0 break-all text-sm">{item.file.name} · {(item.file.size / 1_000_000).toFixed(1)} MB</span>
-                {item.status === 'pending' && <button type="button" className={buttonClass} aria-label={t('authoring.remove', { name: item.file.name })}
-                  onClick={() => setQueue(previous => previous.filter(other => other.id !== item.id))}><X size={14} /></button>}</div>
-              <p role="status" className="text-xs">{t(`authoring.${item.status}`)}</p>
-              {item.error && <p className="mt-1 text-xs text-rose-700 dark:text-rose-300">{item.error}</p>}
-              {item.status === 'saving' && <progress className="w-full accent-teal-600" max={100} value={item.progress} aria-label={t('authoring.file_progress', { name: item.file.name })} />}
-            </li>)}</ul>
+            {queue.length > 0 && <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="font-medium text-slate-700 dark:text-slate-200">{t('authoring.queue')}</span>
+                <span role="status" className="tabular-nums text-slate-500 dark:text-slate-400">{t('authoring.queue_saved', { saved: queue.filter(item => item.status === 'saved').length, total: queue.length })}</span>
+              </div>
+              <ul className="space-y-2">{queue.map(item => {
+                const Icon = item.status === 'saved' ? Check : item.status === 'failed' ? CircleAlert : FileText;
+                return <li key={item.id} className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs dark:border-slate-700/80 dark:bg-slate-800/50">
+                  <div className="flex items-start gap-3">
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.status === 'failed' ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300' : 'bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300'}`}><Icon aria-hidden="true" size={16} /></span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span title={item.file.name} className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{item.file.name}</span>
+                        <span className="shrink-0 text-[11px] tabular-nums text-slate-400 dark:text-slate-500">{(item.file.size / 1_000_000).toFixed(1)} MB</span>
+                        {item.status === 'pending' && <button type="button" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-100" aria-label={t('authoring.remove', { name: item.file.name })}
+                          onClick={() => setQueue(previous => previous.filter(other => other.id !== item.id))}><X size={14} /></button>}
+                      </div>
+                      <FileUploadProgress filename={item.file.name} status={item.status} progress={item.progress} />
+                      {item.error && <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{item.error}</p>}
+                    </div>
+                  </div>
+                </li>;
+              })}</ul>
+              {busy && <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{t('authoring.progress_hint')}</p>}
+            </div>}
             <label className="block">{t('authoring.license')}<select required disabled={!licenses} aria-describedby="file-license-description" className={`${fieldClass} text-sm`} value={license} onChange={e => setLicense(e.target.value)}>
               {licenses?.map(option => {
                 const info = describeFileLicense(option);

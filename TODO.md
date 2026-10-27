@@ -173,6 +173,8 @@ build validation, and English fallback for partial languages.
 
 ## Completed
 
+- [x] Replace native upload bars with gradient progress tracks, distinguish measured transfer from indeterminate ILIAS saving/verification, respect reduced motion, and count only confirmed files as saved.
+
 - [x] Keep license dropdown choices compact and show the selected explanation underneath in smaller, muted text.
 
 - [x] Correct upload confirmation for native extensionless file titles, process queued course files concurrently with independent outcomes, localise the file picker, explain license choices, clarify object switching, and show authoring wait hints only on the disabled submit button.

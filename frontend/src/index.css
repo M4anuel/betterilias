@@ -2,6 +2,22 @@
 
 @custom-variant dark (&:is(.dark, .dark *));
 
+@keyframes upload-progress-processing {
+  from { transform: translateX(0); }
+  to { transform: translateX(185%); }
+}
+
+.upload-progress-processing {
+  animation: upload-progress-processing 1.6s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-progress-processing {
+    animation: none;
+    transform: translateX(90%);
+  }
+}
+
 :root {
   --brand-better: #033683;
   --brand-ilias: #0AACA5;

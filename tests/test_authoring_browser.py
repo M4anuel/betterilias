@@ -53,12 +53,8 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
             assert route.request.headers.get('accept-language') == language
             assert route.request.headers.get('x-session-id') == 'test-author-session'
             pending_uploads.append(route)
-            # No response until all three are in flight: a serial queue would stall.
-            if len(pending_uploads) == 3:
-                for index in [2, 1, 0]:
-                    pending_uploads[index].fulfill(status=502 if index == 1 else 200, content_type='application/json',
-                                                  body=json.dumps({'detail': tr('authoring.uncertain')} if index == 1 else dict(success=True, items=[])))
-            elif len(pending_uploads) > 3:
+            # The test releases the first three after checking pending progress.
+            if len(pending_uploads) > 3:
                 route.fulfill(status=200, content_type='application/json', body=json.dumps(dict(success=True, items=[])))
             return
         elif path.endswith('/materials'):
@@ -75,6 +71,14 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.add_init_script(f"localStorage.setItem('betterilias_language', '{language}'); localStorage.setItem('betterilias_session_id', 'test-author-session');")
+            page.add_init_script('''
+                window.testUploadRequests = [];
+                const originalOpen = XMLHttpRequest.prototype.open;
+                XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+                    if (method === 'POST' && url.endsWith('/files')) window.testUploadRequests.push(this);
+                    return originalOpen.call(this, method, url, ...rest);
+                };
+            ''')
             page.route('**/api/**', respond)
             page.goto(base + '/?course=42')
             page.get_by_role('button', name=tr('authoring.add'), exact=True).click()
@@ -119,9 +123,30 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
             assert dialog.evaluate('(element) => element.scrollWidth <= element.clientWidth')
             page.set_viewport_size({'width': 1280, 'height': 900})
             dialog.get_by_role('button', name=tr('authoring.upload'), exact=True).click()
+            page.wait_for_function('window.testUploadRequests.length === 3')
+            # Drive real XHR upload event handlers deterministically while responses wait.
+            page.evaluate("window.testUploadRequests[0].upload.dispatchEvent(new ProgressEvent('progress', { lengthComputable: true, loaded: 25, total: 100 }))")
+            first_progress = dialog.get_by_role('progressbar', name=tr('authoring.file_progress').replace('{name}', 'first.pdf'))
+            playwright.expect(first_progress).to_have_attribute('aria-valuenow', '25')
+            playwright.expect(first_progress).to_have_attribute('aria-valuetext', tr('authoring.transferring') + ' 25%')
+            page.evaluate("window.testUploadRequests.forEach(xhr => xhr.upload.dispatchEvent(new ProgressEvent('load')))")
+            playwright.expect(dialog.get_by_text(tr('authoring.processing'), exact=True)).to_have_count(3)
+            assert first_progress.get_attribute('aria-valuenow') is None
+            playwright.expect(dialog.get_by_text('100%', exact=True)).to_have_count(0)
+            playwright.expect(dialog.get_by_text(tr('authoring.queue_saved').replace('{saved}', '0').replace('{total}', '4'), exact=True)).to_be_visible()
+            # Reduced motion leaves a static activity indicator, while preserving status.
+            page.emulate_media(reduced_motion='reduce')
+            assert first_progress.locator('.upload-progress-processing').evaluate("e => getComputedStyle(e).animationName") == 'none'
+            page.emulate_media(reduced_motion='no-preference')
+            Path('.pytest_cache').mkdir(exist_ok=True)
+            dialog.screenshot(path=f'.pytest_cache/upload-progress-{language}.png')
+            for index in [2, 1, 0]:
+                pending_uploads[index].fulfill(status=502 if index == 1 else 200, content_type='application/json',
+                                              body=json.dumps({'detail': tr('authoring.uncertain')} if index == 1 else dict(success=True, items=[])))
             playwright.expect(dialog.get_by_role('alert')).to_have_text(tr('authoring.uploads_partial'))
             playwright.expect(dialog.get_by_role('button', name=tr('authoring.upload'), exact=True)).to_be_disabled()
             playwright.expect(dialog.get_by_text(tr('authoring.saved'), exact=True)).to_have_count(3)
+            playwright.expect(dialog.get_by_text(tr('authoring.queue_saved').replace('{saved}', '3').replace('{total}', '4'), exact=True)).to_be_visible()
             playwright.expect(dialog.get_by_text(tr('authoring.pending'), exact=True)).to_have_count(0)
             assert len(uploads) == 4
             assert b'first.pdf' in uploads[0] and b'second.pdf' in uploads[1]
