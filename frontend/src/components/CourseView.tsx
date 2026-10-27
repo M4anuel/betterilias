@@ -91,14 +91,58 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
     }
   );
 
-  // Safeguard: Never allow relative iframes to loop into BetterIlias router
+  // Transform and sanitize PDF iframes and embeds: Ensure absolute URL, hide viewer chrome, fit container width
+  const pdfParams = 'toolbar=0&navpanes=0&scrollbar=0&pagemode=none&view=FitH';
+  const formatPdfUrl = (url: string) => {
+    let full = url;
+    if (!full.startsWith('http')) {
+      full = full.startsWith('/') ? `https://ilias.unibe.ch${full}` : `https://ilias.unibe.ch/${full}`;
+    }
+    if (!full.includes('#')) {
+      return `${full}#${pdfParams}`;
+    }
+    if (!full.includes('toolbar=')) {
+      return `${full}&${pdfParams}`;
+    }
+    return full;
+  };
+
+  cleaned = cleaned.replace(
+    /<(iframe|embed)(\s+[^>]*?)src=["']([^"']*\.pdf[^"']*)["']([^>]*)>([\s\S]*?)(?:<\/\1>|(?=\s*<|$))/gi,
+    (_match, tag, preAttrs, src, postAttrs, inner) => {
+      const fullSrc = formatPdfUrl(src);
+      const rawAttrs = `${preAttrs} ${postAttrs}`;
+      let combinedClass = 'pdf-embed';
+      const classMatch = rawAttrs.match(/class=["']([^"']*)["']/i);
+      let cleanedAttrs = rawAttrs;
+      if (classMatch) {
+        if (!classMatch[1].includes('pdf-embed')) {
+          combinedClass = `${classMatch[1]} pdf-embed`.trim();
+        } else {
+          combinedClass = classMatch[1];
+        }
+        cleanedAttrs = cleanedAttrs.replace(/class=["'][^"']*["']/i, '');
+      }
+
+      if (tag.toLowerCase() === 'embed') {
+        return `<embed class="${combinedClass}" src="${fullSrc}" ${cleanedAttrs.trim()} />`;
+      }
+      return `<iframe class="${combinedClass}" src="${fullSrc}" ${cleanedAttrs.trim()}>${inner}</iframe>`;
+    }
+  );
+
+  cleaned = cleaned.replace(
+    /<object(\s+[^>]*?)data=["']([^"']*\.pdf[^"']*)["']([^>]*)>([\s\S]*?)<\/object>/gi,
+    (_match, _preAttrs, src) => {
+      const fullSrc = formatPdfUrl(src);
+      return `<iframe class="pdf-embed" src="${fullSrc}"></iframe>`;
+    }
+  );
+
+  // Safeguard: Never allow remaining relative iframes to loop into BetterIlias router
   cleaned = cleaned.replace(
     /<iframe\s+[^>]*src=["'](\.[^"']+|\/[^"']*)["'][^>]*>[\s\S]*?<\/iframe>/gi,
-    (match, src) => {
-      if (src.toLowerCase().includes('.pdf')) {
-        const absSrc = src.startsWith('/') ? `https://ilias.unibe.ch${src}` : src;
-        return `<iframe class="pdf-embed" src="${absSrc}"></iframe>`;
-      }
+    () => {
       return `<div class="p-4 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 text-xs"><span>${t('embedded.ilias_content')}</span><a href="https://ilias.unibe.ch" target="_blank" rel="noreferrer" class="text-sky-600 font-bold hover:underline">${t('embedded.open_in_ilias')}</a></div>`;
     }
   );

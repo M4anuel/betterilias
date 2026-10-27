@@ -163,4 +163,16 @@ def test_extract_grading_form_real_dump():
     assert form_data.submit_button_name == "cmd[saveStatusAll]"
     assert len(form_data.hidden_fields) >= 5
 
+def test_clean_rich_html_pdf_embeds():
+    from backend.scrapers.materials import _clean_rich_html
 
+    raw = '<div class="ilc_section"><iframe src="/data/course_1/schedule.pdf"></iframe></div>'
+    res = _clean_rich_html(raw)
+    assert 'class="pdf-embed"' in res
+    assert 'https://ilias.unibe.ch/data/course_1/schedule.pdf#toolbar=0&amp;navpanes=0&amp;scrollbar=0&amp;pagemode=none&amp;view=FitH' in res or 'https://ilias.unibe.ch/data/course_1/schedule.pdf#toolbar=0&navpanes=0&scrollbar=0&pagemode=none&view=FitH' in res
+
+    raw2 = '<embed src="https://ilias.unibe.ch/slides.pdf" type="application/pdf">'
+    res2 = _clean_rich_html(raw2)
+    assert 'pdf-embed' in res2
+    assert 'toolbar=0' in res2
+    assert 'view=FitH' in res2
