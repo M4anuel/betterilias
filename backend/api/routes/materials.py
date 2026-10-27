@@ -1,6 +1,7 @@
 from backend.i18n import t
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status, File, Form, UploadFile
 from backend.schemas import AuthoringContext, AuthoringResult, CreateFolderRequest
+from backend.schemas import ManagementResponse, ManageSelection, DeleteReview, DeleteMaterialsRequest, SaveMaterialOrderRequest
 from backend.services.authoring import AuthoringError
 from fastapi.responses import StreamingResponse
 from typing import List, Optional, Literal
@@ -12,6 +13,38 @@ from backend.schemas import RepositoryResponse
 from backend.schemas import MembershipFormResponse, MembershipRequest, MembershipResult
 
 router = APIRouter(tags=["Materials"])
+
+
+@router.get('/materials/{ref_id}/management', response_model=ManagementResponse)
+async def get_management(ref_id: str = Path(pattern=r'^\d+$'), client: IliasClient = Depends(get_ilias_client)):
+    try:
+        return await client.get_management(ref_id)
+    except AuthoringError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@router.post('/materials/{ref_id}/deletion-review', response_model=DeleteReview)
+async def review_deletion(request: ManageSelection, ref_id: str = Path(pattern=r'^\d+$'), client: IliasClient = Depends(get_ilias_client)):
+    try:
+        return await client.review_material_deletion(ref_id, request.item_ids)
+    except AuthoringError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@router.post('/materials/{ref_id}/batch/delete')
+async def delete_materials(request: DeleteMaterialsRequest, ref_id: str = Path(pattern=r'^\d+$'), client: IliasClient = Depends(get_ilias_client)):
+    try:
+        return await client.delete_materials(ref_id, request)
+    except AuthoringError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@router.post('/materials/{ref_id}/order')
+async def save_material_order(request: SaveMaterialOrderRequest, ref_id: str = Path(pattern=r'^\d+$'), client: IliasClient = Depends(get_ilias_client)):
+    try:
+        return await client.save_material_order(ref_id, request)
+    except AuthoringError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
 
 
 @router.get('/materials/{ref_id}/authoring-context', response_model=AuthoringContext)

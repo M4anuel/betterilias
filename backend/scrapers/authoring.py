@@ -26,6 +26,7 @@ def native_url(url: str, ref_id: str) -> str:
 def parse_authoring_context(html_content: str, ref_id: str) -> AuthoringContext:
     soup = BeautifulSoup(html_content, 'lxml')
     creation = {}
+    manage_url = sorting_url = page_editor_url = content_url = None
     can_manage = can_edit_page = False
     for node in soup.select('a[href], button[data-action], .c-toolbar button[onclick]'):
         if node.has_attr('disabled') or node.get('aria-disabled') == 'true':
@@ -38,13 +39,22 @@ def parse_authoring_context(html_content: str, ref_id: str) -> AuthoringContext:
         if query.get('ref_id') != [ref_id]:
             continue
         command = query.get('cmd', [''])[0].lower()
+        if node.find_parent(id='subtab_view_content'):
+            content_url = native_url(url, ref_id)
         if command == 'create' and query.get('new_type'):
             creation[query['new_type'][0]] = native_url(url, ref_id)
         can_manage |= command in ('manage', 'listobjects', 'editorder', 'enableadministrationpanel')
         can_edit_page |= command == 'editpageframe' or 'pageeditor' in query.get('cmdClass', [''])[0].lower()
+        if command in ('manage', 'enableadministrationpanel'):
+            manage_url = native_url(url, ref_id)
+        if command == 'editorder':
+            sorting_url = native_url(url, ref_id)
+        if command == 'editpageframe':
+            page_editor_url = native_url(url, ref_id)
     return AuthoringContext(ref_id=ref_id, can_create=bool(creation),
                             can_manage=can_manage, can_edit_page=can_edit_page,
-                            creatable_types=list(creation), creation_urls=creation)
+                            creatable_types=list(creation), creation_urls=creation,
+                            manage_url=manage_url, sorting_url=sorting_url, page_editor_url=page_editor_url, content_url=content_url)
 
 
 @dataclass
