@@ -28,7 +28,7 @@ def test_mobile_editor_semester_titles_and_grading_cards(local_site, width, lang
                         active_assignment_id='20', available_assignments=[dict(ass_id='20', title='Assignment one', url='#')], submissions=[
                             dict(member_id='1', student_name='Erler, Elisabeth Alexandra', team_id='40214',
                                  team_members=['Erler, Elisabeth Alexandra', 'Wehrli, Julian Yanis'],
-                                 passed_status='not_graded', submission_status='submitted', files=[], download_url='https://example.org/submission.zip')])
+                                 passed_status='not_graded', submission_status='submitted', submission_time='28.10.2026 11:50', files=[], download_url='https://example.org/submission.zip')])
         elif path.endswith('/grade'):
             saved.append(route.request.post_data_json)
             data = dict(success=True)
@@ -73,7 +73,8 @@ def test_mobile_editor_semester_titles_and_grading_cards(local_site, width, lang
         page.goto(local_site + '/?course=42&exercise=200&tab=submissions')
         views = page.get_by_role('combobox', name=tr('mobile.exercise_view'))
         pw.expect(views.locator('option:checked')).to_have_text(tr('mobile.submissions'))
-        assert page.locator('.exercise-view-control > span').evaluate('e => e.scrollWidth <= e.clientWidth + 1')
+        assert views.bounding_box()['width'] >= width - 40
+        assert views.bounding_box()['height'] >= 48
         assert page.get_by_role('heading', name='Exercises', exact=True).bounding_box()['height'] <= 24
         card = page.locator('.submission-card')
         members = card.locator('.submission-member')
@@ -87,7 +88,13 @@ def test_mobile_editor_semester_titles_and_grading_cards(local_site, width, lang
         assert card.locator('.submission-status-options').bounding_box()['height'] <= 52
         info = card.locator('.submission-details')
         assert info.evaluate("""e => { const a=e.getBoundingClientRect(), b=e.querySelector('svg').getBoundingClientRect();
-            return Math.abs((a.left+a.right-b.left-b.right)/2)<1 && Math.abs((a.top+a.bottom-b.top-b.bottom)/2)<1; }""")
+            return Math.abs((a.top+a.bottom-b.top-b.bottom)/2)<1; }""")
+        pw.expect(card.locator('.submission-avatar')).to_be_hidden()
+        team = card.locator('.submission-team-id').bounding_box()
+        timestamp = card.locator('.submission-timestamps').bounding_box()
+        assert team['x'] >= first['x'] + first['width']
+        assert timestamp['y'] >= team['y'] + team['height']
+        assert info.bounding_box()['x'] < card.locator('.submission-download').bounding_box()['x']
         pw.expect(card.locator('.submission-download .phone-only')).to_be_visible()
         card.get_by_role('button', name=tr('Bestanden'), exact=True).click()
         comment = card.get_by_placeholder(tr('Korrektur-Kommentar für Studierende eingeben...'), exact=True)
@@ -99,4 +106,30 @@ def test_mobile_editor_semester_titles_and_grading_cards(local_site, width, lang
             card.get_by_role('button', name=tr('Speichern'), exact=True).click()
         pw.expect(card.get_by_role('button', name=tr('Bestanden'), exact=True)).to_have_attribute('aria-pressed', 'true')
         assert len(saved) == 1 and saved[0]['status'] == 'passed' and saved[0]['feedback'] == 'Clear mobile feedback'
+        browser.close()
+
+
+@pytest.mark.parametrize('width', [768, 1280])
+@pytest.mark.parametrize('language', ['de', 'en'])
+def test_sidebar_editor_keeps_two_rows_on_tablet_and_desktop(local_site, width, language):
+    pw = pytest.importorskip('playwright.sync_api')
+    tr = json.loads((ROOT / 'locales' / f'{language}.json').read_text(encoding='utf8')).__getitem__
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+        page = browser.new_page(viewport=dict(width=width, height=800))
+        page.add_init_script(f"localStorage.setItem('betterilias_language', '{language}');")
+        page.route('**/api/**', mock_api)
+        page.goto(local_site + '/?semester=HS2026')
+        editor_button = page.get_by_role('button', name=tr('Vorlesungen anpassen'), exact=True)
+        if not editor_button.is_visible():
+            page.get_by_role('button', name=tr('Sidebar umschalten'), exact=True).click()
+        editor_button.click()
+        card = page.locator('.sidebar-course-card').first
+        heading = card.locator('.sidebar-course-heading').bounding_box()
+        controls = card.locator('.sidebar-course-controls').bounding_box()
+        field = card.locator('input').bounding_box()
+        assert heading['y'] <= controls['y'] and controls['y'] + controls['height'] <= field['y']
+        assert card.bounding_box()['height'] <= 140
+        assert card.evaluate('e => e.scrollWidth <= e.clientWidth + 1')
+        page.screenshot(path=f'.pytest_cache/sidebar-two-row-{width}-{language}.png')
         browser.close()

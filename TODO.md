@@ -4,6 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Mobile usability
 
+- [x] Restore two-row sidebar editor cards on tablet/desktop; enlarge the phone
+  assignment selector and balance submission header metadata and actions.
+
 - [x] Rebalance sidebar editor typography and stable ordering controls; simplify
   semester list titles/actions and submission-card names/status controls; shorten
   the mobile tutor view label and verify both languages/themes.

@@ -61,20 +61,25 @@ Existing mobile, upload, authoring, membership and TA regressions are also run.
 
 ## Readability follow-up
 
-Sidebar editor cards now give course titles the same readable scale as inputs,
-followed by the editable field and a consistent ordering/reset toolbar. The DOM
-order follows the visual order. Optional reset controls no longer shift the arrows.
+Phone sidebar editor cards give course titles the same readable scale as inputs,
+followed by the editable field and a consistent ordering/reset toolbar. Desktop
+and tablet cards retain two compact rows: title/actions, then editable field.
+The DOM order follows the visual order at each breakpoint, while the draft inputs
+remain mounted. Optional reset controls no longer shift the phone ordering arrows.
 Mobile semester list rows hide course identifiers and the repeated official title;
 their open indicator is an arrow, leaving room for two lines of course title.
 
 Submission cards stack team names vertically instead of applying the horizontal
 quick-filter layout to them. Status choices share one row above the larger comment
-field, with full accessible labels and pressed states. Download text remains visible
-where it fits, and the details icon is centered. The tutor view is labelled
-“Abgaben” / “Submissions”; its dropdown sizes from the selected label rather than
-the longest option. `tests/test_mobile_card_layout_browser.py` checks these layouts
+field, with full accessible labels and pressed states. On phones, names occupy the
+left side of the header without an avatar; the team number and submission time sit
+on the right. Details and Download occupy opposite ends of the next row.
+The tutor view is labelled “Abgaben” / “Submissions”; its native selector occupies
+a full-width row below the title with a minimum 48 px touch target.
+`tests/test_mobile_card_layout_browser.py` checks these layouts
 at 320, 390 and 430 px in German/dark and English/light mode, including saving a
-grade and correction comment.
+grade and correction comment. It also checks the compact sidebar editor at tablet
+and desktop widths.
 
 Physical iOS Safari/Android Chrome and live ILIAS acceptance must be recorded
 separately from automated browser emulation.

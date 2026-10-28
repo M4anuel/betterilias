@@ -1484,10 +1484,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   const ongoingCount = (overviewData?.assignments || []).filter((a) => a.is_ongoing).length;
   const mobileView: ExerciseTab = taManagementMode === 'editor' ? 'manage-edit' : taManagementMode === 'list' ? 'manage' : activeTab === 'ta_grading' ? 'submissions' : activeTab;
-  const mobileViewLabels: Record<ExerciseTab, string> = {
-    assignments: t('Übungsblätter'), info: t('Informationen'), submissions: t('mobile.submissions'),
-    manage: t('mobile.manage_assignments'), 'manage-edit': t('mobile.edit_assignment'),
-  };
+
 
 
   return (
@@ -1495,7 +1492,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       <MobilePageHeader title={overviewData?.title || t("Übungsübersicht")}
         onBack={onBack} onRefresh={handleRefresh} refreshing={isLoadingOverview || isRevalidatingOverview}
         trailing={<span className="exercise-view-control relative shrink-0 max-w-[46%]">
-          <span aria-hidden="true" className="invisible block whitespace-nowrap pl-2 pr-6 text-base font-semibold leading-[44px]">{mobileViewLabels[mobileView]}</span>
           <select aria-label={t('mobile.exercise_view')} value={mobileView}
           className="exercise-view-select absolute inset-0 w-full min-w-0 appearance-none rounded-xl border border-slate-200 bg-white pl-2 pr-6 text-base font-semibold dark:border-slate-700 dark:bg-slate-900"
           onChange={event => switchTab(event.target.value as ExerciseTab)}>
@@ -1504,7 +1500,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           {taManagementMode === 'list' && <option value="manage">{t('mobile.manage_assignments')}</option>}
           {taManagementMode === 'editor' && <option value="manage-edit">{t('mobile.edit_assignment')}</option>}
           </select>
-          <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2" />
+          <ChevronDown aria-hidden="true" size={18} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
         </span>} />
       {/* Top Header with Breadcrumbs & Sync Status */}
       <div className="desktop-only flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
@@ -2138,9 +2134,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
                     {/* Row Header: Student Info & Actions */}
                     <div className="submission-header flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="submission-person flex min-w-0 items-center gap-3">
+                      <div data-has-team={Boolean(sub.team_id)} className="submission-person flex min-w-0 items-center gap-3">
                         <div
-                          className={`flex h-10 w-10 items-center justify-center rounded-xl text-xs font-bold shrink-0 ${
+                          className={`submission-avatar flex h-10 w-10 items-center justify-center rounded-xl text-xs font-bold shrink-0 ${
                             sub.team_members && sub.team_members.length > 1
                               ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
@@ -2152,7 +2148,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             <span>{sub.student_name.slice(0, 2).toUpperCase()}</span>
                           )}
                         </div>
-                        <div className="min-w-0 flex-1">
+                        <div className="submission-identity min-w-0 flex-1">
                           {/* Student Names / Team Members with Clear Dividers */}
                           <div className="submission-names flex items-center gap-1.5 flex-wrap">
                             {sub.team_members && sub.team_members.length > 1 ? (
@@ -2167,24 +2163,24 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 </span>
                               ))
                             ) : (
-                              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                              <span title={sub.student_name} className="submission-member text-sm font-bold text-slate-900 dark:text-slate-100">
                                 {sub.student_name}
                               </span>
                             )}
 
                             {sub.team_id && (
-                              <span className="rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                              <span className="submission-team-id rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                                 {t("Team #")}{sub.team_id}
                               </span>
                             )}
                           </div>
 
                           {/* Submission Timestamps */}
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                          <div className="submission-timestamps flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500 mt-1">
                             {sub.submission_time ? (
                               <span className="flex items-center gap-1 font-medium text-slate-600 dark:text-slate-400">
                                 <Clock className="h-3 w-3 text-sky-500 dark:text-sky-400" />
-                                <span>{t("Abgabe:")} {sub.submission_time}</span>
+                                <span><span className="sr-only md:not-sr-only">{t("Abgabe:")} </span>{sub.submission_time}</span>
                               </span>
                             ) : hasSubmitted ? (
                               <span className="flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
@@ -2202,7 +2198,17 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       </div>
 
                       {/* Direct Actions: Download, Details "i" */}
-                      <div className="flex items-center gap-2 flex-wrap self-end sm:self-auto">
+                      <div className="submission-actions flex items-center gap-2 flex-wrap self-end sm:self-auto">
+                        {/* "i" Info/Details Button (placed where Mail was) */}
+                        <button
+                          type="button"
+                          onClick={() => setDetailModalSubmission(sub)}
+                          className="submission-details flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-700 dark:hover:text-indigo-300 hover:border-indigo-200 dark:hover:border-indigo-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 transition shadow-2xs cursor-pointer"
+                          title={t("Alle ILIAS-Spalten & Details anzeigen / bearbeiten")}
+                        >
+                          <Info className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                          <span>{t("Details")}</span>
+                        </button>
                         {sub.download_url ? (
                           <a
                             href={sub.download_url}
@@ -2219,16 +2225,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           </span>
                         )}
 
-                        {/* "i" Info/Details Button (placed where Mail was) */}
-                        <button
-                          type="button"
-                          onClick={() => setDetailModalSubmission(sub)}
-                          className="submission-details flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-700 dark:hover:text-indigo-300 hover:border-indigo-200 dark:hover:border-indigo-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 transition shadow-2xs cursor-pointer"
-                          title={t("Alle ILIAS-Spalten & Details anzeigen / bearbeiten")}
-                        >
-                          <Info className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                          <span className="hidden sm:inline">{t("Details")}</span>
-                        </button>
+
                       </div>
                     </div>
 

@@ -113,7 +113,8 @@ def test_compact_settings_semesters_materials_and_exercises(local_site, language
         views = page.get_by_role('combobox', name=tr('mobile.exercise_view'))
         pw.expect(views).to_be_visible()
         title = page.get_by_role('heading', name='Exercises', exact=True).bounding_box()
-        assert abs(title['y'] - views.bounding_box()['y']) < 44
+        assert views.bounding_box()['y'] >= title['y'] + title['height']
+        assert views.bounding_box()['height'] >= 48
         filters = page.locator('.single-row-filters').first
         assert filters.evaluate('e => e.scrollHeight <= e.clientHeight + 1')
         page.get_by_role('button', name=tr('Details & Abgabe'), exact=False).click()

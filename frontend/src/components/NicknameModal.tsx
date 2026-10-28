@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { CourseItem, SidebarOrderItem } from '../types';
+import { useMediaQuery } from '../lib/useMediaQuery';
 import { cache } from '../lib/cache';
 import { CourseIcon, AVAILABLE_COURSE_ICONS } from './CourseIcon';
 
@@ -29,6 +30,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
   onNicknamesUpdated,
 }) => {
   useLanguage();
+  const phone = useMediaQuery('(max-width: 767px)');
   const [nicknames, setNicknames] = useState<Record<string, string>>({});
   const [icons, setIcons] = useState<Record<string, string>>({});
   const [activePickerRefId, setActivePickerRefId] = useState<string | null>(null);
@@ -334,6 +336,40 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                 icons[course.ref_id] || cache.getDefaultCourseIcon(course.ref_id, course);
               const isPickerOpen = activePickerRefId === course.ref_id;
               const hasCustomizations = !!currentNickname || !!icons[course.ref_id];
+              const orderControls = (
+                <div className="sidebar-course-controls flex items-center justify-end gap-1 shrink-0">
+                    {/* Move Up / Move Down buttons */}
+                    <button
+                      type="button"
+                      onClick={() => handleMoveUp(index)}
+                      disabled={index === 0}
+                      className="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                      title={t("Nach oben verschieben")}
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveDown(index)}
+                      disabled={index === orderItems.length - 1}
+                      className="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                      title={t("Nach unten verschieben")}
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </button>
+
+                    {hasCustomizations && (
+                      <button
+                        onClick={() => handleReset(course.ref_id)}
+                        className="sidebar-course-reset flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-red-500 transition shrink-0 cursor-pointer ml-1"
+                        title={t("Auf Standard zurücksetzen")}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        <span>{t("Reset")}</span>
+                      </button>
+                    )}
+                  </div>
+              );
 
               return (
                 <div
@@ -364,6 +400,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                         {cache.getDisplayName(course.ref_id, course.title)}
                       </div>
                     </div>
+                    {!phone && orderControls}
                   </div>
 
                   {/* Icon Button & Nickname Input */}
@@ -412,38 +449,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                     />
                   </div>
 
-                  <div className="sidebar-course-controls flex items-center justify-end gap-1 shrink-0">
-                    {/* Move Up / Move Down buttons */}
-                    <button
-                      type="button"
-                      onClick={() => handleMoveUp(index)}
-                      disabled={index === 0}
-                      className="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
-                      title={t("Nach oben verschieben")}
-                    >
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMoveDown(index)}
-                      disabled={index === orderItems.length - 1}
-                      className="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
-                      title={t("Nach unten verschieben")}
-                    >
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    </button>
-
-                    {hasCustomizations && (
-                      <button
-                        onClick={() => handleReset(course.ref_id)}
-                        className="sidebar-course-reset flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-red-500 transition shrink-0 cursor-pointer ml-1"
-                        title={t("Auf Standard zurücksetzen")}
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        <span>{t("Reset")}</span>
-                      </button>
-                    )}
-                  </div>
+                  {phone && orderControls}
 
                   {/* Inline Icon Picker Grid */}
                   {isPickerOpen && (
