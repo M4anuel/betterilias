@@ -99,6 +99,36 @@ class CourseLogItem(BaseModel):
     url: Optional[str] = None
     log_type: str = "file"  # "file", "forum", "exercise", "general"
 
+class MediaRendition(BaseModel):
+    url: str
+    height: int = 0
+    width: int = 0
+    mimetype: str = 'video/mp4'
+
+
+class MediaStream(BaseModel):
+    content: str
+    main_audio: bool = False
+    renditions: List[MediaRendition]
+
+
+class MediaChapter(BaseModel):
+    time: float
+    image: str
+    text: str = ''
+
+
+class VideoStreamResponse(BaseModel):
+    streams: List[MediaStream] = Field(default_factory=list)
+    chapters: List[MediaChapter] = Field(default_factory=list)
+    duration: Optional[float] = None
+    title: Optional[str] = None
+    preview_url: Optional[str] = None
+    mp4_url: Optional[str] = None  # Legacy embedded-player clients.
+    video_url: str
+    fallback_url: str
+
+
 class PodcastEpisode(BaseModel):
     id: str  # eid
     title: str

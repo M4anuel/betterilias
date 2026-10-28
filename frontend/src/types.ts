@@ -78,6 +78,15 @@ export interface CourseLogItem {
   log_type: string; // 'file' | 'forum' | 'general'
 }
 
+export interface VideoStreamInfo {
+  streams: { content: string; main_audio: boolean; renditions: { url: string; width: number; height: number; mimetype: string }[] }[];
+  chapters: { time: number; image: string; text: string }[];
+  duration: number | null;
+  title: string | null;
+  preview_url: string | null;
+  fallback_url: string;
+}
+
 export interface PodcastEpisode {
   id: string;
   title: string;

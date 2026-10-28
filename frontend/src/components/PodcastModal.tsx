@@ -17,6 +17,7 @@ import {
 import { PodcastEpisode, PodcastSeriesResponse } from '../types';
 import { api } from '../lib/api';
 import { cache } from '../lib/cache';
+import { PodcastPlayer } from './PodcastPlayer';
 
 interface PodcastModalProps {
   refId: string;
@@ -32,6 +33,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
   onNewPodcastFound,
 }) => {
   useLanguage();
+  const [activeEpisode, setActiveEpisode] = useState<PodcastEpisode | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRevalidating, setIsRevalidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,11 +96,11 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !activeEpisode) onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, activeEpisode]);
 
   const episodes = series?.episodes || [];
   const filteredEpisodes = episodes.filter((ep) => {
@@ -116,6 +118,8 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
   });
 
   return (
+    <>
+    {activeEpisode?.stream_url && <PodcastPlayer key={activeEpisode.id} url={activeEpisode.stream_url} title={activeEpisode.title} onClose={() => setActiveEpisode(null)} />}
     <div
       className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
       onMouseDown={(e) => {
@@ -321,15 +325,14 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
 
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                     {isRecorded && ep.stream_url ? (
-                      <a
-                        href={ep.stream_url}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => setActiveEpisode(ep)}
                         className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs"
                       >
                         <Play className="h-3.5 w-3.5 fill-white" />
                         <span>{t("Streamen")}</span>
-                      </a>
+                      </button>
                     ) : (
                       <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 px-2">
                         {t("Wird aufgezeichnet")}
@@ -362,6 +365,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 

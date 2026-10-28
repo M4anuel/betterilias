@@ -1,9 +1,9 @@
 # Native dual-stream podcast player plan
 
-Status: **planned**, not the current playback implementation. Open tasks are in
-[TODO](../TODO.md); existing episode discovery, native-stream links and limited
-embedded MP4 playback are recorded in the
-[support inventory](ILIAS_SUPPORT_MATRIX.md).
+Status: **implemented for native Paella MP4 recordings**, with real-media
+Chromium tests. Live authenticated ILIAS playback and physical mobile-device
+acceptance remain open in [TODO](../TODO.md). Supported behavior and limits are
+recorded in the [support inventory](ILIAS_SUPPORT_MATRIX.md).
 
 ## Goal
 
@@ -70,3 +70,46 @@ audio/camera source; they are not universal size or quality promises.
   outcomes rather than a permanently loading player.
 - Parser fixtures and browser/media tests cover the supported configurations
   before the inventory calls this native dual-stream support.
+
+## Implementation and verification
+
+- `backend/scrapers/player.py` decodes the JSON argument to the native Paella
+  initializer without executing JavaScript. It retains audio roles, signed MP4
+  rendition URLs and `frameList` times, and converts metadata milliseconds to
+  seconds. Unsupported shapes are dumped through `safe_parser`.
+- `/api/courses/video-stream-info` validates the ILIAS origin/player action,
+  uses the tenant's authenticated client, checks session expiry before parsing,
+  and returns a typed response with `Cache-Control: private, no-store`.
+  No episode listing or media file is prefetched. Episode `eid` and native
+  routing parameters come from the supplied link, never a fabricated cmdNode.
+- `PodcastPlayer.tsx` is shared by episode Stream buttons and embedded course
+  video launchers. Its native dialog traps focus, handles Escape and touch
+  dismissal, restores focus, and fits the shared visible viewport styles.
+  Course embeds no longer eagerly request every player page on course load.
+- The audio-bearing stream drives the clock. Both streams pause during buffering,
+  share seeks/rate changes, and correct drift above 300 ms. Rendition changes
+  retain the clock, playback intent, rate and volume. The second stream is always
+  muted. Rejected play promises and media failures have localised retry/fallback
+  feedback, and buffering times out after 20 seconds.
+- Picture in picture is an **in-player inset layout**, alongside responsive split
+  view and screen swap. Slides-only keeps the audio-bearing video active but
+  hidden. Bandwidth saver selects the lowest available camera rendition and the
+  highest available slides rendition; it does not promise an audio-only transfer.
+  Quality options come from the recording. Full screen is offered where supported.
+- Slide thumbnails are lazy-loaded and seek both streams to their actual times.
+  Single-stream recordings work without layout/chapter controls. HLS/DASH-only
+  recordings, subtitles and OS-level picture in picture remain outside this scope.
+- The portable Paella fixture retains the supplied stream/configuration structure
+  and 42 chapter timestamps. Unneeded OCR/transcriptions and captions are omitted.
+  `tests/fixtures/player-test.mp4` is a synthetic 12-second H.264/AAC test clip
+  generated using FFmpeg's `testsrc2` and `sine` sources, not lecture footage.
+- Browser tests decode this local clip via byte-range responses and cover both
+  languages/themes at 320/390/430/768/1280 px and short landscape. They exercise
+  actual play/pause, seeking, rates, quality changes, layouts, focus and fallback.
+  Targeted checks also inject buffering/drift, playback rejection and media errors.
+  These are Chromium viewport/touch emulations, not physical-device validation.
+- Read-only checks of the supplied sample's 480p camera and 1080p presentation
+  URLs each returned HTTP 206 and `video/mp4` for a 1 KiB range request. Native
+  authenticated episode resolution encountered `SessionExpiredError` in the
+  existing local session. Renewed-session live playback, long-recording drift,
+  CDN expiry behavior and real iOS/Android acceptance still need validation.

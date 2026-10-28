@@ -135,7 +135,7 @@ build validation, and English fallback for partial languages.
 - [ ] `xds2` — **Literature Ordering (DigiSem)** (`Digitale Seminarbibliothek`): Needs status display and direct link handling.
 
 #### 2. Video and Audio (`Video und Audio`)
-- [x] `xoct` — **Video- & Audioseries (Opencast/Tobira)** (`Video- & Audioserie`): Episode discovery/filtering/search and limited embedded MP4 playback with ILIAS fallback. Episode stream actions open ILIAS; synchronized dual-stream audio/slides playback is still pending below.
+- [x] `xoct` — **Video- & Audioseries (Opencast/Tobira)** (`Video- & Audioserie`): Episode discovery/filtering/search and native synchronized MP4 audio/slides playback with layouts, independent quality, slide chapters and ILIAS fallback. Live authenticated and physical-device playback validation remains pending below.
 - [ ] `xvid` — **Interactive Video** (`Interaktives Video`): Needs interactive video player supporting embedded questions and jump markers.
 - [ ] `mep` — **Media Pool** (`Medienpool`): Needs media gallery viewer (audio/video/image assets).
 
@@ -189,12 +189,14 @@ Design: [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECI
 
 Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAST_PLAYER_PLAN.md).
 
-- [ ] Native In-App Opencast Podcast Player with Dual-Stream Support:
-  - [ ] Synchronized playback for presenter camera feed (with `mainAudio`) and presentation slides feed.
-  - [ ] Viewing layouts: Picture-in-Picture (PiP), Side-by-Side (desktop split), and one-click screen swap.
-  - [ ] Bandwidth Saver / Slides-Only Mode: Ability to set presenter video quality to lowest (480p) while keeping presentation slides at 1080p.
-  - [ ] Slide chapter navigation using Opencast `frameList` thumbnails and timestamps.
-  - [ ] Fast on-demand stream resolution for podcast episode IDs (`eid`).
+- [x] Native In-App Opencast Podcast Player with Dual-Stream Support:
+  - [x] Synchronized playback for presenter camera feed (with `mainAudio`) and presentation slides feed.
+  - [x] Viewing layouts: Picture-in-Picture (PiP), Side-by-Side (desktop split), and one-click screen swap.
+  - [x] Bandwidth Saver / Slides-Only Mode: Ability to set presenter video quality to lowest (480p) while keeping presentation slides at 1080p.
+  - [x] Slide chapter navigation using Opencast `frameList` thumbnails and timestamps.
+  - [x] Fast on-demand stream resolution for podcast episode IDs (`eid`).
+
+- [ ] Validate authenticated playback after renewing the expired local ILIAS session, and verify real iOS Safari / Android Chrome playback. CDN byte-range checks and local Chromium decoding pass; these do not replace live account/device acceptance.
 
 ## Completed
 

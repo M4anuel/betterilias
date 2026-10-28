@@ -33,6 +33,7 @@ import { MobilePageHeader } from './MobilePageHeader';
 import { CourseIcon } from './CourseIcon';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { PodcastModal } from './PodcastModal';
+import { PodcastPlayer } from './PodcastPlayer';
 import { CourseManagement } from './CourseManagement';
 import { navigationGuard } from '../lib/navigationGuard';
 import { SessionDrawer } from './SessionDrawer';
@@ -94,15 +95,12 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
       if (match.includes('<video') || match.includes('betterilias-video-player-container')) {
         return match;
       }
-      let targetUrl = containerRefId
-        ? `https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&cmdNode=yv:oj&cmdClass=ilobjfoldergui&ref_id=${containerRefId}&item_ref_id=0`
-        : 'https://ilias.unibe.ch';
       let fullSrc = src;
       if (src.startsWith('http')) fullSrc = src;
       else if (src.startsWith('/')) fullSrc = `https://ilias.unibe.ch${src}`;
       else fullSrc = `https://ilias.unibe.ch/${src}`;
 
-      return `<div class="betterilias-video-player-container my-3" data-video-stream-url="${fullSrc}" style="max-width: 960px;"><div class="betterilias-video-placeholder ocpc-video-card" data-video-url="${fullSrc}"><div class="betterilias-video-inner"><div class="betterilias-video-play-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div><div class="betterilias-video-info"><span class="betterilias-video-title">${t('video.load_and_play')}</span><span class="betterilias-video-desc">${t('video.opencast_player')}</span></div><a href="${targetUrl}" target="_blank" rel="noreferrer" class="betterilias-video-btn"><span>${t('video.view_on_ilias')}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div></div></div>`;
+      return `<div class="betterilias-video-player-container my-3" data-video-stream-url="${fullSrc}" style="max-width: 960px;"><div class="betterilias-video-placeholder ocpc-video-card" data-video-url="${fullSrc}"><div class="betterilias-video-inner"><div class="betterilias-video-play-btn" role="button" tabindex="0" aria-label="${t('video.load_and_play')}"><svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div><div class="betterilias-video-info"><span class="betterilias-video-title">${t('video.load_and_play')}</span><span class="betterilias-video-desc">${t('video.opencast_player')}</span></div><a href="${fullSrc}" target="_blank" rel="noreferrer" class="betterilias-video-btn"><span>${t('video.view_on_ilias')}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></div></div></div>`;
     }
   );
 
@@ -259,6 +257,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
   useEffect(() => {
     setCollapsedDrawers(cache.getCourseDrawersState(courseRefId));
   }, [courseRefId]);
+  const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [activePodcast, setActivePodcast] = useState<{ refId: string; title: string } | null>(null);
   const [internalExerciseRefId, setInternalExerciseRefId] = useState<string | null>(null);
   const activeExerciseRefId =
@@ -1145,6 +1144,13 @@ export const CourseView: React.FC<CourseViewProps> = ({
   };
 
   // Interactive handler for ILIAS Page Editor vertical accordions (.ilc_va_cntr_VAccordCntr) and video cards
+  const handleRichContentKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if ((event.key === 'Enter' || event.key === ' ') && target.closest('.betterilias-video-play-btn')) {
+      event.preventDefault(); target.click();
+    }
+  };
+
   const handleRichContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
 
@@ -1159,39 +1165,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
       e.preventDefault();
       const streamUrl = videoCard.getAttribute('data-video-stream-url') || videoCard.getAttribute('data-video-url');
       if (streamUrl) {
-        const container = videoCard.closest<HTMLElement>('.betterilias-video-player-container') || videoCard;
-        const titleSpan = videoCard.querySelector('.betterilias-video-title');
-        if (titleSpan) titleSpan.textContent = t('video.loading');
-
-        fetch(`/api/courses/video-stream-info?url=${encodeURIComponent(streamUrl)}`)
-          .then((res) => res.json())
-          .then((data) => {
-            if (data && data.mp4_url) {
-              const posterAttr = data.preview_url ? `poster="${data.preview_url}"` : '';
-              const durStr = data.duration
-                ? `${Math.floor(data.duration / 60).toString().padStart(2, '0')}:${(data.duration % 60).toString().padStart(2, '0')}`
-                : '';
-              const titleText = data.title ? (durStr ? `${data.title} (${durStr})` : data.title) : t('video.tutorial');
-              container.innerHTML = `
-                <video controls autoplay playsinline preload="auto" ${posterAttr} class="w-full aspect-video rounded-xl bg-black shadow-md border border-slate-800">
-                  <source src="${data.mp4_url}" type="video/mp4" />
-                  ${t('video.unsupported')}
-                </video>
-                <div class="betterilias-video-caption flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-2 px-1">
-                  <span class="font-medium truncate">${titleText}</span>
-                  <a href="${data.fallback_url || 'https://ilias.unibe.ch'}" target="_blank" rel="noreferrer" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-500 font-semibold hover:underline shrink-0">
-                    <span>${t('video.view_on_ilias')}</span>
-                    <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                  </a>
-                </div>
-              `;
-            } else if (data && data.fallback_url) {
-              window.open(data.fallback_url, '_blank', 'noreferrer');
-            }
-          })
-          .catch(() => {
-            if (streamUrl) window.open(streamUrl, '_blank', 'noreferrer');
-          });
+        setActiveVideo(streamUrl);
         return;
       }
     }
@@ -1645,6 +1619,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             {block.html_content && (
               <div
                 onClick={handleRichContentClick}
+                onKeyDown={handleRichContentKeyDown}
                 className="ilias-rich-content text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-sans rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3.5"
                 dangerouslySetInnerHTML={{ __html: cleanRichContentHtml(block.html_content, block.title, materialsData?.container_ref_id || courseRefId) }}
               />
@@ -1704,6 +1679,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
         <div key={block.id} className="pt-6 pb-2 border-b border-slate-200/80 dark:border-slate-800">
           <div
             onClick={handleRichContentClick}
+                onKeyDown={handleRichContentKeyDown}
             className="ilias-rich-content text-base font-bold text-[#d81e5b] dark:text-[#fb7185] tracking-tight flex items-center gap-2"
             dangerouslySetInnerHTML={{ __html: cleanedHtml }}
           />
@@ -1725,6 +1701,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
         {cleanedHtml && (
           <div
             onClick={handleRichContentClick}
+                onKeyDown={handleRichContentKeyDown}
             className="ilias-rich-content text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-sans"
             dangerouslySetInnerHTML={{ __html: cleanedHtml }}
           />
@@ -2306,6 +2283,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
       </div>
 
       </>}
+      {activeVideo && <PodcastPlayer key={activeVideo} url={activeVideo} title={t('video.tutorial')} onClose={() => setActiveVideo(null)} />}
       {/* Opencast Podcast Modal */}
       {activePodcast && (
         <PodcastModal

@@ -708,7 +708,11 @@ dialog:not(.mobile-navigation) {
 
 /* Control hit areas and visible shapes are independent: never enlarge a switch track. */
 .icon-button { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; }
-.my-courses-control { min-height: 48px; }
+.my-courses-control, .player-select { min-height: 48px; }
+.podcast-player-dialog { width: min(72rem, calc(100vw - 1.5rem)); max-width: none; margin-inline: auto; }
+@media (max-width: 639px) {
+  .podcast-player-dialog { width: calc(100vw - .75rem); }
+}
 button:not(.phone-only):not(.desktop-only):has(> svg:only-child) { display: inline-flex; align-items: center; justify-content: center; }
 button > svg:only-child { margin-inline: auto; flex-shrink: 0; }
 summary::-webkit-details-marker { display: none; }

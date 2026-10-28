@@ -1,5 +1,5 @@
 from backend.i18n import t
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status, File, Form, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status, File, Form, UploadFile
 import re, logging
 from backend.schemas import AuthoringContext, AuthoringResult, CreateFolderRequest, PdfInfoResponse
 logger = logging.getLogger(__name__)
@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from typing import List, Optional, Literal
 
 from backend.api.deps import get_ilias_client
-from backend.schemas import CourseLogsResponse, CourseMaterialsResponse, MaterialItem, PodcastSeriesResponse
+from backend.schemas import CourseLogsResponse, CourseMaterialsResponse, MaterialItem, PodcastSeriesResponse, VideoStreamResponse
 from backend.services.ilias_client import IliasClient
 from backend.schemas import RepositoryResponse
 from backend.schemas import MembershipFormResponse, MembershipRequest, MembershipResult
@@ -101,14 +101,16 @@ async def get_repository(
 
 
 
-@router.get("/courses/video-stream-info")
+@router.get("/courses/video-stream-info", response_model=VideoStreamResponse)
 async def get_video_stream_info(
+    response: Response,
     url: str = Query(..., description="Opencast streamVideo URL"),
     client: IliasClient = Depends(get_ilias_client)
 ):
     """
     Resolve an Opencast streamVideo URL to direct MP4 stream and metadata.
     """
+    response.headers['Cache-Control'] = 'private, no-store'
     return await client.resolve_video_stream(url)
 
 @router.get("/courses/{course_id}/materials", response_model=CourseMaterialsResponse)

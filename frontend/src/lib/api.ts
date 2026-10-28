@@ -31,6 +31,7 @@ import {
   CalendarSubscriptionResponse,
 } from '../types';
 import { cache } from './cache';
+import type { VideoStreamInfo } from '../types';
 import { navigationGuard } from './navigationGuard';
 
 
@@ -80,6 +81,11 @@ async function sessionFetch(input: string, init?: RequestInit): Promise<Response
 const inFlightManagement = new Map<string, Promise<ManagementResponse>>();
 
 export const api = {
+  async getVideoStream(url: string): Promise<VideoStreamInfo> {
+    const res = await sessionFetch(`${API_BASE}/courses/video-stream-info?url=${encodeURIComponent(url)}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(t('player.resolve_failed'));
+    return res.json();
+  },
   getManagement(refId: string): Promise<ManagementResponse> {
     const existing = inFlightManagement.get(refId);
     if (existing) return existing;
