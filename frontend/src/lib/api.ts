@@ -275,6 +275,12 @@ export const api = {
     return res.json();
   },
 
+  async getMyCourses(): Promise<DashboardResponse> {
+    const res = await sessionFetch(`${API_BASE}/dashboard/memberships`);
+    if (!res.ok) throw new Error(t('my_courses.load_failed'));
+    return res.json();
+  },
+
   async getDashboardCourses(): Promise<DashboardResponse> {
     const res = await sessionFetch(`${API_BASE}/dashboard/courses`);
     if (!res.ok) {

@@ -1,6 +1,6 @@
 import { t, useLanguage } from '../lib/i18n';
 import React, { useMemo } from 'react';
-import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library, Calendar } from 'lucide-react';
+import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library, Users, Calendar } from 'lucide-react';
 import { CourseItem } from '../types';
 import { cache } from '../lib/cache';
 import { CourseIcon } from './CourseIcon';
@@ -13,6 +13,8 @@ interface SidebarProps {
   onSelectSemesterOverview: () => void;
   onSelectRepository: () => void;
   isRepositorySelected: boolean;
+  onSelectMyCourses: () => void;
+  isMyCoursesSelected: boolean;
   onSelectCalendar?: () => void;
   isCalendarSelected?: boolean;
   isCollapsed: boolean;
@@ -29,6 +31,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectSemesterOverview,
   onSelectRepository,
   isRepositorySelected,
+  onSelectMyCourses,
+  isMyCoursesSelected,
   onSelectCalendar,
   isCalendarSelected = false,
   isCollapsed,
@@ -147,7 +151,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <nav aria-label={t("Meine Vorlesungen")} className="min-h-0 flex-1 overflow-y-auto p-2 space-y-1">
         {/* Semester / Overview Button */}
         {(() => {
-          const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isCalendarSelected;
+          const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isMyCoursesSelected && !isCalendarSelected;
           return (
             <button
               onClick={onSelectSemesterOverview}
@@ -186,7 +190,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })()}
 
-
         {onSelectCalendar && (
           <button
             type="button"
@@ -212,6 +215,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         )}
 
+        <button type="button" onClick={onSelectMyCourses} title={t('my_courses.title')}
+          aria-label={t('my_courses.title')} aria-current={isMyCoursesSelected ? 'page' : undefined}
+          style={isMyCoursesSelected ? { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' } : undefined}
+          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+          <Users className="h-4 w-4 shrink-0" />
+          {!isCollapsed && <span>{t('my_courses.title')}</span>}
+        </button>
         <button
           type="button"
           onClick={onSelectRepository}

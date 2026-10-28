@@ -7,6 +7,11 @@ from backend.services.ilias_client import IliasClient
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
+@router.get("/memberships", response_model=DashboardResponse)
+async def get_my_courses(client: IliasClient = Depends(get_ilias_client)):
+    return await client.get_my_courses()
+
+
 @router.get("/courses", response_model=DashboardResponse)
 async def get_courses(client: IliasClient = Depends(get_ilias_client)):
     """

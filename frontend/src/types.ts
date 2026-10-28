@@ -17,6 +17,7 @@ export interface CourseItem {
   semester?: string;
   subject?: string;
   faculty?: string;
+  is_favourite?: boolean;
 }
 
 export interface SidebarOrderItem {

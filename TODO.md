@@ -198,6 +198,10 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 
 ## Completed
 
+- [x] Simplify My courses and groups by removing the favourites hint and type filter; support both alphabetical and semester sort directions while keeping semester options derived from actual memberships.
+
+- [x] Add My courses and groups with all-semester membership discovery, search, type/semester filters, alphabetical/newest ordering and persistent session-scoped favourites pinned above other entries.
+
 - [x] Animate upload progress smoothly and accurately across multiple files, while retaining confirmed-file counts and reduced-motion support.
 
 - [x] Replace native upload bars with gradient progress tracks, distinguish measured transfer from indeterminate ILIAS saving/verification, respect reduced motion, and count only confirmed files as saved.

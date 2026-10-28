@@ -17,6 +17,7 @@ from backend.services.management import ManagementMixin
 from backend.scrapers.dumper import dump_failed_html
 from backend.schemas import RepositoryResponse
 from backend.scrapers.repository import parse_repository
+from backend.scrapers.dashboard import parse_my_courses
 from backend.schemas import MembershipFormResponse, MembershipRequest, MembershipResult
 from backend.scrapers.membership import membership_link, parse_membership, prepare_membership_form
 from backend.scrapers.materials import _extract_breadcrumbs
@@ -239,6 +240,16 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             user_name=user_or_msg if is_valid else None,
             message=user_or_msg,
         )
+
+    async def get_my_courses(self) -> DashboardResponse:
+        """All course/group memberships, including archived semesters."""
+        self._ensure_authenticated()
+        url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilmembershipoverviewgui"
+        async with self.session_manager.get_http_client() as client:
+            response = await client.get(url)
+            self._check_response_for_session_loss(response, url)
+            response.raise_for_status()
+            return DashboardResponse(courses=parse_my_courses(response.text))
 
     async def get_dashboard(self) -> DashboardResponse:
         """Fetch and parse Personal Desktop courses."""
