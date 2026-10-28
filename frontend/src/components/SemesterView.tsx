@@ -33,7 +33,7 @@ interface SemesterViewProps {
   selectedSemester: string;
   onSelectSemester: (semId: string) => void;
   onSelectCourse: (refId: string) => void;
-  lastOpenedCourseId: string | null;
+  lastOpenedCourseId?: string | null;
   coursesList: CourseItem[];
   isLoading: boolean;
   onManualRefresh?: () => void;
@@ -44,7 +44,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
   selectedSemester,
   onSelectSemester,
   onSelectCourse,
-  lastOpenedCourseId,
+  lastOpenedCourseId = null,
   coursesList,
   isLoading,
   onManualRefresh,

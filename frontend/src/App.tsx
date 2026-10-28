@@ -125,25 +125,16 @@ export const App: React.FC = () => {
   const [isLoadingSemester, setIsLoadingSemester] = useState(false);
   const semesterRequestSeq = useRef<number>(0);
 
-  // --- Navigation & Course State ---
+  // --- Navigation & Course State (Always land on semester overview when accessing site) ---
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() => {
     if (initialRepositoryParam) return null;
-    if (initialCourseParam) return initialCourseParam;
-    if (!initialSemesterParam && !initialRepositoryParam) {
-      return cache.getLastOpenedCourseId();
-    }
-    return null;
+    return initialCourseParam || null;
   });
   const [isManagingCourse, setIsManagingCourse] = useState(false);
   useEffect(() => { setIsManagingCourse(false); }, [selectedCourseId]);
   const [currentContainerId, setCurrentContainerId] = useState<string | null>(() => {
     if (initialRepositoryParam) return null;
-    if (initialFolderParam) return initialFolderParam;
-    if (initialCourseParam) return initialCourseParam;
-    if (!initialSemesterParam && !initialRepositoryParam) {
-      return cache.getLastOpenedCourseId();
-    }
-    return null;
+    return initialFolderParam || initialCourseParam || null;
   });
   const [activeExerciseRefId, setActiveExerciseRefId] = useState<string | null>(() => {
     return initialExerciseParam || null;
@@ -159,10 +150,7 @@ export const App: React.FC = () => {
   });
 
   const [materialsData, setMaterialsData] = useState<CourseMaterialsResponse | null>(() => {
-    const containerId =
-      initialFolderParam ||
-      initialCourseParam ||
-      (!initialSemesterParam && !initialRepositoryParam ? cache.getLastOpenedCourseId() : null);
+    const containerId = initialFolderParam || initialCourseParam || null;
     return containerId ? cache.getCachedMaterials(containerId) : null;
   });
   const [isRevalidatingMaterials, setIsRevalidatingMaterials] = useState(false);
@@ -187,9 +175,7 @@ export const App: React.FC = () => {
     };
   }, [selectedSemester, selectedCourseId, currentContainerId, activeExerciseRefId, activeExerciseTab, repositoryId]);
   const activeContainerRef = useRef<string | null>(
-    initialFolderParam ||
-      initialCourseParam ||
-      (!initialSemesterParam && !initialRepositoryParam ? cache.getLastOpenedCourseId() : null)
+    initialFolderParam || initialCourseParam || null
   );
 
   const [enrolledCourses, setEnrolledCourses] = useState<Record<string, boolean>>({});
@@ -436,7 +422,6 @@ export const App: React.FC = () => {
       setCurrentContainerId(null);
       setActiveExerciseRefId(null);
       setActiveExerciseTab(null);
-      cache.setLastOpenedCourseId(null);
       setMaterialsData(null);
       setLoadMaterialsError(null);
       loadSemesters(semId);
@@ -470,7 +455,6 @@ export const App: React.FC = () => {
       setActiveExerciseRefId(null);
       setActiveExerciseTab(null);
       activeContainerRef.current = courseRefId;
-      cache.setLastOpenedCourseId(courseRefId);
       loadCourseMaterials(courseRefId, true);
 
       const nextState: NavigationState = {
@@ -546,7 +530,6 @@ export const App: React.FC = () => {
     setCurrentContainerId(null);
     setActiveExerciseRefId(null);
     setActiveExerciseTab(null);
-    cache.setLastOpenedCourseId(null);
     setMaterialsData(null);
     setLoadMaterialsError(null);
 
@@ -573,7 +556,6 @@ export const App: React.FC = () => {
     setActiveExerciseTab(null);
     setMaterialsData(null);
     setLoadMaterialsError(null);
-    cache.setLastOpenedCourseId(null);
     const nextState: NavigationState = {
       semester: selectedSemester, courseId: null, containerId: null, exerciseId: null,
       exerciseTab: null,
@@ -743,7 +725,6 @@ export const App: React.FC = () => {
         setSelectedCourseId(state.courseId);
         setCurrentContainerId(state.containerId);
         activeContainerRef.current = state.containerId;
-        cache.setLastOpenedCourseId(state.courseId);
 
         // Instant serve from cache (0ms) + SWR revalidate
         loadCourseMaterials(state.containerId, state.containerId === state.courseId);
@@ -753,7 +734,6 @@ export const App: React.FC = () => {
         activeContainerRef.current = null;
         setSelectedCourseId(null);
         setCurrentContainerId(null);
-        cache.setLastOpenedCourseId(null);
         setMaterialsData(null);
         setLoadMaterialsError(null);
       }
@@ -951,7 +931,6 @@ export const App: React.FC = () => {
               selectedSemester={selectedSemester}
               onSelectSemester={handleSelectSemester}
               onSelectCourse={handleSelectCourse}
-              lastOpenedCourseId={cache.getLastOpenedCourseId()}
               coursesList={allCourses}
               isLoading={isLoadingSemester}
               onManualRefresh={() => loadSemesters(selectedSemester, true)}

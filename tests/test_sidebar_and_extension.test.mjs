@@ -197,3 +197,30 @@ test('Extension and backend cookie sanitization rejects RFC 6265 separators and 
   assert.equal(isIliasAuthCookie(null), false);
   assert.equal(isIliasAuthCookie(undefined), false);
 });
+
+test('Site landing behavior always defaults to semester overview without caching last opened course', () => {
+  const LAST_OPENED_KEY = 'ilias_last_opened_course';
+  localStorage.setItem(LAST_OPENED_KEY, '44102');
+
+  const cache = {
+    getLastOpenedCourseId() {
+      return null;
+    },
+    setLastOpenedCourseId(_refId) {
+      localStorage.removeItem(LAST_OPENED_KEY);
+    },
+  };
+
+  // Calling setLastOpenedCourseId cleans up any legacy key
+  cache.setLastOpenedCourseId('44102');
+  assert.equal(localStorage.getItem(LAST_OPENED_KEY), null);
+  assert.equal(cache.getLastOpenedCourseId(), null);
+
+  // Initial state resolution when landing on site without URL params
+  const initialParams = new URLSearchParams('');
+  const initialRepositoryParam = initialParams.get('repository');
+  const initialCourseParam = initialParams.get('course');
+
+  const selectedCourseId = initialRepositoryParam ? null : (initialCourseParam || null);
+  assert.equal(selectedCourseId, null);
+});

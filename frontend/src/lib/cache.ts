@@ -72,6 +72,12 @@ export const ILIAS_SAVER_TTL_KEY = 'betterilias_saver_ttl';
 const SESSION_ID_KEY = 'betterilias_session_id';
 let inMemorySessionId: string | null = null;
 
+try {
+  localStorage.removeItem(LAST_OPENED_KEY);
+} catch {
+  // Storage can be disabled in private browsing or iframe environments
+}
+
 export const cache = {
   // --- Multi-Tenant Session ID ---
   getSessionId(): string | null {
@@ -374,24 +380,16 @@ export const cache = {
   },
 
 
-  // --- Last Opened Course ---
+  // --- Last Opened Course (Disabled: always land on semester overview) ---
   getLastOpenedCourseId(): string | null {
-    try {
-      return localStorage.getItem(LAST_OPENED_KEY);
-    } catch {
-      return null;
-    }
+    return null;
   },
 
-  setLastOpenedCourseId(refId: string | null) {
+  setLastOpenedCourseId(_refId: string | null) {
     try {
-      if (refId) {
-        localStorage.setItem(LAST_OPENED_KEY, refId);
-      } else {
-        localStorage.removeItem(LAST_OPENED_KEY);
-      }
-    } catch (e) {
-      console.error('Failed to save last opened course', e);
+      localStorage.removeItem(LAST_OPENED_KEY);
+    } catch {
+      // Storage can be disabled in private browsing or iframe environments
     }
   },
 
