@@ -59,5 +59,22 @@ variants, file actions, title-row exercise navigation, compact grading controls,
 German team actions and sidebar drafts surviving real parent refresh events.
 Existing mobile, upload, authoring, membership and TA regressions are also run.
 
+## Readability follow-up
+
+Sidebar editor cards now give course titles the same readable scale as inputs,
+followed by the editable field and a consistent ordering/reset toolbar. The DOM
+order follows the visual order. Optional reset controls no longer shift the arrows.
+Mobile semester list rows hide course identifiers and the repeated official title;
+their open indicator is an arrow, leaving room for two lines of course title.
+
+Submission cards stack team names vertically instead of applying the horizontal
+quick-filter layout to them. Status choices share one row above the larger comment
+field, with full accessible labels and pressed states. Download text remains visible
+where it fits, and the details icon is centered. The tutor view is labelled
+“Abgaben” / “Submissions”; its dropdown sizes from the selected label rather than
+the longest option. `tests/test_mobile_card_layout_browser.py` checks these layouts
+at 320, 390 and 430 px in German/dark and English/light mode, including saving a
+grade and correction comment.
+
 Physical iOS Safari/Android Chrome and live ILIAS acceptance must be recorded
 separately from automated browser emulation.

@@ -4,6 +4,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Mobile usability
 
+- [x] Rebalance sidebar editor typography and stable ordering controls; simplify
+  semester list titles/actions and submission-card names/status controls; shorten
+  the mobile tutor view label and verify both languages/themes.
+
 Follow-up audit: [`docs/MOBILE_UI_REFINEMENT.md`](docs/MOBILE_UI_REFINEMENT.md)
 records the refined prompt, grouped problems and causes found during implementation.
 

@@ -1193,5 +1193,7 @@
   "Bad Gateway": "Bad Gateway",
   "Netzwerkfehler bei der Kommunikation mit ILIAS (ilias.unibe.ch). Bitte überprüfe deine Internetverbindung.": "Netzwerkfehler bei der Kommunikation mit ILIAS (ilias.unibe.ch). Bitte überprüfe deine Internetverbindung.",
   "Zeitüberschreitung bei der Verbindung zu ilias.unibe.ch. Der Server antwortet verzögert.": "Zeitüberschreitung bei der Verbindung zu ilias.unibe.ch. Der Server antwortet verzögert.",
-  "Ein zuvor ausgewählter Teilnehmer ({p0}) ist nicht mehr im Kurs verfügbar und wurde entfernt.": "Ein zuvor ausgewählter Teilnehmer ({p0}) ist nicht mehr im Kurs verfügbar und wurde entfernt."
+  "Ein zuvor ausgewählter Teilnehmer ({p0}) ist nicht mehr im Kurs verfügbar und wurde entfernt.": "Ein zuvor ausgewählter Teilnehmer ({p0}) ist nicht mehr im Kurs verfügbar und wurde entfernt.",
+  "mobile.submissions": "Abgaben",
+  "mobile.not_graded": "Nicht bew."
 }
