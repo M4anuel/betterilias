@@ -1,6 +1,6 @@
 import { t, useLanguage } from '../lib/i18n';
 import React, { useMemo } from 'react';
-import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library } from 'lucide-react';
+import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library, Calendar } from 'lucide-react';
 import { CourseItem } from '../types';
 import { cache } from '../lib/cache';
 import { CourseIcon } from './CourseIcon';
@@ -13,6 +13,8 @@ interface SidebarProps {
   onSelectSemesterOverview: () => void;
   onSelectRepository: () => void;
   isRepositorySelected: boolean;
+  onSelectCalendar?: () => void;
+  isCalendarSelected?: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onOpenNicknameModal: () => void;
@@ -27,6 +29,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectSemesterOverview,
   onSelectRepository,
   isRepositorySelected,
+  onSelectCalendar,
+  isCalendarSelected = false,
   isCollapsed,
   onToggleCollapse,
   onOpenNicknameModal,
@@ -143,7 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <nav aria-label={t("Meine Vorlesungen")} className="min-h-0 flex-1 overflow-y-auto p-2 space-y-1">
         {/* Semester / Overview Button */}
         {(() => {
-          const isSemesterSelected = selectedCourseId === null && !isRepositorySelected;
+          const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isCalendarSelected;
           return (
             <button
               onClick={onSelectSemesterOverview}
@@ -181,6 +185,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           );
         })()}
+
+
+        {onSelectCalendar && (
+          <button
+            type="button"
+            onClick={onSelectCalendar}
+            title={t("calendar.sidebar_nav")}
+            aria-current={isCalendarSelected ? 'page' : undefined}
+            style={isCalendarSelected ? { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' } : undefined}
+            className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition cursor-pointer ${
+              isCalendarSelected
+                ? 'font-semibold'
+                : 'text-slate-700 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white'
+            }`}
+          >
+            <Calendar
+              className={`h-4 w-4 shrink-0 transition ${
+                isCalendarSelected
+                  ? ''
+                  : 'text-slate-400 group-hover:text-[var(--accent)] dark:text-slate-400 dark:group-hover:text-[var(--accent)]'
+              }`}
+              style={isCalendarSelected ? { color: 'var(--accent)' } : undefined}
+            />
+            {!isCollapsed && <span>{t("calendar.sidebar_nav")}</span>}
+          </button>
+        )}
 
         <button
           type="button"

@@ -37,6 +37,7 @@ interface SemesterViewProps {
   coursesList: CourseItem[];
   isLoading: boolean;
   onManualRefresh?: () => void;
+  onOpenCalendar?: () => void;
 }
 
 export const SemesterView: React.FC<SemesterViewProps> = ({
@@ -48,6 +49,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
   coursesList,
   isLoading,
   onManualRefresh,
+  onOpenCalendar,
 }) => {
   useLanguage();
   // Find last opened course object if available
@@ -245,6 +247,20 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                 </button>
               )}
             </div>
+
+            
+            {onOpenCalendar && (
+              <button
+                type="button"
+                onClick={onOpenCalendar}
+                style={{ backgroundColor: 'var(--accent-light, rgba(10, 172, 165, 0.14))', color: 'var(--accent, #0AACA5)' }}
+                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold hover:opacity-90 transition cursor-pointer"
+                title={t('calendar.sidebar_nav')}
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                <span>{t('calendar.sidebar_nav')}</span>
+              </button>
+            )}
 
             {/* View Mode Toggle: Cards vs. List */}
             <div className="flex items-center gap-0.5 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800" title={t("Ansicht umschalten")}>

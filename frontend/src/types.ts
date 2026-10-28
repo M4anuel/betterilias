@@ -493,3 +493,119 @@ export interface FeedbackFilesResponse {
   upload_url?: string;
 }
 
+export type CourseCalendarFeedStatus =
+  | 'not_imported'
+  | 'not_checked'
+  | 'imported_with_lectures'
+  | 'imported_deadlines_only'
+  | 'valid_empty'
+  | 'unavailable'
+  | 'failed'
+  | 'session_expired';
+
+export type CalendarEventSource =
+  | 'ilias_ical'
+  | 'ilias_ics'
+  | 'ilias_session'
+  | 'ilias_calendar_block'
+  | 'ilias_exercise'
+  | 'ilias_mini_cal'
+  | 'custom_rule';
+
+export type CalendarEventKind = 'lecture' | 'deadline' | 'exam' | 'appointment';
+
+export type CalendarViewMode = 'timetable' | 'week' | 'month' | 'agenda';
+
+export interface CalendarEvent {
+  uid: string;
+  course_ref_id: string;
+  course_title: string;
+  title: string;
+  description?: string | null;
+  location?: string | null;
+  date: string;
+  end_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  start_iso: string;
+  end_iso: string;
+  date_str: string;
+  start_time_str: string;
+  end_time_str: string;
+  weekday: number;
+  all_day: boolean;
+  source: CalendarEventSource;
+  kind: CalendarEventKind;
+  cancelled?: boolean;
+  is_cancelled?: boolean;
+  is_override?: boolean;
+  rule_id?: string | null;
+  color?: string | null;
+}
+
+export interface CourseScheduleRuleInput {
+  course_ref_id: string;
+  course_title?: string | null;
+  semester: string;
+  title?: string | null;
+  location?: string | null;
+  weekdays: number[];
+  start_time: string;
+  end_time: string;
+  start_date: string;
+  end_date: string;
+  exceptions: string[];
+  enabled?: boolean;
+  color?: string | null;
+}
+
+export interface CourseScheduleRule extends CourseScheduleRuleInput {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CourseCalendarInfo {
+  course_ref_id: string;
+  course_title: string;
+  semester?: string | null;
+  color: string;
+  status: CourseCalendarFeedStatus;
+  feed_status?: CourseCalendarFeedStatus;
+  status_message: string;
+  needs_manual_schedule: boolean;
+  has_calendar_block?: boolean;
+  ical_modal_url?: string | null;
+  ical_feed_url?: string | null;
+  open_calendar_url?: string | null;
+  imported_event_count: number;
+  imported_lecture_count: number;
+  imported_deadline_count: number;
+  custom_rule_count: number;
+  last_imported_at?: string | null;
+}
+
+export interface SemesterCalendarResponse {
+  semester: string;
+  semester_start_date: string;
+  semester_end_date: string;
+  semester_mid_date?: string;
+  timezone: string;
+  courses: CourseCalendarInfo[];
+  rules: CourseScheduleRule[];
+  events: CalendarEvent[];
+  subscription_token?: string | null;
+  subscription_url?: string | null;
+  webcal_url?: string | null;
+  is_local_host?: boolean;
+  fetched_at: string;
+}
+
+export interface CalendarSubscriptionResponse {
+  token: string;
+  subscription_url: string;
+  webcal_url: string;
+  download_url?: string;
+  export_url?: string;
+  is_local_host?: boolean;
+}

@@ -15,6 +15,9 @@ import {
   TAAssignmentDetailResponse,
   MembershipFormResponse,
   DeleteReview,
+  CalendarViewMode,
+  CourseScheduleRuleInput,
+  SemesterCalendarResponse,
 } from '../types';
 import { getDefaultCourseIcon } from './courseIcons';
 import { getCurrentSemester } from './semesterUtils';
@@ -1013,6 +1016,85 @@ export const cache = {
       }
     } catch {}
   },
+
+  // --- Calendar & Timetable Cache & Drafts ---
+  getCalendarViewMode(): CalendarViewMode {
+    try {
+      const raw = localStorage.getItem('betterilias_calendar_view_mode');
+      if (raw === 'timetable' || raw === 'week' || raw === 'month' || raw === 'agenda') {
+        return raw;
+      }
+    } catch {}
+    return 'timetable';
+  },
+
+  setCalendarViewMode(mode: CalendarViewMode) {
+    try {
+      localStorage.setItem('betterilias_calendar_view_mode', mode);
+    } catch {}
+  },
+
+  getHiddenCalendarCourses(semester: string): string[] {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const raw = localStorage.getItem(`betterilias_cal_hidden_${scope}_${semester}`);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  },
+
+  setHiddenCalendarCourses(semester: string, courseRefIds: string[]) {
+    try {
+      const scope = this.getSessionId() || 'default';
+      localStorage.setItem(`betterilias_cal_hidden_${scope}_${semester}`, JSON.stringify(courseRefIds));
+    } catch {}
+  },
+
+  getScheduleRuleDraft(courseRefId: string, ruleId?: string | null): Partial<CourseScheduleRuleInput> | null {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const key = `betterilias_cal_rule_draft_${scope}_${courseRefId}_${ruleId || 'new'}`;
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setScheduleRuleDraft(courseRefId: string, ruleId: string | null | undefined, draft: Partial<CourseScheduleRuleInput>) {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const key = `betterilias_cal_rule_draft_${scope}_${courseRefId}_${ruleId || 'new'}`;
+      localStorage.setItem(key, JSON.stringify(draft));
+    } catch {}
+  },
+
+  clearScheduleRuleDraft(courseRefId: string, ruleId?: string | null) {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const key = `betterilias_cal_rule_draft_${scope}_${courseRefId}_${ruleId || 'new'}`;
+      localStorage.removeItem(key);
+    } catch {}
+  },
+
+  getCachedCalendar(semester: string): SemesterCalendarResponse | null {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const raw = localStorage.getItem(`betterilias_cal_cache_${scope}_${semester}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedCalendar(semester: string, data: SemesterCalendarResponse) {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const key = `betterilias_cal_cache_${scope}_${semester}`;
+      localStorage.setItem(key, JSON.stringify(data));
+      this.setCacheTimestamp(key);
+    } catch {}
+  },
 };
-
-

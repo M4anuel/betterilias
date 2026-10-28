@@ -25,6 +25,10 @@ import {
   TAInstructionFileItem,
   TAAssignmentDetailResponse,
   SaveTAAssignmentRequest,
+  SemesterCalendarResponse,
+  CourseScheduleRuleInput,
+  CourseCalendarInfo,
+  CalendarSubscriptionResponse,
 } from '../types';
 import { cache } from './cache';
 import { navigationGuard } from './navigationGuard';
@@ -701,5 +705,150 @@ export const api = {
     const res = await sessionFetch(`${API_BASE}/pdf/info?url=${encodeURIComponent(url)}`);
     if (!res.ok) return { aspect_ratio: 2.16, pages: 1 };
     return res.json().catch(() => ({ aspect_ratio: 2.16, pages: 1 }));
+  },
+
+  // ---------------------------------------------------------
+  // Calendar & Timetable Methods
+  // ---------------------------------------------------------
+  async getCalendar(semester?: string): Promise<SemesterCalendarResponse> {
+    const qs = semester ? `?semester=${encodeURIComponent(semester)}` : '';
+    const res = await sessionFetch(`${API_BASE}/calendar${qs}`);
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.load_failed'));
+    }
+    return res.json();
+  },
+
+  async syncCalendar(payload: {
+    semester?: string;
+    courses: { ref_id: string; title: string; semester?: string }[];
+    force_refresh?: boolean;
+  }): Promise<SemesterCalendarResponse> {
+    const res = await sessionFetch(`${API_BASE}/calendar/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.sync_failed'));
+    }
+    return res.json();
+  },
+
+  async createScheduleRule(rule: CourseScheduleRuleInput): Promise<SemesterCalendarResponse> {
+    const res = await sessionFetch(`${API_BASE}/calendar/rules`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rule),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.rule.save_failed'));
+    }
+    return res.json();
+  },
+
+  async updateScheduleRule(ruleId: string, rule: CourseScheduleRuleInput): Promise<SemesterCalendarResponse> {
+    const res = await sessionFetch(`${API_BASE}/calendar/rules/${encodeURIComponent(ruleId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rule),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.rule.save_failed'));
+    }
+    return res.json();
+  },
+
+  async duplicateScheduleRule(ruleId: string, semester?: string): Promise<SemesterCalendarResponse> {
+    const qs = semester ? `?semester=${encodeURIComponent(semester)}` : '';
+    const res = await sessionFetch(`${API_BASE}/calendar/rules/${encodeURIComponent(ruleId)}/duplicate${qs}`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.rule.save_failed'));
+    }
+    return res.json();
+  },
+
+  async deleteScheduleRule(ruleId: string, semester?: string): Promise<SemesterCalendarResponse> {
+    const qs = semester ? `?semester=${encodeURIComponent(semester)}` : '';
+    const res = await sessionFetch(`${API_BASE}/calendar/rules/${encodeURIComponent(ruleId)}${qs}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.rule.delete_failed'));
+    }
+    return res.json();
+  },
+
+  async updateCourseColor(courseRefId: string, color: string, semester?: string): Promise<SemesterCalendarResponse> {
+    const qs = semester ? `?semester=${encodeURIComponent(semester)}` : '';
+    const res = await sessionFetch(`${API_BASE}/calendar/courses/${encodeURIComponent(courseRefId)}/color${qs}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ color }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.load_failed'));
+    }
+    return res.json();
+  },
+
+  async importCourseIcs(payload: {
+    course_ref_id: string;
+    course_title: string;
+    semester?: string;
+    ics_text: string;
+  }): Promise<CourseCalendarInfo> {
+    const res = await sessionFetch(`${API_BASE}/calendar/import-ics`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.import_ics.failed'));
+    }
+    return res.json();
+  },
+
+  async rotateCalendarSubscription(semester?: string): Promise<CalendarSubscriptionResponse> {
+    const qs = semester ? `?semester=${encodeURIComponent(semester)}` : '';
+    const res = await sessionFetch(`${API_BASE}/calendar/subscription/rotate${qs}`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.subscription.failed'));
+    }
+    return res.json();
+  },
+
+  async revokeCalendarSubscription(): Promise<{ success: boolean }> {
+    const res = await sessionFetch(`${API_BASE}/calendar/subscription`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.subscription.failed'));
+    }
+    return res.json();
+  },
+
+  getCalendarExportUrl(semester?: string, courseIds?: string[]): string {
+    const params = new URLSearchParams();
+    if (semester) params.set('semester', semester);
+    if (courseIds && courseIds.length > 0) params.set('course_ids', courseIds.join(','));
+    const sessionId = cache.getSessionId();
+    if (sessionId) params.set('session_id', sessionId);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return `${API_BASE}/calendar/export.ics${qs}`;
   },
 };
