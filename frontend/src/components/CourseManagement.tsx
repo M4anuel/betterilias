@@ -13,8 +13,8 @@ function affectedRefs(items: DeleteReviewItem[]): string[] {
   return items.flatMap(item => [item.ref_id, ...affectedRefs(item.children)]);
 }
 
-export function CourseManagement({ context, title, courseRefId, onRefresh, onOpenFolder }: {
-  context: AuthoringContext; title: string; courseRefId: string; onRefresh: () => void; onOpenFolder: (ref: string) => void;
+export function CourseManagement({ context, title, courseRefId, isRevalidating, onRefresh, onOpenFolder }: {
+  context: AuthoringContext; title: string; courseRefId: string; isRevalidating?: boolean; onRefresh: () => void; onOpenFolder: (ref: string) => void;
 }) {
   useLanguage();
   const [data, setData] = useState<ManagementResponse | null>(null);
@@ -26,6 +26,7 @@ export function CourseManagement({ context, title, courseRefId, onRefresh, onOpe
   const [error, setError] = useState('');
   const [notice, setNotice] = useState<'management.deleted' | 'management.order_saved' | ''>('');
   const [uncertain, setUncertain] = useState(false);
+  const isUpdating = busy || loading || Boolean(isRevalidating);
   const dirty = !!data && JSON.stringify(order) !== JSON.stringify(data.order);
   useNavigationGuard({ isDirty: dirty, isPending: busy });
   const refId = context.ref_id;
@@ -77,15 +78,30 @@ export function CourseManagement({ context, title, courseRefId, onRefresh, onOpe
     void refreshContents().catch(() => setError(t('management.load_failed'))).finally(() => setBusy(false));
   }
   async function prepareDelete(ids: string[]) {
-    if (busy || dirty || uncertain) return;
-    setBusy(true); setError(''); setNotice('');
-    try { setReview(await api.reviewDeletion(refId, ids)); }
-    catch (e) { setError(e instanceof Error ? e.message : t('management.inspection_incomplete')); }
-    finally { setBusy(false); }
+    if (isUpdating || dirty || uncertain || !ids.length) return;
+    setError(''); setNotice('');
+    const cached = cache.getCachedDeleteReview(refId, ids);
+    if (cached) {
+      setReview(cached);
+    } else {
+      setBusy(true);
+    }
+    try {
+      const fresh = await api.reviewDeletion(refId, ids);
+      cache.setCachedDeleteReview(refId, ids, fresh);
+      setReview(fresh);
+    } catch (e) {
+      if (!cached) {
+        setError(e instanceof Error ? e.message : t('management.inspection_incomplete'));
+      }
+    } finally {
+      setBusy(false);
+    }
   }
   async function confirmDelete() {
     if (!review || busy) return;
     setBusy(true); setError('');
+    cache.invalidateCachedDeleteReview(refId);
     const invalidated = [refId, courseRefId, ...affectedRefs(review.items)];
     try {
       await api.deleteMaterials(refId, review.items.map(item => item.ref_id), review.revision);
@@ -120,7 +136,7 @@ export function CourseManagement({ context, title, courseRefId, onRefresh, onOpe
     finally { setBusy(false); }
   }
   function move(ref: string, target: number) {
-    if (busy || uncertain || !data?.can_sort) return;
+    if (isUpdating || uncertain || !data?.can_sort) return;
     const from = order.indexOf(ref);
     if (from < 0 || target < 0 || target >= order.length || from === target) return;
     setOrder(previous => { const next = [...previous]; next.splice(from, 1); next.splice(target, 0, ref); return next; });
@@ -133,7 +149,7 @@ export function CourseManagement({ context, title, courseRefId, onRefresh, onOpe
     <div className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-teal-200 bg-teal-50/50 p-5 dark:border-teal-900 dark:bg-teal-950/30">
       <div><h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-300">{t('management.intro')}</p></div>
-      <fieldset disabled={busy || dirty} title={dirty ? t('management.save_first') : undefined}>
+      <fieldset disabled={isUpdating || dirty} title={dirty ? t('management.save_first') : isUpdating ? t('Aktualisierung läuft... Bitte warten') : undefined}>
         <CourseAuthoring context={data?.authoring || context} onRefresh={changed} editorUrl={data?.editor_url} />
       </fieldset>
     </div>
@@ -143,30 +159,30 @@ export function CourseManagement({ context, title, courseRefId, onRefresh, onOpe
       href={`https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&ref_id=${refId}`}><ExternalLink size={14} />{t('authoring.open_ilias')}</a>}
     <div className="flex flex-wrap items-center gap-2">
       <label className="mr-auto flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-        <input type="checkbox" className="accent-teal-600" disabled={busy || dirty || !selectable.length}
+        <input type="checkbox" className="accent-teal-600" disabled={isUpdating || dirty || !selectable.length}
           checked={!!selectable.length && selectable.every(item => selected.includes(item.ref_id))}
           onChange={e => setSelected(e.target.checked ? selectable.map(item => item.ref_id) : [])} />{t('management.select_all')}
       </label>
       <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">{t('management.selected', { count: selected.length })}</span>
-      <button className={button} disabled={busy || dirty || uncertain || !selected.length} onClick={() => void prepareDelete(selected)}><Trash2 size={15} />{t('management.delete_selected')}</button>
-      {data?.can_sort && <button className={button} disabled={busy || !dirty || uncertain} onClick={() => void saveOrder()}><Save size={15} />{t('management.save_order')}</button>}
+      <button className={button} disabled={isUpdating || dirty || uncertain || !selected.length} onClick={() => void prepareDelete(selected)}><Trash2 size={15} />{t('management.delete_selected')}</button>
+      {data?.can_sort && <button className={button} disabled={isUpdating || !dirty || uncertain} onClick={() => void saveOrder()}><Save size={15} />{t('management.save_order')}</button>}
       <button className={button} disabled={busy || (dirty && !uncertain)} onClick={() => void reload()} aria-label={t('management.reload')}><RefreshCw size={15} /></button>
     </div>
     {dirty && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-      <span>{t('management.order_draft')}</span><button className={button} disabled={busy} onClick={() => setOrder(data?.order || [])}>{t('management.discard_order')}</button>
+      <span>{t('management.order_draft')}</span><button className={button} disabled={isUpdating} onClick={() => setOrder(data?.order || [])}>{t('management.discard_order')}</button>
     </div>}
     {loading ? <p role="status" className="text-sm text-slate-500 dark:text-slate-400">{t('authoring.busy')}</p> : data &&
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-900">
         {items.map(item => {
           const index = order.indexOf(item.ref_id);
           const Icon = item.item_type === 'fold' ? Folder : FileText;
-          return <li key={item.ref_id} draggable={!!data?.can_sort && index >= 0 && !busy && !uncertain}
+          return <li key={item.ref_id} draggable={!!data?.can_sort && index >= 0 && !isUpdating && !uncertain}
             onDragStart={e => e.dataTransfer.setData('text/plain', item.ref_id)}
             onDragOver={e => { if (index >= 0) e.preventDefault(); }}
             onDrop={e => { e.preventDefault(); move(e.dataTransfer.getData('text/plain'), index); }}
             className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50">
             <input type="checkbox" className="accent-teal-600" aria-label={t('management.select_item', { name: item.title })}
-              disabled={busy || dirty || !item.can_delete} checked={selected.includes(item.ref_id)}
+              disabled={isUpdating || dirty || !item.can_delete} checked={selected.includes(item.ref_id)}
               onChange={e => setSelected(previous => e.target.checked ? [...previous, item.ref_id] : previous.filter(ref => ref !== item.ref_id))} />
             {data?.can_sort && index >= 0 && <GripVertical aria-hidden="true" size={16} className="hidden text-slate-400 sm:block" />}
             <Icon aria-hidden="true" size={20} className="shrink-0 text-teal-600 dark:text-teal-300" />

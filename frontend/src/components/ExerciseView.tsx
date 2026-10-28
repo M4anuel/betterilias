@@ -562,7 +562,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   // 3. Load TA Submissions when in ta_grading tab (Cached + Race condition protection)
   const loadTaSubmissions = useCallback(
     (assId?: string, isInitialLoad = false, forceRefresh = false) => {
-      const cacheKey = assId || 'default';
+      const cacheKey = `${exerciseRefId}_${assId || 'default'}`;
       // 1. Instant serve from memory ref cache or localStorage cache (0ms)
       let cached: ExerciseSubmissionsResponse | null = submissionsCacheRef.current[cacheKey] || null;
       if (!cached) {
@@ -590,6 +590,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           }
           return updated;
         });
+      } else {
+        setTaSubmissionsData(null);
       }
 
       const storageKey = `${EXERCISE_SUBMISSIONS_PREFIX}${exerciseRefId}_${assId || 'default'}`;
@@ -657,6 +659,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
           // Cache the fresh data in BOTH memory and persistent localStorage
           submissionsCacheRef.current[cacheKey] = fresh;
+          if (fresh.active_assignment_id) {
+            submissionsCacheRef.current[`${exerciseRefId}_${fresh.active_assignment_id}`] = fresh;
+          }
           cache.setCachedExerciseSubmissions(exerciseRefId, assId, fresh);
           setTaSubmissionsData(fresh);
 
@@ -702,7 +707,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         return;
       }
       setSelectedTaAssId(newAssId);
-      const cacheKey = newAssId || 'default';
+      const cacheKey = `${exerciseRefId}_${newAssId || 'default'}`;
       let cached: ExerciseSubmissionsResponse | null = submissionsCacheRef.current[cacheKey] || null;
       if (!cached) {
         cached = cache.getCachedExerciseSubmissions(exerciseRefId, newAssId);
@@ -973,10 +978,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     }
   };
 
+  // Active assignment matching guard to prevent cross-assignment UI leakage
+  const isDataMatchingSelectedAss = !selectedTaAssId || !taSubmissionsData?.active_assignment_id || taSubmissionsData.active_assignment_id === selectedTaAssId;
+  const currentSubmissionsData = isDataMatchingSelectedAss ? taSubmissionsData : null;
+
   // Filter TA Submissions
   const filteredTaSubmissions = useMemo(() => {
-    if (!taSubmissionsData?.submissions) return [];
-    let list = taSubmissionsData.submissions;
+    if (!currentSubmissionsData?.submissions) return [];
+    let list = currentSubmissionsData.submissions;
 
     if (taSearchQuery.trim()) {
       const q = taSearchQuery.toLowerCase();
@@ -1901,20 +1910,20 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
             {/* Submissions Stats Pill & Background Sync Badge */}
             <div className="desktop-only flex items-center gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 flex-wrap">
-              {isLoadingTaSubmissions && taSubmissionsData && (
+              {isLoadingTaSubmissions && currentSubmissionsData && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-semibold animate-pulse">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
                   <span>{t("Wird synchronisiert...")}</span>
                 </div>
               )}
-              {taSubmissionsData?.exercise && (
+              {currentSubmissionsData?.exercise && (
                 <>
                   <div className="px-3.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-center">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
                       {t("Abgaben")}
                     </span>
                     <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                      {taSubmissionsData.exercise.submitted_count}
+                      {currentSubmissionsData.exercise.submitted_count}
                     </span>
                   </div>
                   <div className="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800/80 text-center">
@@ -1922,7 +1931,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       {t("Bewertet")}
                     </span>
                     <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">
-                      {taSubmissionsData.exercise.graded_count}
+                      {currentSubmissionsData.exercise.graded_count}
                     </span>
                   </div>
                 </>
@@ -2028,7 +2037,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           )}
 
           {/* Submissions List */}
-          {isLoadingTaSubmissions && !taSubmissionsData ? (
+          {isLoadingTaSubmissions && !currentSubmissionsData ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
               <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
               <p className="text-xs font-semibold">{t("Lade Abgaben zur Bewertung...")}</p>

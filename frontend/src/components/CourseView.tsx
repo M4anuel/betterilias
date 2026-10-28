@@ -824,6 +824,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
   if (activeExerciseRefId) {
     return (
       <ExerciseView
+        key={activeExerciseRefId}
         exerciseRefId={activeExerciseRefId}
         courseNickname={courseNickname}
         courseRefId={courseRefId}
@@ -1995,7 +1996,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
           onNavigateFolder(parent || courseRefId);
         }} onRefresh={onManualRefresh} refreshing={isRevalidating}>
         {materialsData?.authoring && (materialsData.authoring.can_create || materialsData.authoring.can_manage || materialsData.authoring.can_edit_page) &&
-          <button type="button" disabled={isRevalidating} className="rounded-lg px-3 py-2 text-sm disabled:opacity-50" aria-pressed={isManaging} onClick={() => { if (navigationGuard.confirmNavigation()) setIsManaging(!isManaging); }}>{t(isManaging ? 'management.done' : 'management.enter')}</button>}
+          <button type="button" className="rounded-lg px-3 py-2 text-sm" aria-pressed={isManaging} onClick={() => { if (navigationGuard.confirmNavigation()) setIsManaging(!isManaging); }}>{t(isManaging ? 'management.done' : 'management.enter')}</button>}
         <button type="button" className="rounded-lg px-3 py-2 text-sm" onClick={() => setIsOrderModalOpen(true)}>{t('Reihenfolge')}</button>
         {membership?.can_leave && <button type="button" className="rounded-lg px-3 py-2 text-sm" onClick={() => onManageMembership('leave')}>{t('Kurs verlassen')}</button>}
       </MobilePageHeader>
@@ -2018,9 +2019,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
           {materialsData?.authoring && (materialsData.authoring.can_create || materialsData.authoring.can_manage || materialsData.authoring.can_edit_page) &&
             <button
               aria-pressed={isManaging}
-              disabled={isRevalidating}
               onClick={() => { if (navigationGuard.confirmNavigation()) setIsManaging(!isManaging); }}
-              title={isRevalidating ? t("Aktualisierung läuft... Bitte warten") : undefined}
               className="rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200 dark:hover:bg-teal-900/40 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {t(isManaging ? 'management.done' : 'management.enter')}
@@ -2051,6 +2050,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
       {/* Main Title Row & Search */}
       {isManaging && materialsData?.authoring && (materialsData.authoring.can_create || materialsData.authoring.can_manage || materialsData.authoring.can_edit_page) ? <CourseManagement key={materialsData.container_ref_id}
         context={materialsData.authoring} title={materialsData.title || courseNickname} courseRefId={courseRefId}
+        isRevalidating={isRevalidating}
         onRefresh={onManualRefresh} onOpenFolder={onNavigateFolder} /> : <>
       <div className="course-title-row flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="desktop-only min-w-0 flex-1">

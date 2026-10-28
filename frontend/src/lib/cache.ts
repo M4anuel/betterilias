@@ -11,6 +11,10 @@ import {
   SidebarOrderItem,
   ManagementResponse,
   TAAssignmentListResponse,
+  TeamCandidatesResponse,
+  TAAssignmentDetailResponse,
+  MembershipFormResponse,
+  DeleteReview,
 } from '../types';
 import { getDefaultCourseIcon } from './courseIcons';
 import { getCurrentSemester } from './semesterUtils';
@@ -59,6 +63,10 @@ export const STUDENT_ASSIGNMENT_PREFIX = 'ilias_student_assignment_';
 export const CACHE_TS_PREFIX = 'ilias_ts_';
 export const MANAGEMENT_CACHE_PREFIX = 'ilias_management_';
 export const TA_ASSIGNMENTS_CACHE_PREFIX = 'ilias_ta_assignments_';
+export const TEAM_CANDIDATES_CACHE_PREFIX = 'ilias_team_candidates_';
+export const TA_ASSIGNMENT_DETAIL_CACHE_PREFIX = 'ilias_ta_assignment_detail_';
+export const MEMBERSHIP_FORM_CACHE_PREFIX = 'ilias_membership_form_';
+export const DELETE_REVIEW_CACHE_PREFIX = 'ilias_delete_review_';
 export const ILIAS_SAVER_ENABLED_KEY = 'betterilias_saver_enabled';
 export const ILIAS_SAVER_TTL_KEY = 'betterilias_saver_ttl';
 const SESSION_ID_KEY = 'betterilias_session_id';
@@ -753,7 +761,18 @@ export const cache = {
     try {
       const key = `${EXERCISE_SUBMISSIONS_PREFIX}${refId}_${assId || 'default'}`;
       const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : null;
+      if (raw) return JSON.parse(raw);
+      if (assId) {
+        // Also check default key in case it was loaded initially as the active assignment
+        const defRaw = localStorage.getItem(`${EXERCISE_SUBMISSIONS_PREFIX}${refId}_default`);
+        if (defRaw) {
+          const parsed = JSON.parse(defRaw) as ExerciseSubmissionsResponse;
+          if (parsed && parsed.active_assignment_id === assId) {
+            return parsed;
+          }
+        }
+      }
+      return null;
     } catch {
       return null;
     }
@@ -764,6 +783,11 @@ export const cache = {
       const key = `${EXERCISE_SUBMISSIONS_PREFIX}${refId}_${assId || 'default'}`;
       localStorage.setItem(key, JSON.stringify(data));
       this.setCacheTimestamp(key);
+      if (data.active_assignment_id && data.active_assignment_id !== assId) {
+        const activeKey = `${EXERCISE_SUBMISSIONS_PREFIX}${refId}_${data.active_assignment_id}`;
+        localStorage.setItem(activeKey, JSON.stringify(data));
+        this.setCacheTimestamp(activeKey);
+      }
     } catch (e) {
       console.warn('Storage quota exceeded for exercise submissions cache', e);
     }
@@ -858,6 +882,137 @@ export const cache = {
     try {
       localStorage.removeItem(`${TA_ASSIGNMENTS_CACHE_PREFIX}${exerciseRefId}`);
       localStorage.removeItem(`${CACHE_TS_PREFIX}${TA_ASSIGNMENTS_CACHE_PREFIX}${exerciseRefId}`);
+    } catch {}
+  },
+
+  // --- Team Candidates Cache ---
+  getCachedTeamCandidates(exerciseRefId: string, assId: string): TeamCandidatesResponse | null {
+    try {
+      const raw = localStorage.getItem(`${TEAM_CANDIDATES_CACHE_PREFIX}${exerciseRefId}_${assId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedTeamCandidates(exerciseRefId: string, assId: string, data: TeamCandidatesResponse) {
+    try {
+      const key = `${TEAM_CANDIDATES_CACHE_PREFIX}${exerciseRefId}_${assId}`;
+      localStorage.setItem(key, JSON.stringify(data));
+      this.setCacheTimestamp(key);
+    } catch (e) {
+      console.warn('Storage quota exceeded for team candidates cache', e);
+    }
+  },
+
+  invalidateCachedTeamCandidates(exerciseRefId: string, assId?: string) {
+    try {
+      if (assId) {
+        localStorage.removeItem(`${TEAM_CANDIDATES_CACHE_PREFIX}${exerciseRefId}_${assId}`);
+        localStorage.removeItem(`${CACHE_TS_PREFIX}${TEAM_CANDIDATES_CACHE_PREFIX}${exerciseRefId}_${assId}`);
+      } else {
+        const prefix = `${TEAM_CANDIDATES_CACHE_PREFIX}${exerciseRefId}_`;
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+        }
+      }
+    } catch {}
+  },
+
+  // --- TA Assignment Detail Cache ---
+  getCachedTAAssignmentDetail(exerciseRefId: string, assId: string): TAAssignmentDetailResponse | null {
+    try {
+      const raw = localStorage.getItem(`${TA_ASSIGNMENT_DETAIL_CACHE_PREFIX}${exerciseRefId}_${assId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedTAAssignmentDetail(exerciseRefId: string, assId: string, data: TAAssignmentDetailResponse) {
+    try {
+      const key = `${TA_ASSIGNMENT_DETAIL_CACHE_PREFIX}${exerciseRefId}_${assId}`;
+      localStorage.setItem(key, JSON.stringify(data));
+      this.setCacheTimestamp(key);
+    } catch (e) {
+      console.warn('Storage quota exceeded for TA assignment detail cache', e);
+    }
+  },
+
+  invalidateCachedTAAssignmentDetail(exerciseRefId: string, assId: string) {
+    try {
+      const key = `${TA_ASSIGNMENT_DETAIL_CACHE_PREFIX}${exerciseRefId}_${assId}`;
+      localStorage.removeItem(key);
+      localStorage.removeItem(`${CACHE_TS_PREFIX}${key}`);
+    } catch {}
+  },
+
+  // --- Membership Form Cache ---
+  getCachedMembershipForm(refId: string, action: string): MembershipFormResponse | null {
+    try {
+      const raw = localStorage.getItem(`${MEMBERSHIP_FORM_CACHE_PREFIX}${refId}_${action}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedMembershipForm(refId: string, action: string, data: MembershipFormResponse) {
+    try {
+      const key = `${MEMBERSHIP_FORM_CACHE_PREFIX}${refId}_${action}`;
+      localStorage.setItem(key, JSON.stringify(data));
+      this.setCacheTimestamp(key);
+    } catch (e) {
+      console.warn('Storage quota exceeded for membership form cache', e);
+    }
+  },
+
+  invalidateCachedMembershipForm(refId: string, action?: string) {
+    try {
+      if (action) {
+        const key = `${MEMBERSHIP_FORM_CACHE_PREFIX}${refId}_${action}`;
+        localStorage.removeItem(key);
+        localStorage.removeItem(`${CACHE_TS_PREFIX}${key}`);
+      } else {
+        const prefix = `${MEMBERSHIP_FORM_CACHE_PREFIX}${refId}_`;
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+        }
+      }
+    } catch {}
+  },
+
+  // --- Delete Review Cache ---
+  getCachedDeleteReview(refId: string, itemIds: string[]): DeleteReview | null {
+    try {
+      const sortedIds = [...itemIds].sort().join('_');
+      const raw = localStorage.getItem(`${DELETE_REVIEW_CACHE_PREFIX}${refId}_${sortedIds}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedDeleteReview(refId: string, itemIds: string[], data: DeleteReview) {
+    try {
+      const sortedIds = [...itemIds].sort().join('_');
+      const key = `${DELETE_REVIEW_CACHE_PREFIX}${refId}_${sortedIds}`;
+      localStorage.setItem(key, JSON.stringify(data));
+      this.setCacheTimestamp(key);
+    } catch (e) {
+      console.warn('Storage quota exceeded for delete review cache', e);
+    }
+  },
+
+  invalidateCachedDeleteReview(refId: string) {
+    try {
+      const prefix = `${DELETE_REVIEW_CACHE_PREFIX}${refId}_`;
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+      }
     } catch {}
   },
 };
