@@ -41,6 +41,7 @@ import {
 import { api } from '../lib/api';
 import { navigationGuard, useNavigationGuard } from '../lib/navigationGuard';
 import { cache, EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX } from '../lib/cache';
+import { MobilePageHeader } from './MobilePageHeader';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { StudentAssignmentModal } from './StudentAssignmentModal';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
@@ -1325,12 +1326,127 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     }
   }, [activeTab, loadOverview, loadTaSubmissions, selectedTaAssId, exerciseRefId]);
 
+  const advancedGradingFilters = (
+    <div className="flex items-center gap-2.5 flex-wrap">
+      {/* Submission Radio Group */}
+      <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
+          {t("Abgabe:")}
+        </span>
+        <button
+          type="button"
+          onClick={() => handleSetSubmissionFilter('all')}
+          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
+            taSubmissionFilter === 'all'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+          title={t("Alle Abgaben anzeigen")}
+        >
+          {t("Alle (")}{filterCounts.total})
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSetSubmissionFilter('submitted')}
+          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
+            taSubmissionFilter === 'submitted'
+              ? 'bg-sky-600 text-white shadow-2xs font-bold'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+          title={t("Nur eingereichte Abgaben anzeigen")}
+        >
+          {t("Eingereicht (")}{filterCounts.submitted})
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSetSubmissionFilter('not_submitted')}
+          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
+            taSubmissionFilter === 'not_submitted'
+              ? 'bg-slate-700 dark:bg-slate-600 text-white shadow-2xs font-bold'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+          title={t("Nur noch nicht eingereichte anzeigen")}
+        >
+          {t("Nicht eingereicht (")}{filterCounts.notSubmitted})
+        </button>
+      </div>
+
+      {/* Grade Status Multi-Select Group */}
+      <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
+          {t("Bewertung:")}
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            setTaGradeFilter([]);
+            localStorage.setItem('ilias_ta_filter_grade', JSON.stringify([]));
+          }}
+          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
+            taGradeFilter.length === 0
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+          title={t("Alle Bewertungsstufen zulassen")}
+        >
+          {t("Beliebig")}
+        </button>
+        <button
+          type="button"
+          onClick={() => handleToggleGradeFilter('not_graded')}
+          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
+            taGradeFilter.includes('not_graded')
+              ? 'bg-amber-600 text-white shadow-2xs font-bold'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+          title={t("Offene / noch nicht bewertete Abgaben filtern")}
+        >
+          {t("Offen (")}{filterCounts.notGraded})
+        </button>
+        <button
+          type="button"
+          onClick={() => handleToggleGradeFilter('passed')}
+          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
+            taGradeFilter.includes('passed')
+              ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+          title={t("Bestandene Abgaben filtern")}
+        >
+          {t("Bestanden (")}{filterCounts.passed})
+        </button>
+        <button
+          type="button"
+          onClick={() => handleToggleGradeFilter('failed')}
+          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
+            taGradeFilter.includes('failed')
+              ? 'bg-rose-600 text-white shadow-2xs font-bold'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+          title={t("Nicht bestandene Abgaben filtern")}
+        >
+          {t("Nicht bestanden (")}{filterCounts.failed})
+        </button>
+      </div>
+    </div>
+  );
+
   const ongoingCount = (overviewData?.assignments || []).filter((a) => a.is_ongoing).length;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
+      <MobilePageHeader title={overviewData?.title || t("Übungsübersicht")}
+        onBack={onBack} onRefresh={handleRefresh} refreshing={isLoadingOverview || isRevalidatingOverview}
+        trailing={<select aria-label={t('mobile.exercise_view')} value={taManagementMode === 'editor' ? 'manage-edit' : taManagementMode === 'list' ? 'manage' : activeTab === 'ta_grading' ? 'submissions' : activeTab}
+          className="min-w-0 max-w-[43%] rounded-xl border border-slate-200 bg-white px-2 text-xs font-semibold dark:border-slate-700 dark:bg-slate-900"
+          onChange={event => switchTab(event.target.value as ExerciseTab)}>
+          <option value="assignments">{t("Übungsblätter")}</option><option value="info">{t('Informationen')}</option>
+          {overviewData?.has_ta_access && <option value="submissions">{t('Abgaben & Noten (Tutor)')}</option>}
+          {taManagementMode === 'list' && <option value="manage">{t('mobile.manage_assignments')}</option>}
+          {taManagementMode === 'editor' && <option value="manage-edit">{t('mobile.edit_assignment')}</option>}
+        </select>} />
       {/* Top Header with Breadcrumbs & Sync Status */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+      <div className="desktop-only flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <CompactBreadcrumbs
           rawBreadcrumbs={effectiveBreadcrumbs}
           courseNickname={courseNickname}
@@ -1384,7 +1500,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       </div>
 
       {/* Main Title Row & Navigation Tabs */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="desktop-only flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
             <Layers className="h-5 w-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
@@ -1490,7 +1606,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           {/* Filter Bar & Search */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             {/* Filter Pills */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="single-row-filters flex items-center gap-1.5 flex-wrap">
               <button
                 type="button"
                 onClick={() => setAssignmentFilterMode('all')}
@@ -1544,7 +1660,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             <div className="flex items-center gap-2 w-full sm:w-auto">
               {/* Search */}
               <div className="relative flex-1 sm:w-64">
-                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                 <input
                   type="text"
                   placeholder={t("Übungsblatt suchen...")}
@@ -1783,7 +1899,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             </div>
 
             {/* Submissions Stats Pill & Background Sync Badge */}
-            <div className="flex items-center gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 flex-wrap">
+            <div className="desktop-only flex items-center gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 flex-wrap">
               {isLoadingTaSubmissions && taSubmissionsData && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-semibold animate-pulse">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
@@ -1814,9 +1930,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           </div>
 
           {/* TA Grading Menu Bar (Left: Quick-Filters, Middle: Radio & Multi-select, Right: Search, Sorting indicator, Settings 3-dot) */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <div className="grading-toolbar flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             {/* Left: Quick-Filters collection */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="single-row-filters flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 hidden sm:inline">
                 {t("Schnellfilter:")}
               </span>
@@ -1848,114 +1964,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             </div>
 
             {/* Middle: Submission Radio toggle + Grade Multi-select */}
-            <div className="flex items-center gap-2.5 flex-wrap">
-              {/* Submission Radio Group */}
-              <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
-                  {t("Abgabe:")}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleSetSubmissionFilter('all')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
-                    taSubmissionFilter === 'all'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                  title={t("Alle Abgaben anzeigen")}
-                >
-                  {t("Alle (")}{filterCounts.total})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetSubmissionFilter('submitted')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
-                    taSubmissionFilter === 'submitted'
-                      ? 'bg-sky-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                  title={t("Nur eingereichte Abgaben anzeigen")}
-                >
-                  {t("Eingereicht (")}{filterCounts.submitted})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetSubmissionFilter('not_submitted')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
-                    taSubmissionFilter === 'not_submitted'
-                      ? 'bg-slate-700 dark:bg-slate-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                  title={t("Nur noch nicht eingereichte anzeigen")}
-                >
-                  {t("Nicht eingereicht (")}{filterCounts.notSubmitted})
-                </button>
-              </div>
-
-              {/* Grade Status Multi-Select Group */}
-              <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
-                  {t("Bewertung:")}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTaGradeFilter([]);
-                    localStorage.setItem('ilias_ta_filter_grade', JSON.stringify([]));
-                  }}
-                  className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
-                    taGradeFilter.length === 0
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                  title={t("Alle Bewertungsstufen zulassen")}
-                >
-                  {t("Beliebig")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleGradeFilter('not_graded')}
-                  className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
-                    taGradeFilter.includes('not_graded')
-                      ? 'bg-amber-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                  title={t("Offene / noch nicht bewertete Abgaben filtern")}
-                >
-                  {t("Offen (")}{filterCounts.notGraded})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleGradeFilter('passed')}
-                  className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
-                    taGradeFilter.includes('passed')
-                      ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                  title={t("Bestandene Abgaben filtern")}
-                >
-                  {t("Bestanden (")}{filterCounts.passed})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleGradeFilter('failed')}
-                  className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
-                    taGradeFilter.includes('failed')
-                      ? 'bg-rose-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                  title={t("Nicht bestandene Abgaben filtern")}
-                >
-                  {t("Nicht bestanden (")}{filterCounts.failed})
-                </button>
-              </div>
-            </div>
+            <div className="desktop-only">{advancedGradingFilters}</div>
 
             {/* Right: Search, Sorting Indicator & 3-Dot Settings Menu */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="grading-search flex items-center gap-2 shrink-0">
               <div className="flex flex-col gap-0.5">
                 <div className="relative w-full sm:w-44">
-                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                   <input
                     type="text"
                     placeholder={t("Student / Team...")}
@@ -1965,7 +1980,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   />
                 </div>
                 {/* Greyed-out sorting indication under search */}
-                <div className="flex items-center gap-1 px-1 text-[10px] text-slate-400 dark:text-slate-500">
+                <div className="desktop-only flex items-center gap-1 px-1 text-[10px] text-slate-400 dark:text-slate-500">
                   <span>{t("Sortiert:")}</span>
                   <span className="text-slate-500 dark:text-slate-400 font-semibold">{sortFieldLabel}</span>
                   <span className="font-bold">{taSortOrder === 'asc' ? '↑' : '↓'}</span>
@@ -2076,7 +2091,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         </div>
                         <div>
                           {/* Student Names / Team Members with Clear Dividers */}
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="single-row-filters flex items-center gap-1.5 flex-wrap">
                             {sub.team_members && sub.team_members.length > 1 ? (
                               sub.team_members.map((member, mIdx) => (
                                 <span
@@ -2632,7 +2647,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         quickFilters={quickFilters}
         onAddQuickFilter={handleAddQuickFilter}
         onDeleteQuickFilter={handleDeleteQuickFilter}
-      />
+      ><div className="phone-only space-y-2"><h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">{t('mobile.submission_filters')}</h3>{advancedGradingFilters}</div></TAFilterSettingsModal>
 
       {/* Toast Notification for changes detected during background revalidation */}
       {localNotifications.length > 0 && (

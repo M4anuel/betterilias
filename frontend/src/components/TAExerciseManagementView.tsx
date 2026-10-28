@@ -197,7 +197,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
   return (
     <div className="space-y-6">
       {/* Top Header & Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+      <div className="ta-management-header flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
         <div className="flex items-center gap-3">
           <button
             type="button"

@@ -209,7 +209,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
 
             {/* Quick search input */}
             <div className="relative w-full sm:w-56">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
               <input
                 type="text"
                 placeholder={t("Episode suchen...")}

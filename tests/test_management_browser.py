@@ -82,13 +82,17 @@ def test_unified_management_order_review_delete_and_empty_parent(local_site, lan
         page.route('**/api/**', respond)
         page.goto(local_site + '/?course=42')
         playwright.expect(page.get_by_role('button', name=tr('authoring.add'), exact=True)).to_have_count(0)
+        if viewport[0] < 768: page.get_by_label(tr('mobile.actions'), exact=True).click()
         page.get_by_role('button', name=tr('management.enter'), exact=True).click()
         panel = page.get_by_role('region', name=tr('management.panel'))
         playwright.expect(panel.get_by_role('button', name=tr('authoring.add'), exact=True)).to_be_visible()
         # Folder navigation preserves management mode within the current course.
         panel.get_by_role('button', name=tr('management.open_folder'), exact=True).click()
         playwright.expect(panel.get_by_role('heading', name='Folder', exact=True)).to_be_visible()
-        page.get_by_role('navigation').get_by_role('button', name='Course', exact=True).click()
+        if viewport[0] < 768:
+            page.get_by_role('button', name=tr('mobile.back'), exact=True).click()
+        else:
+            page.get_by_role('navigation').get_by_role('button', name='Course', exact=True).click()
         playwright.expect(panel.get_by_role('heading', name='Course', exact=True)).to_be_visible()
 
         panel.get_by_role('button', name=tr('authoring.add'), exact=True).click()
@@ -102,6 +106,7 @@ def test_unified_management_order_review_delete_and_empty_parent(local_site, lan
         panel.get_by_role('button', name=tr('management.move_down').replace('{name}', 'Lecture notes'), exact=True).click()
         playwright.expect(panel.get_by_text(tr('management.order_draft'), exact=True)).to_be_visible()
         page.once('dialog', lambda event: event.dismiss())
+        if viewport[0] < 768: page.get_by_label(tr('mobile.actions'), exact=True).click()
         page.get_by_role('button', name=tr('management.done'), exact=True).click()
         playwright.expect(panel).to_be_visible()
         panel.get_by_role('button', name=tr('management.save_order'), exact=True).click()
@@ -134,6 +139,7 @@ def test_unified_management_order_review_delete_and_empty_parent(local_site, lan
             playwright.expect(panel.get_by_text(tr('management.deleted'), exact=True)).to_be_visible()
         assert set(deletes[0]['item_ids']) == {'51', '52'} and len(deletes) == 1
         page.wait_for_function("JSON.parse(localStorage.getItem('ilias_materials_cache_42')).items.length === 0")
+        if viewport[0] < 768: page.get_by_label(tr('mobile.actions'), exact=True).click()
         page.get_by_role('button', name=tr('management.done'), exact=True).click()
         playwright.expect(page.get_by_text('Lecture notes', exact=True)).to_have_count(0)
         page.reload()

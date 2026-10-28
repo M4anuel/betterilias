@@ -89,7 +89,7 @@ def test_upload_rejection_then_verified_success(local_site, team_upload, width):
         playwright.expect(page.get_by_text('"answer.pdf" submitted successfully.', exact=True)).to_be_visible()
         playwright.expect(page.get_by_text('answer.pdf', exact=True)).to_be_visible()
         assert len(attempts) == 2 and all(request.headers.get('accept-language') == 'en' for request in attempts)
-        page.get_by_role('button', name='Close (Esc)', exact=True).click()
+        page.locator('.app-overlay').get_by_role('button', name='Close', exact=True).first.click()
         page.get_by_role('button', name='Appearance & settings', exact=True).click()
         page.get_by_label('Language', exact=True).select_option('de')
         playwright.expect(page.get_by_text('Keine Abgabefrist angegeben', exact=True)).to_be_visible()

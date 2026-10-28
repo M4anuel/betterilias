@@ -18,9 +18,11 @@ import {
   Tag,
   Palette,
 } from 'lucide-react';
+import { ToggleSwitch } from './ToggleSwitch';
 import { TAQuickFilter } from '../types';
 
 interface TAFilterSettingsModalProps {
+  children?: React.ReactNode;
   isOpen: boolean;
   onClose: () => void;
   courseRefId: string;
@@ -49,6 +51,7 @@ const COLOR_OPTIONS: Array<{ key: TAQuickFilter['color']; label: string; bg: str
 
 export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
   isOpen,
+  children,
   onClose,
   showMarksInOverview,
   onToggleShowMarksInOverview,
@@ -106,6 +109,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
 
   return (
     <div
+      role="dialog" aria-modal="true" aria-label={t("Filter- & Anzeige-Einstellungen")}
       className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
       onClick={onClose}
     >
@@ -114,7 +118,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4.5 bg-slate-50/50 dark:bg-slate-800/60">
+        <div className="grading-settings-header flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 px-6 py-4.5 bg-slate-50/50 dark:bg-slate-800/60">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shadow-2xs">
               <SlidersHorizontal className="h-4.5 w-4.5" />
@@ -127,6 +131,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
           <button
             type="button"
             onClick={onClose}
+            aria-label={t("Schliessen")}
             className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
           >
             <X className="h-4 w-4" />
@@ -134,7 +139,8 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 space-y-6">
+        <div className="grading-settings-body p-6 space-y-6">
+          {children}
           {/* Section 1: Sortierung */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -142,7 +148,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
               <span className="text-[11px] text-slate-400 dark:text-slate-500">{t("Reihenfolge & Kriterium")}</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="sort-choices grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 title={t('Nachname des Empfängers unter „Korrektur per Datei“')}
@@ -211,9 +217,9 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
             </div>
 
             {/* Sort Direction Toggle */}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-2 pt-1">
               <span className="text-xs text-slate-500 dark:text-slate-400">{t("Richtung:")}</span>
-              <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 text-xs">
+              <div className="flex flex-wrap rounded-xl bg-slate-100 dark:bg-slate-800 p-1 text-xs">
                 <button
                   type="button"
                   onClick={() => onSetSortOrder('asc')}
@@ -259,19 +265,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                   {t("Ermöglicht das direkte Eintragen von Noten in der Abgabenliste, statt erst das Detailfenster zu öffnen.")}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={onToggleShowMarksInOverview}
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
-                  showMarksInOverview ? 'bg-amber-600' : 'bg-slate-300 dark:bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    showMarksInOverview ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <ToggleSwitch checked={showMarksInOverview} onChange={onToggleShowMarksInOverview} label={t("Noten- / Punktefeld im Überblick anzeigen")} />
             </div>
 
             {/* Standard-Korrektur-Art */}
@@ -283,7 +277,7 @@ export const TAFilterSettingsModal: React.FC<TAFilterSettingsModalProps> = ({
                 </p>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 pt-1">
+              <div className="correction-modes grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => onSetEvalMode('statement')}

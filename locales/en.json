@@ -1181,5 +1181,11 @@
   "Auf Fachbereiche zurücksetzen": "Reset to default subjects",
   "Reihenfolge & Abschnitte anpassen": "Customize order & sections",
   "Abschnitt entfernen": "Remove section",
-  "Sonstige": "Other"
+  "Sonstige": "Other",
+  "mobile.back": "Back",
+  "mobile.actions": "Page actions",
+  "mobile.exercise_view": "Exercise view",
+  "mobile.manage_assignments": "Manage assignments",
+  "mobile.edit_assignment": "Edit assignment",
+  "mobile.submission_filters": "Submission filters"
 }

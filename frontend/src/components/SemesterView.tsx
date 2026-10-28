@@ -154,15 +154,13 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                 <RefreshCw className="h-4 w-4 animate-spin text-slate-400 ml-2" />
               )}
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              {t("Aktuell ausgewählt:")} <strong className="text-slate-800 dark:text-slate-200">{currentSemesterMeta.full}</strong>
-            </p>
+
           </div>
 
           {/* Controls: Quick Pills + Clean Semester Dropdown + Dialog Trigger + View Mode */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Quick Pills */}
-            <div className="flex items-center gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+            <div className="desktop-only flex items-center gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
               {pillIds.map((semId) => {
                 const isActive = semId === selectedSemester;
                 const semMeta = allSemesters.find((s) => s.id === semId);
@@ -186,19 +184,20 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
             </div>
 
             {/* Clean Dropdown: Only semesters (No overfilled settings options) */}
-            <div className="relative flex items-center gap-1.5">
-              <div className="relative">
+            <div className="semester-select-controls relative flex min-w-0 flex-wrap items-center gap-1.5">
+              <div className="relative min-w-0 flex-1">
                 <select
                   value={selectedSemester}
                   onChange={(e) => onSelectSemester(e.target.value)}
-                  className="appearance-none rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-xs font-semibold text-slate-700 shadow-xs hover:border-slate-300 focus:outline-hidden transition cursor-pointer dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  aria-label={t('semester.choose')}
+                  className="w-full min-w-0 appearance-none rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-xs font-semibold text-slate-700 shadow-xs hover:border-slate-300 focus:outline-hidden transition cursor-pointer dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                   title={t('semester.choose')}
                 >
                   {/* Current & Preview */}
                   <optgroup label={t('semester.current_preview')}>
                     {currentAndPreview.map((sem) => (
                       <option key={sem.id} value={sem.id}>
-                        {sem.short} – {sem.full}
+                        {sem.short}
                       </option>
                     ))}
                   </optgroup>
@@ -207,7 +206,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                   <optgroup label={t('semester.past')}>
                     {past.map((sem) => (
                       <option key={sem.id} value={sem.id}>
-                        {sem.short} – {sem.full}
+                        {sem.short}
                       </option>
                     ))}
                   </optgroup>

@@ -160,7 +160,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
         </div>
 
         {/* Filters & Actions */}
-        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+        <div className="desktop-only flex items-center gap-2 self-start sm:self-auto flex-wrap">
           <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-slate-800 p-0.5 rounded-lg text-[11px]">
             <button
               type="button"
@@ -314,12 +314,12 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
 
                             <div className="flex items-center gap-2 shrink-0">
                               {mat.file_size && (
-                                <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">
+                                <span className="file-size font-mono text-[10px] text-slate-400 dark:text-slate-500">
                                   {mat.file_size}
                                 </span>
                               )}
                               <a
-                                href={downloadUrl}
+                                href={downloadUrl} aria-label={t("Download")}
                                 download
                                 className="flex items-center gap-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition shadow-2xs"
                               >

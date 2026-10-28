@@ -1181,5 +1181,11 @@
   "Auf Fachbereiche zurücksetzen": "Auf Fachbereiche zurücksetzen",
   "Reihenfolge & Abschnitte anpassen": "Reihenfolge & Abschnitte anpassen",
   "Abschnitt entfernen": "Abschnitt entfernen",
-  "Sonstige": "Sonstige"
+  "Sonstige": "Sonstige",
+  "mobile.back": "Zurück",
+  "mobile.actions": "Seitenaktionen",
+  "mobile.exercise_view": "Übungsansicht",
+  "mobile.manage_assignments": "Übungen verwalten",
+  "mobile.edit_assignment": "Übung bearbeiten",
+  "mobile.submission_filters": "Abgaben filtern"
 }

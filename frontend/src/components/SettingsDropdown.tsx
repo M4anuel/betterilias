@@ -13,6 +13,9 @@ import {
   Info,
   Gauge,
 } from 'lucide-react';
+import { SettingsGear } from './SettingsGear';
+import { ToggleSwitch } from './ToggleSwitch';
+import { useMediaQuery } from '../lib/useMediaQuery';
 import { cache } from '../lib/cache';
 import { theme, ThemeMode, ACCENT_PRESETS } from '../lib/theme';
 import { MobileSessionShare } from './MobileSessionShare';
@@ -20,6 +23,8 @@ import { MobileSessionShare } from './MobileSessionShare';
 interface SettingsDropdownProps {
   isOpen: boolean;
   onClose: () => void;
+  gearRotation?: number;
+  onGearClick?: () => void;
   onLogout?: () => void;
   isAuthenticated: boolean;
   userName?: string | null;
@@ -29,6 +34,8 @@ interface SettingsDropdownProps {
 export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   isOpen,
   onClose,
+  gearRotation = 0,
+  onGearClick = onClose,
   onLogout,
   isAuthenticated,
   userName,
@@ -42,7 +49,18 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   const [saverTtl, setSaverTtl] = useState<number>(() => cache.getIliasSaverTtl());
   const [showSaverInfo, setShowSaverInfo] = useState<boolean>(false);
   const [customTtlInput, setCustomTtlInput] = useState<string>(() => String(cache.getIliasSaverTtl()));
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDialogElement>(null);
+  const compact = useMediaQuery('(max-width: 767px)');
+  const closePanel = () => {
+    dropdownRef.current?.close();
+    onClose();
+  };
+  useEffect(() => {
+    const panel = dropdownRef.current;
+    if (!panel || !isOpen) return;
+    if (panel.open) panel.close();
+    if (compact) panel.showModal(); else panel.show();
+  }, [isOpen, compact]);
 
   useEffect(() => {
     const handleThemeChange = (e: Event) => {
@@ -74,12 +92,12 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        onClose();
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) && !(e.target as HTMLElement).closest('[data-settings-trigger]')) {
+        closePanel();
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') closePanel();
     };
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
@@ -137,12 +155,14 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   };
 
   return (
-    <div
+    <dialog
       ref={dropdownRef}
-      className="settings-panel absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl backdrop-blur-md transition-all dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150"
+      aria-label={t("Einstellungen & Design")}
+      onCancel={event => { event.preventDefault(); closePanel(); }}
+      className="settings-panel text-slate-900 dark:text-slate-100 z-50 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl backdrop-blur-md transition-all dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 settings-sheet-heading dark:border-slate-800">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
           <SettingsIcon className="h-4 w-4 text-[#0AACA5]" />
           <span>{t("Einstellungen & Design")}</span>
@@ -152,6 +172,10 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
             {userName || t("Angemeldet")}
           </span>
         )}
+        <button type="button" className="settings-sheet-gear phone-only icon-button rounded-xl text-slate-500 dark:text-slate-300"
+          aria-label={t("Design & Einstellungen")} aria-expanded={isOpen} onClick={() => { dropdownRef.current?.close(); onGearClick(); }}>
+          <SettingsGear rotation={gearRotation} />
+        </button>
       </div>
 
       <div className="space-y-4 pt-3">
@@ -288,22 +312,8 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
             </div>
 
             {/* Toggle Switch */}
-            <button
-              type="button"
-              role="switch"
-              aria-checked={saverEnabled}
-              onClick={handleToggleSaver}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                saverEnabled ? 'bg-[#0AACA5]' : 'bg-slate-300 dark:bg-slate-700'
-              }`}
-              title={saverEnabled ? t("ILIAS Saver deaktivieren") : t("ILIAS Saver aktivieren")}
-            >
-              <span
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                  saverEnabled ? 'translate-x-4' : 'translate-x-0'
-                }`}
-              />
-            </button>
+            <ToggleSwitch checked={saverEnabled} onChange={handleToggleSaver}
+              label={saverEnabled ? t("ILIAS Saver deaktivieren") : t("ILIAS Saver aktivieren")} />
           </div>
 
           {/* Explanation Info Box */}
@@ -379,7 +389,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
           <button
             type="button"
             onClick={() => {
-              onClose();
+              closePanel();
               onOpenExtensionInfo();
             }}
             className="w-full flex items-center justify-between rounded-xl p-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
@@ -400,7 +410,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
             <button
               type="button"
               onClick={() => {
-                onClose();
+                closePanel();
                 onLogout();
               }}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-50 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 transition dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50 cursor-pointer"
@@ -411,6 +421,6 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </dialog>
   );
 };

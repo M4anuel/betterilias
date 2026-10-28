@@ -541,7 +541,8 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
             type="button"
             onClick={handleSafeClose}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
-            title={t("Schließen (Esc)")}
+            aria-label={t("Schliessen")}
+            title={t("Schliessen")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -635,7 +636,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     {detail.exercise_files.map((file, idx) => (
                       <a
                         key={idx}
-                        href={file.download_url}
+                        href={file.download_url} aria-label={t("Download")}
                         download
                         className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60 p-3 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/40 hover:border-indigo-200 dark:hover:border-indigo-800 transition group"
                       >
@@ -669,7 +670,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                   </div>
 
                   {/* Team Action Buttons */}
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="team-actions flex items-center gap-2 flex-wrap">
                     {canCreateTeam && (
                       <button
                         type="button"
@@ -1246,7 +1247,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
 
         {/* Modal Footer */}
         <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-6 py-3.5 bg-slate-50/70 dark:bg-slate-800/80 shrink-0">
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">{t("Drücke Esc zum Schließen")}</span>
+          <span className="desktop-only text-[11px] text-slate-400 dark:text-slate-500">{t("Drücke Esc zum Schließen")}</span>
           <button
             type="button"
             onClick={handleSafeClose}

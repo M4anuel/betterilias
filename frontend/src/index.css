@@ -637,7 +637,7 @@
 /* Shared viewport constraints for navigation and authoring/submission overlays. */
 .app-shell { height: 100dvh; }
 main { overflow-wrap: anywhere; }
-:where(button, a, input, select, textarea, [contenteditable]):focus-visible {
+:where(button, summary, a, input, select, textarea, [contenteditable]):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -686,7 +686,6 @@ dialog:not(.mobile-navigation) {
 
 @media (max-width: 767px) {
   header { padding-top: env(safe-area-inset-top); min-height: calc(4rem + env(safe-area-inset-top)); padding-left: max(0.5rem, env(safe-area-inset-left)); padding-right: max(0.5rem, env(safe-area-inset-right)); }
-  .settings-panel { position: fixed; top: calc(var(--visible-top, 0px) + 4.25rem + env(safe-area-inset-top)); right: max(0.5rem, env(safe-area-inset-right)); max-height: calc(var(--visible-height, 100dvh) - 5rem - env(safe-area-inset-top)); }
   main { padding-bottom: env(safe-area-inset-bottom); }
   /* Prevent Safari's focus zoom while retaining the user's ability to pinch zoom. */
   input:not([type=checkbox]):not([type=radio]), select, textarea, [contenteditable=true] { font-size: 16px; max-width: 100%; }
@@ -698,10 +697,89 @@ dialog:not(.mobile-navigation) {
   .app-overlay > div { border-radius: 1rem; }
   .app-overlay .p-6 { padding: 1rem; }
   .app-overlay .px-6 { padding-left: 1rem; padding-right: 1rem; }
-  .app-overlay > div > .flex:not(.flex-col), .app-overlay > div > form > .flex { flex-wrap: wrap; }
+  .app-overlay > div > .flex > :first-child { min-width: 0; }
+  .app-overlay > div > .flex > button:has(> svg:only-child) { flex-shrink: 0; }
   .ilias-rich-content .pdf-embed { height: 60dvh !important; min-height: min(16rem, 60dvh); max-height: 70dvh; }
 }
 @media (hover: none) {
   /* Keep secondary actions visible when there is no pointer hover. */
   .group .group-hover\:opacity-100 { opacity: 1; }
+}
+
+/* Control hit areas and visible shapes are independent: never enlarge a switch track. */
+.icon-button { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; }
+button:not(.phone-only):not(.desktop-only):has(> svg:only-child) { display: inline-flex; align-items: center; justify-content: center; }
+button > svg:only-child { margin-inline: auto; flex-shrink: 0; }
+summary::-webkit-details-marker { display: none; }
+.phone-only { display: none; }
+dialog.settings-panel {
+  position: fixed; inset: 4.25rem 1rem auto auto; margin: 0; transform: none;
+  width: 20rem; max-width: calc(100vw - 2rem);
+  max-height: calc(var(--visible-height, 100dvh) - 5rem);
+}
+.sidebar-course-title { min-width: 0; overflow-wrap: break-word; }
+@media (max-width: 767px) {
+  .desktop-only { display: none; }
+  .phone-only { display: block; }
+  .phone-page-header { display: flex; }
+  dialog.settings-panel {
+    inset: var(--visible-top, 0px) 0 auto 0; width: 100%; max-width: none;
+    height: var(--visible-height, 100dvh); max-height: none; border: 0; border-radius: 0;
+    padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  }
+  .settings-sheet-heading { position: sticky; top: 0; z-index: 10; min-height: 44px; background: var(--color-white); }
+  .dark .settings-sheet-heading { background: var(--color-slate-900); }
+  .settings-sheet-heading > span { display: none; }
+  .settings-sheet-gear.phone-only { display: inline-flex; margin-left: auto; }
+  .semester-select-controls { flex: 1 1 100%; }
+  .semester-select-controls select { max-width: 100%; }
+  .course-search-actions { flex-wrap: nowrap; }
+  .course-search-actions > .relative { flex: 1; }
+  .course-title-row { gap: 0; }
+  .file-size { display: none; }
+  a[download]:has(> svg) { min-width: 44px; justify-content: center; }
+  a[download]:has(> svg) > span { display: none; }
+  .single-row-filters { flex-wrap: nowrap; min-width: 0; max-width: 100%; overflow-x: auto; }
+  .single-row-filters > button { flex-shrink: 0; white-space: nowrap; }
+  .grading-toolbar { gap: .5rem; }
+  .grading-search { width: 100%; }
+  .grading-search > div:first-child { min-width: 0; flex: 1; }
+  .grading-settings-body { overflow-wrap: normal; }
+  .grading-settings-body .sort-choices { grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
+  .grading-settings-body > .phone-only > div { flex-direction: column; align-items: stretch; }
+  .grading-settings-body > .phone-only > div > div { display: flex; flex-wrap: wrap; gap: .25rem; }
+  .grading-settings-body .correction-modes { grid-template-columns: 1fr; }
+  .correction-modes > button { white-space: nowrap; }
+  .team-actions { flex-wrap: nowrap; width: 100%; gap: .375rem; }
+  .team-actions > button { flex: 1; min-width: 0; justify-content: center; padding-inline: .375rem; font-size: 11px; line-height: 1.2; }
+  .team-actions > button > svg { flex-shrink: 0; }
+  .sidebar-course-heading > div:first-child { flex-basis: 100%; }
+  .sidebar-course-controls { width: 100%; }
+  .sidebar-course-title { line-height: 1.5; }
+}
+
+@media (max-width: 767px) {
+  .ta-editor-header, .ta-management-header { padding: .75rem; gap: .5rem; }
+  .ta-editor-header > div:first-child > div > p, .ta-management-header > div:first-child > div { display: none; }
+  .ta-editor-header h1 { font-size: 1rem; }
+  .ta-editor-header > div:last-child { display: none; }
+  .ta-management-header { flex-direction: row; align-items: center; }
+}
+
+@media (max-width: 767px) {
+  .grading-settings-header > div:first-child { min-width: 0; flex: 1; }
+  .grading-settings-header > div:first-child > div:first-child { flex-shrink: 0; }
+  .grading-settings-header p { display: none; }
+}
+
+@keyframes gear-turn {
+  from { transform: rotate(var(--gear-start)); }
+  to { transform: rotate(var(--gear-end)); }
+}
+.gear-turn { animation: gear-turn .45s ease-out; }
+@media (prefers-reduced-motion: reduce) { .gear-turn { animation: none; } }
+
+.phone-page-header details > div {
+  max-height: max(44px, calc(var(--visible-height, 100dvh) - 8rem));
+  overflow-y: auto;
 }

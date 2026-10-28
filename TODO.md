@@ -4,6 +4,13 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Mobile usability
 
+Follow-up audit: [`docs/MOBILE_UI_REFINEMENT.md`](docs/MOBILE_UI_REFINEMENT.md)
+records the refined prompt, grouped problems and causes found during implementation.
+
+- [x] Refine compact mobile controls, settings, semester/course/exercise navigation,
+  material rows, grading/team actions and stable sidebar editing drafts; verify
+  related cases in both languages and themes.
+
 Implementation: responsive phone/tablet navigation, visible-viewport overlays,
 safe-area spacing, touch targets, contained rich-content tables, PDF fallback links,
 and narrow-screen exercise tabs are implemented. Automated phone workflow checks

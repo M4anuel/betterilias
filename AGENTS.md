@@ -97,6 +97,8 @@ python start.py --help  # or verify python start.py syntax
 * Check 320-430 CSS px portrait widths, tablet widths and short landscape viewports. Prevent page-wide horizontal overflow; keep wide tables, code and media in labelled, keyboard-accessible scrolling regions.
 * Keep navigation, course context, search and secondary actions accessible by tap without hover. Aim for 44 x 44 CSS px touch targets, clear focus states and accessible names; offer tap controls alongside drag-and-drop.
 * Fit dialogs, menus and primary actions to the visible viewport and safe areas. Account for the on-screen keyboard and Safari input zoom; preserve mounted form drafts across resizing and rotation. Reuse shared viewport/overlay styles and maintain focus/escape behavior.
+* Keep touch hit areas separate from switch tracks and other compact visual controls; center icons against the actual control height. Avoid global sizing/wrapping rules that distort control shapes or force modal close buttons onto a new row.
+* Keep phone navigation chrome compact: retain back/context and put secondary actions in accessible menus. Preserve editor drafts during parent rerenders and background refreshes; initialise them when opening, not whenever a collection prop changes.
 * Support native phone file pickers, upload feedback/retry and usable PDF/video fallback links. Preserve lecturer content while adapting its layout.
 * Verify German/English and light/dark modes. Add focused browser regressions for changed mobile workflows; record which checks use emulation and which use real iOS Safari/Android Chrome. Do not claim physical-device or live ILIAS validation from mocked tests.
 
