@@ -709,10 +709,41 @@ dialog:not(.mobile-navigation) {
 /* Control hit areas and visible shapes are independent: never enlarge a switch track. */
 .icon-button { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; }
 .my-courses-control, .player-select { min-height: 48px; }
-.podcast-player-dialog { width: min(72rem, calc(100vw - 1.5rem)); max-width: none; margin-inline: auto; }
+dialog.podcast-player-dialog { width: min(72rem, calc(100vw - 1.5rem)); max-width: none; margin-inline: auto; top: calc(var(--visible-top, 0px) + 1rem); transform: none; }
+.player-stage { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 55dvh; border-radius: .75rem; }
+.player-overlay {
+  position: absolute; inset: auto .5rem .5rem; z-index: 15; padding: .25rem .5rem;
+  border-radius: .75rem; color: white; background: rgb(15 23 42 / .72); backdrop-filter: blur(8px);
+  opacity: 1; transition: opacity 180ms ease, visibility 180ms;
+}
+.player-overlay[data-visible=false] { opacity: 0; visibility: hidden; pointer-events: none; }
+.player-toolbar { display: grid; grid-template-columns: 44px minmax(60px, 120px) minmax(60px, 80px) minmax(0, 1fr) 44px; align-items: center; gap: .5rem; }
+.player-timeline { position: relative; height: 52px; }
+.player-timeline-track { position: absolute; left: 8px; right: 8px; top: 30px; height: 8px; border-radius: 999px; background: rgb(255 255 255 / .3); }
+.player-chapter-marker { position: absolute; width: 2px; height: 12px; top: -2px; background: white; transform: translateX(-1px); pointer-events: none; }
+.player-seek { position: absolute; top: 12px; left: 0; width: 100%; height: 44px; margin: 0; appearance: none; background: transparent; cursor: pointer; }
+.player-seek::-webkit-slider-runnable-track { height: 8px; background: transparent; }
+.player-seek::-moz-range-track { height: 8px; background: transparent; }
+.player-seek::-webkit-slider-thumb { appearance: none; margin-top: -4px; width: 16px; height: 16px; border: 2px solid white; border-radius: 50%; background: #2dd4bf; box-shadow: 0 1px 4px #0008; }
+.player-seek::-moz-range-thumb { width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; background: #2dd4bf; box-shadow: 0 1px 4px #0008; }
+.player-preview { position: absolute; bottom: calc(100% + 6px); width: 144px; transform: translateX(-50%); border-radius: .5rem; padding: 3px; background: rgb(15 23 42 / .9); pointer-events: none; box-shadow: 0 2px 10px #0008; }
+.player-volume { position: relative; display: block; min-width: 0; height: 44px; }
+.player-volume-cone { position: absolute; inset: 10px 8px; clip-path: polygon(0 44%, 100% 0, 100% 100%, 0 56%); }
+.player-volume-range { position: absolute; inset: 0; width: 100%; height: 44px; margin: 0; appearance: none; background: transparent; cursor: pointer; }
+.player-volume-range::-webkit-slider-runnable-track { height: 28px; background: transparent; }
+.player-volume-range::-moz-range-track { height: 28px; background: transparent; }
+.player-volume-range::-webkit-slider-thumb { appearance: none; width: 4px; height: 28px; border: 0; border-radius: 2px; background: white; }
+.player-volume-range::-moz-range-thumb { width: 4px; height: 28px; border: 0; border-radius: 2px; background: white; }
+.player-speed { width: 100%; min-height: 44px; border: 1px solid #ffffff60; border-radius: .5rem; padding: .25rem; color: white; background: #0f172a80; font-size: 16px; color-scheme: dark; }
+@media (min-width: 640px) { .player-speed { font-size: 14px; } }
+@media (prefers-reduced-motion: reduce) { .player-overlay { transition: none; } }
 @media (max-width: 639px) {
   .podcast-player-dialog { width: calc(100vw - .75rem); }
+  .player-preview { width: 96px; bottom: calc(100% - 24px); }
+  .player-overlay[data-preview=true] .player-timeline > span:first-child { opacity: 0; }
 }
+@media (min-width: 375px) and (max-width: 639px) { .player-preview { width: 128px; } }
+@media (max-height: 450px) { .player-preview { width: 96px; bottom: calc(100% - 24px); } }
 button:not(.phone-only):not(.desktop-only):has(> svg:only-child) { display: inline-flex; align-items: center; justify-content: center; }
 button > svg:only-child { margin-inline: auto; flex-shrink: 0; }
 summary::-webkit-details-marker { display: none; }

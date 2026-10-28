@@ -96,8 +96,12 @@ audio/camera source; they are not universal size or quality promises.
   hidden. Bandwidth saver selects the lowest available camera rendition and the
   highest available slides rendition; it does not promise an audio-only transfer.
   Quality options come from the recording. Full screen is offered where supported.
-- Slide thumbnails are lazy-loaded and seek both streams to their actual times.
-  Single-stream recordings work without layout/chapter controls. HLS/DASH-only
+- Chapter timestamps mark the timeline, with thumbnails displayed during hover
+  and scrubbing instead of a separate slide collection. Keyboard Page Up/Down
+  seeks between chapters. The translucent playback controls hide after inactivity
+  while preserving touch and keyboard access, and loading skeletons reserve the
+  video area. See [the refinement specification](PLAYER_CONTROLS_REFINEMENT.md).
+  Single-stream recordings work without layout controls. HLS/DASH-only
   recordings, subtitles and OS-level picture in picture remain outside this scope.
 - The portable Paella fixture retains the supplied stream/configuration structure
   and 42 chapter timestamps. Unneeded OCR/transcriptions and captions are omitted.

@@ -11,6 +11,21 @@ const timestamp = (time: number) => {
 const buttonStyle = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800';
 const selectStyle = 'player-select mt-1 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 text-base dark:border-slate-700 dark:bg-slate-900 sm:text-sm';
 
+function PlayerSkeleton() {
+  return <div className="space-y-4" data-player-skeleton role="status" aria-label={t('player.loading')}>
+    <div className="player-stage bg-slate-200 motion-safe:animate-pulse dark:bg-slate-800">
+      <div className="absolute inset-x-3 bottom-3 h-16 rounded-lg bg-slate-300 dark:bg-slate-700" />
+    </div>
+    <div className="player-settings grid grid-cols-2 gap-3 sm:grid-cols-3" aria-hidden="true">
+      {[0, 1, 2].map(value => <div key={value} className="col-span-2 h-[72px] rounded-lg bg-slate-200 motion-safe:animate-pulse dark:bg-slate-800 sm:col-span-1" />)}
+      <div className="col-span-2 flex flex-wrap items-end gap-2 sm:col-span-3">
+        <span className={`${buttonStyle} bg-slate-200 !text-transparent dark:bg-slate-800`}><ArrowLeftRight className="h-4 w-4" /><span>{t('player.swap')}</span></span>
+        <span className={`${buttonStyle} bg-slate-200 !text-transparent dark:bg-slate-800`}>{t('player.saver')}</span>
+      </div>
+    </div>
+  </div>;
+}
+
 export function PodcastPlayer({ url, title, onClose }: { url: string; title: string; onClose: () => void }) {
   useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -40,7 +55,7 @@ export function PodcastPlayer({ url, title, onClose }: { url: string; title: str
       <button type="button" aria-label={t('Schliessen')} onClick={onClose} className={`${buttonStyle} w-11 shrink-0 !px-0`}><X className="h-5 w-5" /></button>
     </div>
     <div className="space-y-4 p-3 sm:p-5">
-      {error ? <p role="alert">{t('player.resolve_failed')}</p> : !data ? <p role="status">{t('player.loading')}</p>
+      {error ? <p role="alert">{t('player.resolve_failed')}</p> : !data ? <PlayerSkeleton />
         : <SynchronizedPlayer key={`${url}_${revision}`} data={data} />}
       <div className="flex flex-wrap gap-3">
         <button type="button" onClick={() => setRevision(value => value + 1)} className={buttonStyle}><RefreshCw className="h-4 w-4" /><span>{t('player.reload')}</span></button>
@@ -66,6 +81,14 @@ function SynchronizedPlayer({ data }: { data: VideoStreamInfo }) {
   const [rate, setRate] = useState(1);
   const [volume, setVolume] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
+  const [mediaReady, setMediaReady] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [controlsFocused, setControlsFocused] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
+  const [previewTime, setPreviewTime] = useState<number | null>(null);
+  const activity = useRef(Date.now());
+  const lastInput = useRef<'pointer' | 'keyboard'>('pointer');
+  const dragging = useRef(false);
   const audio = useRef<HTMLVideoElement>(null);
   const playerArea = useRef<HTMLDivElement>(null);
   const slides = useRef<HTMLVideoElement>(null);
@@ -76,6 +99,16 @@ function SynchronizedPlayer({ data }: { data: VideoStreamInfo }) {
   const controller = useRef<{ toggle: () => void; seek: (value: number) => void } | null>(null);
   const audioUrl = audioStream.renditions[audioQuality].url;
   const slidesUrl = slidesStream?.renditions[slidesQuality].url;
+  const revealControls = () => { activity.current = Date.now(); setControlsVisible(true); };
+
+  useEffect(() => {
+    revealControls();
+    if (!playing || controlsFocused || scrubbing || error || buffering) return;
+    const interval = window.setInterval(() => {
+      if (Date.now() - activity.current >= 2500) { setControlsVisible(false); setPreviewTime(null); }
+    }, 250);
+    return () => window.clearInterval(interval);
+  }, [playing, controlsFocused, scrubbing, error, buffering]);
 
   useEffect(() => {
     const update = () => setFullscreen(document.fullscreenElement === playerArea.current);
@@ -100,7 +133,7 @@ function SynchronizedPlayer({ data }: { data: VideoStreamInfo }) {
     let active = true;
     let starting = false;
     setError(null);
-    setPlaying(false); setBuffering(wanted.current);
+    setPlaying(false); setBuffering(wanted.current); setMediaReady(false);
     const pause = () => { videos.forEach(video => video.pause()); setPlaying(false); };
     const resume = async () => {
       if (!active || !wanted.current || starting) return;
@@ -136,7 +169,7 @@ function SynchronizedPlayer({ data }: { data: VideoStreamInfo }) {
         video.currentTime = position.current;
         video.playbackRate = speed.current;
       });
-      listen(video, 'canplay', () => { void resume(); });
+      listen(video, 'canplay', () => { if (videos.every(item => item.readyState >= 2)) setMediaReady(true); void resume(); });
       listen(video, 'seeked', () => { void resume(); });
       listen(video, 'waiting', () => { if (wanted.current) { pause(); setBuffering(true); } });
       listen(video, 'error', () => { wanted.current = false; pause(); setBuffering(false); setError(t('player.media_failed')); });
@@ -156,34 +189,84 @@ function SynchronizedPlayer({ data }: { data: VideoStreamInfo }) {
   }, [audioUrl, slidesUrl]);
 
   const primaryAudio = swapped && layout !== 'slides';
-  const frameStyle = (isAudio: boolean) => !slidesStream ? 'relative w-full' : layout === 'slides' && isAudio ? 'hidden'
-    : layout === 'split' ? 'relative min-w-0 flex-1' : isAudio === primaryAudio ? 'relative w-full'
-      : 'absolute bottom-2 right-2 z-10 w-[30%] overflow-hidden rounded-lg border border-white/60 shadow-lg';
-  const activeChapter = data.chapters.findLastIndex(chapter => chapter.time <= time);
+  const frameStyle = (isAudio: boolean) => !slidesStream ? 'relative h-full w-full' : layout === 'slides' && isAudio ? 'hidden'
+    : layout === 'split' ? 'relative min-h-0 min-w-0 flex-1' : isAudio === primaryAudio ? 'relative h-full w-full'
+      : 'absolute top-2 right-2 z-10 aspect-video w-[30%] overflow-hidden rounded-lg border border-white/60 shadow-lg';
+  const displayedTime = scrubbing && previewTime !== null ? previewTime : time;
+  const previewChapterIndex = previewTime === null ? -1 : data.chapters.findLastIndex(chapter => chapter.time <= previewTime);
+  const previewChapter = data.chapters[previewChapterIndex];
+  const previewPercent = duration && previewTime !== null ? 100 * previewTime / duration : 0;
+  const overlayButton = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-white';
+  const previewAtPointer = (event: React.PointerEvent<HTMLInputElement>) => {
+    if (!duration) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    setPreviewTime(Math.max(0, Math.min(duration, (event.clientX - bounds.left - 8) / Math.max(1, bounds.width - 16) * duration)));
+  };
   return <div ref={playerArea} className="space-y-4 bg-white dark:bg-slate-950 [&:fullscreen]:overflow-y-auto [&:fullscreen]:p-4">
-    <div data-player-layout={layout} className={`relative overflow-hidden rounded-xl bg-black ${layout === 'split' ? 'flex flex-col gap-1 sm:flex-row' : ''}`}>
-      <div className={frameStyle(true)} style={layout === 'split' ? { order: swapped ? 1 : 2 } : undefined}><video ref={audio} data-stream="audio" aria-label={t('player.camera')} playsInline preload="metadata" poster={data.preview_url || undefined} className="aspect-video max-h-[55dvh] w-full bg-black object-contain" /></div>
-      {slidesStream && <div className={frameStyle(false)} style={layout === 'split' ? { order: swapped ? 2 : 1 } : undefined}><video ref={slides} data-stream="slides" aria-label={t('player.slides')} playsInline muted preload="metadata" className="aspect-video max-h-[55dvh] w-full bg-black object-contain" /></div>}
+    <div data-player-layout={layout} className="player-stage bg-black" tabIndex={0} role="group" aria-label={t('player.controls')}
+      onPointerMove={revealControls} onPointerDown={revealControls} onPointerDownCapture={() => { lastInput.current = 'pointer'; setControlsFocused(false); }} onFocus={revealControls}
+      onKeyDown={event => { lastInput.current = 'keyboard'; revealControls(); }}>
+      <div className={`absolute inset-0 overflow-hidden rounded-xl ${layout === 'split' ? 'flex flex-col gap-1 sm:flex-row' : ''}`}>
+        <div className={frameStyle(true)} style={layout === 'split' ? { order: swapped ? 1 : 2 } : undefined}><video ref={audio} data-stream="audio" aria-label={t('player.camera')} playsInline preload="metadata" poster={data.preview_url || undefined} className="h-full w-full bg-black object-contain" /></div>
+        {slidesStream && <div className={frameStyle(false)} style={layout === 'split' ? { order: swapped ? 2 : 1 } : undefined}><video ref={slides} data-stream="slides" aria-label={t('player.slides')} playsInline muted preload="metadata" className="h-full w-full bg-black object-contain" /></div>}
+      </div>
+      {!mediaReady && !error && <div data-media-skeleton role="status" aria-label={t('player.loading')} className="pointer-events-none absolute inset-0 z-10 rounded-xl bg-slate-200 motion-safe:animate-pulse dark:bg-slate-800" />}
+      {buffering && <p role="status" className="absolute left-3 top-3 z-10 rounded-lg bg-black/60 px-3 py-2 text-xs text-white">{t('player.buffering')}</p>}
+      <div className="player-overlay" data-visible={controlsVisible} data-preview={previewTime !== null} data-scrubbing={scrubbing}
+        aria-hidden={!controlsVisible} inert={!controlsVisible}
+        onFocusCapture={event => { if (lastInput.current === 'keyboard' || event.target.tagName === 'SELECT') setControlsFocused(true); }}
+        onKeyDownCapture={() => setControlsFocused(true)}
+        onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setControlsFocused(false); }}>
+        <div className="player-timeline">
+          <span className="pointer-events-none absolute left-2 top-0 text-[10px] tabular-nums text-white">{timestamp(displayedTime)} / {timestamp(duration)}</span>
+          <div className="player-timeline-track" aria-hidden="true">
+            <div className="h-full rounded-full bg-teal-400" style={{ width: `${duration ? Math.min(100, displayedTime / duration * 100) : 0}%` }} />
+            {duration > 0 && data.chapters.filter(chapter => chapter.time <= duration).map((chapter, index) =>
+              <span key={index} data-chapter-time={chapter.time} className="player-chapter-marker" style={{ left: `${chapter.time / duration * 100}%` }} />)}
+          </div>
+          <input type="range" aria-label={t('player.seek')} aria-valuetext={timestamp(displayedTime)} min={0} max={duration || 1} step={0.1}
+            value={Math.min(displayedTime, duration || 1)} disabled={!duration} className="player-seek" aria-describedby="player-seek-help"
+            onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); dragging.current = true; setScrubbing(true); previewAtPointer(event); }}
+            onPointerMove={previewAtPointer}
+            onPointerUp={event => { dragging.current = false; setScrubbing(false); controller.current?.seek(Number(event.currentTarget.value)); if (event.pointerType !== 'mouse') setPreviewTime(null); }}
+            onPointerCancel={() => { dragging.current = false; setScrubbing(false); setPreviewTime(null); }}
+            onPointerLeave={() => { if (!dragging.current) setPreviewTime(null); }}
+            onFocus={() => setPreviewTime(time)} onBlur={() => setPreviewTime(null)}
+            onKeyDown={event => {
+              if (event.key !== 'PageUp' && event.key !== 'PageDown') return;
+              event.preventDefault();
+              const chapter = event.key === 'PageUp' ? data.chapters.find(item => item.time > time + 0.1)
+                : data.chapters.findLast(item => item.time < time - 0.1);
+              if (chapter) { setPreviewTime(chapter.time); controller.current?.seek(chapter.time); }
+            }}
+            onChange={event => { const value = Number(event.target.value); setPreviewTime(value); if (!dragging.current) controller.current?.seek(value); }} />
+          <span id="player-seek-help" className="sr-only">{t('player.seek_help')}</span>
+          {previewTime !== null && <div className="player-preview" data-preview-time={previewTime} style={{ left: `clamp(76px, ${previewPercent}%, calc(100% - 76px))` }}>
+            {previewChapter && <img src={previewChapter.image} alt={t('player.chapter', { number: previewChapterIndex + 1, time: timestamp(previewChapter.time) })} className="aspect-video w-full rounded object-contain" />}
+            <span className="block py-1 text-center text-[10px] tabular-nums text-white">{timestamp(previewTime)}</span>
+          </div>}
+        </div>
+        <div className="player-toolbar">
+          <button type="button" onClick={() => controller.current?.toggle()} aria-label={t(playing || buffering ? 'player.pause' : 'player.play')} className={overlayButton}>
+            {playing || buffering ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}</button>
+          <label className="player-volume" title={t('player.volume')}><span className="sr-only">{t('player.volume')}</span>
+            <span className="player-volume-cone" aria-hidden="true" style={{ background: `linear-gradient(to right, #2dd4bf ${volume * 100}%, rgb(255 255 255 / .3) ${volume * 100}%)` }} />
+            <input type="range" min={0} max={1} step={0.05} value={volume} className="player-volume-range" aria-valuetext={t('player.volume_percent', { percent: Math.round(volume * 100) })} onChange={event => {
+              const value = Number(event.target.value); setVolume(value); loudness.current = value; if (audio.current) audio.current.volume = value;
+            }} /></label>
+          <label className="min-w-0"><span className="sr-only">{t('player.speed')}</span><select value={rate} className="player-speed" onChange={event => {
+            const value = Number(event.target.value); setRate(value); speed.current = value;
+            if (lastInput.current === 'pointer') setControlsFocused(false);
+            [audio.current, slides.current].forEach(video => { if (video) video.playbackRate = value; });
+          }}>{[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(value => <option key={value} value={value}>{value}×</option>)}</select></label>
+          <span aria-hidden="true" />
+          {document.fullscreenEnabled && <button type="button" aria-label={t(fullscreen ? 'player.exit_fullscreen' : 'player.fullscreen')} className={overlayButton}
+            onClick={() => { void (fullscreen ? document.exitFullscreen() : playerArea.current?.requestFullscreen())?.catch(() => setError(t('player.fullscreen_failed'))); }}><Maximize className="h-4 w-4" /></button>}
+        </div>
+      </div>
     </div>
     {error && <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">{error}</p>}
-    {buffering && <p role="status" className="text-sm text-slate-500 dark:text-slate-400">{t('player.buffering')}</p>}
-    <div className="flex items-center gap-3">
-      <button type="button" onClick={() => controller.current?.toggle()} aria-label={t(playing || buffering ? 'player.pause' : 'player.play')} className={`${buttonStyle} w-11 shrink-0 !px-0`}>
-        {playing || buffering ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}</button>
-      <label className="min-w-0 flex-1"><span className="sr-only">{t('player.seek')}</span><input type="range" min={0} max={duration || 1} step={1} value={Math.min(time, duration || 1)} disabled={!duration}
-        onChange={event => controller.current?.seek(Number(event.target.value))} className="min-h-11 w-full accent-teal-600" /></label>
-      <span className="shrink-0 text-xs tabular-nums">{timestamp(time)} / {timestamp(duration)}</span>
-      {document.fullscreenEnabled && <button type="button" aria-label={t(fullscreen ? 'player.exit_fullscreen' : 'player.fullscreen')} className={`${buttonStyle} w-11 shrink-0 !px-0`}
-        onClick={() => { void (fullscreen ? document.exitFullscreen() : playerArea.current?.requestFullscreen())?.catch(() => setError(t('player.fullscreen_failed'))); }}><Maximize className="h-4 w-4" /></button>}
-    </div>
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <label className="min-w-0 text-sm">{t('player.speed')}<select value={rate} className={selectStyle} onChange={event => {
-        const value = Number(event.target.value); setRate(value); speed.current = value;
-        [audio.current, slides.current].forEach(video => { if (video) video.playbackRate = value; });
-      }}>{[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(value => <option key={value}>{value}</option>)}</select></label>
-      <label className="min-w-0 text-sm">{t('player.volume')}<input type="range" min={0} max={1} step={0.05} value={volume} className="mt-1 min-h-12 w-full accent-teal-600" onChange={event => {
-        const value = Number(event.target.value); setVolume(value); loudness.current = value; if (audio.current) audio.current.volume = value;
-      }} /></label>
+    <div className="player-settings grid grid-cols-2 gap-3 sm:grid-cols-3">
       <label className="col-span-2 min-w-0 text-sm sm:col-span-1">{t('player.camera_quality')}<select value={audioQuality} className={selectStyle} onChange={event => setAudioQuality(Number(event.target.value))}>
         {audioStream.renditions.map((source, index) => <option key={index} value={index}>{source.height ? `${source.height}p` : t('player.original')}</option>)}</select></label>
       {slidesStream && <>
@@ -191,22 +274,11 @@ function SynchronizedPlayer({ data }: { data: VideoStreamInfo }) {
           {slidesStream.renditions.map((source, index) => <option key={index} value={index}>{source.height ? `${source.height}p` : t('player.original')}</option>)}</select></label>
         <label className="col-span-2 min-w-0 text-sm sm:col-span-1">{t('player.layout')}<select value={layout} className={selectStyle} onChange={event => setLayout(event.target.value as typeof layout)}>
           <option value="inset">{t('player.inset')}</option><option value="split">{t('player.split')}</option><option value="slides">{t('player.slides_only')}</option></select></label>
-        <div className="col-span-2 flex flex-wrap items-end gap-2 sm:col-span-1">
+        <div className="col-span-2 flex flex-wrap items-end gap-2 sm:col-span-3">
           <button type="button" disabled={layout === 'slides'} className={buttonStyle} onClick={() => setSwapped(value => !value)}><ArrowLeftRight className="h-4 w-4" /><span>{t('player.swap')}</span></button>
           <button type="button" className={buttonStyle} onClick={() => { setAudioQuality(0); setSlidesQuality(slidesStream.renditions.length - 1); setLayout('slides'); }}>{t('player.saver')}</button>
         </div>
       </>}
     </div>
-    {data.chapters.length > 0 && <details className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-      <summary className="cursor-pointer py-2 text-sm font-semibold">{t('player.chapters', { count: data.chapters.length })}</summary>
-      <div className="mt-3 grid max-h-64 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-4">
-        {data.chapters.map((chapter, index) => <button type="button" key={`${chapter.time}_${index}`} aria-current={index === activeChapter ? 'true' : undefined}
-          aria-label={t('player.chapter', { number: index + 1, time: timestamp(chapter.time) })} onClick={() => controller.current?.seek(chapter.time)}
-          className={`min-w-0 rounded-lg border p-1 text-left ${index === activeChapter ? 'border-teal-500 bg-teal-50 dark:bg-teal-950' : 'border-slate-200 dark:border-slate-700'}`}>
-          <img src={chapter.image} alt="" loading="lazy" className="aspect-video w-full rounded object-contain" />
-          <span className="block px-1 py-2 text-xs">{timestamp(chapter.time)}</span>
-        </button>)}
-      </div>
-    </details>}
   </div>;
 }
