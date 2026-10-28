@@ -49,6 +49,7 @@ class CourseItem(BaseModel):
     semester: Optional[str] = None
     subject: Optional[str] = None
     faculty: Optional[str] = None
+    is_favourite: bool = False
 
 class DashboardResponse(BaseModel):
     courses: List[CourseItem]

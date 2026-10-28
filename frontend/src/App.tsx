@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SemesterView } from './components/SemesterView';
 import { CourseView } from './components/CourseView';
+import { MyCoursesView } from './components/MyCoursesView';
 import { RepositoryView } from './components/RepositoryView';
 import { CourseMembershipModal } from './components/CourseMembershipModal';
 import { NicknameModal } from './components/NicknameModal';
@@ -32,11 +33,14 @@ export interface NavigationState {
   exerciseId: string | null;
   exerciseTab?: ExerciseTab | null;
   repositoryId?: string | null;
+  myCourses?: boolean;
 }
 
 export function stateToUrl(state: NavigationState): string {
   const params = new URLSearchParams();
-  if (state.repositoryId) {
+  if (state.myCourses) {
+    params.set('view', 'my-courses');
+  } else if (state.repositoryId) {
     params.set('repository', state.repositoryId);
   } else if (state.courseId) {
     params.set('course', state.courseId);
@@ -60,11 +64,12 @@ export function stateToUrl(state: NavigationState): string {
 
 export function parseStateFromUrl(defaultSemester: string): NavigationState {
   const params = new URLSearchParams(window.location.search);
-  const repositoryId = params.get('repository');
-  const courseId = repositoryId ? null : params.get('course');
-  const folderId = repositoryId ? null : params.get('folder');
-  const exerciseId = repositoryId ? null : params.get('exercise');
-  const tabParam = repositoryId ? null : params.get('tab');
+  const myCourses = params.get('view') === 'my-courses';
+  const repositoryId = myCourses ? null : params.get('repository');
+  const courseId = myCourses || repositoryId ? null : params.get('course');
+  const folderId = myCourses || repositoryId ? null : params.get('folder');
+  const exerciseId = myCourses || repositoryId ? null : params.get('exercise');
+  const tabParam = myCourses || repositoryId ? null : params.get('tab');
   const semester = params.get('semester') || defaultSemester;
 
   let exerciseTab: ExerciseTab | null = null;
@@ -79,6 +84,7 @@ export function parseStateFromUrl(defaultSemester: string): NavigationState {
   return {
     semester,
     repositoryId,
+    myCourses,
     courseId: courseId || null,
     containerId: folderId || courseId || null,
     exerciseId: exerciseId || null,
@@ -107,12 +113,13 @@ export const App: React.FC = () => {
 
   // --- URL Search Params Initialization ---
   const initialParams = new URLSearchParams(window.location.search);
-  const initialRepositoryParam = initialParams.get('repository');
+  const [myCourses, setMyCourses] = useState(initialParams.get('view') === 'my-courses');
+  const initialRepositoryParam = myCourses ? null : initialParams.get('repository');
   const [repositoryId, setRepositoryId] = useState<string | null>(initialRepositoryParam);
   const initialSemesterParam = initialParams.get('semester');
-  const initialCourseParam = initialParams.get('course');
-  const initialFolderParam = initialParams.get('folder');
-  const initialExerciseParam = initialParams.get('exercise');
+  const initialCourseParam = myCourses ? null : initialParams.get('course');
+  const initialFolderParam = myCourses ? null : initialParams.get('folder');
+  const initialExerciseParam = myCourses ? null : initialParams.get('exercise');
   const initialTabParam = initialParams.get('tab');
 
   // --- Semester & Courses State ---
@@ -164,6 +171,7 @@ export const App: React.FC = () => {
     exerciseId: activeExerciseRefId,
     exerciseTab: activeExerciseTab,
     repositoryId,
+    myCourses,
   });
   useEffect(() => {
     currentNavStateRef.current = {
@@ -173,8 +181,9 @@ export const App: React.FC = () => {
       exerciseId: activeExerciseRefId,
       exerciseTab: activeExerciseTab,
       repositoryId,
+      myCourses,
     };
-  }, [selectedSemester, selectedCourseId, currentContainerId, activeExerciseRefId, activeExerciseTab, repositoryId]);
+  }, [selectedSemester, selectedCourseId, currentContainerId, activeExerciseRefId, activeExerciseTab, repositoryId, myCourses]);
   const activeContainerRef = useRef<string | null>(
     initialFolderParam || initialCourseParam || null
   );
@@ -411,9 +420,10 @@ export const App: React.FC = () => {
   const handleSelectSemester = useCallback(
     async (semId: string) => {
       if (!await navigationGuard.confirmNavigation()) return;
-      if (!repositoryId && semId === selectedSemester && selectedCourseId === null && !activeExerciseRefId) {
+      if (!myCourses && !repositoryId && semId === selectedSemester && selectedCourseId === null && !activeExerciseRefId) {
         return;
       }
+      setMyCourses(false);
       setRepositoryId(null);
       materialsRequestSeq.current++;
       activeContainerRef.current = null;
@@ -436,7 +446,7 @@ export const App: React.FC = () => {
       };
       window.history.pushState(nextState, '', stateToUrl(nextState));
     },
-    [repositoryId, selectedSemester, selectedCourseId, activeExerciseRefId, loadSemesters]
+    [myCourses, repositoryId, selectedSemester, selectedCourseId, activeExerciseRefId, loadSemesters]
   );
 
   // --- Course Selection Handler ---
@@ -450,6 +460,7 @@ export const App: React.FC = () => {
       ) {
         return;
       }
+      setMyCourses(false);
       setRepositoryId(null);
       setSelectedCourseId(courseRefId);
       setCurrentContainerId(courseRefId);
@@ -522,7 +533,8 @@ export const App: React.FC = () => {
   // --- Return to Semester Overview ---
   const handleNavigateHome = useCallback(async () => {
     if (!await navigationGuard.confirmNavigation()) return;
-    if (!repositoryId && selectedCourseId === null && !activeExerciseRefId) return;
+    if (!myCourses && !repositoryId && selectedCourseId === null && !activeExerciseRefId) return;
+    setMyCourses(false);
     setRepositoryId(null);
 
     materialsRequestSeq.current++;
@@ -542,7 +554,7 @@ export const App: React.FC = () => {
       exerciseTab: null,
     };
     window.history.pushState(nextState, '', stateToUrl(nextState));
-  }, [repositoryId, selectedCourseId, activeExerciseRefId, selectedSemester]);
+  }, [myCourses, repositoryId, selectedCourseId, activeExerciseRefId, selectedSemester]);
 
   const handleNavigateRepository = useCallback(async (refId: string) => {
     if (!await navigationGuard.confirmNavigation()) return;
@@ -550,6 +562,7 @@ export const App: React.FC = () => {
     cache.rememberRepositoryPath(materialsData?.breadcrumbs || []);
     materialsRequestSeq.current++;
     activeContainerRef.current = null;
+    setMyCourses(false);
     setRepositoryId(refId);
     setSelectedCourseId(null);
     setCurrentContainerId(null);
@@ -564,6 +577,23 @@ export const App: React.FC = () => {
     };
     window.history.pushState(nextState, '', stateToUrl(nextState));
   }, [repositoryId, selectedSemester, materialsData]);
+
+  const handleNavigateMyCourses = useCallback(async () => {
+    if (!await navigationGuard.confirmNavigation() || myCourses) return;
+    materialsRequestSeq.current++;
+    activeContainerRef.current = null;
+    setMyCourses(true);
+    setRepositoryId(null);
+    setSelectedCourseId(null);
+    setCurrentContainerId(null);
+    setActiveExerciseRefId(null);
+    setActiveExerciseTab(null);
+    setMaterialsData(null);
+    setLoadMaterialsError(null);
+    const state: NavigationState = { semester: selectedSemester, courseId: null,
+      containerId: null, exerciseId: null, myCourses: true };
+    window.history.pushState(state, '', stateToUrl(state));
+  }, [myCourses, selectedSemester]);
 
   // --- Exercise View Handler ---
   const handleSelectExercise = useCallback(
@@ -615,6 +645,7 @@ export const App: React.FC = () => {
     // Prime History Stack
     const currentState: NavigationState = {
       repositoryId,
+      myCourses,
       semester: selectedSemester,
       courseId: selectedCourseId,
       containerId: currentContainerId,
@@ -708,6 +739,7 @@ export const App: React.FC = () => {
       const state: NavigationState =
         (event.state as NavigationState) || parseStateFromUrl(cache.getSelectedSemester());
 
+      setMyCourses(Boolean(state.myCourses));
       setRepositoryId(state.repositoryId || null);
 
       // 1. Update semester if changed
@@ -800,7 +832,9 @@ export const App: React.FC = () => {
 
   // --- Dynamic Document Title ---
   useEffect(() => {
-    if (repositoryId) {
+    if (myCourses) {
+      document.title = `BetterIlias – ${t('my_courses.title')}`;
+    } else if (repositoryId) {
       document.title = t("BetterIlias - Magazin");
     } else if (activeExerciseRefId) {
       document.title = t("BetterIlias – Übungen ({p0})", { p0: currentNickname || currentCourse?.title || t('Vorlesung') });
@@ -816,6 +850,7 @@ export const App: React.FC = () => {
     }
   }, [
     language,
+    myCourses,
     repositoryId,
     activeExerciseRefId,
     selectedCourseId,
@@ -837,6 +872,8 @@ export const App: React.FC = () => {
     onSelectCourse={refId => { handleSelectCourse(refId); setMobileNavigationOpen(false); }}
     onSelectSemesterOverview={() => { handleNavigateHome(); setMobileNavigationOpen(false); }}
     onSelectRepository={() => { handleNavigateRepository('1'); setMobileNavigationOpen(false); }}
+    onSelectMyCourses={() => { handleNavigateMyCourses(); setMobileNavigationOpen(false); }}
+    isMyCoursesSelected={myCourses}
     isRepositorySelected={repositoryId !== null}
     isCollapsed={isMobile ? false : isSidebarCollapsed}
     onToggleCollapse={isMobile ? () => setMobileNavigationOpen(false) : handleToggleSidebar}
@@ -898,7 +935,10 @@ export const App: React.FC = () => {
               </div>
             </div>
           )}
-          {repositoryId ? (
+          {myCourses ? (
+            <MyCoursesView key={`${cache.getSessionId()}_${membershipVersion}`} onOpenCourse={handleSelectCourse}
+              onOpenGroup={handleNavigateRepository} />
+          ) : repositoryId ? (
             <RepositoryView key={`${repositoryId}_${membershipVersion}`} refId={repositoryId} onNavigate={handleNavigateRepository} onOpenCourse={handleSelectCourse}
               onManageMembership={(refId, title, action) => setMembershipDialog({ refId, title, action })} />
           ) : selectedCourseId && currentContainerId ? (

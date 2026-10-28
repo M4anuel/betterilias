@@ -38,7 +38,10 @@ def _extract_ref_id_from_url(url: str) -> Optional[str]:
 
 def _detect_item_type(url: str, elem_classes: str, icon_src: Optional[str]) -> str:
     """Detect whether item is course (crs), group (grp), folder (fold), etc."""
-    combined = f"{url} {elem_classes} {icon_src or ''}".lower()
+    # Saved-page asset directories can contain "Courses and Groups". Only the
+    # icon filename identifies the object, never the directory containing it.
+    icon_name = (icon_src or '').rsplit('/', 1)[-1]
+    combined = f"{url} {elem_classes} {icon_name}".lower()
     if "_grp_" in combined or "/go/grp/" in combined or "icon_grp" in combined or "group" in combined:
         return "grp"
     if "_fold_" in combined or "/go/fold/" in combined or "icon_fold" in combined or "folder" in combined:
@@ -135,4 +138,32 @@ def parse_dashboard(html_content: str) -> List[CourseItem]:
                     )
                     seen_ref_ids.add(ref_id)
 
+    return courses
+
+
+@safe_parser(context_name="my_courses_and_groups")
+def parse_my_courses(html_content: str) -> List[CourseItem]:
+    """Read the membership overview, excluding notifications and bulk dialogs."""
+    soup = BeautifulSoup(html_content, 'lxml')
+    main = soup.select_one('main') or soup
+    for dialog in main.select('[role="dialog"], .modal'):
+        dialog.decompose()
+    courses = parse_dashboard(str(main))
+    items = {}
+    for item in main.select('.il-item, .il-std-item, .ilContainerListItem, .il_ContainerListItem'):
+        link = item.select_one('.il-item-title a, h3 a, h4 a')
+        if link:
+            ref_id = _extract_ref_id_from_url(link.get('href', ''))
+            if ref_id:
+                items[ref_id] = item
+    for course in courses:
+        match = re.search(r'\b(HS|FS)\s*(20\d{2})\b', course.title)
+        course.semester = ''.join(match.groups()) if match else None
+        item = items.get(course.ref_id)
+        if item:
+            course.is_favourite = any(
+                urllib.parse.parse_qs(urllib.parse.urlparse(action.get('data-action') or action.get('href', '')).query)
+                .get('cmd', [''])[0].lower() in {'dropfromdesk', 'removefromdesk'}
+                for action in item.select('[data-action], a[href]')
+            )
     return courses

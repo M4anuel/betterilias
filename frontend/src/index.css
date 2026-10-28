@@ -708,6 +708,7 @@ dialog:not(.mobile-navigation) {
 
 /* Control hit areas and visible shapes are independent: never enlarge a switch track. */
 .icon-button { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; }
+.my-courses-control { min-height: 48px; }
 button:not(.phone-only):not(.desktop-only):has(> svg:only-child) { display: inline-flex; align-items: center; justify-content: center; }
 button > svg:only-child { margin-inline: auto; flex-shrink: 0; }
 summary::-webkit-details-marker { display: none; }
