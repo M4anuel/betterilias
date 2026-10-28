@@ -43,7 +43,7 @@ class CourseItem(BaseModel):
     ref_id: str
     title: str
     description: Optional[str] = None
-    url: str
+    url: str = ""
     item_type: str = "crs"  # crs (course), grp (group), fold (folder), etc.
     icon: Optional[str] = None
     semester: Optional[str] = None
@@ -584,3 +584,134 @@ class PdfInfoResponse(BaseModel):
     height: Optional[float] = None
     aspect_ratio: float = 2.16
     pages: int = 1
+
+
+# ---------------------------------------------------------
+# Semester Calendar & Timetable Schemas
+# ---------------------------------------------------------
+CourseCalendarFeedStatus = Literal[
+    "imported_with_lectures",
+    "imported_deadlines_only",
+    "valid_empty",
+    "unavailable",
+    "failed",
+    "session_expired",
+    "not_imported",
+]
+
+CalendarEventSource = Literal[
+    "ilias_ical",
+    "ilias_session",
+    "ilias_calendar_block",
+    "custom_rule",
+]
+
+CalendarEventKind = Literal[
+    "lecture",
+    "deadline",
+    "appointment",
+]
+
+
+class CalendarEvent(BaseModel):
+    uid: str
+    course_ref_id: str
+    course_title: str
+    title: str
+    description: Optional[str] = None
+    location: Optional[str] = None
+    date: str  # YYYY-MM-DD in Europe/Zurich
+    end_date: Optional[str] = None  # YYYY-MM-DD in Europe/Zurich
+    start_time: Optional[str] = None  # HH:MM in Europe/Zurich (None if all_day)
+    end_time: Optional[str] = None  # HH:MM in Europe/Zurich (None if all_day)
+    start_iso: str
+    end_iso: str
+    all_day: bool = False
+    source: CalendarEventSource
+    kind: CalendarEventKind = "lecture"
+    rule_id: Optional[str] = None
+    cancelled: bool = False
+
+
+class CourseScheduleRuleInput(BaseModel):
+    course_ref_id: str
+    course_title: Optional[str] = None
+    semester: str
+    title: Optional[str] = None
+    location: Optional[str] = None
+    weekdays: List[int] = Field(..., description="0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun")
+    start_time: str = Field(..., description="HH:MM in Europe/Zurich")
+    end_time: str = Field(..., description="HH:MM in Europe/Zurich")
+    start_date: str = Field(..., description="YYYY-MM-DD")
+    end_date: str = Field(..., description="YYYY-MM-DD")
+    exceptions: List[str] = Field(default_factory=list, description="Skipped YYYY-MM-DD dates")
+    enabled: bool = True
+
+
+class CourseScheduleRule(CourseScheduleRuleInput):
+    id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CourseCalendarInfo(BaseModel):
+    course_ref_id: str
+    course_title: str
+    semester: Optional[str] = None
+    color: str
+    status: CourseCalendarFeedStatus = "not_imported"
+    status_message: str = ""
+    needs_manual_schedule: bool = True
+    has_calendar_block: bool = False
+    ical_modal_url: Optional[str] = None
+    ical_feed_url: Optional[str] = None
+    open_calendar_url: Optional[str] = None
+    imported_event_count: int = 0
+    imported_lecture_count: int = 0
+    imported_deadline_count: int = 0
+    custom_rule_count: int = 0
+    last_imported_at: Optional[datetime] = None
+
+
+class SemesterCalendarResponse(BaseModel):
+    semester: str
+    semester_start_date: str
+    semester_end_date: str
+    semester_mid_date: str
+    timezone: str = "Europe/Zurich"
+    courses: List[CourseCalendarInfo] = Field(default_factory=list)
+    rules: List[CourseScheduleRule] = Field(default_factory=list)
+    events: List[CalendarEvent] = Field(default_factory=list)
+    subscription_token: Optional[str] = None
+    subscription_url: Optional[str] = None
+    webcal_url: Optional[str] = None
+    is_local_host: bool = True
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CalendarCourseImportRequest(BaseModel):
+    semester: str
+    courses: List[CourseItem] = Field(default_factory=list)
+    force_refresh: bool = False
+
+
+class CourseColorUpdateRequest(BaseModel):
+    course_ref_id: Optional[str] = None
+    color: str
+
+
+class CalendarIcsImportRequest(BaseModel):
+    course_ref_id: str
+    course_title: Optional[str] = None
+    semester: Optional[str] = None
+    ics_content: Optional[str] = None
+    ics_text: Optional[str] = None
+
+
+class CalendarSubscriptionResponse(BaseModel):
+    token: str
+    subscription_url: str
+    webcal_url: str
+    download_url: str
+    is_local_host: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

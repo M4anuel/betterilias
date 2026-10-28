@@ -14,6 +14,7 @@ __pycache__/
 session_cookies.json
 .sessions/
 sessions/
+.calendar/
 .browser_profile/
 .env.*
 !.env.example

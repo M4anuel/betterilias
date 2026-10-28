@@ -31,6 +31,16 @@ from backend.scrapers.submissions import (
     ParsedTeamConfirmRemoveScreen,
 )
 from backend.scrapers.feedback_files import parse_feedback_files
+from backend.scrapers.calendar import (
+    parse_course_calendar_discovery,
+    parse_ilias_subscription_modal,
+    parse_ilias_agenda_page,
+    parse_ics_feed,
+    generate_ics_feed,
+    expand_schedule_rule,
+    combine_calendar_events,
+    get_semester_date_bounds,
+)
 
 __all__ = [
     "parse_dashboard",
@@ -55,6 +65,14 @@ __all__ = [
     "parse_ta_assignment_form",
     "parse_instruction_files",
     "parse_semester_courses",
+    "parse_course_calendar_discovery",
+    "parse_ilias_subscription_modal",
+    "parse_ilias_agenda_page",
+    "parse_ics_feed",
+    "generate_ics_feed",
+    "expand_schedule_rule",
+    "combine_calendar_events",
+    "get_semester_date_bounds",
     "extract_grading_form",
     "extract_feedback_modal_form",
     "FeedbackModalFormData",
@@ -64,4 +82,3 @@ __all__ = [
     "list_failed_dumps",
     "get_dump_content",
 ]
-
