@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
-from backend.schemas import MediaChapter, MediaRendition, MediaStream, VideoStreamResponse
+from backend.schemas import MediaCaption, MediaChapter, MediaRendition, MediaStream, VideoStreamResponse
 from backend.scrapers.dumper import safe_parser
 
 
@@ -64,6 +64,18 @@ def parse_player(html_content: str, video_url: str) -> VideoStreamResponse:
         if image and math.isfinite(timestamp) and timestamp >= 0 and (duration is None or timestamp < duration):
             frames[timestamp] = MediaChapter(time=timestamp, image=image, text=frame.get('text') or '')
     audio = next(stream for stream in streams if stream.main_audio)
-    return VideoStreamResponse(streams=streams, chapters=[frames[key] for key in sorted(frames)],
+    captions = []
+    for caption in config.get('captions') or []:
+        if not isinstance(caption, dict):
+            continue
+        url = media_url(caption.get('url') or caption.get('src'))
+        fmt = str(caption.get('format') or urlparse(url or '').path.rsplit('.', 1)[-1]).lower()
+        if not url or fmt not in {'vtt', 'srt', 'webvtt'}:
+            continue
+        language = caption.get('lang') or caption.get('language') or 'und'
+        label = caption.get('label') or (language.get('txt') if isinstance(language, dict) else language)
+        language = language.get('code', 'und') if isinstance(language, dict) else language
+        captions.append(MediaCaption(url=url, language=str(language), label=str(label or language), format='vtt' if fmt == 'webvtt' else fmt))
+    return VideoStreamResponse(streams=streams, chapters=[frames[key] for key in sorted(frames)], captions=captions,
                                duration=duration, title=metadata.get('title'), preview_url=media_url(metadata.get('preview')),
                                mp4_url=audio.renditions[-1].url, video_url=video_url, fallback_url=video_url)

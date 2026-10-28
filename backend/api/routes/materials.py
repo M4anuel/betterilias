@@ -101,6 +101,12 @@ async def get_repository(
 
 
 
+@router.get('/courses/video-captions')
+async def get_video_captions(url: str = Query(...), track: int = Query(0, ge=0), client: IliasClient = Depends(get_ilias_client)):
+    text = await client.get_video_captions(url, track)
+    return Response(text, media_type='text/vtt', headers={'Cache-Control': 'private, no-store'})
+
+
 @router.get("/courses/video-stream-info", response_model=VideoStreamResponse)
 async def get_video_stream_info(
     response: Response,

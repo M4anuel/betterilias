@@ -200,6 +200,8 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 
 ## Completed
 
+- [x] Add whole-player keyboard toggles, canvas-only fullscreen, animated click/tap playback feedback, icon layouts with switching in every mode, overlay quality settings and supplied WebVTT/SRT subtitles; move episode ILIAS links below Stream and remove persistent reload/bandwidth actions.
+
 - [x] Refine the video player with loading skeletons, a translucent playback overlay that hides after inactivity, chapter markers and scrubbing thumbnails in the thicker timeline, and a tapered volume slider; replace the separate slide collection.
 
 - [x] Simplify My courses and groups by removing the favourites hint and type filter; support both alphabetical and semester sort directions while keeping semester options derived from actual memberships.

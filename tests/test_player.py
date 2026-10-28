@@ -5,6 +5,9 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
+from backend.api.deps import get_ilias_client
+from backend.main import app
 
 from backend.scrapers.player import parse_player
 from backend.scrapers.dumper import ScrapingParsingError
@@ -42,6 +45,82 @@ def test_single_stream_signed_urls_and_invalid_chapters():
     assert result.streams[0].renditions[0].url.endswith('?token=signed&expires=123')
     assert [chapter.time for chapter in result.chapters] == [4]
     assert result.duration == 12
+
+
+def test_caption_metadata_supports_native_language_objects_and_filters_formats():
+    config = single_config()
+    config['captions'] = [
+        dict(url='https://dist.opencast.unibe.ch/subtitles.vtt?token=signed', format='vtt', lang=dict(code='de', txt='Deutsch')),
+        dict(src='https://dist.opencast.unibe.ch/subtitles.srt', format='srt', language='en', label='English'),
+        dict(url='javascript:alert(1)', format='vtt'),
+        dict(url='https://dist.opencast.unibe.ch/subtitles.xml', format='dfxp'),
+    ]
+    result = parse_player(config_html(config), URL)
+    assert [(caption.language, caption.label, caption.format) for caption in result.captions] == [('de', 'Deutsch', 'vtt'), ('en', 'English', 'srt')]
+    assert result.captions[0].url.endswith('?token=signed')
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('format', ['vtt', 'srt'])
+async def test_caption_delivery_resolves_the_native_manifest_and_normalizes_srt(format):
+    config = single_config()
+    config['captions'] = [dict(url=f'https://dist.opencast.unibe.ch/captions.{format}', format=format, lang='en')]
+    requests = []
+    def respond(request):
+        requests.append(request)
+        if request.url.host == 'ilias.unibe.ch':
+            return httpx.Response(200, text=config_html(config))
+        text = 'WEBVTT\n\n00:00:00.000 --> 00:00:06.000\nHello\n' if format == 'vtt' else '1\n00:00:00,000 --> 00:00:06,000\nHello\n'
+        return httpx.Response(200, text=text)
+    manager = MagicMock()
+    manager.has_cookies.return_value = True
+    manager.get_http_client.side_effect = lambda: httpx.AsyncClient(transport=httpx.MockTransport(respond))
+    text = await IliasClient(manager).get_video_captions(URL, 0)
+    assert text.startswith('WEBVTT') and '00:00:00.000 --> 00:00:06.000' in text
+    assert len(requests) == 2
+
+
+def test_caption_endpoint_is_private_and_requires_the_resolved_session():
+    config = single_config()
+    config['captions'] = [dict(url='https://dist.opencast.unibe.ch/captions.vtt', format='vtt', lang='en')]
+    def respond(request):
+        return httpx.Response(200, text=config_html(config) if request.url.host == 'ilias.unibe.ch' else 'WEBVTT\n\n00:00.000 --> 00:01.000\nHello\n')
+    manager = MagicMock()
+    manager.has_cookies.return_value = True
+    manager.get_http_client.side_effect = lambda: httpx.AsyncClient(transport=httpx.MockTransport(respond))
+    app.dependency_overrides[get_ilias_client] = lambda: IliasClient(manager)
+    try:
+        with TestClient(app) as client:
+            response = client.get('/api/courses/video-captions', params=dict(url=URL, track=0))
+            assert response.status_code == 200
+            assert response.headers['cache-control'] == 'private, no-store'
+            assert response.headers['content-type'].startswith('text/vtt')
+            manager.has_cookies.return_value = False
+            assert client.get('/api/courses/video-captions', params=dict(url=URL, track=0)).status_code == 401
+    finally:
+        app.dependency_overrides.pop(get_ilias_client, None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('url,status,body', [
+    ('https://127.0.0.1/private.vtt', 200, 'WEBVTT'),
+    ('https://dist.opencast.unibe.ch/captions.vtt', 302, ''),
+    ('https://dist.opencast.unibe.ch/captions.vtt', 200, '<html>Login</html>'),
+    ('https://dist.opencast.unibe.ch/captions.vtt', 200, 'WEBVTT' + 'x' * (2 * 1024 * 1024)),
+], ids=['untrusted-host', 'redirect', 'invalid-vtt', 'oversized-vtt'])
+async def test_caption_proxy_rejects_untrusted_redirected_invalid_or_oversized_content(url, status, body):
+    config = single_config()
+    config['captions'] = [dict(url=url, format='vtt')]
+    requests = []
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(200, text=config_html(config)) if request.url.host == 'ilias.unibe.ch' else httpx.Response(status, text=body, headers={'Location':'https://127.0.0.1/private'})
+    manager = MagicMock()
+    manager.has_cookies.return_value = True
+    manager.get_http_client.side_effect = lambda: httpx.AsyncClient(transport=httpx.MockTransport(respond))
+    with pytest.raises(HTTPException):
+        await IliasClient(manager).get_video_captions(URL, 0)
+    assert all(request.url.host != '127.0.0.1' for request in requests)
 
 
 @pytest.mark.parametrize('html', ['<main>Not a player</main>', config_html(dict(streams=[])),

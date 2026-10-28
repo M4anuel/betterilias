@@ -3,7 +3,7 @@ import json
 import os
 import re
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 import pytest
 from tests.test_localisation_browser import local_site, ROOT
@@ -14,16 +14,20 @@ URL = 'https://ilias.unibe.ch/ilias.php?cmdClass=xoctPlayerGUI&cmd=streamVideo&r
 MEDIA = (Path(__file__).parent / 'fixtures/player-test.mp4').read_bytes()
 
 
-def player_api(route, single=False, failure=False, embedded=False):
+def player_api(route, single=False, failure=False, embedded=False, captions=False):
     path = urlparse(route.request.url).path
     if path.endswith('/video-stream-info'):
         base = route.request.url.split('/api/')[0]
         streams = [dict(content=kind, main_audio=kind == 'presenter', renditions=[
             dict(url=f'{base}/media/{kind}-{height}.mp4', width=320, height=height, mimetype='video/mp4') for height in [480, 720, 1080]])
             for kind in ['presenter', 'presentation']]
-        data = dict(streams=streams[:1] if single else streams, chapters=[] if single else [dict(time=0, image=base+'/media/slide-0.svg', text=''), dict(time=6, image=base+'/media/slide-6.svg', text='')],
+        data = dict(streams=streams[:1] if single else streams, captions=[dict(url=base+'/media/captions.vtt',language=lang,label=label,format='vtt') for lang,label in [('en','English'),('de','Deutsch')]] if captions else [], chapters=[] if single else [dict(time=0, image=base+'/media/slide-0.svg', text=''), dict(time=6, image=base+'/media/slide-6.svg', text='')],
                     duration=12, title='Recording one', preview_url=None, fallback_url=URL)
         route.fulfill(status=401 if failure else 200, content_type='application/json', body=json.dumps(data))
+    elif path.endswith('/video-captions'):
+        track=parse_qs(urlparse(route.request.url).query).get('track',['0'])[0]
+        text='Hallo Untertitel' if track=='1' else 'Hello subtitles'
+        route.fulfill(content_type='text/vtt',body=f'WEBVTT\n\n00:00:00.000 --> 00:00:12.000\n<b>{text}</b>\n')
     elif path == '/api/podcasts/60':
         data = dict(ref_id='60', title='Lecture recordings', total_episodes=1, recorded_count=1, scheduled_count=0, pages_available=[],
                     episodes=[dict(id='episode-one', title='Recording one', status='available', stream_url=URL)])
@@ -79,8 +83,8 @@ def test_dual_stream_playback_quality_layouts_and_chapters(local_site, width, he
         dialog = page.locator('dialog.podcast-player-dialog')
         skeleton = dialog.locator('[data-player-skeleton]')
         pw.expect(skeleton).to_be_visible()
-        stage_before = skeleton.locator('.player-stage').bounding_box()
-        footer_before = dialog.get_by_role('button', name=tr('player.reload'), exact=True).bounding_box()
+        stage_before = skeleton.bounding_box()
+        header_before = dialog.get_by_role('heading', name='Recording one').bounding_box()
         page.screenshot(path=f'.pytest_cache/player-skeleton-{width}-{height}-{language}-{scheme}.png', animations='disabled')
         player_api(held.pop())
         audio = dialog.locator('video[data-stream="audio"]')
@@ -90,10 +94,11 @@ def test_dual_stream_playback_quality_layouts_and_chapters(local_site, width, he
         pw.expect(dialog.locator('[data-media-skeleton]')).to_have_count(0)
         stage = dialog.locator('[data-player-layout]')
         stage_after = stage.bounding_box()
-        footer_after = dialog.get_by_role('button', name=tr('player.reload'), exact=True).bounding_box()
+        header_after = dialog.get_by_role('heading', name='Recording one').bounding_box()
         assert abs(stage_before['height']-stage_after['height']) < 2
         assert abs(stage_before['y']-stage_after['y']) < 2
-        assert abs(footer_before['y']-footer_after['y']) < 4
+        assert abs(header_before['y']-header_after['y']) < 2
+        stage.hover(position=dict(x=20,y=70))
         pw.expect(dialog.locator('.player-chapter-marker')).to_have_count(2)
         assert dialog.locator('details').count() == 0
         assert len(requests) == 1
@@ -113,25 +118,36 @@ def test_dual_stream_playback_quality_layouts_and_chapters(local_site, width, he
         pw.expect(dialog.locator('.player-preview img')).to_be_visible()
         page.wait_for_function("Array.from(document.querySelectorAll('dialog video')).every(v => Math.abs(v.currentTime-6) < .2 && !v.seeking)")
         assert audio.evaluate('v => v.paused')
-        layout = dialog.get_by_role('combobox', name=tr('player.layout'), exact=True)
-        layout.select_option('split')
+        dialog.get_by_role('button',name=tr('player.split'),exact=True).click()
         before = audio.evaluate('v => v.parentElement.style.order')
         dialog.get_by_role('button', name=tr('player.swap'), exact=True).click()
         assert audio.evaluate('v => v.parentElement.style.order') != before
-        dialog.get_by_role('button', name=tr('player.saver'), exact=True).click()
+        dialog.get_by_role('button',name=tr('player.settings'),exact=True).click()
+        settings=dialog.get_by_role('dialog',name=tr('player.settings'),exact=True)
+        settings.get_by_role('combobox',name=tr('player.camera_quality'),exact=True).select_option('0')
+        settings.get_by_role('combobox',name=tr('player.slides_quality'),exact=True).select_option('2')
+        page.keyboard.press('Escape')
+        dialog.get_by_role('button',name=tr('player.single'),exact=True).click()
         page.wait_for_function("document.querySelector('[data-stream=audio]').readyState>=3 && !document.querySelector('[data-stream=audio]').seeking")
         assert audio.evaluate('v => v.currentSrc').endswith('presenter-480.mp4')
         assert slides.evaluate('v => v.currentSrc').endswith('presentation-1080.mp4')
         assert audio.evaluate('v => v.paused && !v.muted && Math.abs(v.currentTime-6)<.2')
-        pw.expect(layout).to_have_value('slides')
+        pw.expect(dialog.get_by_role('button',name=tr('player.single'),exact=True)).to_have_attribute('aria-pressed','true')
+        pw.expect(audio).to_be_visible()
+        pw.expect(slides).to_be_hidden()
+        dialog.get_by_role('button',name=tr('player.swap'),exact=True).click()
+        pw.expect(audio).to_be_hidden()
+        pw.expect(slides).to_be_visible()
         dialog.get_by_role('button', name=tr('player.play'), exact=True).click()
         page.wait_for_function("document.querySelector('[data-stream=audio]').currentTime > 6.4")
         # A rendition change while playing restores the clock, speed and intent.
+        dialog.get_by_role('button',name=tr('player.settings'),exact=True).click()
         dialog.get_by_role('combobox', name=tr('player.camera_quality'), exact=True).select_option('1')
+        page.keyboard.press('Escape')
         page.wait_for_function("document.querySelector('[data-stream=audio]').currentSrc.endsWith('presenter-720.mp4') && !document.querySelector('[data-stream=audio]').paused && document.querySelector('[data-stream=audio]').currentTime>6")
         dialog.get_by_role('button', name=tr('player.pause'), exact=True).click()
         assert audio.evaluate('v => v.playbackRate') == 1.5
-        layout.select_option('inset')
+        dialog.get_by_role('button',name=tr('player.inset'),exact=True).click()
         assert_no_overflow(page)
         assert dialog.evaluate('e => e.scrollWidth <= e.clientWidth+1')
         seek.blur()
@@ -203,10 +219,12 @@ def test_overlay_loading_drag_previews_inactivity_and_keyboard(local_site,width)
         page.mouse.move(2,2)
         page.clock.fast_forward(3000)
         pw.expect(overlay).to_have_attribute('data-visible','false')
-        # Touch reveals hidden controls without pausing the recording.
+        # Touch reveals controls and toggles playback, with central feedback.
         stage.tap(position=dict(x=20,y=20))
         pw.expect(overlay).to_have_attribute('data-visible','true')
-        assert dialog.locator('[data-stream=audio]').evaluate('v=>!v.paused')
+        assert dialog.locator('[data-stream=audio]').evaluate('v=>v.paused')
+        pw.expect(dialog.locator('[data-feedback=pause]')).to_be_visible()
+        page.keyboard.press('Space')
         page.clock.fast_forward(3000)
         pw.expect(overlay).to_have_attribute('data-visible','false')
         box=stage.bounding_box()
@@ -215,7 +233,8 @@ def test_overlay_loading_drag_previews_inactivity_and_keyboard(local_site,width)
         # Keyboard focus pins the controls, including while previewing a slide.
         stage.focus()
         stage.press('Tab')
-        pw.expect(seek).to_be_focused()
+        pw.expect(dialog.get_by_role('button',name='Picture in picture',exact=True)).to_be_focused()
+        seek.focus()
         page.clock.fast_forward(3000)
         pw.expect(overlay).to_have_attribute('data-visible','true')
         seek.press('Tab')
@@ -272,7 +291,7 @@ def test_embedded_player_drift_buffering_rejected_play_and_retry(local_site):
             page.wait_for_function('!document.fullscreenElement')
         slides.evaluate("v => v.dispatchEvent(new Event('error'))")
         pw.expect(dialog.get_by_role('alert')).to_contain_text('A stream could not be played')
-        dialog.get_by_role('button',name='Reload recording',exact=True).click()
+        dialog.get_by_role('button',name='Try again',exact=True).click()
         pw.expect(dialog.get_by_role('alert')).to_have_count(0)
         pw.expect(dialog.locator('video')).to_have_count(2)
         assert len(requests)==2
@@ -296,10 +315,142 @@ def test_single_stream_and_resolution_failure(local_site, single, failure):
         dialog=page.locator('dialog.podcast-player-dialog')
         if failure:
             pw.expect(dialog.get_by_role('alert')).to_be_visible()
-            pw.expect(dialog.get_by_role('link')).to_have_attribute('href',URL)
+            pw.expect(dialog.get_by_role('button',name='Try again',exact=True)).to_be_visible()
+            assert dialog.get_by_role('link').count()==0
+            page.keyboard.press('Escape')
+            pw.expect(page.get_by_role('link',name='Open in ILIAS',exact=True).first).to_have_attribute('href',URL)
         else:
             pw.expect(dialog.locator('video')).to_have_count(1)
             pw.expect(dialog.get_by_role('combobox',name='Layout')).to_have_count(0)
             dialog.get_by_role('button',name='Play',exact=True).click()
             page.wait_for_function("document.querySelector('dialog video').currentTime>.3")
+        browser.close()
+
+
+@pytest.mark.parametrize('width,height', [(320,740),(390,800),(768,850),(1280,900),(740,360)])
+@pytest.mark.parametrize('language,scheme', [('en','light'),('de','dark')])
+def test_keyboard_canvas_layout_settings_and_subtitles(local_site,width,height,language,scheme):
+    pw=pytest.importorskip('playwright.sync_api')
+    tr=json.loads((ROOT/'locales'/f'{language}.json').read_text(encoding='utf-8')).__getitem__
+    with pw.sync_playwright() as p:
+        browser=p.chromium.launch(headless=True,channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+        page=browser.new_page(viewport=dict(width=width,height=height),color_scheme=scheme,has_touch=True,reduced_motion='reduce')
+        page.set_default_timeout(10000)
+        page.add_init_script(f"localStorage.setItem('betterilias_language','{language}');localStorage.setItem('betterilias_theme_mode','{scheme}')")
+        page.route('**/api/**',lambda route:player_api(route,captions=True))
+        page.route('**/media/**',media_route)
+        errors=[]
+        page.on('pageerror',lambda error:errors.append(str(error)))
+        page.goto(local_site+'/?course=42')
+        page.get_by_text('Lecture recordings',exact=True).click()
+        stream=page.get_by_role('button',name=tr('Streamen'),exact=True)
+        link=stream.locator('..').get_by_role('link')
+        pw.expect(link).to_have_attribute('href',URL)
+        assert link.bounding_box()['y']>=stream.bounding_box()['y']+stream.bounding_box()['height']
+        stream.click()
+        dialog=page.locator('dialog.podcast-player-dialog')
+        stage=dialog.locator('[data-player-layout]')
+        page.wait_for_function("Array.from(document.querySelectorAll('dialog video')).every(v=>v.readyState>=3)")
+        audio=dialog.locator('[data-stream=audio]')
+        slides=dialog.locator('[data-stream=slides]')
+        assert dialog.get_by_role('button',name=tr('player.reload'),exact=True).count()==0
+        assert dialog.get_by_role('button',name=tr('player.saver'),exact=True).count()==0
+        assert dialog.get_by_role('link').count()==0
+        # Space toggles playback even when a different button has focus and is
+        # never followed by a second native button activation on key-up.
+        close=dialog.get_by_role('button',name=tr('Schliessen'),exact=True)
+        close.focus()
+        page.keyboard.press('Space')
+        page.wait_for_function("document.querySelector('[data-stream=audio]').currentTime>.2")
+        pw.expect(dialog.locator('[data-feedback=play]')).to_be_visible()
+        page.keyboard.down('Space')
+        page.keyboard.down('Space')
+        page.keyboard.up('Space')
+        assert audio.evaluate('v=>v.paused')
+        pw.expect(dialog.locator('[data-feedback=pause]')).to_be_visible()
+        page.clock.install()
+        page.clock.fast_forward(1000)
+        pw.expect(dialog.locator('.player-feedback')).to_have_count(0)
+        # Direct canvas taps have identical behavior, including with hidden UI.
+        canvas_point=stage.evaluate("e=>{const r=e.getBoundingClientRect(),a=e.querySelector('.player-top-controls').getBoundingClientRect(),b=e.querySelector('.player-overlay').getBoundingClientRect();return {x:r.width/2,y:(a.bottom+b.top)/2-r.y}}")
+        stage.tap(position=canvas_point)
+        page.wait_for_function("!document.querySelector('[data-stream=audio]').paused")
+        stage.tap(position=canvas_point)
+        assert audio.evaluate('v=>v.paused')
+        page.mouse.move(2,2)
+        page.clock.fast_forward(3000)
+        pw.expect(dialog.locator('.player-overlay')).to_have_attribute('data-visible','false')
+        stage.tap(position=canvas_point)
+        page.wait_for_function("!document.querySelector('[data-stream=audio]').paused")
+        page.keyboard.press('Space')
+        assert audio.evaluate('v=>v.paused')
+        page.keyboard.press('m')
+        assert audio.evaluate('v=>v.muted') and slides.evaluate('v=>v.muted')
+        page.keyboard.press('m')
+        assert audio.evaluate('v=>!v.muted') and slides.evaluate('v=>v.muted')
+        # Captions use an actual WebVTT track clock, even when the audio stream
+        # is hidden by single view. Rendered cue markup remains plain text.
+        page.keyboard.press('c')
+        pw.expect(dialog.locator('.player-caption-layer')).to_have_text('Hello subtitles')
+        assert dialog.locator('.player-caption-layer b').count()==0
+        page.keyboard.press('c')
+        pw.expect(dialog.locator('.player-caption-layer')).to_have_count(0)
+        page.keyboard.press('c')
+        pw.expect(dialog.locator('.player-caption-layer')).to_have_text('Hello subtitles')
+        dialog.get_by_role('button',name=tr('player.settings'),exact=True).click()
+        settings=dialog.get_by_role('dialog',name=tr('player.settings'),exact=True)
+        language_select=settings.get_by_role('combobox',name=tr('player.subtitle_language'),exact=True)
+        language_select.select_option('1')
+        pw.expect(dialog.locator('.player-caption-layer')).to_have_text('Hallo Untertitel')
+        # Space still controls playback inside a focused native quality select.
+        quality=settings.get_by_role('combobox',name=tr('player.camera_quality'),exact=True)
+        quality.select_option('0')
+        page.wait_for_function("document.querySelector('[data-stream=audio]').currentSrc.endsWith('presenter-480.mp4') && document.querySelector('[data-stream=audio]').readyState>=3")
+        quality.focus()
+        page.keyboard.press('Space')
+        page.wait_for_function("!document.querySelector('[data-stream=audio]').paused")
+        page.keyboard.press('Space')
+        assert audio.evaluate('v=>v.paused')
+        page.keyboard.press('Escape')
+        pw.expect(settings).to_have_count(0)
+        pw.expect(dialog.get_by_role('button',name=tr('player.settings'),exact=True)).to_be_focused()
+        for mode,label in [('inset','player.inset'),('split','player.split'),('slides','player.single')]:
+            dialog.get_by_role('button',name=tr(label),exact=True).click()
+            pw.expect(stage).to_have_attribute('data-player-layout',mode)
+            swap=dialog.get_by_role('button',name=tr('player.swap'),exact=True)
+            pw.expect(swap).to_be_enabled()
+            swap.click()
+            if mode=='slides':
+                assert audio.is_visible()!=slides.is_visible()
+                before=audio.is_visible()
+                swap.click()
+                assert audio.is_visible()!=before
+                assert audio.evaluate('v=>!v.muted') and slides.evaluate('v=>v.muted')
+        # Fullscreen contains only the player canvas and its own controls.
+        page.keyboard.press('f')
+        page.wait_for_function("document.fullscreenElement?.hasAttribute('data-player-layout')")
+        assert stage.evaluate('e=>Math.abs(e.clientHeight-innerHeight)<2')
+        assert stage.evaluate("e=>!!e.querySelector('.player-overlay') && !e.querySelector('h2')")
+        page.keyboard.press('f')
+        page.wait_for_function('!document.fullscreenElement')
+        stage.focus()
+        page.keyboard.press('ArrowRight')
+        page.wait_for_function("document.querySelector('[data-stream=audio]').currentTime>=5")
+        assert_no_overflow(page)
+        page.clock.fast_forward(1000)
+        stage.hover(position=dict(x=20,y=56))
+        dialog.evaluate('e=>e.scrollTop=0')
+        page.screenshot(path=f'.pytest_cache/player-keyboard-{width}-{height}-{language}-{scheme}.png',animations='disabled')
+        dialog.get_by_role('button',name=tr('player.settings'),exact=True).click()
+        settings.screenshot(path=f'.pytest_cache/player-settings-{width}-{height}-{language}-{scheme}.png',animations='disabled')
+        page.keyboard.press('Escape')
+        page.keyboard.press('f')
+        page.wait_for_function('Boolean(document.fullscreenElement)')
+        page.keyboard.press('Escape')
+        page.wait_for_function('!document.fullscreenElement')
+        pw.expect(dialog).to_be_visible()
+        page.keyboard.press('Escape')
+        pw.expect(dialog).to_have_count(0)
+        pw.expect(stream).to_be_focused()
+        assert not errors
         browser.close()

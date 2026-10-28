@@ -79,6 +79,7 @@ export interface CourseLogItem {
 }
 
 export interface VideoStreamInfo {
+  captions?: { url: string; language: string; label: string; format: string }[];
   streams: { content: string; main_audio: boolean; renditions: { url: string; width: number; height: number; mimetype: string }[] }[];
   chapters: { time: number; image: string; text: string }[];
   duration: number | null;
