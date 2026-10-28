@@ -419,45 +419,65 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const [freshCal, membershipsRes] = await Promise.all([
+      const [freshCal, discoveredCal, membershipsRes] = await Promise.all([
         api.getCalendar(),
+        api.discoverCalendarCourses().catch(() => null),
         api.getMyCourses().catch(() => null),
       ]);
 
-      setCalendarData(freshCal);
-      cache.setCachedCalendar('ALL', freshCal);
+      const effectiveCal =
+        discoveredCal && discoveredCal.courses.length >= freshCal.courses.length
+          ? discoveredCal
+          : freshCal;
+
+      setCalendarData(effectiveCal);
+      cache.setCachedCalendar('ALL', effectiveCal);
       setCacheTimestamp(Date.now());
 
-      if (freshCal.semester_start_date && freshCal.semester_end_date) {
+      if (effectiveCal.semester_start_date && effectiveCal.semester_end_date) {
         const todayStr = formatYmd(new Date());
-        if (todayStr < freshCal.semester_start_date || todayStr > freshCal.semester_end_date) {
-          const semStart = parseYmd(freshCal.semester_start_date);
+        if (todayStr < effectiveCal.semester_start_date || todayStr > effectiveCal.semester_end_date) {
+          const semStart = parseYmd(effectiveCal.semester_start_date);
           setReferenceDate(semStart);
-          setSelectedMonthDateStr(freshCal.semester_start_date);
+          setSelectedMonthDateStr(effectiveCal.semester_start_date);
         }
       }
 
+      const rawMemberships: CourseItem[] = Array.isArray(membershipsRes)
+        ? membershipsRes
+        : membershipsRes?.courses || [];
+
       let discovered: CourseItem[] = [];
-      if (membershipsRes && Array.isArray(membershipsRes) && membershipsRes.length > 0) {
-        discovered = membershipsRes;
-        setAllMemberships(membershipsRes);
-        cache.setCachedAllMemberships(membershipsRes);
+      if (rawMemberships.length > 0) {
+        discovered = rawMemberships;
+        setAllMemberships(rawMemberships);
+        cache.setCachedAllMemberships(rawMemberships);
       } else {
         discovered = cache.getCachedAllMemberships()?.courses || [];
       }
 
-      // Combine all known courses from memberships, current semester coursesList, and backend calendar
+      // Combine all known courses from Agenda discovery, memberships, and current semester coursesList
       const courseMap = new Map<
         string,
         { ref_id: string; title: string; semester?: string | null; item_type: string }
       >();
-      for (const c of discovered) {
-        courseMap.set(c.ref_id, {
-          ref_id: c.ref_id,
-          title: cache.getDisplayName(c.ref_id, c.title),
+      for (const c of effectiveCal.courses) {
+        courseMap.set(c.course_ref_id, {
+          ref_id: c.course_ref_id,
+          title: cache.getDisplayName(c.course_ref_id, c.course_title),
           semester: c.semester || null,
           item_type: c.item_type || 'crs',
         });
+      }
+      for (const c of discovered) {
+        if (!courseMap.has(c.ref_id)) {
+          courseMap.set(c.ref_id, {
+            ref_id: c.ref_id,
+            title: cache.getDisplayName(c.ref_id, c.title),
+            semester: c.semester || null,
+            item_type: c.item_type || 'crs',
+          });
+        }
       }
       for (const c of coursesList) {
         if (!courseMap.has(c.ref_id)) {
@@ -471,7 +491,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       }
 
       const existingById = new Map<string, CourseCalendarInfo>(
-        freshCal.courses.map((c) => [c.course_ref_id, c])
+        effectiveCal.courses.map((c) => [c.course_ref_id, c])
       );
 
       const toAutoSync = Array.from(courseMap.values()).filter((c) => {

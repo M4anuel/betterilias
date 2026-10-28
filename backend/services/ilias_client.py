@@ -306,6 +306,35 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             self._check_response_for_session_loss(resp, url)
             html_content = resp.text
             parsed = parse_course_materials(html_content, container_ref_id=ref_id)
+            # Opportunistically extract and cache the course's calendar from the same page fetch
+            # if this is a course/group root page (not a subfolder inside a course).
+            is_subfolder = any(
+                b.ref_id
+                and b.ref_id != ref_id
+                and (
+                    "/go/crs/" in (b.url or "")
+                    or "/go/grp/" in (b.url or "")
+                    or "_crs_" in (b.url or "")
+                    or "_grp_" in (b.url or "")
+                )
+                for b in (parsed.breadcrumbs or [])
+            )
+            if not is_subfolder:
+                try:
+                    from backend.services.calendar_service import calendar_service
+
+                    tenant_key = calendar_service._sanitize_tenant_key(
+                        getattr(self.session_manager, "session_id", None)
+                    )
+                    await calendar_service.ingest_course_page_html(
+                        tenant_key=tenant_key,
+                        course_ref_id=ref_id,
+                        html_content=html_content,
+                        course_title=parsed.title,
+                        client=self,
+                    )
+                except Exception as cal_err:
+                    logger.debug(f"Opportunistic calendar ingest skipped for {ref_id}: {cal_err}")
             # Some unjoined courses expose Join only in their parent category.
             if not parsed.items and not parsed.membership.can_join and not parsed.membership.can_leave:
                 parent = next((b for b in reversed(parsed.breadcrumbs) if b.ref_id != ref_id and b.url and '/go/cat/' in b.url), None)

@@ -28,6 +28,7 @@ from backend.scrapers.calendar import (
     get_semester_date_bounds,
     parse_course_calendar_discovery,
     parse_ics_feed,
+    parse_ilias_agenda_page,
     parse_ilias_subscription_modal,
     strip_course_code_prefix,
 )
@@ -516,6 +517,268 @@ class CalendarService:
             return age_sec < CURRENT_SEMESTER_TTL_SECONDS
         except Exception:
             return True
+
+    @staticmethod
+    def _extract_semester_from_title(title: Optional[str]) -> Optional[str]:
+        if not title:
+            return None
+        m = re.search(r"(?:^|[^A-Za-z])(HS|FS)\s*(20\d{2})\b", title, flags=re.I)
+        if m:
+            return f"{m.group(1).upper()}{m.group(2)}"
+        return None
+
+    async def discover_courses_from_agenda_and_memberships(
+        self,
+        tenant_key: str,
+        client: IliasClient,
+        base_url: str = "http://localhost:8000",
+    ) -> SemesterCalendarResponse:
+        """
+        Discover all courses and groups across all semesters directly from:
+        1. The native ILIAS Agenda/Calendar page (ilDashboardGUI&cmd=jumpToCalendar -> #block_cal_sel_0),
+           which contains every course and group calendar category across all semesters (even ones never
+           opened in BetterIlias or on a new device).
+        2. The ILIAS Memberships Overview page (ilmembershipoverviewgui) as a secondary source.
+        3. Local Agenda HTML dump fallback when running offline with dumps present.
+        """
+        state = self._load_tenant_state(tenant_key)
+        courses_dict: Dict[str, Any] = state.get("courses", {})
+        colors_dict: Dict[str, str] = state.get("colors", {})
+        ignored_dict: Dict[str, bool] = state.get("ignored_missing_schedule", {})
+
+        agenda_categories = []
+        membership_courses: List[CourseItem] = []
+
+        if client.session_manager.has_cookies():
+            agenda_url = f"{settings.ilias_base_url}/ilias.php?baseClass=ilDashboardGUI&cmd=jumpToCalendar"
+            try:
+                async with client.session_manager.get_http_client() as http:
+                    resp = await http.get(agenda_url)
+                    client._check_response_for_session_loss(resp, agenda_url)
+                    parsed_agenda = parse_ilias_agenda_page(resp.text)
+                    agenda_categories = parsed_agenda.categories
+            except Exception as e:
+                logger.warning(f"Failed live Agenda discovery fetch: {e}")
+
+            try:
+                dash_resp = await client.get_my_courses()
+                membership_courses = dash_resp.courses
+            except Exception as e:
+                logger.debug(f"Secondary memberships discovery skipped: {e}")
+
+        # Fallback to local Agenda HTML dump if live Agenda returned 0 categories and local dump exists
+        if not agenda_categories:
+            dump_roots = [
+                Path(r"C:\Users\manue\OneDrive\Dokumente\_Uni\IliasAlternative\htmlfromilias\Calendar"),
+                Path(r"C:\Users\manue\Downloads\betterilias\betterilias\htmlfromilias\Calendar"),
+            ]
+            for root in dump_roots:
+                if root.exists():
+                    agenda_files = list(root.glob("Agenda*.html"))
+                    if agenda_files:
+                        try:
+                            html_txt = agenda_files[0].read_text(encoding="utf-8", errors="replace")
+                            parsed_agenda = parse_ilias_agenda_page(html_txt)
+                            agenda_categories = parsed_agenda.categories
+                            break
+                        except Exception:
+                            pass
+
+        changed = False
+        # 1. Register all courses/groups discovered from the ILIAS Agenda Calendar Selection panel
+        for idx, cat in enumerate(agenda_categories):
+            cid = cat.ref_id
+            if not cid or not cat.title:
+                continue
+            c_sem = self._extract_semester_from_title(cat.title)
+            existing = courses_dict.get(cid)
+            if not existing:
+                c_color = colors_dict.get(cid) or cat.color or _default_color_for_course(cid, idx)
+                colors_dict[cid] = c_color
+                is_ignored = bool(ignored_dict.get(cid, False))
+                info = CourseCalendarInfo(
+                    course_ref_id=cid,
+                    course_title=cat.title,
+                    semester=c_sem,
+                    item_type=cat.item_type or "crs",
+                    color=c_color,
+                    status="not_imported",
+                    has_calendar_block=True,
+                    open_calendar_url=cat.calendar_url,
+                    ignored_missing_schedule=is_ignored,
+                    needs_manual_schedule=not is_ignored,
+                )
+                info.status_message = _status_message_for_course(info)
+                courses_dict[cid] = info.model_dump(mode="json")
+                changed = True
+            else:
+                if c_sem and not existing.get("semester"):
+                    existing["semester"] = c_sem
+                    changed = True
+                if cat.item_type and not existing.get("item_type"):
+                    existing["item_type"] = cat.item_type
+                    changed = True
+                if cat.calendar_url and not existing.get("open_calendar_url"):
+                    existing["open_calendar_url"] = cat.calendar_url
+                    changed = True
+
+        # 2. Register any additional courses/groups from Memberships Overview
+        for idx, mc in enumerate(membership_courses):
+            cid = mc.ref_id
+            if not cid or not mc.title:
+                continue
+            c_sem = mc.semester or self._extract_semester_from_title(mc.title)
+            existing = courses_dict.get(cid)
+            if not existing:
+                c_color = colors_dict.get(cid) or _default_color_for_course(cid, len(courses_dict) + idx)
+                colors_dict[cid] = c_color
+                is_ignored = bool(ignored_dict.get(cid, False))
+                info = CourseCalendarInfo(
+                    course_ref_id=cid,
+                    course_title=mc.title,
+                    semester=c_sem,
+                    item_type=mc.item_type or "crs",
+                    color=c_color,
+                    status="not_imported",
+                    ignored_missing_schedule=is_ignored,
+                    needs_manual_schedule=not is_ignored,
+                )
+                info.status_message = _status_message_for_course(info)
+                courses_dict[cid] = info.model_dump(mode="json")
+                changed = True
+            elif c_sem and not existing.get("semester"):
+                existing["semester"] = c_sem
+                changed = True
+
+        if changed:
+            state["courses"] = courses_dict
+            state["colors"] = colors_dict
+            self._save_tenant_state(tenant_key, state)
+
+        return self.build_semester_response(
+            tenant_key=tenant_key,
+            semester=None,
+            base_url=base_url,
+        )
+
+    async def ingest_course_page_html(
+        self,
+        tenant_key: str,
+        course_ref_id: str,
+        html_content: str,
+        course_title: Optional[str] = None,
+        client: Optional[IliasClient] = None,
+        force: bool = False,
+    ) -> bool:
+        """
+        Opportunistically extract and store a course's calendar directly from an already-fetched
+        ILIAS course page HTML (e.g. when a user opens a lecture in BetterIlias), avoiding a
+        duplicate page fetch.
+        """
+        state = self._load_tenant_state(tenant_key)
+        courses_dict: Dict[str, Any] = state.get("courses", {})
+        colors_dict: Dict[str, str] = state.get("colors", {})
+        ignored_dict: Dict[str, bool] = state.get("ignored_missing_schedule", {})
+        imported_map: Dict[str, List[Dict[str, Any]]] = state.get("imported_events", {})
+
+        existing_info = courses_dict.get(course_ref_id)
+        inferred_sem = self._extract_semester_from_title(course_title) or (
+            existing_info.get("semester") if existing_info else None
+        )
+        current_sem = get_current_semester()
+
+        if not force and self._is_course_cache_fresh(existing_info, inferred_sem, current_sem):
+            return False
+
+        disc = parse_course_calendar_discovery(html_content, course_ref_id, course_title)
+        effective_title = course_title or disc.course_title or (
+            existing_info.get("course_title") if existing_info else f"Course {course_ref_id}"
+        )
+        inferred_sem = inferred_sem or self._extract_semester_from_title(effective_title)
+
+        # Only ingest if the page actually has calendar/session indicators or is a known course
+        if (
+            not disc.has_calendar_block
+            and not disc.ical_modal_url
+            and not disc.events
+            and existing_info is None
+            and inferred_sem is None
+        ):
+            return False
+
+        ical_feed_url: Optional[str] = None
+        ics_events: List[CalendarEvent] = []
+        if disc.ical_modal_url and client is not None and client.session_manager.has_cookies():
+            try:
+                async with client.session_manager.get_http_client() as http:
+                    modal_resp = await http.get(disc.ical_modal_url)
+                    client._check_response_for_session_loss(modal_resp, disc.ical_modal_url)
+                    ical_feed_url = parse_ilias_subscription_modal(modal_resp.text)
+                    if ical_feed_url:
+                        ics_resp = await http.get(ical_feed_url)
+                        if ics_resp.status_code == 200 and "BEGIN:VCALENDAR" in ics_resp.text:
+                            ics_events = parse_ics_feed(ics_resp.text, course_ref_id, effective_title)
+            except Exception as ics_err:
+                logger.debug(f"Opportunistic iCal modal fetch skipped for {course_ref_id}: {ics_err}")
+
+        raw_events: List[CalendarEvent] = list(ics_events) + list(disc.events)
+        deduped_events = combine_calendar_events(
+            imported_events=raw_events,
+            custom_rules=[],
+            course_titles={course_ref_id: effective_title},
+        )
+
+        lecture_count = sum(1 for e in deduped_events if e.kind == "lecture")
+        deadline_count = len(deduped_events) - lecture_count
+        if lecture_count > 0:
+            final_status: CourseCalendarFeedStatus = "imported_with_lectures"
+        elif deadline_count > 0:
+            final_status = "imported_deadlines_only"
+        elif disc.has_calendar_block or disc.ical_modal_url or ical_feed_url:
+            final_status = "valid_empty"
+        else:
+            final_status = "unavailable"
+
+        c_color = (
+            colors_dict.get(course_ref_id)
+            or (existing_info.get("color") if existing_info else None)
+            or _default_color_for_course(course_ref_id, len(courses_dict))
+        )
+        colors_dict[course_ref_id] = c_color
+        is_ignored = bool(
+            ignored_dict.get(
+                course_ref_id,
+                existing_info.get("ignored_missing_schedule", False) if existing_info else False,
+            )
+        )
+
+        info = CourseCalendarInfo(
+            course_ref_id=course_ref_id,
+            course_title=effective_title,
+            semester=inferred_sem,
+            item_type=(existing_info.get("item_type") if existing_info else "crs") or "crs",
+            color=c_color,
+            status=final_status,
+            ignored_missing_schedule=is_ignored,
+            needs_manual_schedule=(lecture_count == 0 and not is_ignored),
+            has_calendar_block=bool(disc.has_calendar_block or disc.ical_modal_url),
+            ical_modal_url=disc.ical_modal_url,
+            ical_feed_url=ical_feed_url,
+            open_calendar_url=disc.open_calendar_url or (existing_info.get("open_calendar_url") if existing_info else None),
+            imported_event_count=len(deduped_events),
+            imported_lecture_count=lecture_count,
+            imported_deadline_count=deadline_count,
+            last_imported_at=datetime.now(timezone.utc),
+        )
+        info.status_message = _status_message_for_course(info)
+
+        imported_map[course_ref_id] = [e.model_dump(mode="json") for e in deduped_events]
+        courses_dict[course_ref_id] = info.model_dump(mode="json")
+        state["courses"] = courses_dict
+        state["colors"] = colors_dict
+        state["imported_events"] = imported_map
+        self._save_tenant_state(tenant_key, state)
+        return True
 
     async def sync_semester_calendar(
         self,

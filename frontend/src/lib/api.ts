@@ -732,6 +732,17 @@ export const api = {
     return res.json();
   },
 
+  async discoverCalendarCourses(): Promise<SemesterCalendarResponse> {
+    const res = await sessionFetch(`${API_BASE}/calendar/discover`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.load_failed'));
+    }
+    return res.json();
+  },
+
   async syncCalendar(payload: {
     semester?: string;
     courses: { ref_id: string; title: string; semester?: string; item_type?: string; url?: string }[];

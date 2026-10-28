@@ -339,6 +339,19 @@ export const App: React.FC = () => {
 
         // Always cache fresh result so subsequent loads are instant
         cache.setCachedMaterials(refId, fresh);
+        if (isCourseRoot) {
+          const cachedCal = cache.getCachedCalendar('ALL');
+          const existingCalCourse = cachedCal?.courses?.find((c) => c.course_ref_id === refId);
+          const isChecked =
+            existingCalCourse &&
+            ['imported_with_lectures', 'imported_deadlines_only', 'valid_empty'].includes(existingCalCourse.status);
+          if (!isChecked) {
+            api
+              .getCalendar()
+              .then((cal) => cache.setCachedCalendar('ALL', cal))
+              .catch(() => {});
+          }
+        }
 
         // Discard stale responses from out-of-order network requests
         if (reqId === materialsRequestSeq.current && activeContainerRef.current === refId) {

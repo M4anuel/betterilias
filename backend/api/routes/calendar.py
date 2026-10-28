@@ -44,6 +44,25 @@ async def get_semester_calendar(
     )
 
 
+@router.post("/discover", response_model=SemesterCalendarResponse)
+async def discover_calendar_courses(
+    request: Request,
+    client: IliasClient = Depends(get_ilias_client),
+):
+    """
+    Discover all courses and groups across all semesters from the native ILIAS Agenda/Calendar
+    page (#block_cal_sel_0) and Memberships Overview without requiring the user to have visited
+    past semesters in BetterIlias.
+    """
+    tenant_key = _resolve_tenant_key(request, client)
+    base_url = _resolve_base_url(request)
+    return await calendar_service.discover_courses_from_agenda_and_memberships(
+        tenant_key=tenant_key,
+        client=client,
+        base_url=base_url,
+    )
+
+
 @router.post("/sync", response_model=SemesterCalendarResponse)
 async def sync_semester_calendar(
     payload: CalendarCourseImportRequest,

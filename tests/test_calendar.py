@@ -471,6 +471,125 @@ def test_cross_semester_calendar_ignore_schedule_and_tiered_caching(tmp_path, mo
     assert unign_courses["old-hs2025"]["needs_manual_schedule"] is True
 
 
+@pytest.mark.anyio
+async def test_agenda_discovery_and_opportunistic_course_materials_ingest(tmp_path, monkeypatch):
+    """
+    Verify:
+    1. POST /api/calendar/discover extracts courses and groups across all semesters directly
+       from the ILIAS Agenda page (#block_cal_sel_0) and Memberships Overview without requiring
+       the user to open past semesters in BetterIlias first.
+    2. Opening a lecture's page (via ingest_course_page_html, called inside get_course_materials)
+       immediately extracts and stores its calendar events and status from the already-fetched
+       HTML page with zero extra course-page HTTP fetches, and subsequent calls skip re-parsing
+       when cached.
+    """
+    test_service = CalendarService(storage_dir=tmp_path / ".calendar")
+    monkeypatch.setattr("backend.api.routes.calendar.calendar_service", test_service)
+
+    agenda_fixture_html = """
+    <html><body>
+      <div id="block_cal_sel_0">
+        <ul class="ilCalSel">
+          <li>
+            <input type="checkbox" name="selected_cat_ids[]" value="101" checked="checked" />
+            <div class="ilCalColSpan" style="border-color: #0c4299"></div>
+            <span class="ilCalSelTitle"><a href="ilias.php?baseClass=ilDashboardGUI&cmdClass=ilcalendarcategorygui&calendar_id=101&ref_id=3695519">449033-HS2026-0: Computergrafik</a></span>
+            <img src="templates/default/images/icon_crs.svg" />
+          </li>
+          <li>
+            <input type="checkbox" name="selected_cat_ids[]" value="102" checked="checked" />
+            <div class="ilCalColSpan" style="border-color: #30990c"></div>
+            <span class="ilCalSelTitle"><a href="ilias.php?baseClass=ilDashboardGUI&cmdClass=ilcalendarcategorygui&calendar_id=102&ref_id=3187493">442670-HS2024-0: Einführung in die Programmierung</a></span>
+            <img src="templates/default/images/icon_crs.svg" />
+          </li>
+          <li>
+            <input type="checkbox" name="selected_cat_ids[]" value="103" checked="checked" />
+            <div class="ilCalColSpan" style="border-color: #746625"></div>
+            <span class="ilCalSelTitle"><a href="ilias.php?baseClass=ilDashboardGUI&cmdClass=ilcalendarcategorygui&calendar_id=103&ref_id=2640154">7567-HS2022-0: Einführung in die Betriebswirtschaftslehre</a></span>
+            <img src="templates/default/images/icon_crs.svg" />
+          </li>
+          <li>
+            <input type="checkbox" name="selected_cat_ids[]" value="104" checked="checked" />
+            <div class="ilCalColSpan" style="border-color: #9333ea"></div>
+            <span class="ilCalSelTitle"><a href="ilias.php?baseClass=ilDashboardGUI&cmdClass=ilcalendarcategorygui&calendar_id=104&ref_id=2713697">Fachschaft Mathematik und Informatik (MIB)</a></span>
+            <img src="templates/default/images/icon_grp.svg" />
+          </li>
+        </ul>
+      </div>
+    </body></html>
+    """
+
+    class FakeResp:
+        status_code = 200
+        text = agenda_fixture_html
+
+    class FakeHttp:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def get(self, url, **kwargs):
+            return FakeResp()
+
+    class FakeSessionManager:
+        def has_cookies(self):
+            return True
+
+        def get_http_client(self):
+            return FakeHttp()
+
+    class FakeClient:
+        session_manager = FakeSessionManager()
+
+        def _check_response_for_session_loss(self, resp, url):
+            pass
+
+        async def get_my_courses(self):
+            return type("Dash", (), {"courses": []})()
+
+    disc_cal = await test_service.discover_courses_from_agenda_and_memberships(
+        "test-discover-tenant", client=FakeClient()
+    )
+    semesters = [c.semester for c in disc_cal.courses]
+    # Sorted newest semester first, undated groups last!
+    assert semesters == ["HS2026", "HS2024", "HS2022", None]
+    types = {c.course_ref_id: c.item_type for c in disc_cal.courses}
+    assert types["3695519"] == "crs"
+    assert types["2713697"] == "grp"
+
+    # Now simulate opening the lecture page for Personal und Organisation (or an older course)
+    # via get_course_materials -> ingest_course_page_html using the already-fetched HTML
+    po_html = (FIXTURES_UNIBE / "unibe_po_course_content.html").read_text(
+        encoding="utf-8", errors="replace"
+    )
+    ingested = await test_service.ingest_course_page_html(
+        tenant_key="test-discover-tenant",
+        course_ref_id="3715339",
+        html_content=po_html,
+        course_title="24-HS2026-0: Personal und Organisation",
+        client=None,
+    )
+    assert ingested is True
+
+    cal_after = test_service.build_semester_response("test-discover-tenant")
+    po_course = next(c for c in cal_after.courses if c.course_ref_id == "3715339")
+    assert po_course.status == "imported_with_lectures"
+    assert po_course.imported_lecture_count >= 7
+    assert any(e.course_ref_id == "3715339" and e.kind == "lecture" for e in cal_after.events)
+
+    # Opening the same course again while its calendar cache is fresh should be a fast no-op
+    ingested_again = await test_service.ingest_course_page_html(
+        tenant_key="test-discover-tenant",
+        course_ref_id="3715339",
+        html_content=po_html,
+        course_title="24-HS2026-0: Personal und Organisation",
+        client=None,
+    )
+    assert ingested_again is False
+
+
 from tests.test_localisation_browser import local_site, ROOT
 
 
