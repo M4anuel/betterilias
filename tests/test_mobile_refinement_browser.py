@@ -53,6 +53,39 @@ def assert_no_overflow(page):
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
 
 
+@pytest.mark.parametrize('width,language', [(320, 'de'), (1280, 'en')])
+def test_cached_course_content_hides_native_bulk_actions(local_site, width, language):
+    pw = pytest.importorskip('playwright.sync_api')
+    from bs4 import BeautifulSoup
+    source = (ROOT / 'tests/fixtures/management/manage.html').read_text(encoding='utf8')
+    toolbar = str(BeautifulSoup(source, 'lxml').select_one('#adm2').parent)
+    data = dict(container_ref_id='42', title='Course', items=[], sections=[], sessions=[],
+                breadcrumbs=[], logs=[], rich_text_blocks=[], blocks=[
+                    dict(id='old-toolbar', block_type='text', html_content=toolbar,
+                         plain_text='Functions Availability Period'),
+                    dict(id='lecture', block_type='text', html_content='<p>Delete, Move and Copy are file operations.</p>')])
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+        page = browser.new_page(viewport=dict(width=width, height=740))
+        page.add_init_script(f'''localStorage.setItem('betterilias_language', {json.dumps(language)});
+            localStorage.setItem('betterilias_saver_enabled', 'true');
+            localStorage.setItem('ilias_materials_cache_42', {json.dumps(json.dumps(data))});
+            localStorage.setItem('ilias_ts_ilias_materials_cache_42', String(Date.now()));''')
+        requests = []
+        def respond(route):
+            if urlparse(route.request.url).path.endswith('/materials'):
+                requests.append(route.request.url)
+            mock_api(route)
+        page.route('**/api/**', respond)
+        page.goto(local_site + '/?course=42')
+        pw.expect(page.get_by_text('Delete, Move and Copy are file operations.', exact=True)).to_be_visible()
+        pw.expect(page.locator('.ilias-rich-content')).to_have_count(1)
+        pw.expect(page.locator('.c-toolbar, .ilAdminRow, img[alt="Actions"]')).to_have_count(0)
+        assert requests == []
+        assert_no_overflow(page)
+        browser.close()
+
+
 @pytest.mark.parametrize('language,scheme', [('de', 'dark'), ('en', 'light')])
 @pytest.mark.parametrize('width', [320, 430])
 def test_compact_settings_semesters_materials_and_exercises(local_site, language, scheme, width):

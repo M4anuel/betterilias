@@ -75,6 +75,18 @@ export function cleanRichContentHtml(html?: string | null, blockTitle?: string |
     .replace(/PageTocPH/g, '')
     .replace(/Break(?=\s*<\/|\s*$|\s*<)|\bBreak\b/g, '');
 
+  // Older cached pages can still contain ILIAS bulk-action toolbars.
+  if (cleaned.includes('ilAdminRow') || cleaned.includes('c-toolbar')) {
+    const document = new DOMParser().parseFromString(cleaned, 'text/html');
+    document.querySelectorAll('.ilAdminRow, .c-toolbar.l-bar__container').forEach(control => {
+      const heading = control.previousElementSibling;
+      if (heading?.matches('h2.hidden, h3.hidden')) heading.remove();
+      control.remove();
+    });
+    if (!document.body.textContent?.trim() && !document.body.querySelector('img, video, audio, iframe, embed, object, svg, math, mjx-container, table, hr')) return '';
+    cleaned = document.body.innerHTML;
+  }
+
   // Safeguard: Preserve pre-resolved video players, or wrap Opencast video containers
   cleaned = cleaned.replace(
     /<div\s+[^>]*class=["'][^"']*ocpc-container[^"']*["'][^>]*>[\s\S]*?<iframe\s+[^>]*src=["']([^"']*)["'][^>]*>[\s\S]*?<\/iframe>[\s\S]*?<\/div>/gi,
@@ -1673,7 +1685,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
       .replace(/Break(?=\s*<\/|\s*$|\s*<)|\bBreak\b/g, '')
       .trim();
 
-    if (!cleanedHtml && !cleanedPlain && !cleanTitle) return null;
+    // Ignore stale plain_text when a cached HTML block contained only native UI.
+    if (!cleanTitle && (block.html_content ? !cleanedHtml : !cleanedPlain)) return null;
 
     // Detect section divider headings (e.g. "Informationen zur Lehrveranstaltung", "Zusätzliches Lernangebot", "Materialien")
     const isDividerHeading =
