@@ -200,6 +200,8 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 
 ## Completed
 
+- [x] Refine the video player with loading skeletons, a translucent playback overlay that hides after inactivity, chapter markers and scrubbing thumbnails in the thicker timeline, and a tapered volume slider; replace the separate slide collection.
+
 - [x] Simplify My courses and groups by removing the favourites hint and type filter; support both alphabetical and semester sort directions while keeping semester options derived from actual memberships.
 
 - [x] Add My courses and groups with all-semester membership discovery, search, type/semester filters, alphabetical/newest ordering and persistent session-scoped favourites pinned above other entries.
