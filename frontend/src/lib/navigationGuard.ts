@@ -1,11 +1,13 @@
 import { t } from './i18n';
 import { useEffect, useRef } from 'react';
+import { confirmDialog } from './dialog';
 
 export interface GuardItem {
   id: string;
   isDirty?: boolean | (() => boolean);
   isPending?: boolean | (() => boolean);
   message?: string | (() => string);
+  onDiscard?: () => void;
 }
 
 export interface GuardOptions {
@@ -13,6 +15,7 @@ export interface GuardOptions {
   isDirty?: boolean | (() => boolean);
   isPending?: boolean | (() => boolean);
   message?: string | (() => string);
+  onDiscard?: () => void;
 }
 
 function evaluateBool(val?: boolean | (() => boolean)): boolean {
@@ -93,10 +96,35 @@ class NavigationGuardManager {
     return null;
   }
 
-  public confirmNavigation(): boolean {
+  public async confirmNavigation(): Promise<boolean> {
     const msg = this.getWarningMessage();
     if (!msg) return true;
-    return window.confirm(msg);
+
+    const isPending = this.hasPendingOperations();
+    const confirmed = await confirmDialog({
+      title: isPending ? t("Vorgang abbrechen?") : t("Ungespeicherte Änderungen"),
+      message: msg,
+      confirmLabel: isPending ? t("Trotzdem verlassen") : t("Änderungen verwerfen"),
+      cancelLabel: t("Auf Seite bleiben"),
+      variant: 'warning',
+    });
+
+    if (confirmed) {
+      this.discardDirtyChanges();
+    }
+    return confirmed;
+  }
+
+  public discardDirtyChanges(): void {
+    for (const guard of this.guards.values()) {
+      if (evaluateBool(guard.isDirty)) {
+        try {
+          guard.onDiscard?.();
+        } catch (e) {
+          console.error('Error discarding changes in guard', guard.id, e);
+        }
+      }
+    }
   }
 }
 
@@ -116,6 +144,9 @@ export function useNavigationGuard(guard: GuardOptions): void {
       id,
       isDirty: () => evaluateBool(guardRef.current.isDirty),
       isPending: () => evaluateBool(guardRef.current.isPending),
+      onDiscard: () => {
+        guardRef.current.onDiscard?.();
+      },
       message: () => {
         const m = guardRef.current.message;
         if (typeof m === 'function') return m();
@@ -129,4 +160,3 @@ export function useNavigationGuard(guard: GuardOptions): void {
     });
   }, []);
 }
-

@@ -28,7 +28,7 @@ export function CourseManagement({ context, title, courseRefId, isRevalidating, 
   const [uncertain, setUncertain] = useState(false);
   const isUpdating = busy || loading || Boolean(isRevalidating);
   const dirty = !!data && JSON.stringify(order) !== JSON.stringify(data.order);
-  useNavigationGuard({ isDirty: dirty, isPending: busy });
+  useNavigationGuard({ isDirty: dirty, isPending: busy, onDiscard: () => { if (data) setOrder(data.order); } });
   const refId = context.ref_id;
   const load = useCallback(async () => {
     const response = await api.getManagement(refId);

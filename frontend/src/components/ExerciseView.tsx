@@ -41,6 +41,7 @@ import {
 } from '../types';
 import { api } from '../lib/api';
 import { navigationGuard, useNavigationGuard } from '../lib/navigationGuard';
+import { confirmDialog, alertDialog } from '../lib/dialog';
 import { cache, EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX } from '../lib/cache';
 import { MobilePageHeader } from './MobilePageHeader';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
@@ -118,8 +119,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   }, [activeTabProp]);
 
   const switchTab = useCallback(
-    (tab: ExerciseTab) => {
-      if (tab !== activeTabProp && !navigationGuard.confirmNavigation()) {
+    async (tab: ExerciseTab) => {
+      if (tab !== activeTabProp && !await navigationGuard.confirmNavigation()) {
         return;
       }
       if (tab === 'assignments') {
@@ -394,6 +395,17 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     isDirty: () => hasDirtyGrades,
     isPending: () => uploadingMemberId !== null || deletingFeedbackFileId !== null,
     message: () => t("Sie haben ungespeicherte Bewertungen oder Notizen. Möchten Sie die Seite wirklich verlassen?"),
+    onDiscard: () => {
+      setLocalEdits((prev) => {
+        const next = { ...prev };
+        for (const k of Object.keys(next)) {
+          if (next[k]?.isDirty) {
+            next[k] = { ...next[k], isDirty: false };
+          }
+        }
+        return next;
+      });
+    },
   });
 
   // Sorting state for TA grading submissions
@@ -728,8 +740,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   );
 
   const handleSelectTaAssignment = useCallback(
-    (newAssId: string) => {
-      if (newAssId !== selectedTaAssId && hasCurrentAssDirtyGrades && !navigationGuard.confirmNavigation()) {
+    async (newAssId: string) => {
+      if (newAssId !== selectedTaAssId && hasCurrentAssDirtyGrades && !await navigationGuard.confirmNavigation()) {
         return;
       }
       setSelectedTaAssId(newAssId);
@@ -797,7 +809,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       setFileUploadSuccessId(memberId);
       setTimeout(() => setFileUploadSuccessId(null), 3500);
     } catch (err: any) {
-      alert(t("Fehler beim Hochladen der Korrekturdatei: {p0}", { p0: err.message }));
+      await alertDialog({
+        title: t("Fehler beim Hochladen"),
+        message: t("Fehler beim Hochladen der Korrekturdatei: {p0}", { p0: err.message }),
+        variant: 'danger',
+      });
     } finally {
       setUploadingMemberId(null);
     }
@@ -805,7 +821,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   const handleDeleteRowFeedbackFile = async (memberId: string, fileId: string, feedbackUrl?: string) => {
     if (!exerciseRefId || deletingFeedbackFileId) return;
-    if (!window.confirm(t("Möchten Sie diese Korrekturdatei wirklich löschen?"))) return;
+    const confirmed = await confirmDialog({
+      title: t("Korrekturdatei löschen"),
+      message: t("Möchten Sie diese Korrekturdatei wirklich löschen?"),
+      confirmLabel: t("Löschen"),
+      cancelLabel: t("Abbrechen"),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     setDeletingFeedbackFileId(fileId);
     try {
@@ -822,7 +845,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         [k]: res.files || [],
       }));
     } catch (err: any) {
-      alert(err.message || t("Fehler beim Löschen der Korrekturdatei"));
+      await alertDialog({
+        title: t("Fehler beim Löschen"),
+        message: err.message || t("Fehler beim Löschen der Korrekturdatei"),
+        variant: 'danger',
+      });
     } finally {
       setDeletingFeedbackFileId(null);
     }
@@ -1288,7 +1315,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         wasFilteredOut: isNotGradedFilter && isNowGraded,
       });
     } catch (err: any) {
-      alert(t("Fehler beim Speichern: {p0}", { p0: err.message }));
+      await alertDialog({
+        title: t("Fehler beim Speichern"),
+        message: t("Fehler beim Speichern: {p0}", { p0: err.message }),
+        variant: 'danger',
+      });
     } finally {
       setSavingMemberId(null);
     }
@@ -1512,13 +1543,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           onNavigateHome={onNavigateHome}
           onNavigateRepository={onNavigateRepository}
           onNavigateSemester={onNavigateSemester}
-          onNavigateCourse={(ref) => {
-            if (!navigationGuard.confirmNavigation()) return;
+          onNavigateCourse={async (ref) => {
+            if (!await navigationGuard.confirmNavigation()) return;
             onNavigateCourse(ref);
             onBack();
           }}
-          onNavigateFolder={(ref) => {
-            if (!navigationGuard.confirmNavigation()) return;
+          onNavigateFolder={async (ref) => {
+            if (!await navigationGuard.confirmNavigation()) return;
             if (onNavigateFolder) onNavigateFolder(ref);
             onBack();
           }}

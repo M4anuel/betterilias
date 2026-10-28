@@ -1,5 +1,6 @@
 import { t, useLanguage } from '../lib/i18n';
 import { navigationGuard, useNavigationGuard } from '../lib/navigationGuard';
+import { confirmDialog } from '../lib/dialog';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ArrowLeft,
@@ -393,7 +394,14 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   // Delete an existing instruction file
   const handleDeleteFile = async (fileId: string) => {
     if (!currentAssId) return;
-    if (!confirm(t("Möchten Sie diese Anweisungsdatei wirklich entfernen?"))) return;
+    const ok = await confirmDialog({
+      title: t("Datei löschen"),
+      message: t("Möchten Sie diese Anweisungsdatei wirklich entfernen?"),
+      confirmLabel: t("Löschen"),
+      cancelLabel: t("Abbrechen"),
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setIsDeletingFileId(fileId);
     setError(null);
@@ -449,6 +457,10 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
     isDirty,
     isPending: isSaving || isUploadingFile || Boolean(isDeletingFileId),
     message: t("Sie haben ungespeicherte Änderungen. Möchten Sie die Seite wirklich verlassen und Ihre Änderungen verwerfen?"),
+    onDiscard: () => {
+      setInitialSnapshot(currentSnapshot);
+      setPendingFiles([]);
+    },
   });
 
   // Navigate only after React has committed the clean draft and finished saving.
@@ -463,8 +475,8 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
     onSaved(savedResult.id, { created: savedResult.created, title: savedResult.title });
   }, [savedResult, isSaving, isUploadingFile, isDirty, onSaved]);
 
-  const handleSafeBack = () => {
-    if (navigationGuard.confirmNavigation()) {
+  const handleSafeBack = async () => {
+    if (await navigationGuard.confirmNavigation()) {
       onBack();
     }
   };

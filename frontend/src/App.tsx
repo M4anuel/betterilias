@@ -9,6 +9,7 @@ import { RepositoryView } from './components/RepositoryView';
 import { CourseMembershipModal } from './components/CourseMembershipModal';
 import { NicknameModal } from './components/NicknameModal';
 import { ExtensionInfoModal } from './components/ExtensionInfoModal';
+import { ConfirmModal } from './components/ConfirmModal';
 import { NotificationToast, ChangeNotification } from './components/NotificationToast';
 import {
   AuthStatus,
@@ -408,8 +409,8 @@ export const App: React.FC = () => {
 
   // --- Semester Selection Handler ---
   const handleSelectSemester = useCallback(
-    (semId: string) => {
-      if (!navigationGuard.confirmNavigation()) return;
+    async (semId: string) => {
+      if (!await navigationGuard.confirmNavigation()) return;
       if (!repositoryId && semId === selectedSemester && selectedCourseId === null && !activeExerciseRefId) {
         return;
       }
@@ -440,8 +441,8 @@ export const App: React.FC = () => {
 
   // --- Course Selection Handler ---
   const handleSelectCourse = useCallback(
-    (courseRefId: string) => {
-      if (!navigationGuard.confirmNavigation()) return;
+    async (courseRefId: string) => {
+      if (!await navigationGuard.confirmNavigation()) return;
       if (
         courseRefId === selectedCourseId &&
         currentContainerId === courseRefId &&
@@ -471,8 +472,8 @@ export const App: React.FC = () => {
 
   // --- Subfolder Navigation Handler ---
   const handleNavigateFolder = useCallback(
-    (folderRefId: string) => {
-      if (!navigationGuard.confirmNavigation()) return;
+    async (folderRefId: string) => {
+      if (!await navigationGuard.confirmNavigation()) return;
       if (!selectedCourseId) return;
       if (folderRefId === currentContainerId && !activeExerciseRefId) return;
 
@@ -496,8 +497,8 @@ export const App: React.FC = () => {
 
   // --- Return to Course Root ---
   const handleNavigateCourseRoot = useCallback(
-    (courseRefId: string) => {
-      if (!navigationGuard.confirmNavigation()) return;
+    async (courseRefId: string) => {
+      if (!await navigationGuard.confirmNavigation()) return;
       if (currentContainerId === courseRefId && !activeExerciseRefId) return;
 
       setCurrentContainerId(courseRefId);
@@ -519,8 +520,8 @@ export const App: React.FC = () => {
   );
 
   // --- Return to Semester Overview ---
-  const handleNavigateHome = useCallback(() => {
-    if (!navigationGuard.confirmNavigation()) return;
+  const handleNavigateHome = useCallback(async () => {
+    if (!await navigationGuard.confirmNavigation()) return;
     if (!repositoryId && selectedCourseId === null && !activeExerciseRefId) return;
     setRepositoryId(null);
 
@@ -543,8 +544,8 @@ export const App: React.FC = () => {
     window.history.pushState(nextState, '', stateToUrl(nextState));
   }, [repositoryId, selectedCourseId, activeExerciseRefId, selectedSemester]);
 
-  const handleNavigateRepository = useCallback((refId: string) => {
-    if (!navigationGuard.confirmNavigation()) return;
+  const handleNavigateRepository = useCallback(async (refId: string) => {
+    if (!await navigationGuard.confirmNavigation()) return;
     if (repositoryId === refId) return;
     cache.rememberRepositoryPath(materialsData?.breadcrumbs || []);
     materialsRequestSeq.current++;
@@ -566,8 +567,8 @@ export const App: React.FC = () => {
 
   // --- Exercise View Handler ---
   const handleSelectExercise = useCallback(
-    (exerciseRefId: string | null, tab: ExerciseTab | null = null) => {
-      if (exerciseRefId !== activeExerciseRefId && !navigationGuard.confirmNavigation()) return;
+    async (exerciseRefId: string | null, tab: ExerciseTab | null = null) => {
+      if (exerciseRefId !== activeExerciseRefId && !await navigationGuard.confirmNavigation()) return;
       if (exerciseRefId === activeExerciseRefId && tab === activeExerciseTab) return;
 
       if (exerciseRefId === null) {
@@ -592,8 +593,8 @@ export const App: React.FC = () => {
   );
 
   const handleExerciseTabChange = useCallback(
-    (tab: ExerciseTab) => {
-      if (tab !== activeExerciseTab && !navigationGuard.confirmNavigation()) return;
+    async (tab: ExerciseTab) => {
+      if (tab !== activeExerciseTab && !await navigationGuard.confirmNavigation()) return;
       if (tab === activeExerciseTab) return;
       setActiveExerciseTab(tab);
       const nextState: NavigationState = {
@@ -698,8 +699,8 @@ export const App: React.FC = () => {
 
   // --- History Navigation & PopState Effect ---
   useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
-      if (!navigationGuard.confirmNavigation()) {
+    const handlePopState = async (event: PopStateEvent) => {
+      if (!await navigationGuard.confirmNavigation()) {
         const current = currentNavStateRef.current;
         window.history.pushState(current, '', stateToUrl(current));
         return;
@@ -989,6 +990,9 @@ export const App: React.FC = () => {
           onDismiss={() => setChangeNotifications([])}
         />
       )}
+
+      {/* Global Confirmation & Alert Dialog */}
+      <ConfirmModal />
     </div>
   );
 };

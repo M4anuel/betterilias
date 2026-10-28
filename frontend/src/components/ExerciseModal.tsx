@@ -1,4 +1,5 @@
 import { t, useLanguage, assignmentStatusText } from '../lib/i18n';
+import { alertDialog, confirmDialog } from '../lib/dialog';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   X,
@@ -254,7 +255,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
       setSavedSuccessId(memberId);
       setTimeout(() => setSavedSuccessId(null), 2500);
     } catch (err: any) {
-      alert(t("Fehler beim Speichern: {p0}", { p0: err.message }));
+      await alertDialog({ title: t("Fehler"), message: t("Fehler beim Speichern: {p0}", { p0: err.message }), variant: 'danger' });
     } finally {
       setSavingMemberId(null);
     }
@@ -860,12 +861,19 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                         <button
                           type="button"
                           onClick={async () => {
-                            if (!window.confirm(t("Möchtest du das Team wirklich auflösen?"))) return;
+                            const ok = await confirmDialog({
+                              title: t("Team auflösen"),
+                              message: t("Möchtest du das Team wirklich auflösen?"),
+                              confirmLabel: t("Team auflösen"),
+                              cancelLabel: t("Abbrechen"),
+                              variant: 'danger',
+                            });
+                            if (!ok) return;
                             try {
                               const updated = await api.deleteStudentTeam(exerciseRefId, selectedAssId);
                               setStudentDetail(updated);
                             } catch (err: any) {
-                              alert(err.message || t("Fehler beim Auflösen des Teams"));
+                              await alertDialog({ title: t("Fehler"), message: err.message || t("Fehler beim Auflösen des Teams"), variant: 'danger' });
                             }
                           }}
                           className="text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer"
@@ -897,7 +905,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 const updated = await api.createStudentTeam(exerciseRefId, selectedAssId);
                                 setStudentDetail(updated);
                               } catch (err: any) {
-                                alert(err.message || t("Fehler beim Erstellen des Teams"));
+                                await alertDialog({ title: t("Fehler"), message: err.message || t("Fehler beim Erstellen des Teams"), variant: 'danger' });
                               }
                             }}
                             className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 shadow-2xs cursor-pointer"

@@ -25,6 +25,7 @@ import {
 import { SubmissionItem, FeedbackFileItem } from '../types';
 import { api } from '../lib/api';
 import { useNavigationGuard } from '../lib/navigationGuard';
+import { confirmDialog, alertDialog } from '../lib/dialog';
 
 interface SubmissionDetailModalProps {
   submission: SubmissionItem;
@@ -122,7 +123,11 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
       setUploadSuccessMsg(`"${file.name}" erfolgreich hochgeladen.`);
       setTimeout(() => setUploadSuccessMsg(null), 3500);
     } catch (err: any) {
-      alert(t("Fehler beim Hochladen: {p0}", { p0: err.message }));
+      await alertDialog({
+        title: t("Fehler beim Hochladen"),
+        message: t("Fehler beim Hochladen: {p0}", { p0: err.message }),
+        variant: 'danger',
+      });
     } finally {
       setIsUploadingFile(false);
     }
@@ -148,7 +153,14 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
 
   const handleDeleteFeedbackFile = async (fileId: string) => {
     if (!exerciseRefId || deletingFileId) return;
-    if (!window.confirm(t("Möchten Sie diese Korrekturdatei wirklich löschen?"))) return;
+    const confirmed = await confirmDialog({
+      title: t("Korrekturdatei löschen"),
+      message: t("Möchten Sie diese Korrekturdatei wirklich löschen?"),
+      confirmLabel: t("Löschen"),
+      cancelLabel: t("Abbrechen"),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     setDeletingFileId(fileId);
     try {
@@ -162,7 +174,11 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
       setFeedbackFiles(res.files || []);
       onFeedbackFilesChange?.(submission.member_id, res.files || []);
     } catch (err: any) {
-      alert(err.message || t("Fehler beim Löschen der Korrekturdatei"));
+      await alertDialog({
+        title: t("Fehler beim Löschen"),
+        message: err.message || t("Fehler beim Löschen der Korrekturdatei"),
+        variant: 'danger',
+      });
     } finally {
       setDeletingFileId(null);
     }
@@ -174,19 +190,32 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
     isDirty: () => isDirty,
     isPending: () => isUploadingFile || isSaving || deletingFileId !== null,
     message: () => t("Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?"),
+    onDiscard: () => {
+      setIsDirty(false);
+    },
   });
 
-  const handleSafeClose = () => {
+  const handleSafeClose = async () => {
     if (isDirty) {
-      if (!window.confirm(t("Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?"))) {
-        return;
-      }
+      const confirmed = await confirmDialog({
+        title: t("Ungespeicherte Änderungen"),
+        message: t("Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?"),
+        confirmLabel: t("Änderungen verwerfen"),
+        cancelLabel: t("Abbrechen"),
+        variant: 'warning',
+      });
+      if (!confirmed) return;
+    } else if (isUploadingFile || isSaving) {
+      const confirmed = await confirmDialog({
+        title: t("Vorgang abbrechen?"),
+        message: t("Ein Vorgang oder Upload wird gerade ausgeführt. Wenn Sie die Seite jetzt verlassen, wird er möglicherweise abgebrochen. Möchten Sie wirklich fortfahren?"),
+        confirmLabel: t("Trotzdem schließen"),
+        cancelLabel: t("Abbrechen"),
+        variant: 'warning',
+      });
+      if (!confirmed) return;
     }
-    if (isUploadingFile || isSaving) {
-      if (!window.confirm(t("Ein Vorgang oder Upload wird gerade ausgeführt. Wenn Sie die Seite jetzt verlassen, wird er möglicherweise abgebrochen. Möchten Sie wirklich fortfahren?"))) {
-        return;
-      }
-    }
+    setIsDirty(false);
     onClose();
   };
 
@@ -217,7 +246,11 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
       setIsDirty(false);
       setTimeout(() => setIsSaved(false), 3000);
     } catch (err: any) {
-      alert(err.message || t("Fehler beim Speichern der Bewertung"));
+      await alertDialog({
+        title: t("Fehler beim Speichern"),
+        message: err.message || t("Fehler beim Speichern der Bewertung"),
+        variant: 'danger',
+      });
     } finally {
       setIsSaving(false);
     }

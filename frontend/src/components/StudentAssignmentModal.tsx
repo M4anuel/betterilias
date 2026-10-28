@@ -23,6 +23,7 @@ import { CourseUserCandidate, StudentAssignmentDetail, TeamMemberInfo } from '..
 import { api } from '../lib/api';
 import { cache, TEAM_CANDIDATES_CACHE_PREFIX } from '../lib/cache';
 import { useNavigationGuard } from '../lib/navigationGuard';
+import { confirmDialog, alertDialog } from '../lib/dialog';
 
 interface StudentAssignmentModalProps {
   exerciseRefId: string;
@@ -226,9 +227,14 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       return;
     }
     const label = member.name || member.login || member.user_id;
-    if (!window.confirm(t("Möchtest du \"{p0}\" wirklich aus dem Team entfernen?", { p0: label }))) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: t("Mitglied entfernen"),
+      message: t("Möchtest du \"{p0}\" wirklich aus dem Team entfernen?", { p0: label }),
+      confirmLabel: t("Entfernen"),
+      cancelLabel: t("Abbrechen"),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     setRemovingMemberId(member.user_id);
     setTeamFeedbackMessage(null);
@@ -251,9 +257,14 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
         ? t("Möchtest du das gesamte Team ({p0} Mitglieder) wirklich auflösen?\n\nHinweis: Da ILIAS ein Team erst löschen lässt, wenn nur noch 1 Person darin ist, entfernt BetterIlias zuerst automatisch alle anderen Teammitglieder und löst danach das Team auf.", { p0: memberCount })
         : t("Möchtest du dein Team wirklich auflösen?");
 
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: t("Team auflösen"),
+      message: confirmMsg,
+      confirmLabel: t("Team auflösen"),
+      cancelLabel: t("Abbrechen"),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     setIsDeletingTeam(true);
     setTeamFeedbackMessage(null);
@@ -429,7 +440,11 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
         setTimeout(() => setUploadSuccessMessage(null), 4000);
       }
     } catch (err: any) {
-      alert(t("Fehler beim Hochladen der Abgabe: {p0}", { p0: err.message }));
+      await alertDialog({
+        title: t("Fehler beim Hochladen"),
+        message: t("Fehler beim Hochladen der Abgabe: {p0}", { p0: err.message }),
+        variant: 'danger',
+      });
     } finally {
       setIsUploading(false);
     }
@@ -472,9 +487,14 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
   const [deletingDeliveredId, setDeletingDeliveredId] = useState<string | null>(null);
 
   const handleDeleteStudentFile = async (deliveredId: string, filename: string) => {
-    if (!window.confirm(t("Möchtest du die Datei \"{p0}\" wirklich löschen?", { p0: filename }))) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: t("Abgabe löschen"),
+      message: t("Möchtest du die Datei \"{p0}\" wirklich löschen?", { p0: filename }),
+      confirmLabel: t("Löschen"),
+      cancelLabel: t("Abbrechen"),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     setDeletingDeliveredId(deliveredId);
     try {
@@ -484,7 +504,11 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
       setUploadSuccessMessage(t("\"{p0}\" erfolgreich gelöscht.", { p0: filename }));
       setTimeout(() => setUploadSuccessMessage(null), 4000);
     } catch (err: any) {
-      alert(t("Fehler beim Löschen der Abgabe: {p0}", { p0: err.message }));
+      await alertDialog({
+        title: t("Fehler beim Löschen"),
+        message: t("Fehler beim Löschen der Abgabe: {p0}", { p0: err.message }),
+        variant: 'danger',
+      });
     } finally {
       setDeletingDeliveredId(null);
     }
@@ -496,11 +520,16 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
     message: () => t("Ein Vorgang oder Upload wird gerade ausgeführt. Wenn Sie die Seite jetzt verlassen, wird er möglicherweise abgebrochen. Möchten Sie wirklich fortfahren?"),
   });
 
-  const handleSafeClose = () => {
+  const handleSafeClose = async () => {
     if (isUploading || isDeletingTeam || deletingDeliveredId !== null) {
-      if (!window.confirm(t("Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?"))) {
-        return;
-      }
+      const confirmed = await confirmDialog({
+        title: t("Vorgang abbrechen?"),
+        message: t("Ein Upload wird gerade ausgeführt. Möchten Sie wirklich abbrechen?"),
+        confirmLabel: t("Trotzdem abbrechen"),
+        cancelLabel: t("Fortfahren"),
+        variant: 'warning',
+      });
+      if (!confirmed) return;
     }
     onClose();
   };

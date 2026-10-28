@@ -83,3 +83,12 @@ and desktop widths.
 
 Physical iOS Safari/Android Chrome and live ILIAS acceptance must be recorded
 separately from automated browser emulation.
+
+## Custom Confirmation & Navigation Dialog System
+
+Browser-native window.confirm and window.alert dialogs have been entirely replaced across student and TA workflows with a responsive custom dialog system (ConfirmModal.tsx and dialog.ts):
+- **Mobile Geometry & Touch Targets:** Width fits within min(30rem, 92vw) and max-h-[90dvh]. On viewports under 640px, action buttons stack vertically in reverse column order (lex-col-reverse) to place primary affirmative actions comfortably within thumb reach, with min-h-[44px] touch targets.
+- **Accessible Focus & Backdrop:** Backed by native <dialog> element with showModal(), ria-labelledby, ria-describedby, keyboard Esc listener, and focus trapping. Backdrop uses subtle dark blur (ackdrop-blur-xs) and supports light and dark modes (dark:bg-slate-900, dark:border-slate-800).
+- **Clean Discard Lifecycle:** Registered navigation guards support an onDiscard callback. When the user confirms discarding changes on navigation, 
+avigationGuard immediately resets dirty state flags, preventing ghost warnings or repeated prompts when changing tabs or navigating courses.
+
