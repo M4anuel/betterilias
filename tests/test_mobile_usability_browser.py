@@ -55,6 +55,7 @@ def test_mobile_navigation_content_settings_and_draft(local_site, language, sche
             toggle.click()
             page.keyboard.press('Escape')
             playwright.expect(toggle).to_be_focused()
+        if width < 768: page.get_by_label(tr('mobile.actions'), exact=True).click()
         playwright.expect(page.get_by_role('button', name=tr('management.enter'), exact=True)).to_be_visible()
         playwright.expect(page.get_by_role('link', name=tr('media.open_pdf'))).to_have_attribute('href', 'https://example.org/notes.pdf')
         playwright.expect(page.get_by_role('region', name=tr('media.scroll_table'))).to_be_visible()
@@ -74,6 +75,7 @@ def test_mobile_navigation_content_settings_and_draft(local_site, language, sche
         playwright.expect(settings).to_be_visible()
         page.keyboard.press('Escape')
         page.screenshot(path=f'.pytest_cache/mobile-{width}-{language}.png')
+        if width < 768: page.get_by_label(tr('mobile.actions'), exact=True).click()
         page.get_by_role('button', name=tr('management.enter'), exact=True).click()
         page.get_by_role('button', name=tr('authoring.add'), exact=True).click()
         dialog = page.get_by_role('dialog', name=tr('authoring.add'), exact=True)
@@ -81,6 +83,7 @@ def test_mobile_navigation_content_settings_and_draft(local_site, language, sche
         search.fill('draft')
         # Resize to a keyboard-sized landscape viewport without remounting the draft.
         page.set_viewport_size(dict(width=667, height=320))
+        page.wait_for_function("parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--visible-height')) <= 321")
         playwright.expect(search).to_have_value('draft')
         bounds = dialog.bounding_box()
         assert bounds['y'] >= 0 and bounds['y'] + bounds['height'] <= 321

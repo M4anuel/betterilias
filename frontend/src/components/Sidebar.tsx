@@ -32,7 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenNicknameModal,
   nicknamesVersion,
 }) => {
-  useLanguage();
+  const language = useLanguage();
 
   // Check if a custom user ordering exists
   const customOrder = useMemo(() => {
@@ -43,7 +43,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Group by subject when in default mode (no custom ordering)
   const groupedBySubject = useMemo(() => {
     const map = new Map<string, CourseItem[]>();
-    for (const course of courses) {
+    const positions = new Map((customOrder || []).filter(item => item.type === 'course').map((item, index) => [item.id, index]));
+    const ordered = [...courses].sort((a, b) => (positions.get(a.ref_id) ?? Infinity) - (positions.get(b.ref_id) ?? Infinity));
+    for (const course of ordered) {
       const subject = (course.subject && course.subject.trim()) || t('Sonstige');
       if (!map.has(subject)) {
         map.set(subject, []);
@@ -51,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       map.get(subject)!.push(course);
     }
     return map;
-  }, [courses]);
+  }, [courses, language, customOrder]);
 
   const renderCourseButton = (course: CourseItem) => {
     const displayName = cache.getDisplayName(course.ref_id, course.title);
@@ -72,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ? { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }
             : undefined
         }
-        aria-label={course.title}
+        aria-label={displayName}
         aria-current={isSelected ? "page" : undefined}
         title={course.title}
       >
@@ -197,7 +199,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Courses List - Custom Ordering vs Default Subject Sectioning */}
-        {customOrder !== null ? (
+        {customOrder?.some(item => item.type === 'section') ? (
           /* Custom Ordering Mode: default subject sections disappear, custom order and custom section dividers take over */
           <div className="space-y-1">
             {(() => {
@@ -211,7 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div
                         key={item.id}
                         className="my-2 flex items-center justify-center"
-                        title={item.title || t("Hilfsassistenz (TA)")}
+                        title={item.title || t("Abschnittsname")}
                       >
                         <div className="h-0.5 w-6 rounded-full bg-[var(--accent)] opacity-60" />
                       </div>
@@ -222,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] truncate max-w-[190px]"
                             title={item.title}
                           >
-                            {item.title || t("Hilfsassistenz (TA)")}
+                            {item.title || t("Abschnittsname")}
                           </span>
                           <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
                         </div>

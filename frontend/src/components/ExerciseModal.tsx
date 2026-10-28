@@ -448,7 +448,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 shadow-2xs">
                 {/* Search input */}
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
                     value={searchQuery}

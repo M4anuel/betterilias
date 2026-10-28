@@ -154,7 +154,10 @@ def test_create_team_assignment_preserves_draft_and_recovers_from_rejection(loca
         playwright.expect(selector).to_have_value('4')
         playwright.expect(instructions).to_have_text('Keep these instructions')
         page.get_by_role('button', name='Create assignment', exact=True).last.click()
-        playwright.expect(page.get_by_role('heading', name='Manage & edit assignments', exact=True)).to_be_visible()
+        if width < 768:
+            playwright.expect(page.get_by_role('combobox', name='Exercise view')).to_have_value('manage')
+        else:
+            playwright.expect(page.get_by_role('heading', name='Manage & edit assignments', exact=True)).to_be_visible()
         playwright.expect(page.get_by_text(title, exact=True)).to_be_visible()
         confirmation = page.get_by_role('status', name='Assignment confirmation', exact=True)
         playwright.expect(confirmation).to_have_text(f'Assignment “{title}” created successfully.')

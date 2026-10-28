@@ -457,7 +457,7 @@ def test_extension_sync_cookie_sanitization(tmp_path, monkeypatch):
         data = response.json()
         assert data["success"] is True
         session_id = data["session_id"]
-        
+
         # Verify saved cookies on disk
         mgr = SessionManager(session_id=session_id)
         saved_cookies = mgr.load_cookies()

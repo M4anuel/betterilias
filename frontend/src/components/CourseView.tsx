@@ -28,6 +28,8 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { CourseMaterialsResponse, MaterialItem, CourseContentBlock, CourseMembership, MembershipAction, ExerciseTab } from '../types';
+import { useMediaQuery } from '../lib/useMediaQuery';
+import { MobilePageHeader } from './MobilePageHeader';
 import { CourseIcon } from './CourseIcon';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { PodcastModal } from './PodcastModal';
@@ -236,6 +238,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
   onExerciseTabChange,
 }) => {
   const language = useLanguage();
+  const compact = useMediaQuery('(max-width: 767px)');
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedDrawers, setCollapsedDrawers] = useState<Record<string, boolean>>(() =>
     cache.getCourseDrawersState(courseRefId)
@@ -972,8 +975,21 @@ export const CourseView: React.FC<CourseViewProps> = ({
       r.item.url.toLowerCase().includes('/go/exc/')
   ).length;
 
+  const renderMobileFolder = (item: MaterialItem) => {
+    const stat = folderStats[item.ref_id];
+    return <button key={item.ref_id} type="button" onClick={() => onNavigateFolder(item.ref_id)}
+      aria-label={item.title} data-mobile-folder className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"><Folder size={20} /></span>
+      <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{item.title}</span>
+        {stat?.isMapped && <span className="block text-[10px] text-slate-500 dark:text-slate-400">{stat.files} {stat.files === 1 ? t('Datei') : t('Dateien')}{stat.folders > 0 ? ` / ${stat.folders} ${t('Ordner')}` : ''}</span>}
+      </span>
+      <ArrowRight size={16} className="shrink-0 self-end text-slate-400" aria-hidden="true" />
+    </button>;
+  };
+
   const renderSearchResultRow = (result: CourseSearchResult) => {
     const { item, containerRefId, breadcrumbs, isSubfolderItem } = result;
+    if (compact && item.item_type === 'fold') return renderMobileFolder(item);
     const isFile = item.item_type === 'file';
     const isFolder = item.item_type === 'fold';
     const isPodcast =
@@ -1003,7 +1019,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 {item.title}
               </span>
               {item.file_size && (
-                <span className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                <span className="file-size rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-500 dark:text-slate-400">
                   {item.file_size}
                 </span>
               )}
@@ -1065,7 +1081,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             </button>
           ) : isFile && downloadUrl ? (
             <a
-              href={downloadUrl}
+              href={downloadUrl} aria-label={t("Download")}
               download
               style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
               className="flex items-center gap-1 rounded-lg text-white px-2.5 py-1 text-xs font-semibold hover:opacity-90 transition shadow-2xs"
@@ -1192,6 +1208,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
   // Render a rich tile card for courses with tile layout (e.g. Programming with R)
   const renderTileItemCard = (item: MaterialItem) => {
+    if (compact && item.item_type === 'fold') return renderMobileFolder(item);
+    if (compact && item.item_type === 'file') return renderItemRow(item);
     const isFile = item.item_type === 'file';
     const isFolder = item.item_type === 'fold';
     const isPodcast =
@@ -1297,6 +1315,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
   // Render a single material item row
   const renderItemRow = (item: MaterialItem) => {
+    if (compact && item.item_type === 'fold') return renderMobileFolder(item);
     const isFile = item.item_type === 'file';
     const isFolder = item.item_type === 'fold';
     const isPodcast =
@@ -1546,13 +1565,13 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
         <div className="flex items-center gap-2 shrink-0">
           {item.file_size && (
-            <span className="rounded bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-mono font-medium text-slate-600 dark:text-slate-400">
+            <span className="file-size rounded bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-mono font-medium text-slate-600 dark:text-slate-400">
               {item.file_size}
             </span>
           )}
           {isFile && downloadUrl ? (
             <a
-              href={downloadUrl}
+              href={downloadUrl} aria-label={t("Download")}
               download
               className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-[var(--accent)] hover:text-white transition shadow-2xs"
             >
@@ -1798,6 +1817,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {items.map((folder) => {
+              if (compact) return renderMobileFolder(folder);
               const stat = folderStats[folder.ref_id];
               return (
                 <div
@@ -1967,8 +1987,21 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
+      <MobilePageHeader title={isInsideSubfolder ? materialsData?.title || courseNickname : cache.getDisplayName(courseRefId, materialsData?.title || courseNickname)}
+        onBack={() => {
+          if (!isInsideSubfolder) { onNavigateHome(); return; }
+          const crumbs = materialsData?.breadcrumbs || [];
+          const current = crumbs.findIndex(crumb => crumb.ref_id === materialsData?.container_ref_id);
+          const parent = current > 0 ? crumbs[current - 1]?.ref_id : courseRefId;
+          onNavigateFolder(parent || courseRefId);
+        }} onRefresh={onManualRefresh} refreshing={isRevalidating}>
+        {materialsData?.authoring && (materialsData.authoring.can_create || materialsData.authoring.can_manage || materialsData.authoring.can_edit_page) &&
+          <button type="button" className="rounded-lg px-3 py-2 text-sm" aria-pressed={isManaging} onClick={() => { if (navigationGuard.confirmNavigation()) setIsManaging(!isManaging); }}>{t(isManaging ? 'management.done' : 'management.enter')}</button>}
+        <button type="button" className="rounded-lg px-3 py-2 text-sm" onClick={() => setIsOrderModalOpen(true)}>{t('Reihenfolge')}</button>
+        {membership?.can_leave && <button type="button" className="rounded-lg px-3 py-2 text-sm" onClick={() => onManageMembership('leave')}>{t('Kurs verlassen')}</button>}
+      </MobilePageHeader>
       {/* Top Header with Breadcrumbs & Sync Status */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+      <div className="desktop-only flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <CompactBreadcrumbs
           rawBreadcrumbs={materialsData?.breadcrumbs || []}
           courseNickname={courseNickname}
@@ -2019,8 +2052,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
         context={materialsData.authoring} title={materialsData.title || courseNickname} courseRefId={courseRefId}
         isRevalidating={isRevalidating}
         onRefresh={onManualRefresh} onOpenFolder={onNavigateFolder} /> : <>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="min-w-0 flex-1">
+      <div className="course-title-row flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="desktop-only min-w-0 flex-1">
           <div className="flex items-center gap-3">
             {isInsideSubfolder && (
               <button
@@ -2042,13 +2075,13 @@ export const CourseView: React.FC<CourseViewProps> = ({
         </div>
 
         {/* Search & Actions Bar */}
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 min-w-0 w-full md:w-auto">
+        <div className="course-search-actions flex flex-wrap sm:flex-nowrap items-center gap-2 min-w-0 w-full md:w-auto">
           {membership?.can_leave && <button type="button" onClick={() => onManageMembership('leave')}
-            className="rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800">{t("Kurs verlassen")}</button>}
+            className="desktop-only rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800">{t("Kurs verlassen")}</button>}
           <button
             type="button"
             onClick={() => setIsOrderModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition shadow-2xs cursor-pointer shrink-0"
+            className="desktop-only flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition shadow-2xs cursor-pointer shrink-0"
             title={t("Reihenfolge der Abschnitte anpassen")}
           >
             <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
@@ -2056,7 +2089,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
           </button>
 
           <div className="relative min-w-0 w-full md:w-72">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
             <input
               type="text"
               placeholder={t("Vorlesung durchsuchen...")}

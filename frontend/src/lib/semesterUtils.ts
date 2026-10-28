@@ -74,7 +74,7 @@ export function getSemesterOption(
     },
     get full() {
       const termName = t(parsed.term === 'HS' ? 'semester.autumn' : 'semester.spring');
-      const suffix = isCurrent ? ` (${t('semester.current')})` : isPreview ? ` (${t('semester.preview')})` : '';
+      const suffix = isPreview ? ` (${t('semester.preview')})` : '';
       return `${termName} ${parsed.year}${suffix}`;
     },
     term: parsed.term,

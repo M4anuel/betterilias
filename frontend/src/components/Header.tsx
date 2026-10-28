@@ -1,7 +1,8 @@
 import { t, useLanguage } from '../lib/i18n';
 import React, { useState } from 'react';
-import { Menu, Settings, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Menu, CheckCircle2, AlertCircle } from 'lucide-react';
 import { AuthStatus } from '../types';
+import { SettingsGear } from './SettingsGear';
 import { SettingsDropdown } from './SettingsDropdown';
 
 interface HeaderProps {
@@ -23,6 +24,11 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   useLanguage();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [gearRotation, setGearRotation] = useState(0);
+  const toggleSettings = () => {
+    setGearRotation(angle => angle + 180);
+    setIsSettingsOpen(open => !open);
+  };
 
   return (
     <header className="sticky top-0 z-40 flex min-h-16 shrink-0 w-full items-center justify-between border-b border-slate-200 bg-white/90 px-2 sm:px-4 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90 transition-colors">
@@ -83,7 +89,8 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Settings Menu Button */}
         <button
-          onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+          onClick={toggleSettings}
+          data-settings-trigger
           aria-label={t("Design & Einstellungen")}
           aria-expanded={isSettingsOpen}
           className={`rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer border ${
@@ -93,12 +100,14 @@ export const Header: React.FC<HeaderProps> = ({
           }`}
           title={t("Design & Einstellungen")}
         >
-          <Settings className="h-5 w-5" />
+          <SettingsGear rotation={gearRotation} />
         </button>
 
         {/* Settings Dropdown Panel */}
         <SettingsDropdown
           isOpen={isSettingsOpen}
+          gearRotation={gearRotation}
+          onGearClick={toggleSettings}
           onClose={() => setIsSettingsOpen(false)}
           onLogout={onLogout}
           isAuthenticated={Boolean(authStatus?.authenticated)}
