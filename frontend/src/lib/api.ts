@@ -73,11 +73,23 @@ async function sessionFetch(input: string, init?: RequestInit): Promise<Response
   }
 }
 
+const inFlightManagement = new Map<string, Promise<ManagementResponse>>();
+
 export const api = {
-  async getManagement(refId: string): Promise<ManagementResponse> {
-    const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/management`, { cache: 'no-store' });
-    if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('management.load_failed'));
-    return res.json();
+  getManagement(refId: string): Promise<ManagementResponse> {
+    const existing = inFlightManagement.get(refId);
+    if (existing) return existing;
+    const req = (async () => {
+      try {
+        const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/management`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('management.load_failed'));
+        return await res.json();
+      } finally {
+        inFlightManagement.delete(refId);
+      }
+    })();
+    inFlightManagement.set(refId, req);
+    return req;
   },
   async reviewDeletion(refId: string, item_ids: string[]): Promise<DeleteReview> {
     const res = await sessionFetch(`${API_BASE}/materials/${encodeURIComponent(refId)}/deletion-review`, {

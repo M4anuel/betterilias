@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { cache, TA_ASSIGNMENT_DETAIL_CACHE_PREFIX } from '../lib/cache';
 import { InstructionEditor } from './InstructionEditor';
 import { TAAssignmentDetailResponse, TAInstructionFileItem, SaveTAAssignmentRequest } from '../types';
 
@@ -49,6 +50,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   const [currentAssId, setCurrentAssId] = useState<string | null>(assId);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRevalidating, setIsRevalidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -155,7 +157,47 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       return;
     }
 
-    setIsLoading(true);
+    const cached = cache.getCachedTAAssignmentDetail(exerciseRefId, assId);
+    if (cached) {
+      setTitle(cached.title || '');
+      setTypeId(cached.type_id || initialTypeId);
+      if (cached.available_types && Object.keys(cached.available_types).length) {
+        setAvailableTypes({ ...cached.available_types, [cached.type_id]: cached.type_name });
+      }
+      setMandatory(cached.mandatory);
+      setInstructionHtml(cached.instruction_html || '');
+      setStartTime(cached.start_time || '');
+      setDeadlineMode(cached.deadline_mode === -1 ? -1 : 0);
+      setDeadline(cached.deadline || '');
+      setHasGracePeriod(cached.has_grace_period || false);
+      setDeadline2(cached.deadline2 || '');
+      setMaxFileEnabled(cached.max_file_enabled || false);
+      setMaxFile(cached.max_file ?? null);
+      setInstructionFiles(cached.instruction_files || []);
+      setInitialSnapshot(JSON.stringify({
+        title: cached.title || '',
+        typeId: cached.type_id || initialTypeId,
+        mandatory: cached.mandatory,
+        instructionHtml: cached.instruction_html || '',
+        startTime: cached.start_time || '',
+        deadlineMode: cached.deadline_mode === -1 ? -1 : 0,
+        deadline: cached.deadline || '',
+        hasGracePeriod: cached.has_grace_period || false,
+        deadline2: cached.deadline2 || '',
+        maxFileEnabled: cached.max_file_enabled || false,
+        maxFile: cached.max_file ?? null,
+      }));
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+
+    const storageKey = `${TA_ASSIGNMENT_DETAIL_CACHE_PREFIX}${exerciseRefId}_${assId}`;
+    if (cached && cache.isIliasSaverFresh(storageKey)) {
+      return;
+    }
+
+    setIsRevalidating(true);
     setError(null);
     try {
       const data: TAAssignmentDetailResponse = await api.getTAAssignmentDetail(
@@ -163,6 +205,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
         assId,
         typeId
       );
+      cache.setCachedTAAssignmentDetail(exerciseRefId, assId, data);
       setTitle(data.title || '');
       setTypeId(data.type_id || initialTypeId);
       if (data.available_types && Object.keys(data.available_types).length) {
@@ -171,7 +214,6 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       setMandatory(data.mandatory);
       setInstructionHtml(data.instruction_html || '');
       setStartTime(data.start_time || '');
-      // If deadline is present or deadline_mode is 0, set to 0 (Fixed Date), otherwise -1 (No Deadline)
       setDeadlineMode(data.deadline_mode === -1 ? -1 : 0);
       setDeadline(data.deadline || '');
       setHasGracePeriod(data.has_grace_period || false);
@@ -194,9 +236,12 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       }));
 
     } catch (err: any) {
-      setError(err?.message || t("Fehler beim Laden der Übungsdetails"));
+      if (!cached) {
+        setError(err?.message || t("Fehler beim Laden der Übungsdetails"));
+      }
     } finally {
       setIsLoading(false);
+      setIsRevalidating(false);
     }
   }, [exerciseRefId, assId, typeId, initialTypeId]);
 
@@ -411,6 +456,10 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   useEffect(() => {
     if (!savedResult || isSaving || isUploadingFile || isDirty) return;
     setSavedResult(null);
+    if (savedResult.id) {
+      cache.invalidateCachedTAAssignmentDetail(exerciseRefId, savedResult.id);
+    }
+    cache.invalidateCachedTAAssignments(exerciseRefId);
     onSaved(savedResult.id, { created: savedResult.created, title: savedResult.title });
   }, [savedResult, isSaving, isUploadingFile, isDirty, onSaved]);
 
@@ -865,7 +914,8 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || isRevalidating}
+              title={isRevalidating ? t("Aktualisierung läuft... Bitte warten") : undefined}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-xs cursor-pointer disabled:opacity-50"
             >
               {isSaving ? (

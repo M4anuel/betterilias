@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { CourseUserCandidate, StudentAssignmentDetail, TeamMemberInfo } from '../types';
 import { api } from '../lib/api';
-import { cache } from '../lib/cache';
+import { cache, TEAM_CANDIDATES_CACHE_PREFIX } from '../lib/cache';
 import { useNavigationGuard } from '../lib/navigationGuard';
 
 interface StudentAssignmentModalProps {
@@ -77,16 +77,49 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
   };
 
   const loadCandidates = async (force = false) => {
-    if (candidates.length > 0 && !force) return;
+    const cachedCandidates = cache.getCachedTeamCandidates(exerciseRefId, assId);
+    if (cachedCandidates && !force && candidates.length === 0) {
+      setCandidates(cachedCandidates.candidates || []);
+      if (cachedCandidates.current_user_id) setCurrentUserId(cachedCandidates.current_user_id);
+    }
+    const storageKey = `${TEAM_CANDIDATES_CACHE_PREFIX}${exerciseRefId}_${assId}`;
+    if (cachedCandidates && !force && cache.isIliasSaverFresh(storageKey)) {
+      return;
+    }
     setIsLoadingCandidates(true);
     try {
       const res = await api.getTeamCandidates(exerciseRefId, assId);
+      const freshUserIds = new Set((res.candidates || []).map((c) => c.user_id));
+      const staleSelectedNames: string[] = [];
+      setSelectedCandidateIds((prev) => {
+        const next = new Set<string>();
+        for (const id of prev) {
+          if (freshUserIds.has(id)) {
+            next.add(id);
+          } else {
+            const found = candidates.find((c) => c.user_id === id);
+            staleSelectedNames.push(found?.full_name || id);
+          }
+        }
+        return next;
+      });
+      if (staleSelectedNames.length > 0) {
+        showTeamFeedback(
+          'error',
+          t("Ein zuvor ausgewählter Teilnehmer ({p0}) ist nicht mehr im Kurs verfügbar und wurde entfernt.", {
+            p0: staleSelectedNames.join(', '),
+          })
+        );
+      }
       setCandidates(res.candidates || []);
       if (res.current_user_id) {
         setCurrentUserId(res.current_user_id);
       }
+      cache.setCachedTeamCandidates(exerciseRefId, assId, res);
     } catch (err: any) {
-      showTeamFeedback('error', t("Kurs-Teilnehmerliste konnte nicht geladen werden: {p0}", { p0: err.message }));
+      if (candidates.length === 0) {
+        showTeamFeedback('error', t("Kurs-Teilnehmerliste konnte nicht geladen werden: {p0}", { p0: err.message }));
+      }
     } finally {
       setIsLoadingCandidates(false);
     }
@@ -95,7 +128,12 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
   const handleToggleAddMemberPanel = () => {
     const nextOpen = !isAddMemberOpen;
     setIsAddMemberOpen(nextOpen);
-    if (nextOpen && candidates.length === 0) {
+    if (nextOpen) {
+      const cached = cache.getCachedTeamCandidates(exerciseRefId, assId);
+      if (cached && candidates.length === 0) {
+        setCandidates(cached.candidates || []);
+        if (cached.current_user_id) setCurrentUserId(cached.current_user_id);
+      }
       loadCandidates();
     }
   };
@@ -875,7 +913,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                     </div>
 
                     {/* Candidates List */}
-                    {isLoadingCandidates ? (
+                    {isLoadingCandidates && candidates.length === 0 ? (
                       <div className="flex items-center justify-center gap-2 py-8 text-xs text-slate-500 dark:text-slate-400">
                         <RefreshCw className="h-4 w-4 animate-spin text-indigo-600" />
                         <span>{t("Lade Kursteilnehmer aus ILIAS...")}</span>

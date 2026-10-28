@@ -2,6 +2,7 @@ import { t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../lib/api';
+import { cache, MEMBERSHIP_FORM_CACHE_PREFIX } from '../lib/cache';
 import { MembershipAction, MembershipFormResponse, MembershipResult } from '../types';
 
 interface Props {
@@ -14,7 +15,8 @@ interface Props {
 
 export const CourseMembershipModal: React.FC<Props> = ({ refId, title, action, onClose, onChanged }) => {
   useLanguage();
-  const [form, setForm] = useState<MembershipFormResponse | null>(null);
+  const [form, setForm] = useState<MembershipFormResponse | null>(() => cache.getCachedMembershipForm(refId, action));
+  const [isRevalidating, setIsRevalidating] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -23,17 +25,35 @@ export const CourseMembershipModal: React.FC<Props> = ({ refId, title, action, o
     let active = true;
     const previousFocus = document.activeElement as HTMLElement | null;
     closeButton.current?.focus();
-    api.getMembershipForm(refId, action).then((next) => { if (active) setForm(next); })
-      .catch((err) => { if (active) setError(err.message); });
+    const cached = cache.getCachedMembershipForm(refId, action);
+    if (cached && !form) {
+      setForm(cached);
+    }
+    const storageKey = `${MEMBERSHIP_FORM_CACHE_PREFIX}${refId}_${action}`;
+    if (cached && cache.isIliasSaverFresh(storageKey)) {
+      return () => { active = false; previousFocus?.focus(); };
+    }
+    setIsRevalidating(true);
+    api.getMembershipForm(refId, action).then((next) => {
+      if (active) {
+        setForm(next);
+        cache.setCachedMembershipForm(refId, action, next);
+      }
+    }).catch((err) => {
+      if (active && !cached) setError(err.message);
+    }).finally(() => {
+      if (active) setIsRevalidating(false);
+    });
     return () => { active = false; previousFocus?.focus(); };
   }, [refId, action]);
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (busy || !form?.available) return;
+    if (busy || isRevalidating || !form?.available) return;
     setBusy(true);
     setError(null);
     try {
       const result = await api.changeMembership(refId, action, values);
+      cache.invalidateCachedMembershipForm(refId, action);
       onChanged(result);
     } catch (err: any) {
       setError(err.message);
@@ -71,7 +91,7 @@ export const CourseMembershipModal: React.FC<Props> = ({ refId, title, action, o
         </label>)}
         <div className="flex justify-end gap-3">
           <button type="button" disabled={busy} onClick={onClose} className="px-3 py-2 text-sm">{t("Abbrechen")}</button>
-          {form.available ? <button type="submit" disabled={busy} className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? t("Wird gespeichert…") : label}</button>
+          {form.available ? <button type="submit" disabled={busy || isRevalidating} title={isRevalidating ? t("Aktualisierung läuft... Bitte warten") : undefined} className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? t("Wird gespeichert…") : label}</button>
             : <a href={form.ilias_url} target="_blank" rel="noreferrer" className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white">{t("In ILIAS öffnen")}</a>}
         </div>
       </form>}
