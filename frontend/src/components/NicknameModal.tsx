@@ -342,7 +342,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                   onDragStart={() => handleDragStart(index)}
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDragEnd={handleDragEnd}
-                  className={`rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-4 space-y-3 transition hover:border-slate-300 dark:hover:border-slate-700 ${
+                  className={`sidebar-course-card rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-4 space-y-3 transition hover:border-slate-300 dark:hover:border-slate-700 ${
                     draggedIndex === index
                       ? 'opacity-40 border-dashed border-[var(--accent)]'
                       : ''
@@ -358,49 +358,16 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                         <GripVertical className="h-4 w-4" />
                       </div>
                       <div
-                        className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-snug sidebar-course-title flex-1"
+                        className="text-sm font-semibold text-slate-700 dark:text-slate-300 leading-snug sidebar-course-title flex-1"
                         title={course.title}
                       >
                         {cache.getDisplayName(course.ref_id, course.title)}
                       </div>
                     </div>
-
-                    <div className="sidebar-course-controls flex items-center justify-end gap-1 shrink-0">
-                      {/* Move Up / Move Down buttons */}
-                      <button
-                        type="button"
-                        onClick={() => handleMoveUp(index)}
-                        disabled={index === 0}
-                        className="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
-                        title={t("Nach oben verschieben")}
-                      >
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMoveDown(index)}
-                        disabled={index === orderItems.length - 1}
-                        className="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
-                        title={t("Nach unten verschieben")}
-                      >
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      </button>
-
-                      {hasCustomizations && (
-                        <button
-                          onClick={() => handleReset(course.ref_id)}
-                          className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-red-500 transition shrink-0 cursor-pointer ml-1"
-                          title={t("Auf Standard zurücksetzen")}
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                          <span>{t("Reset")}</span>
-                        </button>
-                      )}
-                    </div>
                   </div>
 
                   {/* Icon Button & Nickname Input */}
-                  <div className="flex items-center gap-2.5">
+                  <div className="sidebar-course-fields flex items-center gap-2.5">
                     {/* Icon selection trigger */}
                     <button
                       type="button"
@@ -445,9 +412,42 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                     />
                   </div>
 
+                  <div className="sidebar-course-controls flex items-center justify-end gap-1 shrink-0">
+                    {/* Move Up / Move Down buttons */}
+                    <button
+                      type="button"
+                      onClick={() => handleMoveUp(index)}
+                      disabled={index === 0}
+                      className="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                      title={t("Nach oben verschieben")}
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveDown(index)}
+                      disabled={index === orderItems.length - 1}
+                      className="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                      title={t("Nach unten verschieben")}
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </button>
+
+                    {hasCustomizations && (
+                      <button
+                        onClick={() => handleReset(course.ref_id)}
+                        className="sidebar-course-reset flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-red-500 transition shrink-0 cursor-pointer ml-1"
+                        title={t("Auf Standard zurücksetzen")}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        <span>{t("Reset")}</span>
+                      </button>
+                    )}
+                  </div>
+
                   {/* Inline Icon Picker Grid */}
                   {isPickerOpen && (
-                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-xs animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="sidebar-icon-picker rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-xs animate-in fade-in slide-in-from-top-1 duration-150">
                       <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
                         {t("Icon auswählen")}
                       </div>

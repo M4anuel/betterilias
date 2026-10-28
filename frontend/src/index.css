@@ -783,3 +783,26 @@ dialog.settings-panel {
   max-height: max(44px, calc(var(--visible-height, 100dvh) - 8rem));
   overflow-y: auto;
 }
+
+/* Give mobile editor rows a stable title / field / actions hierarchy. */
+@media (max-width: 767px) {
+  .sidebar-course-card { display: flex; flex-direction: column; gap: .625rem; padding: .75rem; }
+  .sidebar-course-card > * { margin-block: 0; }
+  .sidebar-course-title { font-size: 1rem; line-height: 1.4; font-weight: 650; }
+  .sidebar-course-controls { justify-content: flex-start; }
+  .sidebar-course-reset { margin-inline-start: auto; }
+  .semester-course-row { gap: .5rem; }
+  .semester-course-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .phone-page-header:has(.exercise-view-select) { margin-inline: -.5rem; }
+  .submission-person { align-items: flex-start; }
+  .submission-names { flex-direction: column; align-items: flex-start; gap: .25rem; }
+  .submission-member { max-width: 100%; padding: 0; border: 0; background: none; box-shadow: none; }
+  .submission-member > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .submission-status-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .submission-status-options > button { min-width: 0; flex-direction: column; justify-content: center; gap: .125rem; padding: .25rem .125rem; font-size: 11px; line-height: 1.2; }
+  .submission-status-options > button > svg { width: 12px; height: 12px; }
+  .submission-feedback-header { flex-wrap: wrap; gap: .25rem; }
+  .submission-feedback-header > div { flex-shrink: 0; }
+  .submission-evaluation textarea { min-height: 6rem; }
+  .submission-download[download] > .phone-only { display: inline; }
+}

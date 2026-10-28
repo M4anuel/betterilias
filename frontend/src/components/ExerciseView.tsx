@@ -25,6 +25,7 @@ import {
   Upload,
   Trash2,
   MoreVertical,
+  ChevronDown,
   Edit3,
 } from 'lucide-react';
 import {
@@ -1482,19 +1483,29 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   );
 
   const ongoingCount = (overviewData?.assignments || []).filter((a) => a.is_ongoing).length;
+  const mobileView: ExerciseTab = taManagementMode === 'editor' ? 'manage-edit' : taManagementMode === 'list' ? 'manage' : activeTab === 'ta_grading' ? 'submissions' : activeTab;
+  const mobileViewLabels: Record<ExerciseTab, string> = {
+    assignments: t('Übungsblätter'), info: t('Informationen'), submissions: t('mobile.submissions'),
+    manage: t('mobile.manage_assignments'), 'manage-edit': t('mobile.edit_assignment'),
+  };
+
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
       <MobilePageHeader title={overviewData?.title || t("Übungsübersicht")}
         onBack={onBack} onRefresh={handleRefresh} refreshing={isLoadingOverview || isRevalidatingOverview}
-        trailing={<select aria-label={t('mobile.exercise_view')} value={taManagementMode === 'editor' ? 'manage-edit' : taManagementMode === 'list' ? 'manage' : activeTab === 'ta_grading' ? 'submissions' : activeTab}
-          className="min-w-0 max-w-[43%] rounded-xl border border-slate-200 bg-white px-2 text-xs font-semibold dark:border-slate-700 dark:bg-slate-900"
+        trailing={<span className="exercise-view-control relative shrink-0 max-w-[46%]">
+          <span aria-hidden="true" className="invisible block whitespace-nowrap pl-2 pr-6 text-base font-semibold leading-[44px]">{mobileViewLabels[mobileView]}</span>
+          <select aria-label={t('mobile.exercise_view')} value={mobileView}
+          className="exercise-view-select absolute inset-0 w-full min-w-0 appearance-none rounded-xl border border-slate-200 bg-white pl-2 pr-6 text-base font-semibold dark:border-slate-700 dark:bg-slate-900"
           onChange={event => switchTab(event.target.value as ExerciseTab)}>
           <option value="assignments">{t("Übungsblätter")}</option><option value="info">{t('Informationen')}</option>
-          {overviewData?.has_ta_access && <option value="submissions">{t('Abgaben & Noten (Tutor)')}</option>}
+          {overviewData?.has_ta_access && <option value="submissions">{t('mobile.submissions')}</option>}
           {taManagementMode === 'list' && <option value="manage">{t('mobile.manage_assignments')}</option>}
           {taManagementMode === 'editor' && <option value="manage-edit">{t('mobile.edit_assignment')}</option>}
-        </select>} />
+          </select>
+          <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2" />
+        </span>} />
       {/* Top Header with Breadcrumbs & Sync Status */}
       <div className="desktop-only flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <CompactBreadcrumbs
@@ -2109,7 +2120,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 return (
                   <div
                     key={sub.member_id}
-                    className={`rounded-2xl border bg-white dark:bg-slate-900 p-4 transition shadow-2xs space-y-3 ${
+                    className={`submission-card rounded-2xl border bg-white dark:bg-slate-900 p-4 transition shadow-2xs space-y-3 ${
                       isSaved
                         ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/30 ring-2 ring-emerald-500/20'
                         : edit.isDirty
@@ -2126,8 +2137,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                     )}
 
                     {/* Row Header: Student Info & Actions */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
+                    <div className="submission-header flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="submission-person flex min-w-0 items-center gap-3">
                         <div
                           className={`flex h-10 w-10 items-center justify-center rounded-xl text-xs font-bold shrink-0 ${
                             sub.team_members && sub.team_members.length > 1
@@ -2141,17 +2152,18 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             <span>{sub.student_name.slice(0, 2).toUpperCase()}</span>
                           )}
                         </div>
-                        <div>
+                        <div className="min-w-0 flex-1">
                           {/* Student Names / Team Members with Clear Dividers */}
-                          <div className="single-row-filters flex items-center gap-1.5 flex-wrap">
+                          <div className="submission-names flex items-center gap-1.5 flex-wrap">
                             {sub.team_members && sub.team_members.length > 1 ? (
                               sub.team_members.map((member, mIdx) => (
                                 <span
                                   key={mIdx}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-2xs transition"
+                                  title={member}
+                                  className="submission-member inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-2xs transition"
                                 >
                                   <User className="h-3 w-3 text-slate-400 dark:text-slate-500 shrink-0" />
-                                  <span>{member}</span>
+                                  <span className="min-w-0">{member}</span>
                                 </span>
                               ))
                             ) : (
@@ -2194,11 +2206,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         {sub.download_url ? (
                           <a
                             href={sub.download_url}
+                            aria-label={t("Abgabe herunterladen")}
                             download
-                            className="flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition shadow-2xs border border-indigo-200 dark:border-indigo-800"
+                            className="submission-download flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition shadow-2xs border border-indigo-200 dark:border-indigo-800"
                           >
                             <Download className="h-3.5 w-3.5" />
-                            <span>{t("Abgabe herunterladen")}</span>
+                            <span className="desktop-only">{t("Abgabe herunterladen")}</span><span className="phone-only">{t("Download")}</span>
                           </a>
                         ) : (
                           <span className="rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">
@@ -2210,7 +2223,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         <button
                           type="button"
                           onClick={() => setDetailModalSubmission(sub)}
-                          className="flex items-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-700 dark:hover:text-indigo-300 hover:border-indigo-200 dark:hover:border-indigo-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 transition shadow-2xs cursor-pointer"
+                          className="submission-details flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-700 dark:hover:text-indigo-300 hover:border-indigo-200 dark:hover:border-indigo-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 transition shadow-2xs cursor-pointer"
                           title={t("Alle ILIAS-Spalten & Details anzeigen / bearbeiten")}
                         >
                           <Info className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
@@ -2220,7 +2233,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                     </div>
 
                     {/* Grading & Evaluation Area */}
-                    <div className="rounded-xl bg-slate-50/80 dark:bg-slate-800/40 p-3 border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row gap-3">
+                    <div className="submission-evaluation rounded-xl bg-slate-50/80 dark:bg-slate-800/40 p-3 border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row gap-3">
                       {/* Left: Status Toggle & Grade */}
                       <div className="w-full md:w-56 shrink-0 space-y-2">
                         <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
@@ -2228,10 +2241,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         </label>
 
                         {/* Status Pills */}
-                        <div className="flex flex-col gap-1">
+                        <div className="submission-status-options flex flex-col gap-1">
                           <button
                             type="button"
                             disabled={isLoadingTaSubmissions || isSaving}
+                            aria-label={t('Bestanden')} aria-pressed={edit.status === 'passed'}
                             onClick={() => handleStatusChange(sub.member_id, 'passed')}
                             className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer border ${
                               edit.status === 'passed'
@@ -2246,6 +2260,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           <button
                             type="button"
                             disabled={isLoadingTaSubmissions || isSaving}
+                            aria-label={t('Nicht bestanden')} aria-pressed={edit.status === 'failed'}
                             onClick={() => handleStatusChange(sub.member_id, 'failed')}
                             className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer border ${
                               edit.status === 'failed'
@@ -2253,13 +2268,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-950/30'
                             } disabled:opacity-50 disabled:cursor-not-allowed`}
                           >
-                            <span>{t("Nicht bestanden")}</span>
+                            <span className="desktop-only">{t("Nicht bestanden")}</span><span className="phone-only">{t("Nicht best.")}</span>
                             {edit.status === 'failed' && <Check className="h-3 w-3" />}
                           </button>
 
                           <button
                             type="button"
                             disabled={isLoadingTaSubmissions || isSaving}
+                            aria-label={t('Nicht bewertet')} aria-pressed={edit.status === 'not_graded'}
                             onClick={() => handleStatusChange(sub.member_id, 'not_graded')}
                             className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer border ${
                               edit.status === 'not_graded'
@@ -2267,7 +2283,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                             } disabled:opacity-50 disabled:cursor-not-allowed`}
                           >
-                            <span>{t("Nicht bewertet")}</span>
+                            <span className="desktop-only">{t("Nicht bewertet")}</span><span className="phone-only">{t('mobile.not_graded')}</span>
                             {edit.status === 'not_graded' && <Check className="h-3 w-3" />}
                           </button>
                         </div>
@@ -2295,7 +2311,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                       {/* Middle: According to evalModeInOverview */}
                       {evalModeInOverview === 'statement' ? (
                         <div className="flex-1 space-y-2">
-                          <div className="flex items-center justify-between">
+                          <div className="submission-feedback-header flex items-center justify-between">
                             <div className="flex items-center gap-1 rounded-lg bg-slate-200/70 dark:bg-slate-800 p-0.5 text-[11px]">
                               <button
                                 type="button"

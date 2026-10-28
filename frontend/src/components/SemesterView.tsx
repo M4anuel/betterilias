@@ -96,7 +96,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
   }, [allSemesters, selectedSemester]);
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-200">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-200">
       {/* Hero Welcome & Last Opened Course banner */}
       {lastOpenedCourse && (
         <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 dark:border-slate-800 dark:from-slate-900 dark:via-slate-900/80 dark:to-slate-800 transition-colors">
@@ -369,26 +369,27 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                       const iconName = cache.getCourseIcon(course.ref_id, course);
 
                       return (
-                        <div
+                        <button type="button"
+                          aria-label={displayName}
                           key={course.ref_id}
                           onClick={() => onSelectCourse(course.ref_id)}
-                          className="group flex items-center justify-between p-3.5 hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition cursor-pointer gap-4"
+                          className="semester-course-row group flex w-full text-left items-center justify-between p-3.5 hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition cursor-pointer gap-4"
                         >
-                          <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="flex flex-1 items-center gap-3.5 min-w-0">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200 group-hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-slate-700 dark:group-hover:text-slate-100 transition">
                               <CourseIcon iconName={iconName} className="h-4 w-4" />
                             </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h4 className="text-sm font-bold text-slate-900 group-hover:text-[var(--accent)] dark:text-slate-100 transition truncate">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <h4 className="semester-course-title min-w-0 text-sm font-bold text-slate-900 group-hover:text-[var(--accent)] dark:text-slate-100 transition truncate">
                                   {displayName}
                                 </h4>
-                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400 shrink-0">
+                                <span className="desktop-only rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400 shrink-0">
                                   {course.ref_id}
                                 </span>
                               </div>
                               {displayName !== course.title && (
-                                <p className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-xl">{course.title}</p>
+                                <p className="desktop-only text-xs text-slate-400 dark:text-slate-500 truncate max-w-xl">{course.title}</p>
                               )}
                             </div>
                           </div>
@@ -400,11 +401,11 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                               </span>
                             )}
                             <span className="inline-flex items-center gap-1 font-semibold text-slate-700 group-hover:text-[var(--accent)] dark:text-slate-300 transition text-xs">
-                              {t("Öffnen")}
+                              <span className="desktop-only">{t("Öffnen")}</span>
                               <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition" />
                             </span>
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
