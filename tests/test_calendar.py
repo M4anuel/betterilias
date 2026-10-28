@@ -774,6 +774,14 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
         playwright.expect(page.get_by_text(tr("calendar.status.badge_ignored"), exact=True)).to_be_visible()
         sem_select.select_option("ALL")
 
+        # Verify compact session count chip and Info button popover on course card
+        expected_sessions = tr("calendar.course_sessions_count").replace("{count}", "7")
+        playwright.expect(page.get_by_text(expected_sessions, exact=True)).to_be_visible()
+        info_btn = page.get_by_role("button", name=tr("calendar.info.button_label"), exact=True).first
+        info_btn.click()
+        playwright.expect(page.get_by_text(tr("calendar.info.synced_from_ilias"), exact=True)).to_be_visible()
+        info_btn.click()
+
         # Open Manual Recheck Modal and verify checkbox list + layout
         page.get_by_role("button", name=tr("calendar.recheck.button"), exact=True).click()
         recheck_dialog = page.get_by_role("dialog", name=tr("calendar.recheck.modal_title"), exact=True)

@@ -44,7 +44,7 @@ function apiError(error: { detail?: unknown }): string | undefined {
 }
 
 // Protected API responses confirm the current session, including expiry.
-async function sessionFetch(input: string, init?: RequestInit): Promise<Response> {
+async function sessionFetch(input: string, init?: RequestInit & { trackPending?: boolean }): Promise<Response> {
   const sessionId = cache.getSessionId();
   const headers = new Headers(init?.headers);
   headers.set('Accept-Language', getLanguage());
@@ -55,7 +55,7 @@ async function sessionFetch(input: string, init?: RequestInit): Promise<Response
   const isMutation = Boolean(
     init?.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(init.method.toUpperCase())
   );
-  if (isMutation) {
+  if (isMutation && init?.trackPending !== false) {
     navigationGuard.incrementPending();
   }
 
@@ -72,7 +72,7 @@ async function sessionFetch(input: string, init?: RequestInit): Promise<Response
     }
     return response;
   } finally {
-    if (isMutation) {
+    if (isMutation && init?.trackPending !== false) {
       navigationGuard.decrementPending();
     }
   }
@@ -732,8 +732,8 @@ export const api = {
     return res.json();
   },
 
-  async discoverCalendarCourses(): Promise<SemesterCalendarResponse> {
-    const res = await sessionFetch(`${API_BASE}/calendar/discover`, {
+  async discoverCalendarCourses(signal?: AbortSignal): Promise<SemesterCalendarResponse> {
+    const res = await sessionFetch(`${API_BASE}/calendar/discover`, { trackPending: false, signal,
       method: 'POST',
     });
     if (!res.ok) {
@@ -747,8 +747,10 @@ export const api = {
     semester?: string;
     courses: { ref_id: string; title: string; semester?: string; item_type?: string; url?: string }[];
     force_refresh?: boolean;
+    signal?: AbortSignal;
   }): Promise<SemesterCalendarResponse> {
-    const res = await sessionFetch(`${API_BASE}/calendar/sync`, {
+    const signal = (payload as { signal?: AbortSignal }).signal;
+    const res = await sessionFetch(`${API_BASE}/calendar/sync`, { trackPending: false, signal,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

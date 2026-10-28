@@ -344,13 +344,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   // Selected Event Details Modal
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [openInfoCourseId, setOpenInfoCourseId] = useState<string | null>(null);
 
   const syncRunIdRef = useRef<number>(0);
+  const syncAbortRef = useRef<AbortController | null>(null);
   const hasInitialLoadedRef = useRef<boolean>(false);
 
   useEffect(() => {
     return () => {
       syncRunIdRef.current += 1;
+      syncAbortRef.current?.abort();
     };
   }, []);
 
@@ -362,6 +365,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     ) => {
       if (queue.length === 0) return;
       const runId = ++syncRunIdRef.current;
+      syncAbortRef.current?.abort();
+      const abortController = new AbortController();
+      syncAbortRef.current = abortController;
       setIsSyncing(true);
       setErrorMsg(null);
 
@@ -374,7 +380,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
       try {
         for (let i = 0; i < sortedQueue.length; i++) {
-          if (syncRunIdRef.current !== runId) break;
+          if (syncRunIdRef.current !== runId || abortController.signal.aborted) break;
           const item = sortedQueue[i];
           setSyncProgress({
             current: i + 1,
@@ -391,16 +397,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               },
             ],
             force_refresh: forceRefresh,
+            signal: abortController.signal,
           });
-          if (syncRunIdRef.current !== runId) break;
+          if (syncRunIdRef.current !== runId || abortController.signal.aborted) break;
           setCalendarData(synced);
           cache.setCachedCalendar('ALL', synced);
           setCacheTimestamp(Date.now());
         }
-        if (syncRunIdRef.current === runId && forceRefresh) {
+        if (syncRunIdRef.current === runId && !abortController.signal.aborted && forceRefresh) {
           setStatusBanner(t('calendar.sync_completed'));
         }
       } catch (err: any) {
+        if (abortController.signal.aborted || err?.name === 'AbortError') {
+          return;
+        }
         if (syncRunIdRef.current === runId) {
           setErrorMsg(err?.message || t('calendar.sync_failed'));
         }
@@ -418,12 +428,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const loadGlobalCalendar = useCallback(async () => {
     setIsLoading(true);
     setErrorMsg(null);
+    const abortController = new AbortController();
+    syncAbortRef.current = abortController;
     try {
       const [freshCal, discoveredCal, membershipsRes] = await Promise.all([
         api.getCalendar(),
-        api.discoverCalendarCourses().catch(() => null),
+        api.discoverCalendarCourses(abortController.signal).catch(() => null),
         api.getMyCourses().catch(() => null),
       ]);
+      if (abortController.signal.aborted) return;
 
       const effectiveCal =
         discoveredCal && discoveredCal.courses.length >= freshCal.courses.length
@@ -999,51 +1012,68 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     [mergedCourses]
   );
 
-  const renderFeedStatusBadge = (status: CourseCalendarFeedStatus) => {
-    switch (status) {
-      case 'imported_with_lectures':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-            <Check className="h-3 w-3" />
-            {t('calendar.status.badge_lectures')}
-          </span>
-        );
-      case 'imported_deadlines_only':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
-            <AlertTriangle className="h-3 w-3" />
-            {t('calendar.status.badge_deadlines_only')}
-          </span>
-        );
-      case 'valid_empty':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
-            <Info className="h-3 w-3" />
-            {t('calendar.status.badge_empty')}
-          </span>
-        );
-      case 'session_expired':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
-            <AlertTriangle className="h-3 w-3" />
-            {t('calendar.status.badge_expired')}
-          </span>
-        );
-      case 'failed':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
-            <AlertTriangle className="h-3 w-3" />
-            {t('calendar.status.badge_failed')}
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-            <Info className="h-3 w-3" />
-            {t('calendar.status.badge_manual')}
-          </span>
-        );
+  // Total lecture sessions per course (computed across both ILIAS sessions and custom timetable rules)
+  const courseSessionCountMap = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const ev of calendarData?.events || []) {
+      if (ev.kind === 'lecture' && !ev.cancelled && !ev.is_cancelled) {
+        counts.set(ev.course_ref_id, (counts.get(ev.course_ref_id) || 0) + 1);
+      }
     }
+    for (const c of mergedCourses) {
+      const evCount = counts.get(c.course_ref_id) || 0;
+      const importedCount = c.imported_lecture_count || 0;
+      counts.set(c.course_ref_id, Math.max(evCount, importedCount));
+    }
+    return counts;
+  }, [calendarData?.events, mergedCourses]);
+
+  const renderFeedStatusIcon = (
+    status: CourseCalendarFeedStatus,
+    hasLecturesOrRules: boolean,
+    ignored: boolean
+  ) => {
+    const isSynced =
+      status === 'imported_with_lectures' ||
+      status === 'imported_deadlines_only' ||
+      status === 'valid_empty';
+
+    if (status === 'imported_with_lectures' || (isSynced && (hasLecturesOrRules || ignored))) {
+      return (
+        <span
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300"
+          title={t('calendar.info.synced_from_ilias')}
+          aria-label={t('calendar.info.synced_from_ilias')}
+        >
+          <Check className="h-3 w-3 stroke-[2.5]" />
+        </span>
+      );
+    }
+    if (status === 'session_expired' || status === 'failed') {
+      return (
+        <span
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300"
+          title={
+            status === 'session_expired'
+              ? t('calendar.status.badge_expired')
+              : t('calendar.status.badge_failed')
+          }
+        >
+          <AlertTriangle className="h-3 w-3" />
+        </span>
+      );
+    }
+    if (isSynced && !hasLecturesOrRules && !ignored) {
+      return (
+        <span
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300"
+          title={t('calendar.info.synced_from_ilias')}
+        >
+          <AlertTriangle className="h-3 w-3" />
+        </span>
+      );
+    }
+    return null;
   };
 
   const navigatePeriod = (direction: -1 | 0 | 1) => {
@@ -1991,24 +2021,36 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 const courseRules = (calendarData?.rules || []).filter(
                   (r) => r.course_ref_id === course.course_ref_id
                 );
+                const totalSessions = courseSessionCountMap.get(course.course_ref_id) || 0;
                 const hasLecturesOrRules =
-                  (course.imported_lecture_count ?? 0) > 0 || (course.custom_rule_count ?? 0) > 0;
-                const canToggleIgnore = !hasLecturesOrRules || course.ignored_missing_schedule;
+                  totalSessions > 0 || (course.custom_rule_count ?? 0) > 0;
+                const canToggleIgnore = !hasLecturesOrRules || Boolean(course.ignored_missing_schedule);
+                const statusVal = course.status || course.feed_status || 'not_imported';
+                const isSyncedFromIlias =
+                  statusVal === 'imported_with_lectures' ||
+                  statusVal === 'imported_deadlines_only' ||
+                  statusVal === 'valid_empty';
+                const isInfoOpen = openInfoCourseId === course.course_ref_id;
+                const lastCheckedText = course.last_imported_at
+                  ? t('calendar.course_last_checked', {
+                      time: formatTimestampAge(course.last_imported_at, language),
+                    })
+                  : t('calendar.course_never_checked');
 
                 return (
                   <div
                     key={course.course_ref_id}
-                    className={`rounded-xl border p-3.5 transition space-y-2.5 ${
+                    className={`rounded-xl border p-3 transition space-y-2 ${
                       isHidden
                         ? 'border-slate-200/60 bg-slate-50/40 opacity-60 dark:border-slate-800/60 dark:bg-slate-900/30'
                         : 'border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-800/40'
                     }`}
                   >
                     {/* Course Header Row */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         <label
-                          className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full cursor-pointer shadow-2xs border border-white/50"
+                          className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full cursor-pointer shadow-2xs border border-white/50"
                           style={{ backgroundColor: course.color }}
                           title={t('calendar.change_color')}
                         >
@@ -2022,28 +2064,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             className="sr-only"
                           />
                         </label>
-                        <div className="min-w-0">
-                          <button
-                            type="button"
-                            onClick={() => onSelectCourse(course.course_ref_id)}
-                            className="text-left text-xs font-bold text-slate-900 hover:text-[#0AACA5] dark:text-slate-100 truncate block max-w-full cursor-pointer"
-                            title={course.course_title}
-                          >
-                            {course.course_title}
-                          </button>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                              {course.semester || t('my_courses.group')}
-                            </span>
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                              {course.last_imported_at
-                                ? t('calendar.course_last_checked', {
-                                    time: formatTimestampAge(course.last_imported_at, language),
-                                  })
-                                : t('calendar.course_never_checked')}
-                            </span>
-                          </div>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onSelectCourse(course.course_ref_id)}
+                          className="text-left text-xs font-bold text-slate-900 hover:text-[#0AACA5] dark:text-slate-100 truncate block max-w-full cursor-pointer"
+                          title={course.course_title}
+                        >
+                          {course.course_title}
+                        </button>
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
@@ -2065,63 +2093,115 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         <button
                           type="button"
                           onClick={() => openRuleModal(course.course_ref_id)}
-                          className="min-h-9 sm:min-h-7 inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                          className="min-h-9 sm:min-h-7 whitespace-nowrap shrink-0 inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
                         >
-                          <Plus className="h-3 w-3" />
+                          <Plus className="h-3 w-3 shrink-0" />
                           <span>{t('calendar.rule.add_short')}</span>
                         </button>
                       </div>
                     </div>
 
-                    {/* ILIAS Calendar Status Badge & Message */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center flex-wrap gap-1.5">
-                        {renderFeedStatusBadge(
-                          course.status || course.feed_status || 'not_imported'
+                    {/* Single-Line Compact Metadata Row: Semester/Group + Green Checkmark + Info Button + Session Count */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center flex-wrap gap-1.5 min-w-0">
+                        <span className="whitespace-nowrap shrink-0 rounded-md bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                          {course.semester || t('calendar.badge_group_short')}
+                        </span>
+
+                        {renderFeedStatusIcon(
+                          statusVal,
+                          hasLecturesOrRules,
+                          Boolean(course.ignored_missing_schedule)
                         )}
+
+                        {totalSessions > 0 && (
+                          <span className="whitespace-nowrap shrink-0 rounded-md bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-slate-700 shadow-2xs dark:bg-slate-900/80 dark:text-slate-200">
+                            {totalSessions === 1
+                              ? t('calendar.course_sessions_count_one')
+                              : t('calendar.course_sessions_count', { count: totalSessions })}
+                          </span>
+                        )}
+
                         {course.ignored_missing_schedule && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                            <BellOff className="h-3 w-3" />
+                          <span className="whitespace-nowrap shrink-0 inline-flex items-center gap-1 rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                            <BellOff className="h-2.5 w-2.5 shrink-0" />
                             {t('calendar.status.badge_ignored')}
                           </span>
                         )}
-                        {(course.custom_rule_count ?? 0) > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[#0AACA5]/15 px-2 py-0.5 text-[11px] font-semibold text-[#0AACA5]">
-                            {course.custom_rule_count ?? 0} {t('calendar.rules_active')}
-                          </span>
-                        )}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenInfoCourseId(isInfoOpen ? null : course.course_ref_id)
+                          }
+                          aria-label={t('calendar.info.button_label')}
+                          aria-expanded={isInfoOpen}
+                          title={`${
+                            isSyncedFromIlias
+                              ? t('calendar.info.synced_from_ilias')
+                              : t('calendar.status.not_checked')
+                          } • ${lastCheckedText}`}
+                          className={`min-h-8 min-w-8 sm:min-h-6 sm:min-w-6 inline-flex items-center justify-center rounded-full transition cursor-pointer ${
+                            isInfoOpen
+                              ? 'bg-[#0AACA5]/15 text-[#0AACA5]'
+                              : 'text-slate-400 hover:bg-slate-200/70 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300'
+                          }`}
+                        >
+                          <Info className="h-3.5 w-3.5" />
+                        </button>
                       </div>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                        {course.status_message}
-                      </p>
 
                       {canToggleIgnore && (
-                        <div className="pt-0.5">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleToggleIgnoreSchedule(
-                                course.course_ref_id,
-                                !course.ignored_missing_schedule
-                              )
-                            }
-                            className="min-h-9 sm:min-h-7 inline-flex items-center gap-1.5 rounded-lg border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
-                          >
-                            {course.ignored_missing_schedule ? (
-                              <>
-                                <Bell className="h-3 w-3 text-[#0AACA5]" />
-                                <span>{t('calendar.unignore_missing_schedule')}</span>
-                              </>
-                            ) : (
-                              <>
-                                <BellOff className="h-3 w-3 text-slate-400" />
-                                <span>{t('calendar.ignore_missing_schedule')}</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleToggleIgnoreSchedule(
+                              course.course_ref_id,
+                              !course.ignored_missing_schedule
+                            )
+                          }
+                          className="min-h-8 sm:min-h-6 whitespace-nowrap shrink-0 inline-flex items-center gap-1 rounded-lg border border-slate-200/90 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
+                        >
+                          {course.ignored_missing_schedule ? (
+                            <>
+                              <Bell className="h-3 w-3 text-[#0AACA5] shrink-0" />
+                              <span>{t('calendar.unignore_missing_schedule')}</span>
+                            </>
+                          ) : (
+                            <>
+                              <BellOff className="h-3 w-3 text-slate-400 shrink-0" />
+                              <span>{t('calendar.ignore_missing_schedule')}</span>
+                            </>
+                          )}
+                        </button>
                       )}
                     </div>
+
+                    {/* Expandable Sync & Last-Checked Info Popover */}
+                    {isInfoOpen && (
+                      <div className="rounded-lg border border-slate-200/80 bg-white p-2.5 text-[11px] text-slate-600 shadow-2xs dark:border-slate-700/80 dark:bg-slate-900 dark:text-slate-300 space-y-1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap font-semibold text-slate-800 dark:text-slate-100">
+                          <span className="inline-flex items-center gap-1">
+                            {isSyncedFromIlias ? (
+                              <>
+                                <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span>{t('calendar.info.synced_from_ilias')}</span>
+                              </>
+                            ) : (
+                              <span>{t('calendar.status.not_checked')}</span>
+                            )}
+                          </span>
+                          <span className="whitespace-nowrap text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                            {lastCheckedText}
+                          </span>
+                        </div>
+                        {course.status_message && (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                            {course.status_message}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Custom Weekly Schedule Rules for this Course */}
                     {courseRules.length > 0 && (
