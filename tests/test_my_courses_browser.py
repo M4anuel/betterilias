@@ -55,17 +55,24 @@ def test_membership_search_sort_pin_navigation_and_persistence(local_site, width
         pw.expect(rows).to_have_count(3)
         if width < 640:
             page.get_by_role('button', name=tr('my_courses.filters'), exact=True).click()
-        kind = page.get_by_role('combobox', name=tr('my_courses.type'), exact=True)
-        kind.select_option('grp')
-        pw.expect(rows).to_have_count(1)
-        kind.select_option('all')
         semester = page.get_by_role('combobox', name=tr('my_courses.semester'), exact=True)
+        assert semester.locator('option').evaluate_all('(options) => options.map(option => option.value)') == ['all', 'HS2026', 'FS2023', 'none']
+        assert page.locator('main label').count() == 3
         semester.select_option('FS2023')
         pw.expect(rows).to_have_count(1)
         assert rows.first.get_attribute('data-course-id') == '43'
         semester.select_option('all')
-        page.get_by_role('combobox', name=tr('my_courses.sort'), exact=True).select_option('semester')
+        sort = page.get_by_role('combobox', name=tr('my_courses.sort'), exact=True)
+        assert rows.nth(1).get_attribute('data-course-id') == '43'
+        sort.select_option('name-desc')
         assert rows.nth(1).get_attribute('data-course-id') == '42'
+        sort.select_option('name')
+        assert rows.nth(1).get_attribute('data-course-id') == '43'
+        sort.select_option('semester')
+        assert rows.nth(1).get_attribute('data-course-id') == '42'
+        sort.select_option('semester-asc')
+        assert rows.nth(1).get_attribute('data-course-id') == '43'
+        assert rows.first.get_attribute('data-course-id') == '44'
         pin = page.locator('article[data-course-id="42"]').get_by_role('button').last
         pin.click()
         pw.expect(pin).to_be_focused()
@@ -75,7 +82,7 @@ def test_membership_search_sort_pin_navigation_and_persistence(local_site, width
         if width < 640:
             # Controls stay mounted and retain values when the disclosure closes.
             page.get_by_role('button', name=tr('my_courses.filters'), exact=True).click()
-        pw.expect(page.get_by_role('combobox', name=tr('my_courses.sort'), exact=True)).to_have_value('semester')
+        pw.expect(page.get_by_role('combobox', name=tr('my_courses.sort'), exact=True)).to_have_value('semester-asc')
         assert_no_overflow(page)
         for select in page.get_by_role('combobox').all():
             assert select.bounding_box()['height'] >= 48
@@ -111,6 +118,9 @@ def test_membership_search_sort_pin_navigation_and_persistence(local_site, width
         if width < 640:
             page.get_by_role('button', name=tr('my_courses.filters'), exact=True).click()
         pw.expect(page.get_by_role('combobox', name=tr('my_courses.sort'), exact=True)).to_have_value('name')
+        courses.append(dict(ref_id='45', title='Future course', semester='FS2029', item_type='crs', url=''))
+        page.get_by_role('button', name=tr('my_courses.refresh')).click()
+        pw.expect(page.get_by_role('combobox', name=tr('my_courses.semester'), exact=True).locator('option').filter(has_text='FS2029')).to_have_count(1)
         courses.clear()
         page.get_by_role('button', name=tr('my_courses.refresh')).click()
         pw.expect(page.get_by_text(tr('my_courses.empty'), exact=True)).to_be_visible()

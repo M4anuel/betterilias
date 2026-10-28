@@ -8,12 +8,12 @@ it into the existing sidebar and URL/history navigation. Retrieve the membership
 overview rather than only the dashboard's selected items.
 
 Provide case-insensitive search over original titles, display names, descriptions
-and semesters, course/group and semester filters, alphabetical sorting and newest
-semester sorting. Keep favourites in a separate first section under every sort
+and semesters, a semester filter, alphabetical sorting in both directions and
+newest/oldest semester sorting. Keep favourites in a separate first section under every sort
 order. Offer an accessible star button separate from the open action; preserve
 keyboard focus when a card moves. Initialise from existing ILIAS favourites and
 persist local overrides and sorting per session in the browser, including explicit
-unpin overrides. Explain where these preferences are saved.
+unpin overrides. Keep the page header free of explanatory favourites hints.
 
 Use existing course display names and icons, retain course/group navigation,
 provide loading, empty, no-results, refresh and retry states, and retain the last
@@ -33,6 +33,9 @@ with mocked API responses, and run the repository's required checks.
   favourites or memberships. Active search and filters apply to both sections.
 - Semester metadata is extracted from explicit HS/FS year codes in item titles.
   Entries without such a code are available under “Without semester”.
+  Dropdown options come from the loaded memberships and update after refresh;
+  there is no fixed semester list. Undated entries follow dated entries in both
+  semester sort directions.
 - The portable HTML fixture retains the 64 membership items from the user's
   saved page (60 courses, four groups). Account navigation, notifications, bulk
   dialogs, scripts, DOM IDs and event handlers are excluded. Saved asset paths

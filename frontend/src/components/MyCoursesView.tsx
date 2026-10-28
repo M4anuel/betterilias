@@ -6,7 +6,8 @@ import { cache } from '../lib/cache';
 import { getLocale, t, useLanguage } from '../lib/i18n';
 import { CourseIcon } from './CourseIcon';
 
-type Preferences = { favourites: Record<string, boolean>; sort: 'name' | 'semester' };
+type SortOrder = 'name' | 'name-desc' | 'semester' | 'semester-asc';
+type Preferences = { favourites: Record<string, boolean>; sort: SortOrder };
 
 export const MyCoursesView: React.FC<{
   onOpenCourse: (id: string) => void;
@@ -18,12 +19,11 @@ export const MyCoursesView: React.FC<{
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
       return { favourites: Object.fromEntries(Object.entries(saved.favourites || {}).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean')),
-        sort: saved.sort === 'semester' ? 'semester' : 'name' };
+        sort: (['name', 'name-desc', 'semester', 'semester-asc'].includes(saved.sort) ? saved.sort : 'name') as SortOrder };
     } catch { return { favourites: {}, sort: 'name' }; }
   });
   const [courses, setCourses] = useState<CourseItem[] | null>(null);
   const [query, setQuery] = useState('');
-  const [kind, setKind] = useState('all');
   const [semester, setSemester] = useState('all');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const pendingFocus = useRef<string | null>(null);
@@ -60,11 +60,17 @@ export const MyCoursesView: React.FC<{
   semesters.sort((a, b) => semesterRank(b) - semesterRank(a));
   const search = query.trim().toLocaleLowerCase(getLocale());
   const visible = (courses || []).filter(course =>
-    (kind === 'all' || course.item_type === kind) &&
     (semester === 'all' || (semester === 'none' ? !course.semester : course.semester === semester)) &&
     `${course.title} ${name(course)} ${course.description || ''} ${course.semester || ''}`.toLocaleLowerCase(getLocale()).includes(search)
-  ).sort((a, b) => (preferences.sort === 'semester' ? semesterRank(b.semester) - semesterRank(a.semester) : 0)
-    || name(a).localeCompare(name(b), getLocale(), { numeric: true }) || a.ref_id.localeCompare(b.ref_id));
+  ).sort((a, b) => {
+    const byName = name(a).localeCompare(name(b), getLocale(), { numeric: true });
+    if (preferences.sort === 'name-desc') return -byName || a.ref_id.localeCompare(b.ref_id);
+    if (preferences.sort === 'name') return byName || a.ref_id.localeCompare(b.ref_id);
+    // Undated memberships remain after dated ones in either semester direction.
+    const bySemester = !a.semester ? Number(Boolean(b.semester)) : !b.semester ? -1
+      : (semesterRank(a.semester) - semesterRank(b.semester)) * (preferences.sort === 'semester-asc' ? 1 : -1);
+    return bySemester || byName || a.ref_id.localeCompare(b.ref_id);
+  });
   const pinned = visible.filter(favourite);
   const others = visible.filter(course => !favourite(course));
   const control = 'my-courses-control min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 text-base text-slate-900 focus-visible:outline-2 focus-visible:outline-teal-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 sm:text-sm';
@@ -98,14 +104,13 @@ export const MyCoursesView: React.FC<{
   </section>;
   return <div ref={container} className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
     <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0"><h1 className="text-2xl font-bold sm:text-3xl">{t('my_courses.title')}</h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t('my_courses.hint')}</p></div>
+      <h1 className="min-w-0 text-2xl font-bold sm:text-3xl">{t('my_courses.title')}</h1>
       <button type="button" onClick={() => setRevision(value => value + 1)} disabled={loading} aria-label={t('my_courses.refresh')}
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
         <RefreshCw className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`} /></button>
     </div>
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <label className="min-w-0 text-sm font-medium">{t('my_courses.search')}
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <label className="min-w-0 text-sm font-medium sm:col-span-2 lg:col-span-1">{t('my_courses.search')}
         <span className="relative mt-1 block"><Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input type="search" value={query} onChange={event => setQuery(event.target.value)} className={`${control} pl-10`} /></span></label>
       <button type="button" className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-teal-500 dark:text-teal-300 sm:hidden"
@@ -113,17 +118,14 @@ export const MyCoursesView: React.FC<{
         <SlidersHorizontal className="h-4 w-4" aria-hidden="true" /><span>{t('my_courses.filters')}</span>
       </button>
       <div id="my-courses-filters" className={`${filtersOpen ? 'grid gap-3' : 'hidden'} sm:contents`}>
-      <label className="min-w-0 text-sm font-medium">{t('my_courses.type')}
-        <select value={kind} onChange={event => setKind(event.target.value)} className={`${control} mt-1`}>
-          <option value="all">{t('my_courses.all_types')}</option><option value="crs">{t('my_courses.courses')}</option><option value="grp">{t('my_courses.groups')}</option>
-        </select></label>
       <label className="min-w-0 text-sm font-medium">{t('my_courses.semester')}
         <select value={semester} onChange={event => setSemester(event.target.value)} className={`${control} mt-1`}>
           <option value="all">{t('my_courses.all_semesters')}</option>{semesters.map(value => <option key={value}>{value}</option>)}<option value="none">{t('my_courses.no_semester')}</option>
         </select></label>
       <label className="min-w-0 text-sm font-medium">{t('my_courses.sort')}
         <select value={preferences.sort} onChange={event => save({ ...preferences, sort: event.target.value as Preferences['sort'] })} className={`${control} mt-1`}>
-          <option value="name">{t('my_courses.name')}</option><option value="semester">{t('my_courses.newest')}</option>
+          <option value="name">{t('my_courses.name')}</option><option value="name-desc">{t('my_courses.name_reverse')}</option>
+          <option value="semester">{t('my_courses.newest')}</option><option value="semester-asc">{t('my_courses.oldest')}</option>
         </select></label>
       </div>
     </div>
@@ -138,7 +140,7 @@ export const MyCoursesView: React.FC<{
       <BookOpen aria-hidden="true" className="mx-auto mb-3 h-8 w-8 text-teal-600 dark:text-teal-400" />
       <p>{t(courses?.length ? 'my_courses.no_results' : 'my_courses.empty')}</p>
       {Boolean(courses?.length) && <button type="button" className="mt-3 min-h-11 px-3 font-semibold text-teal-700 dark:text-teal-300"
-        onClick={() => { setQuery(''); setKind('all'); setSemester('all'); }}>{t('my_courses.clear')}</button>}
+        onClick={() => { setQuery(''); setSemester('all'); }}>{t('my_courses.clear')}</button>}
     </div>}
   </div>;
 };
