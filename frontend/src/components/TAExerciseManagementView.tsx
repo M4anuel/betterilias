@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { cache } from '../lib/cache';
 import { TAAssignmentListItem } from '../types';
 
 export interface AssignmentFeedback {
@@ -64,13 +65,31 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
   const [deleteTarget, setDeleteTarget] = useState<TAAssignmentListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Load assignments
+  // Load assignments with SWR caching & ILIAS Saver support
   const loadAssignments = useCallback(async () => {
-    setIsLoading(true);
     setError(null);
+    const cached = cache.getCachedTAAssignments(exerciseRefId);
+    if (cached) {
+      const sorted = [...(cached.assignments || [])].sort((a, b) => a.order_val - b.order_val);
+      setAssignments(sorted);
+      const ordersMap: Record<string, number> = {};
+      sorted.forEach((a) => {
+        ordersMap[a.ass_id] = a.order_val;
+      });
+      setInitialOrders(ordersMap);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+
+    const isSaverFresh = cache.isIliasSaverFresh(`ilias_ta_assignments_${exerciseRefId}`);
+    if (cached && isSaverFresh) {
+      return;
+    }
+
     try {
       const data = await api.getTAAssignments(exerciseRefId);
-      // Sort by order_val initially
+      cache.setCachedTAAssignments(exerciseRefId, data);
       const sorted = [...(data.assignments || [])].sort((a, b) => a.order_val - b.order_val);
       setAssignments(sorted);
       const ordersMap: Record<string, number> = {};
@@ -79,7 +98,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
       });
       setInitialOrders(ordersMap);
     } catch (err: any) {
-      setError(err?.message || t("Fehler beim Laden der Übungsliste"));
+      if (!cached) setError(err?.message || t("Fehler beim Laden der Übungsliste"));
     } finally {
       setIsLoading(false);
     }
@@ -147,6 +166,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
         ordersMap[a.ass_id] = a.order_val;
       });
       const res = await api.updateTAAssignmentOrder(exerciseRefId, ordersMap);
+      cache.setCachedTAAssignments(exerciseRefId, res);
       const sorted = [...(res.assignments || [])].sort((a, b) => a.order_val - b.order_val);
       setAssignments(sorted);
       const newOrdersMap: Record<string, number> = {};
@@ -171,6 +191,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
     setError(null);
     try {
       await api.deleteTAAssignment(exerciseRefId, deleteTarget.ass_id);
+      cache.invalidateCachedTAAssignments(exerciseRefId);
       setAssignments((prev) => prev.filter((a) => a.ass_id !== deleteTarget.ass_id));
       onFeedbackChange({ kind: 'deleted', title: deleteTarget.title });
       setDeleteTarget(null);

@@ -37,6 +37,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     sync.textContent = syncing ? t('Synchronisiere...') : t('Sitzung mit BetterIlias synchronisieren');
     sync.disabled = syncing;
   }
+  function isIliasAuthCookie(name) {
+    if (!name || typeof name !== 'string') return false;
+    if (name.includes('|') || name.includes('{') || name.includes('}') || name.includes('[') || name.includes(']')) return false;
+    return name === 'PHPSESSID' || name.startsWith('_shibsession_') || name === 'ilClientId' || name.startsWith('il_');
+  }
   async function fetchCookies() {
     const cookies = new Map();
     // Host-only, domain and Firefox partitioned cookies.
@@ -44,7 +49,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       { domain: 'ilias.unibe.ch', firstPartyDomain: null }]) {
       try {
         for (const cookie of await browserAPI.cookies.getAll(query)) {
-          if (cookie.name && cookie.value) cookies.set(cookie.name, cookie.value);
+          if (cookie.name && cookie.value && isIliasAuthCookie(cookie.name)) {
+            cookies.set(cookie.name, cookie.value);
+          }
         }
       } catch (_) { /* Query support differs between browsers. */ }
     }

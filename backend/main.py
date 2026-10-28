@@ -1,3 +1,4 @@
+import httpx
 import logging
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -74,6 +75,32 @@ async def scraping_error_handler(request: Request, exc: ScrapingParsingError):
             "context": exc.context,
             "dump_file": str(exc.dump_path) if exc.dump_path else None,
             "code": "PARSING_FAILED"
+        }
+    )
+
+
+@app.exception_handler(httpx.TimeoutException)
+async def httpx_timeout_handler(request: Request, exc: httpx.TimeoutException):
+    logger.warning(f"ILIAS timeout on {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        content={
+            "error": t('Gateway Timeout'),
+            "detail": t('Zeitüberschreitung bei der Kommunikation mit ILIAS (ilias.unibe.ch). Bitte versuche es in wenigen Momenten erneut.'),
+            "code": "ILIAS_TIMEOUT"
+        }
+    )
+
+
+@app.exception_handler(httpx.NetworkError)
+async def httpx_network_handler(request: Request, exc: httpx.NetworkError):
+    logger.warning(f"ILIAS network error on {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        content={
+            "error": t('Bad Gateway'),
+            "detail": t('Netzwerkfehler bei der Kommunikation mit ILIAS (ilias.unibe.ch). Bitte überprüfe deine Internetverbindung.'),
+            "code": "ILIAS_NETWORK_ERROR"
         }
     )
 

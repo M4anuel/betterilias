@@ -83,6 +83,7 @@ def test_mobile_navigation_content_settings_and_draft(local_site, language, sche
         search.fill('draft')
         # Resize to a keyboard-sized landscape viewport without remounting the draft.
         page.set_viewport_size(dict(width=667, height=320))
+        page.wait_for_function("parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--visible-height')) <= 321")
         playwright.expect(search).to_have_value('draft')
         bounds = dialog.bounding_box()
         assert bounds['y'] >= 0 and bounds['y'] + bounds['height'] <= 321

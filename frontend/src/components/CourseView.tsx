@@ -478,6 +478,25 @@ export const CourseView: React.FC<CourseViewProps> = ({
     };
   }, [materialsData]);
 
+  // Predictive pre-fetching of management data for TAs/instructors (when ILIAS Saver is OFF)
+  useEffect(() => {
+    if (isManaging) return;
+    const auth = materialsData?.authoring;
+    if (!auth || (!auth.can_create && !auth.can_manage && !auth.can_edit_page)) return;
+    if (cache.getIliasSaverEnabled()) return; // When ILIAS Saver is ON, management is only fetched on explicit click
+
+    const containerId = materialsData.container_ref_id || auth.ref_id;
+    if (!containerId) return;
+
+    const cached = cache.getCachedManagement(containerId);
+    const ts = cache.getCacheTimestamp(`ilias_management_${containerId}`);
+    if (cached && ts && Date.now() - ts < 60_000) return;
+
+    api.getManagement(containerId).then((res) => {
+      cache.setCachedManagement(containerId, res);
+    }).catch(() => {});
+  }, [materialsData, isManaging]);
+
   // Recursive subfolder discovery & tree mapping on initial load
   useEffect(() => {
     if (!materialsData) return;
@@ -1976,7 +1995,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
           onNavigateFolder(parent || courseRefId);
         }} onRefresh={onManualRefresh} refreshing={isRevalidating}>
         {materialsData?.authoring && (materialsData.authoring.can_create || materialsData.authoring.can_manage || materialsData.authoring.can_edit_page) &&
-          <button type="button" className="rounded-lg px-3 py-2 text-sm" aria-pressed={isManaging} onClick={() => { if (navigationGuard.confirmNavigation()) setIsManaging(!isManaging); }}>{t(isManaging ? 'management.done' : 'management.enter')}</button>}
+          <button type="button" disabled={isRevalidating} className="rounded-lg px-3 py-2 text-sm disabled:opacity-50" aria-pressed={isManaging} onClick={() => { if (navigationGuard.confirmNavigation()) setIsManaging(!isManaging); }}>{t(isManaging ? 'management.done' : 'management.enter')}</button>}
         <button type="button" className="rounded-lg px-3 py-2 text-sm" onClick={() => setIsOrderModalOpen(true)}>{t('Reihenfolge')}</button>
         {membership?.can_leave && <button type="button" className="rounded-lg px-3 py-2 text-sm" onClick={() => onManageMembership('leave')}>{t('Kurs verlassen')}</button>}
       </MobilePageHeader>
@@ -1997,8 +2016,13 @@ export const CourseView: React.FC<CourseViewProps> = ({
         {/* Sync / Refresh status */}
         <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
           {materialsData?.authoring && (materialsData.authoring.can_create || materialsData.authoring.can_manage || materialsData.authoring.can_edit_page) &&
-            <button aria-pressed={isManaging} onClick={() => { if (navigationGuard.confirmNavigation()) setIsManaging(!isManaging); }}
-              className="rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200 dark:hover:bg-teal-900/40">
+            <button
+              aria-pressed={isManaging}
+              disabled={isRevalidating}
+              onClick={() => { if (navigationGuard.confirmNavigation()) setIsManaging(!isManaging); }}
+              title={isRevalidating ? t("Aktualisierung läuft... Bitte warten") : undefined}
+              className="rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200 dark:hover:bg-teal-900/40 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
               {t(isManaging ? 'management.done' : 'management.enter')}
             </button>}
           {isRevalidating ? (

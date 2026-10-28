@@ -1674,9 +1674,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               {overviewData?.has_ta_access && (
                 <button
                   type="button"
+                  disabled={isLoadingOverview || isRevalidatingOverview}
                   onClick={() => switchTab('manage')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 font-bold text-xs transition cursor-pointer shrink-0 shadow-2xs"
-                  title={t("Übungen verwalten & bearbeiten (Tutor)")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 font-bold text-xs transition cursor-pointer shrink-0 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={isLoadingOverview || isRevalidatingOverview ? t("Aktualisierung läuft... Bitte warten") : t("Übungen verwalten & bearbeiten (Tutor)")}
                 >
                   <Edit3 className="h-3.5 w-3.5" />
                   <span>{t("Übungen verwalten")}</span>
@@ -2179,12 +2180,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         <div className="flex flex-col gap-1">
                           <button
                             type="button"
+                            disabled={isLoadingTaSubmissions || isSaving}
                             onClick={() => handleStatusChange(sub.member_id, 'passed')}
                             className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer border ${
                               edit.status === 'passed'
                                 ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
                                 : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
-                            }`}
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
                           >
                             <span>{t("Bestanden")}</span>
                             {edit.status === 'passed' && <Check className="h-3 w-3" />}
@@ -2192,12 +2194,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
                           <button
                             type="button"
+                            disabled={isLoadingTaSubmissions || isSaving}
                             onClick={() => handleStatusChange(sub.member_id, 'failed')}
                             className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer border ${
                               edit.status === 'failed'
                                 ? 'bg-red-600 text-white border-red-600 shadow-2xs'
                                 : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-950/30'
-                            }`}
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
                           >
                             <span>{t("Nicht bestanden")}</span>
                             {edit.status === 'failed' && <Check className="h-3 w-3" />}
@@ -2205,12 +2208,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
                           <button
                             type="button"
+                            disabled={isLoadingTaSubmissions || isSaving}
                             onClick={() => handleStatusChange(sub.member_id, 'not_graded')}
                             className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer border ${
                               edit.status === 'not_graded'
                                 ? 'bg-slate-700 dark:bg-slate-600 text-white border-slate-700 dark:border-slate-600 shadow-2xs'
                                 : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                            }`}
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
                           >
                             <span>{t("Nicht bewertet")}</span>
                             {edit.status === 'not_graded' && <Check className="h-3 w-3" />}
@@ -2222,10 +2226,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           <div>
                             <input
                               type="text"
+                              disabled={isLoadingTaSubmissions || isSaving}
                               value={edit.mark}
                               onChange={(e) => handleMarkChange(sub.member_id, e.target.value)}
                               placeholder={t("Note / Punkte (optional)")}
-                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
                         ) : edit.mark ? (
@@ -2278,18 +2283,20 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           {(rowTabState[sub.member_id] || 'feedback') === 'feedback' ? (
                             <textarea
                               rows={3}
+                              disabled={isLoadingTaSubmissions || isSaving}
                               value={edit.feedback}
                               onChange={(e) => handleFeedbackChange(sub.member_id, e.target.value)}
                               placeholder={t("Korrektur-Kommentar für Studierende eingeben...")}
-                              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 font-sans"
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 font-sans disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           ) : (
                             <textarea
                               rows={3}
+                              disabled={isLoadingTaSubmissions || isSaving}
                               value={edit.notice}
                               onChange={(e) => handleNoticeChange(sub.member_id, e.target.value)}
                               placeholder={t("Interne Notiz für Tutoren (wird nicht an Studierende gesendet)...")}
-                              className="w-full rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/30 p-2.5 text-xs text-slate-800 dark:text-amber-200 placeholder-slate-400 dark:placeholder-amber-400/60 focus:border-amber-500 focus:outline-hidden focus:ring-1 focus:ring-amber-500 font-sans"
+                              className="w-full rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/30 p-2.5 text-xs text-slate-800 dark:text-amber-200 placeholder-slate-400 dark:placeholder-amber-400/60 focus:border-amber-500 focus:outline-hidden focus:ring-1 focus:ring-amber-500 font-sans disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           )}
                         </div>
@@ -2491,10 +2498,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           <div className="pt-1">
                             <input
                               type="text"
+                              disabled={isLoadingTaSubmissions || isSaving}
                               value={edit.notice}
                               onChange={(e) => handleNoticeChange(sub.member_id, e.target.value)}
                               placeholder={t("Tutor-Notiz (intern)...")}
-                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
                         </div>
@@ -2536,10 +2544,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           <div className="pt-1">
                             <input
                               type="text"
+                              disabled={isLoadingTaSubmissions || isSaving}
                               value={edit.notice}
                               onChange={(e) => handleNoticeChange(sub.member_id, e.target.value)}
                               placeholder={t("Tutor-Notiz (intern)...")}
-                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
                         </div>

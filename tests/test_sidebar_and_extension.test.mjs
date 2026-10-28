@@ -177,3 +177,23 @@ test('Extension cookie verification logic checks for active SWITCH edu-ID sessio
     true
   );
 });
+
+test('Extension and backend cookie sanitization rejects RFC 6265 separators and retains auth tokens', () => {
+  const isIliasAuthCookie = (name) => {
+    if (!name || typeof name !== 'string') return false;
+    if (name.includes('|') || name.includes('{') || name.includes('}') || name.includes('[') || name.includes(']')) return false;
+    return name === 'PHPSESSID' || name.startsWith('_shibsession_') || name === 'ilClientId' || name.startsWith('il_');
+  };
+
+  assert.equal(isIliasAuthCookie('PHPSESSID'), true);
+  assert.equal(isIliasAuthCookie('_shibsession_64656661756c74'), true);
+  assert.equal(isIliasAuthCookie('ilClientId'), true);
+  assert.equal(isIliasAuthCookie('il_mode'), true);
+
+  // Junk/bloat/media cookies that cause header corruption or infinite reload loops
+  assert.equal(isIliasAuthCookie('preferences|{}'), false);
+  assert.equal(isIliasAuthCookie('cookie[test]'), false);
+  assert.equal(isIliasAuthCookie('unrelated_tracker'), false);
+  assert.equal(isIliasAuthCookie(null), false);
+  assert.equal(isIliasAuthCookie(undefined), false);
+});

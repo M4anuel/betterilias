@@ -1187,5 +1187,10 @@
   "mobile.exercise_view": "Übungsansicht",
   "mobile.manage_assignments": "Übungen verwalten",
   "mobile.edit_assignment": "Übung bearbeiten",
-  "mobile.submission_filters": "Abgaben filtern"
+  "mobile.submission_filters": "Abgaben filtern",
+  "Gateway Timeout": "Gateway Timeout",
+  "Zeitüberschreitung bei der Kommunikation mit ILIAS (ilias.unibe.ch). Bitte versuche es in wenigen Momenten erneut.": "Zeitüberschreitung bei der Kommunikation mit ILIAS (ilias.unibe.ch). Bitte versuche es in wenigen Momenten erneut.",
+  "Bad Gateway": "Bad Gateway",
+  "Netzwerkfehler bei der Kommunikation mit ILIAS (ilias.unibe.ch). Bitte überprüfe deine Internetverbindung.": "Netzwerkfehler bei der Kommunikation mit ILIAS (ilias.unibe.ch). Bitte überprüfe deine Internetverbindung.",
+  "Zeitüberschreitung bei der Verbindung zu ilias.unibe.ch. Der Server antwortet verzögert.": "Zeitüberschreitung bei der Verbindung zu ilias.unibe.ch. Der Server antwortet verzögert."
 }
