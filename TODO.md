@@ -2,6 +2,43 @@
 
 Unchecked items are unfinished; completed work is listed separately below. Current behavior and limitations are also recorded in [`docs/ILIAS_SUPPORT_MATRIX.md`](docs/ILIAS_SUPPORT_MATRIX.md) and [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECIFICATION.md).
 
+## Calendar and timetable
+
+Goal: combine all courses from the current semester into a calendar, a weekly
+timetable and one iCalendar feed, with flexible manual schedules when ILIAS has
+no lecture dates.
+
+- [ ] Add calendar views (including week/month/agenda) and a weekly timetable
+  generated from the current semester's courses. Provide course filters/colours,
+  readable overlaps and usable phone/tablet/desktop layouts in both languages
+  and themes.
+- [ ] Discover each course's ILIAS iCalendar link and import its actual events.
+  Distinguish a valid but empty calendar from unavailable feeds, failed requests
+  or expired sessions; explain when a course needs a manual schedule.
+- [ ] Let users create, edit, duplicate and delete multiple schedule entries per
+  course. Each weekly rule specifies weekday(s), start/end dates and start/end
+  times, with optional location/title. Preserve drafts and saved rules per user
+  and course when changing semesters or refreshing ILIAS data.
+- [ ] Make both examples straightforward: two lectures every week, and one rule
+  for Wednesday 16:00-18:00 during the first part of the semester followed by a
+  separate Friday 14:00-16:00 rule during the second part. Support different date
+  ranges and hours without forcing one fixed timetable slot per course.
+- [ ] Combine imported dates and custom rules into one consistent event model.
+  Handle time zones/daylight-saving changes (Europe/Zurich), recurrence bounds,
+  exceptions/cancellations, updates and duplicate prevention. Keep manually
+  entered schedules when re-importing course calendars.
+- [ ] Export the combined semester calendar as one .ics file. Investigate a
+  stable, automatically updating subscription URL usable by external calendar
+  clients; give events stable UIDs so refreshes update existing entries.
+- [ ] For subscriptions, design a private, unguessable and revocable feed URL
+  without exposing ILIAS cookies. Check server reachability, refresh scheduling
+  and session/feed expiry; document local-only hosting limitations and retain
+  downloadable .ics export where subscriptions cannot be supported.
+- [ ] Verify native events, empty feeds, multiple weekly slots, mid-semester
+  schedule changes, overlapping events, DST and import/export round trips.
+  Validate subscriptions with representative external calendar clients where
+  hosting supports them.
+
 ## Mobile usability
 
 - [x] Restore two-row sidebar editor cards on tablet/desktop; enlarge the phone

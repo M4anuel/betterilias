@@ -14,6 +14,15 @@ from backend.scrapers.dumper import safe_parser
 from backend.scrapers.membership import parse_membership, membership_form
 
 
+# Native repository bulk actions are application chrome, not lecturer content.
+# Keep their detection structural so lecturer text mentioning Delete/Move survives.
+REPOSITORY_CONTROLS_SELECTOR = (
+    ".ilAdminRow, .c-toolbar.l-bar__container, "
+    "h2.hidden:has(+ .c-toolbar.l-bar__container), "
+    "h3.hidden:has(+ .c-toolbar.l-bar__container)"
+)
+
+
 def _clean_rich_html(raw_html: str, container_ref_id: str = "") -> str:
     """Strip ILIAS comment artifacts, transform Opencast video iframes into interactive player cards, and wrap tables."""
     if not raw_html:
@@ -26,6 +35,9 @@ def _clean_rich_html(raw_html: str, container_ref_id: str = "") -> str:
     if "<" in cleaned:
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(cleaned, "html.parser")
+        for control in soup.select(REPOSITORY_CONTROLS_SELECTOR):
+            if control.parent is not None:
+                control.decompose()
 
         ilias_page_url = (
             f"https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&cmdNode=yv:oj&cmdClass=ilobjfoldergui&ref_id={container_ref_id}&item_ref_id=0"
@@ -486,6 +498,9 @@ def parse_course_blocks(
     Extract the sequential content blocks as structured on the ILIAS page.
     Preserves lecturer-defined ordering of text, item groups, drawers, and sessions.
     """
+    for control in soup.select(REPOSITORY_CONTROLS_SELECTOR):
+        if control.parent is not None:
+            control.decompose()
     center = soup.select_one("#il_center_col") or soup.select_one(".il-layout-page-content, main, #ilContentContainer")
     if not center:
         return []
@@ -941,6 +956,11 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
     """
     soup = BeautifulSoup(html_content, "lxml")
     membership = parse_membership(soup, container_ref_id)
+    # Remove before either the legacy or structured rich-text walker runs.
+    # Authoring permissions are still parsed from the original HTML below.
+    for control in soup.select(REPOSITORY_CONTROLS_SELECTOR):
+        if control.parent is not None:
+            control.decompose()
     # Registration is handled by our membership dialog, not embedded upstream forms.
     for action in ('join', 'leave'):
         form, _ = membership_form(soup, container_ref_id, action)
