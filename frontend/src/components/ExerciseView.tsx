@@ -191,7 +191,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       const ongoing = cachedOverview.assignments.find((a) => a.is_ongoing) || cachedOverview.assignments[0];
       initialAssId = ongoing.ass_id || undefined;
     }
-    return cache.getCachedExerciseSubmissions(exerciseRefId, initialAssId);
+    const cached = cache.getCachedExerciseSubmissions(exerciseRefId, initialAssId);
+    if (cached && !cached.active_assignment_id && initialAssId) {
+      cached.active_assignment_id = initialAssId;
+    }
+    return cached;
   });
   const [isLoadingTaSubmissions, setIsLoadingTaSubmissions] = useState(false);
   const [taSearchQuery, setTaSearchQuery] = useState('');
@@ -314,9 +318,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     }
     const cachedSub = cache.getCachedExerciseSubmissions(exerciseRefId, initialAssId);
     const initialEdits: Record<string, any> = {};
+    const initKey = initialAssId || 'default';
     if (cachedSub?.submissions) {
       for (const s of cachedSub.submissions) {
-        initialEdits[s.member_id] = {
+        initialEdits[`${initKey}_${s.member_id}`] = {
           status: s.passed_status || 'not_graded',
           mark: s.mark || '',
           feedback: s.feedback || '',
@@ -336,6 +341,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const [uploadingMemberId, setUploadingMemberId] = useState<string | null>(null);
   const [draggingMemberId, setDraggingMemberId] = useState<string | null>(null);
   const [fileUploadSuccessId, setFileUploadSuccessId] = useState<string | null>(null);
+
+  const currentAssKey = selectedTaAssId || taSubmissionsData?.active_assignment_id || 'default';
+  const getEditKey = useCallback(
+    (memberId: string, assId?: string | null) => `${assId || currentAssKey}_${memberId}`,
+    [currentAssKey]
+  );
 
 
   // Course-specific TA Grading preferences (saved per courseRefId in localStorage)
@@ -369,6 +380,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const fetchedFeedbackMembersRef = useRef<Set<string>>(new Set());
 
   // Check for unsaved grades or feedback notes
+  const hasCurrentAssDirtyGrades = useMemo(
+    () => Object.entries(localEdits).some(([k, e]) => k.startsWith(`${currentAssKey}_`) && e.isDirty),
+    [localEdits, currentAssKey]
+  );
   const hasDirtyGrades = useMemo(
     () => Object.values(localEdits).some((e) => e.isDirty),
     [localEdits]
@@ -574,13 +589,18 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       }
 
       if (cached) {
+        if (!cached.active_assignment_id && assId) {
+          cached.active_assignment_id = assId;
+        }
         setTaSubmissionsData(cached);
+        const aId = assId || cached.active_assignment_id || 'default';
         // Seed local edits for any submissions not yet edited
         setLocalEdits((prev) => {
           const updated = { ...prev };
           for (const s of cached!.submissions) {
-            if (!updated[s.member_id]) {
-              updated[s.member_id] = {
+            const k = `${aId}_${s.member_id}`;
+            if (!updated[k]) {
+              updated[k] = {
                 status: s.passed_status || 'not_graded',
                 mark: s.mark || '',
                 feedback: s.feedback || '',
@@ -663,8 +683,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           if (fresh.active_assignment_id) {
             submissionsCacheRef.current[`${exerciseRefId}_${fresh.active_assignment_id}`] = fresh;
           }
+          if (!fresh.active_assignment_id && assId) {
+            fresh.active_assignment_id = assId;
+          }
           cache.setCachedExerciseSubmissions(exerciseRefId, assId, fresh);
           setTaSubmissionsData(fresh);
+          const aId = assId || fresh.active_assignment_id || 'default';
 
           // ONLY set selectedTaAssId if it was not already chosen by the user!
           if (isInitialLoad && fresh.active_assignment_id) {
@@ -675,8 +699,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           setLocalEdits((prev) => {
             const updated = { ...prev };
             for (const s of fresh.submissions) {
-              if (!updated[s.member_id] || !updated[s.member_id].isDirty) {
-                updated[s.member_id] = {
+              const k = `${aId}_${s.member_id}`;
+              if (!updated[k] || !updated[k].isDirty) {
+                updated[k] = {
                   status: s.passed_status || 'not_graded',
                   mark: s.mark || '',
                   feedback: s.feedback || '',
@@ -704,10 +729,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   const handleSelectTaAssignment = useCallback(
     (newAssId: string) => {
-      if (newAssId !== selectedTaAssId && hasDirtyGrades && !navigationGuard.confirmNavigation()) {
+      if (newAssId !== selectedTaAssId && hasCurrentAssDirtyGrades && !navigationGuard.confirmNavigation()) {
         return;
       }
       setSelectedTaAssId(newAssId);
+      setSavedSuccessId(null);
       const cacheKey = `${exerciseRefId}_${newAssId || 'default'}`;
       let cached: ExerciseSubmissionsResponse | null = submissionsCacheRef.current[cacheKey] || null;
       if (!cached) {
@@ -718,12 +744,17 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       }
 
       if (cached) {
+        if (!cached.active_assignment_id && newAssId) {
+          cached.active_assignment_id = newAssId;
+        }
         setTaSubmissionsData(cached);
+        const aId = newAssId || cached.active_assignment_id || 'default';
         setLocalEdits((prev) => {
           const updated = { ...prev };
           for (const s of cached!.submissions) {
-            if (!updated[s.member_id]) {
-              updated[s.member_id] = {
+            const k = `${aId}_${s.member_id}`;
+            if (!updated[k]) {
+              updated[k] = {
                 status: s.passed_status || 'not_graded',
                 mark: s.mark || '',
                 feedback: s.feedback || '',
@@ -743,7 +774,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       lastRevalidatedAssKeyRef.current = `${exerciseRefId}_${newAssId}`;
       loadTaSubmissions(newAssId, false);
     },
-    [exerciseRefId, loadTaSubmissions]
+    [exerciseRefId, loadTaSubmissions, hasCurrentAssDirtyGrades]
   );
 
   const uploadMemberFeedbackFile = async (memberId: string, file: File) => {
@@ -758,9 +789,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         selectedTaAssId || undefined,
         sub?.evaluation_by_file_url
       );
+      const k = getEditKey(memberId);
       setRowFeedbackFiles((prev) => ({
         ...prev,
-        [memberId]: res.files || [],
+        [k]: res.files || [],
       }));
       setFileUploadSuccessId(memberId);
       setTimeout(() => setFileUploadSuccessId(null), 3500);
@@ -784,9 +816,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         selectedTaAssId || undefined,
         feedbackUrl
       );
+      const k = getEditKey(memberId);
       setRowFeedbackFiles((prev) => ({
         ...prev,
-        [memberId]: res.files || [],
+        [k]: res.files || [],
       }));
     } catch (err: any) {
       alert(err.message || t("Fehler beim Löschen der Korrekturdatei"));
@@ -812,7 +845,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           while (queue.length > 0 && !isCancelled) {
             const sub = queue.shift();
             if (!sub || !sub.evaluation_by_file_url) continue;
-            setLoadingFeedbackFilesFor((prev) => ({ ...prev, [sub.member_id]: true }));
+            const k = getEditKey(sub.member_id);
+            setLoadingFeedbackFilesFor((prev) => ({ ...prev, [k]: true }));
             try {
               const res = await api.getFeedbackFiles(
                 exerciseRefId,
@@ -823,19 +857,19 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               if (!isCancelled) {
                 setRowFeedbackFiles((prev) => ({
                   ...prev,
-                  [sub.member_id]: res.files || [],
+                  [k]: res.files || [],
                 }));
               }
             } catch {
               if (!isCancelled) {
                 setRowFeedbackFiles((prev) => ({
                   ...prev,
-                  [sub.member_id]: [],
+                  [k]: [],
                 }));
               }
             } finally {
               if (!isCancelled) {
-                setLoadingFeedbackFilesFor((prev) => ({ ...prev, [sub.member_id]: false }));
+                setLoadingFeedbackFilesFor((prev) => ({ ...prev, [k]: false }));
               }
             }
           }
@@ -903,9 +937,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     return list;
   }, [overviewData?.assignments, assignmentFilterMode, assignmentSearchQuery]);
 
+  // Active assignment matching guard to prevent cross-assignment UI leakage
+  const isDataMatchingSelectedAss = !selectedTaAssId || (taSubmissionsData?.active_assignment_id === selectedTaAssId);
+  const currentSubmissionsData = isDataMatchingSelectedAss ? taSubmissionsData : null;
+
   // Counts for TA Filter pills
   const filterCounts = useMemo(() => {
-    const list = taSubmissionsData?.submissions || [];
+    const list = currentSubmissionsData?.submissions || [];
     let toGrade = 0;
     let submitted = 0;
     let graded = 0;
@@ -917,7 +955,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       const hasSubmitted = Boolean(
         s.download_url || s.files.length > 0 || ['submitted', 'late'].includes(s.submission_status)
       );
-      const edit = localEdits[s.member_id];
+      const edit = localEdits[getEditKey(s.member_id)];
       const isUnsaved = Boolean(edit?.isDirty);
       const curStatus = (isUnsaved ? s.passed_status : edit?.status) || s.passed_status || 'not_graded';
       const curMark = isUnsaved
@@ -943,7 +981,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       failed,
       notGraded,
     };
-  }, [taSubmissionsData?.submissions, localEdits]);
+  }, [currentSubmissionsData?.submissions, localEdits, getEditKey]);
 
   const getQuickFilterClasses = (color: TAQuickFilter['color'], isActive: boolean) => {
     switch (color) {
@@ -979,10 +1017,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     }
   };
 
-  // Active assignment matching guard to prevent cross-assignment UI leakage
-  const isDataMatchingSelectedAss = !selectedTaAssId || !taSubmissionsData?.active_assignment_id || taSubmissionsData.active_assignment_id === selectedTaAssId;
-  const currentSubmissionsData = isDataMatchingSelectedAss ? taSubmissionsData : null;
-
   // Filter TA Submissions
   const filteredTaSubmissions = useMemo(() => {
     if (!currentSubmissionsData?.submissions) return [];
@@ -1016,7 +1050,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           return true;
         }
 
-        const edit = localEdits[s.member_id];
+        const edit = localEdits[getEditKey(s.member_id)];
         const isUnsaved = Boolean(edit?.isDirty);
         const curStatus = (isUnsaved ? s.passed_status : edit?.status) || s.passed_status || 'not_graded';
         const curMark = isUnsaved
@@ -1099,14 +1133,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         const nameB = (b.team_members && b.team_members.length > 0 ? b.team_members[0] : b.student_name) || '';
         comparison = nameA.localeCompare(nameB, 'de');
       } else if (taSortField === 'status') {
-        const editA = localEdits[a.member_id];
-        const editB = localEdits[b.member_id];
+        const editA = localEdits[getEditKey(a.member_id)];
+        const editB = localEdits[getEditKey(b.member_id)];
         const statusA = (editA?.isDirty ? a.passed_status : editA?.status) || a.passed_status || 'not_graded';
         const statusB = (editB?.isDirty ? b.passed_status : editB?.status) || b.passed_status || 'not_graded';
         comparison = statusA.localeCompare(statusB);
       } else if (taSortField === 'mark') {
-        const editA = localEdits[a.member_id];
-        const editB = localEdits[b.member_id];
+        const editA = localEdits[getEditKey(a.member_id)];
+        const editB = localEdits[getEditKey(b.member_id)];
         const markA = editA?.isDirty
           ? (a.mark || '')
           : (editA?.mark !== undefined ? editA.mark : (a.mark || ''));
@@ -1136,14 +1170,16 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     taSortField,
     taSortOrder,
     teamSortNames,
+    getEditKey,
   ]);
 
   // TA Grading Handlers
   const handleStatusChange = (memberId: string, status: string) => {
+    const k = getEditKey(memberId);
     setLocalEdits((prev) => ({
       ...prev,
-      [memberId]: {
-        ...(prev[memberId] || { mark: '', feedback: '', notice: '' }),
+      [k]: {
+        ...(prev[k] || { mark: '', feedback: '', notice: '' }),
         status,
         isDirty: true,
       },
@@ -1151,10 +1187,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   };
 
   const handleMarkChange = (memberId: string, mark: string) => {
+    const k = getEditKey(memberId);
     setLocalEdits((prev) => ({
       ...prev,
-      [memberId]: {
-        ...(prev[memberId] || { status: 'not_graded', feedback: '', notice: '' }),
+      [k]: {
+        ...(prev[k] || { status: 'not_graded', feedback: '', notice: '' }),
         mark,
         isDirty: true,
       },
@@ -1162,10 +1199,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   };
 
   const handleFeedbackChange = (memberId: string, feedback: string) => {
+    const k = getEditKey(memberId);
     setLocalEdits((prev) => ({
       ...prev,
-      [memberId]: {
-        ...(prev[memberId] || { status: 'not_graded', mark: '', notice: '' }),
+      [k]: {
+        ...(prev[k] || { status: 'not_graded', mark: '', notice: '' }),
         feedback,
         isDirty: true,
       },
@@ -1173,10 +1211,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   };
 
   const handleNoticeChange = (memberId: string, notice: string) => {
+    const k = getEditKey(memberId);
     setLocalEdits((prev) => ({
       ...prev,
-      [memberId]: {
-        ...(prev[memberId] || { status: 'not_graded', mark: '', feedback: '' }),
+      [k]: {
+        ...(prev[k] || { status: 'not_graded', mark: '', feedback: '' }),
         notice,
         isDirty: true,
       },
@@ -1184,7 +1223,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   };
 
   const handleSaveSubmission = async (memberId: string) => {
-    const edit = localEdits[memberId];
+    const k = getEditKey(memberId);
+    const edit = localEdits[k];
     if (!edit) return;
 
     setSavingMemberId(memberId);
@@ -1201,8 +1241,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
       setLocalEdits((prev) => ({
         ...prev,
-        [memberId]: {
-          ...prev[memberId],
+        [k]: {
+          ...prev[k],
           isDirty: false,
         },
       }));
@@ -1225,7 +1265,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             return s;
           }),
         };
-        const cacheKey = selectedTaAssId || 'default';
+        const cacheKey = `${exerciseRefId}_${selectedTaAssId || 'default'}`;
         submissionsCacheRef.current[cacheKey] = updated;
         cache.setCachedExerciseSubmissions(exerciseRefId, selectedTaAssId || undefined, updated);
         return updated;
@@ -1268,9 +1308,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       rtoken: taSubmissionsData?.rtoken,
     });
 
+    const k = getEditKey(memberId);
     setLocalEdits((prev) => ({
       ...prev,
-      [memberId]: {
+      [k]: {
         ...updated,
         isDirty: false,
       },
@@ -1293,7 +1334,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           return s;
         }),
       };
-      const cacheKey = selectedTaAssId || 'default';
+      const cacheKey = `${exerciseRefId}_${selectedTaAssId || 'default'}`;
       submissionsCacheRef.current[cacheKey] = updatedData;
       cache.setCachedExerciseSubmissions(exerciseRefId, selectedTaAssId || undefined, updatedData);
       return updatedData;
@@ -2041,7 +2082,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             <div role="status" className="text-xs text-slate-500 dark:text-slate-400">
               {!teamSortNames ? t('ILIAS-Reihenfolge wird geladen…') : teamOrder?.error ? (
                 <>{t('ILIAS-Reihenfolge konnte nicht geladen werden.')} <button type="button" className="underline" onClick={() => setTeamOrderRetry((value) => value + 1)}>{t('Erneut versuchen')}</button></>
-              ) : taSubmissionsData?.submissions.some((s) => !teamSortNames[s.member_id]) ? (
+              ) : currentSubmissionsData?.submissions.some((s) => !teamSortNames[s.member_id]) ? (
                 t('Abgaben ohne ermittelbaren Feedback-Empfänger stehen am Ende.')
               ) : null}
             </div>
@@ -2060,7 +2101,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           ) : (
             <div className="space-y-3">
               {filteredTaSubmissions.map((sub) => {
-                const edit = localEdits[sub.member_id] || {
+                const subAssKey = getEditKey(sub.member_id);
+                const edit = localEdits[subAssKey] || {
                   status: sub.passed_status || 'not_graded',
                   mark: sub.mark || '',
                   feedback: sub.feedback || '',
@@ -2274,10 +2316,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setRowTabState((prev) => ({ ...prev, [sub.member_id]: 'feedback' }))
+                                  setRowTabState((prev) => ({ ...prev, [subAssKey]: 'feedback' }))
                                 }
                                 className={`px-2 py-0.5 rounded-md font-semibold transition cursor-pointer ${
-                                  (rowTabState[sub.member_id] || 'feedback') === 'feedback'
+                                  (rowTabState[subAssKey] || 'feedback') === 'feedback'
                                     ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs'
                                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                                 }`}
@@ -2287,10 +2329,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setRowTabState((prev) => ({ ...prev, [sub.member_id]: 'notice' }))
+                                  setRowTabState((prev) => ({ ...prev, [subAssKey]: 'notice' }))
                                 }
                                 className={`px-2 py-0.5 rounded-md font-semibold transition cursor-pointer ${
-                                  rowTabState[sub.member_id] === 'notice'
+                                  rowTabState[subAssKey] === 'notice'
                                     ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs'
                                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                                 }`}
@@ -2299,13 +2341,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               </button>
                             </div>
                             <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                              {(rowTabState[sub.member_id] || 'feedback') === 'feedback'
+                              {(rowTabState[subAssKey] || 'feedback') === 'feedback'
                                 ? t("Für Studierende sichtbar")
                                 : t("Nur intern für Tutoren")}
                             </span>
                           </div>
 
-                          {(rowTabState[sub.member_id] || 'feedback') === 'feedback' ? (
+                          {(rowTabState[subAssKey] || 'feedback') === 'feedback' ? (
                             <textarea
                               rows={3}
                               disabled={isLoadingTaSubmissions || isSaving}
@@ -2333,12 +2375,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
                                 {t("Korrektur per Datei")}
                               </span>
-                              {rowFeedbackFiles[sub.member_id] && rowFeedbackFiles[sub.member_id].length > 0 && (
+                              {rowFeedbackFiles[subAssKey] && rowFeedbackFiles[subAssKey].length > 0 && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
                                   <FileText className="h-3 w-3" />
                                   <span>
-                                    {rowFeedbackFiles[sub.member_id].length}{' '}
-                                    {rowFeedbackFiles[sub.member_id].length === 1
+                                    {rowFeedbackFiles[subAssKey].length}{' '}
+                                    {rowFeedbackFiles[subAssKey].length === 1
                                       ? t("Datei")
                                       : t("Dateien")}
                                   </span>
@@ -2379,14 +2421,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           </div>
 
                           {/* Uploaded Feedback Files List */}
-                          {loadingFeedbackFilesFor[sub.member_id] && !rowFeedbackFiles[sub.member_id] ? (
+                          {loadingFeedbackFilesFor[subAssKey] && !rowFeedbackFiles[subAssKey] ? (
                             <div className="p-2.5 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80">
                               <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
                               <span>{t("Lade Korrekturdateien aus ILIAS...")}</span>
                             </div>
-                          ) : rowFeedbackFiles[sub.member_id] && rowFeedbackFiles[sub.member_id].length > 0 ? (
+                          ) : rowFeedbackFiles[subAssKey] && rowFeedbackFiles[subAssKey].length > 0 ? (
                             <div className="space-y-1.5">
-                              {rowFeedbackFiles[sub.member_id].map((ff) => (
+                              {rowFeedbackFiles[subAssKey].map((ff) => (
                                 <div
                                   key={ff.id}
                                   className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 p-2 text-xs"
@@ -2476,7 +2518,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 <span className="font-semibold text-indigo-700 dark:text-indigo-300">
                                   {t("Datei hier loslassen zum Hochladen...")}
                                 </span>
-                              ) : rowFeedbackFiles[sub.member_id] && rowFeedbackFiles[sub.member_id].length > 0 ? (
+                              ) : rowFeedbackFiles[subAssKey] && rowFeedbackFiles[subAssKey].length > 0 ? (
                                 <span>{t("Weitere Korrekturdatei per Drag & Drop hierher ziehen oder auswählen.")}</span>
                               ) : sub.evaluation_by_file_url ? (
                                 <span>{t("Korrekturdatei per Drag & Drop hierher ziehen oder Button nutzen.")}</span>
@@ -2502,7 +2544,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                     <span>
                                       {uploadingMemberId === sub.member_id
                                         ? t("Lädt...")
-                                        : rowFeedbackFiles[sub.member_id] && rowFeedbackFiles[sub.member_id].length > 0
+                                        : rowFeedbackFiles[subAssKey] && rowFeedbackFiles[subAssKey].length > 0
                                         ? t("Datei hinzufügen")
                                         : t("Datei hochladen")}
                                     </span>
@@ -2652,10 +2694,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           exerciseRefId={exerciseRefId}
           assId={selectedTaAssId || undefined}
           isUpdating={isLoadingTaSubmissions}
-          initialEdit={localEdits[detailModalSubmission.member_id]}
-          initialFeedbackFiles={rowFeedbackFiles[detailModalSubmission.member_id]}
+          initialEdit={localEdits[getEditKey(detailModalSubmission.member_id)]}
+          initialFeedbackFiles={rowFeedbackFiles[getEditKey(detailModalSubmission.member_id)]}
           onFeedbackFilesChange={(memberId, files) => {
-            setRowFeedbackFiles((prev) => ({ ...prev, [memberId]: files }));
+            setRowFeedbackFiles((prev) => ({ ...prev, [getEditKey(memberId)]: files }));
           }}
           onSave={handleSaveFromModal}
           onClose={() => setDetailModalSubmission(null)}

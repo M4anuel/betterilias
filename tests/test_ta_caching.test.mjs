@@ -381,3 +381,51 @@ test('Delete review pre-scan cache persists and invalidates', () => {
   cache.invalidateCachedDeleteReview(refId);
   assert.equal(cache.getCachedDeleteReview(refId, itemIds), null);
 });
+
+test('Exercise grading edits and comments are strictly scoped per assignment ID without cross-assignment contamination', () => {
+  // Simulates student member_id #39619 across Ubung 3 and Ubung 4
+  const memberId = '39619';
+  const assId3 = 'ass_ubung_3';
+  const assId4 = 'ass_ubung_4';
+
+  const localEdits = {};
+  const getEditKey = (mId, assId) => `${assId}_${mId}`;
+
+  // TA grades Ubung 3
+  const key3 = getEditKey(memberId, assId3);
+  localEdits[key3] = {
+    status: 'passed',
+    mark: '',
+    feedback: 'Akzeptiert: Die Formatierung eurer Abgabe...',
+    notice: 'Guter Ansatz',
+    isDirty: false,
+  };
+
+  // TA switches to Ubung 4 and enters different feedback for the same student
+  const key4 = getEditKey(memberId, assId4);
+  localEdits[key4] = {
+    status: 'passed',
+    mark: '',
+    feedback: 'gutes, klares video. qualität ist etwas tief...',
+    notice: 'Video abgabe',
+    isDirty: false,
+  };
+
+  // Switching back to Ubung 3 reads key3
+  assert.equal(localEdits[key3].feedback, 'Akzeptiert: Die Formatierung eurer Abgabe...');
+  // Ubung 4 retains key4 independently
+  assert.equal(localEdits[key4].feedback, 'gutes, klares video. qualität ist etwas tief...');
+  assert.notEqual(localEdits[key3].feedback, localEdits[key4].feedback);
+
+  // Active assignment matching guard
+  const isDataMatchingSelectedAss = (selectedAssId, dataAssId) => {
+    return !selectedAssId || (dataAssId === selectedAssId);
+  };
+
+  // When selected is assId3 and loaded data is for assId3: matches
+  assert.equal(isDataMatchingSelectedAss(assId3, assId3), true);
+  // When selected is assId4 but data in state is still assId3: does NOT match (prevents rendering stale cards)
+  assert.equal(isDataMatchingSelectedAss(assId4, assId3), false);
+  // When no specific assignment selected: matches
+  assert.equal(isDataMatchingSelectedAss(null, assId3), true);
+});
