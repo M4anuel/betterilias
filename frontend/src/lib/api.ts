@@ -734,7 +734,7 @@ export const api = {
 
   async syncCalendar(payload: {
     semester?: string;
-    courses: { ref_id: string; title: string; semester?: string }[];
+    courses: { ref_id: string; title: string; semester?: string; item_type?: string; url?: string }[];
     force_refresh?: boolean;
   }): Promise<SemesterCalendarResponse> {
     const res = await sessionFetch(`${API_BASE}/calendar/sync`, {
@@ -805,6 +805,20 @@ export const api = {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ color }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.load_failed'));
+    }
+    return res.json();
+  },
+
+  async updateCourseIgnoreSchedule(courseRefId: string, ignored: boolean, semester?: string): Promise<SemesterCalendarResponse> {
+    const qs = semester ? `?semester=${encodeURIComponent(semester)}` : '';
+    const res = await sessionFetch(`${API_BASE}/calendar/courses/${encodeURIComponent(courseRefId)}/ignore-schedule${qs}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ignored }),
     });
     if (!res.ok) {
       const error = await res.json().catch(() => ({}));

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
@@ -330,6 +330,147 @@ def test_calendar_api_endpoints_and_subscription_revocation(tmp_path, monkeypatc
     assert feed_after_revoke.status_code == 404
 
 
+def test_cross_semester_calendar_ignore_schedule_and_tiered_caching(tmp_path, monkeypatch):
+    """
+    Verify:
+    1. Global calendar loads courses across multiple semesters (HS2026, FS2026, HS2025) and undated groups,
+       sorted newest semester to oldest.
+    2. Ignoring missing schedule suppresses needs_manual_schedule warning on past courses or groups.
+    3. Tiered cache freshness: past-semester courses remain cached indefinitely even with old timestamps,
+       while current-semester courses expire after CURRENT_SEMESTER_TTL_SECONDS (6 hours).
+    """
+    test_service = CalendarService(storage_dir=tmp_path / ".calendar")
+    monkeypatch.setattr("backend.api.routes.calendar.calendar_service", test_service)
+
+    client = TestClient(app)
+    headers = {"X-Session-Id": "test-cal-tiered-1"}
+
+    # Seed tenant with courses from HS2025, HS2026, FS2026, and an undated group
+    state = test_service._load_tenant_state("test-cal-tiered-1")
+    state["courses"] = {
+        "old-hs2025": {
+            "course_ref_id": "old-hs2025",
+            "course_title": "HS2025: Alte Vorlesung",
+            "semester": "HS2025",
+            "item_type": "crs",
+            "color": "#0AACA5",
+            "status": "valid_empty",
+            "status_message": "Keine Termine",
+            "needs_manual_schedule": True,
+            "ignored_missing_schedule": False,
+            "imported_event_count": 0,
+            "imported_lecture_count": 0,
+            "imported_deadline_count": 0,
+            "custom_rule_count": 0,
+            "last_imported_at": "2025-11-01T10:00:00+00:00",  # ~1 year old!
+        },
+        "curr-hs2026": {
+            "course_ref_id": "curr-hs2026",
+            "course_title": "HS2026: Aktuelle Vorlesung",
+            "semester": "HS2026",
+            "item_type": "crs",
+            "color": "#2563EB",
+            "status": "imported_deadlines_only",
+            "status_message": "Nur Fristen",
+            "needs_manual_schedule": True,
+            "ignored_missing_schedule": False,
+            "imported_event_count": 2,
+            "imported_lecture_count": 0,
+            "imported_deadline_count": 2,
+            "custom_rule_count": 0,
+            "last_imported_at": "2026-01-01T10:00:00+00:00",  # > 6 hours old
+        },
+        "mid-fs2026": {
+            "course_ref_id": "mid-fs2026",
+            "course_title": "FS2026: Frühlingsvorlesung",
+            "semester": "FS2026",
+            "item_type": "crs",
+            "color": "#7C3AED",
+            "status": "imported_with_lectures",
+            "status_message": "10 Termine",
+            "needs_manual_schedule": False,
+            "ignored_missing_schedule": False,
+            "imported_event_count": 10,
+            "imported_lecture_count": 10,
+            "imported_deadline_count": 0,
+            "custom_rule_count": 0,
+            "last_imported_at": "2026-03-15T10:00:00+00:00",  # Months old
+        },
+        "grp-1": {
+            "course_ref_id": "grp-1",
+            "course_title": "Übungsgruppe 3",
+            "semester": None,
+            "item_type": "grp",
+            "color": "#D97706",
+            "status": "valid_empty",
+            "status_message": "Keine Termine",
+            "needs_manual_schedule": True,
+            "ignored_missing_schedule": False,
+            "imported_event_count": 0,
+            "imported_lecture_count": 0,
+            "imported_deadline_count": 0,
+            "custom_rule_count": 0,
+            "last_imported_at": "2026-02-01T10:00:00+00:00",
+        },
+    }
+    test_service._save_tenant_state("test-cal-tiered-1", state)
+
+    # 1. GET /api/calendar without semester returns ALL courses sorted newest semester to oldest
+    res = client.get("/api/calendar", headers=headers)
+    assert res.status_code == 200
+    cal = res.json()
+    returned_ids = [c["course_ref_id"] for c in cal["courses"]]
+    assert returned_ids == ["curr-hs2026", "mid-fs2026", "old-hs2025", "grp-1"]
+
+    # 2. Verify tiered cache freshness:
+    # Past semester (HS2025, FS2026) and undated group (grp-1) are fresh indefinitely despite months-old timestamps
+    assert (
+        test_service._is_course_cache_fresh(
+            state["courses"]["old-hs2025"], "HS2025", "HS2026"
+        )
+        is True
+    )
+    assert (
+        test_service._is_course_cache_fresh(
+            state["courses"]["mid-fs2026"], "FS2026", "HS2026"
+        )
+        is True
+    )
+    assert (
+        test_service._is_course_cache_fresh(state["courses"]["grp-1"], None, "HS2026")
+        is True
+    )
+    # Current semester (HS2026) with old timestamp is expired (> 6h)
+    assert (
+        test_service._is_course_cache_fresh(
+            state["courses"]["curr-hs2026"], "HS2026", "HS2026"
+        )
+        is False
+    )
+
+    # 3. Ignore missing schedule on old-hs2025 and verify needs_manual_schedule becomes False
+    ign_res = client.put(
+        "/api/calendar/courses/old-hs2025/ignore-schedule",
+        json={"ignored": True},
+        headers=headers,
+    )
+    assert ign_res.status_code == 200
+    ign_courses = {c["course_ref_id"]: c for c in ign_res.json()["courses"]}
+    assert ign_courses["old-hs2025"]["ignored_missing_schedule"] is True
+    assert ign_courses["old-hs2025"]["needs_manual_schedule"] is False
+
+    # Unignore and verify needs_manual_schedule is restored
+    unign_res = client.put(
+        "/api/calendar/courses/old-hs2025/ignore-schedule",
+        json={"ignored": False},
+        headers=headers,
+    )
+    assert unign_res.status_code == 200
+    unign_courses = {c["course_ref_id"]: c for c in unign_res.json()["courses"]}
+    assert unign_courses["old-hs2025"]["ignored_missing_schedule"] is False
+    assert unign_courses["old-hs2025"]["needs_manual_schedule"] is True
+
+
 from tests.test_localisation_browser import local_site, ROOT
 
 
@@ -347,8 +488,9 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
     playwright = pytest.importorskip("playwright.sync_api")
     tr = json.loads((ROOT / "locales" / f"{language}.json").read_text(encoding="utf8")).__getitem__
 
+    now_iso = datetime.now(timezone.utc).isoformat()
     cal_response = {
-        "semester": "HS2026",
+        "semester": "ALL",
         "semester_start_date": "2026-09-14",
         "semester_end_date": "2026-12-18",
         "semester_mid_date": "2026-10-30",
@@ -358,27 +500,65 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
                 "course_ref_id": "3715339",
                 "course_title": "Personal und Organisation",
                 "semester": "HS2026",
+                "item_type": "crs",
                 "color": "#0AACA5",
                 "status": "imported_with_lectures",
                 "status_message": "7 Vorlesungstermine aus ILIAS importiert.",
                 "needs_manual_schedule": False,
+                "ignored_missing_schedule": False,
                 "imported_event_count": 7,
                 "imported_lecture_count": 7,
                 "imported_deadline_count": 0,
                 "custom_rule_count": 0,
+                "last_imported_at": now_iso,
             },
             {
                 "course_ref_id": "3695519",
                 "course_title": "Computergrafik",
                 "semester": "HS2026",
+                "item_type": "crs",
                 "color": "#2563EB",
                 "status": "imported_deadlines_only",
                 "status_message": "Nur Abgabefristen in ILIAS.",
                 "needs_manual_schedule": True,
+                "ignored_missing_schedule": False,
                 "imported_event_count": 5,
                 "imported_lecture_count": 0,
                 "imported_deadline_count": 5,
                 "custom_rule_count": 0,
+                "last_imported_at": now_iso,
+            },
+            {
+                "course_ref_id": "3100001",
+                "course_title": "HS2025: Alte Vorlesung",
+                "semester": "HS2025",
+                "item_type": "crs",
+                "color": "#7C3AED",
+                "status": "valid_empty",
+                "status_message": "Keine Termine in ILIAS.",
+                "needs_manual_schedule": True,
+                "ignored_missing_schedule": False,
+                "imported_event_count": 0,
+                "imported_lecture_count": 0,
+                "imported_deadline_count": 0,
+                "custom_rule_count": 0,
+                "last_imported_at": "2025-11-15T10:00:00Z",
+            },
+            {
+                "course_ref_id": "3200002",
+                "course_title": "Lerngruppe Informatik",
+                "semester": None,
+                "item_type": "grp",
+                "color": "#D97706",
+                "status": "valid_empty",
+                "status_message": "Keine Termine in ILIAS.",
+                "needs_manual_schedule": True,
+                "ignored_missing_schedule": False,
+                "imported_event_count": 0,
+                "imported_lecture_count": 0,
+                "imported_deadline_count": 0,
+                "custom_rule_count": 0,
+                "last_imported_at": "2026-03-01T10:00:00Z",
             },
         ],
         "rules": [],
@@ -403,7 +583,7 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
         ],
         "subscription_token": "tok123",
         "subscription_url": "http://localhost:8000/api/calendar/feed/tok123.ics",
-        "fetched_at": "2026-10-21T10:00:00Z",
+        "fetched_at": now_iso,
     }
 
     def respond(route):
@@ -420,6 +600,19 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
                     dict(ref_id="3695519", title="Computergrafik", url="", item_type="crs", semester="HS2026"),
                 ],
             )
+        elif path.endswith("/memberships"):
+            body = [
+                dict(ref_id="3715339", title="Personal und Organisation", url="", item_type="crs", semester="HS2026"),
+                dict(ref_id="3695519", title="Computergrafik", url="", item_type="crs", semester="HS2026"),
+                dict(ref_id="3100001", title="HS2025: Alte Vorlesung", url="", item_type="crs", semester="HS2025"),
+                dict(ref_id="3200002", title="Lerngruppe Informatik", url="", item_type="grp", semester=None),
+            ]
+        elif "/ignore-schedule" in path:
+            for c in cal_response["courses"]:
+                if c["course_ref_id"] in path:
+                    c["ignored_missing_schedule"] = True
+                    c["needs_manual_schedule"] = False
+            body = cal_response
         elif "/api/calendar" in path:
             body = cal_response
         else:
@@ -446,6 +639,29 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
         for vkey in ["calendar.view.week", "calendar.view.month", "calendar.view.agenda", "calendar.view.timetable"]:
             page.get_by_role("tab", name=tr(vkey), exact=True).click()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+        # Filter Courses & ILIAS Calendar Status panel by Category (Groups) and Semester
+        cat_select = page.get_by_role("combobox", name=tr("calendar.filter.category_label"), exact=True)
+        cat_select.select_option("groups")
+        playwright.expect(page.get_by_role("button", name="Lerngruppe Informatik", exact=True)).to_be_visible()
+        cat_select.select_option("all")
+
+        sem_select = page.get_by_role("combobox", name=tr("calendar.filter.semester_label"), exact=True)
+        sem_select.select_option("HS2025")
+        playwright.expect(page.get_by_role("button", name="Alte Vorlesung", exact=True)).to_be_visible()
+
+        # Ignore missing schedule warning on past course HS2025: Alte Vorlesung
+        page.get_by_role("button", name=tr("calendar.ignore_missing_schedule"), exact=True).first.click()
+        playwright.expect(page.get_by_text(tr("calendar.status.badge_ignored"), exact=True)).to_be_visible()
+        sem_select.select_option("ALL")
+
+        # Open Manual Recheck Modal and verify checkbox list + layout
+        page.get_by_role("button", name=tr("calendar.recheck.button"), exact=True).click()
+        recheck_dialog = page.get_by_role("dialog", name=tr("calendar.recheck.modal_title"), exact=True)
+        playwright.expect(recheck_dialog).to_be_visible()
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        recheck_dialog.get_by_role("button", name=tr("calendar.recheck.select_all"), exact=True).click()
+        recheck_dialog.get_by_role("button", name=tr("Abbrechen"), exact=True).click()
 
         # Open Schedule Rule modal, fill draft, resize viewport, verify draft persists
         page.get_by_role("button", name=tr("calendar.add_schedule")).first.click()

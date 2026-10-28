@@ -1034,10 +1034,35 @@ export const cache = {
     } catch {}
   },
 
-  getHiddenCalendarCourses(semester: string): string[] {
+  getHiddenCalendarCourses(semester: string = 'ALL'): string[] {
     try {
       const scope = this.getSessionId() || 'default';
       const raw = localStorage.getItem(`betterilias_cal_hidden_${scope}_${semester}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      // Fallback to global ALL key
+      const globalRaw = localStorage.getItem(`betterilias_cal_hidden_${scope}_ALL`);
+      const globalParsed = globalRaw ? JSON.parse(globalRaw) : [];
+      return Array.isArray(globalParsed) ? globalParsed : [];
+    } catch {
+      return [];
+    }
+  },
+
+  setHiddenCalendarCourses(semester: string = 'ALL', courseRefIds: string[]) {
+    try {
+      const scope = this.getSessionId() || 'default';
+      localStorage.setItem(`betterilias_cal_hidden_${scope}_${semester}`, JSON.stringify(courseRefIds));
+      localStorage.setItem(`betterilias_cal_hidden_${scope}_ALL`, JSON.stringify(courseRefIds));
+    } catch {}
+  },
+
+  getIgnoredCalendarCourses(): string[] {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const raw = localStorage.getItem(`betterilias_cal_ignored_${scope}`);
       const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed : [];
     } catch {
@@ -1045,10 +1070,10 @@ export const cache = {
     }
   },
 
-  setHiddenCalendarCourses(semester: string, courseRefIds: string[]) {
+  setIgnoredCalendarCourses(courseRefIds: string[]) {
     try {
       const scope = this.getSessionId() || 'default';
-      localStorage.setItem(`betterilias_cal_hidden_${scope}_${semester}`, JSON.stringify(courseRefIds));
+      localStorage.setItem(`betterilias_cal_ignored_${scope}`, JSON.stringify(courseRefIds));
     } catch {}
   },
 
@@ -1079,21 +1104,58 @@ export const cache = {
     } catch {}
   },
 
-  getCachedCalendar(semester: string): SemesterCalendarResponse | null {
+  getCachedCalendar(semester: string = 'ALL'): SemesterCalendarResponse | null {
     try {
       const scope = this.getSessionId() || 'default';
-      const raw = localStorage.getItem(`betterilias_cal_cache_${scope}_${semester}`);
+      const raw =
+        localStorage.getItem(`betterilias_cal_cache_${scope}_${semester}`) ||
+        localStorage.getItem(`betterilias_cal_cache_${scope}_ALL`);
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
   },
 
-  setCachedCalendar(semester: string, data: SemesterCalendarResponse) {
+  setCachedCalendar(semester: string = 'ALL', data: SemesterCalendarResponse) {
     try {
       const scope = this.getSessionId() || 'default';
       const key = `betterilias_cal_cache_${scope}_${semester}`;
-      localStorage.setItem(key, JSON.stringify(data));
+      const globalKey = `betterilias_cal_cache_${scope}_ALL`;
+      const serialized = JSON.stringify(data);
+      localStorage.setItem(key, serialized);
+      localStorage.setItem(globalKey, serialized);
+      this.setCacheTimestamp(key);
+      this.setCacheTimestamp(globalKey);
+    } catch {}
+  },
+
+  getCalendarCacheTimestamp(semester: string = 'ALL'): number | null {
+    const scope = this.getSessionId() || 'default';
+    return (
+      this.getCacheTimestamp(`betterilias_cal_cache_${scope}_${semester}`) ||
+      this.getCacheTimestamp(`betterilias_cal_cache_${scope}_ALL`)
+    );
+  },
+
+  getCachedAllMemberships(): { courses: any[]; fetchedAt: number } | null {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const key = `betterilias_cal_memberships_${scope}`;
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const courses = JSON.parse(raw);
+      const ts = this.getCacheTimestamp(key) || Date.now();
+      return Array.isArray(courses) ? { courses, fetchedAt: ts } : null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedAllMemberships(courses: any[]) {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const key = `betterilias_cal_memberships_${scope}`;
+      localStorage.setItem(key, JSON.stringify(courses));
       this.setCacheTimestamp(key);
     } catch {}
   },

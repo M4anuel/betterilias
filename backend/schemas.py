@@ -689,10 +689,12 @@ class CourseCalendarInfo(BaseModel):
     course_ref_id: str
     course_title: str
     semester: Optional[str] = None
+    item_type: str = "crs"
     color: str
     status: CourseCalendarFeedStatus = "not_imported"
     status_message: str = ""
     needs_manual_schedule: bool = True
+    ignored_missing_schedule: bool = False
     has_calendar_block: bool = False
     ical_modal_url: Optional[str] = None
     ical_feed_url: Optional[str] = None
@@ -721,7 +723,7 @@ class SemesterCalendarResponse(BaseModel):
 
 
 class CalendarCourseImportRequest(BaseModel):
-    semester: str
+    semester: Optional[str] = None
     courses: List[CourseItem] = Field(default_factory=list)
     force_refresh: bool = False
 
@@ -729,6 +731,10 @@ class CalendarCourseImportRequest(BaseModel):
 class CourseColorUpdateRequest(BaseModel):
     course_ref_id: Optional[str] = None
     color: str
+
+
+class CourseIgnoreScheduleUpdateRequest(BaseModel):
+    ignored: bool
 
 
 class CalendarIcsImportRequest(BaseModel):

@@ -32,8 +32,11 @@ from backend.scrapers.calendar import (
     strip_course_code_prefix,
 )
 from backend.services.ilias_client import IliasClient, SessionExpiredError
+from backend.services.semester_utils import get_current_semester, semester_order_key
 
 logger = logging.getLogger("ilias.calendar")
+
+CURRENT_SEMESTER_TTL_SECONDS = 6 * 3600  # 6 hours for current semester courses
 
 COURSE_COLOR_PALETTE = [
     "#0AACA5",  # BetterIlias Teal
@@ -111,6 +114,7 @@ class CalendarService:
             "imported_events": {},
             "rules": [],
             "colors": {},
+            "ignored_missing_schedule": {},
             "subscription_token": None,
             "subscription_semester": None,
             "subscription_created_at": None,
@@ -151,15 +155,19 @@ class CalendarService:
     def build_semester_response(
         self,
         tenant_key: str,
-        semester: str,
+        semester: Optional[str] = None,
         base_url: str = "http://localhost:8000",
         seed_courses: Optional[List[CourseItem]] = None,
     ) -> SemesterCalendarResponse:
         state = self._load_tenant_state(tenant_key)
         courses_dict: Dict[str, Any] = state.get("courses", {})
         colors_dict: Dict[str, str] = state.get("colors", {})
+        ignored_dict: Dict[str, bool] = state.get("ignored_missing_schedule", {})
         imported_map: Dict[str, List[Dict[str, Any]]] = state.get("imported_events", {})
         raw_rules: List[Dict[str, Any]] = state.get("rules", [])
+
+        effective_sem = semester if (semester and semester.upper() != "ALL") else get_current_semester()
+        filter_by_semester = bool(semester and semester.upper() != "ALL")
 
         # Ensure any seed_courses passed from the UI are registered in courses_dict
         if seed_courses:
@@ -173,38 +181,47 @@ class CalendarService:
                     info = CourseCalendarInfo(
                         course_ref_id=sc.ref_id,
                         course_title=sc.title,
-                        semester=sc.semester or semester,
+                        semester=sc.semester or (effective_sem if filter_by_semester else None),
+                        item_type=sc.item_type or "crs",
                         color=c_color,
                         status="not_imported",
                         needs_manual_schedule=True,
+                        ignored_missing_schedule=bool(ignored_dict.get(sc.ref_id, False)),
                     )
                     courses_dict[sc.ref_id] = info.model_dump(mode="json")
                     changed = True
                 else:
                     existing_c = courses_dict[sc.ref_id]
-                    if not existing_c.get("semester"):
-                        existing_c["semester"] = sc.semester or semester
+                    if sc.semester and not existing_c.get("semester"):
+                        existing_c["semester"] = sc.semester
+                        changed = True
+                    if sc.item_type and existing_c.get("item_type") != sc.item_type:
+                        existing_c["item_type"] = sc.item_type
                         changed = True
             if changed:
                 state["courses"] = courses_dict
                 state["colors"] = colors_dict
                 self._save_tenant_state(tenant_key, state)
 
-        start_d, mid_d, end_d = get_semester_date_bounds(semester)
+        start_d, mid_d, end_d = get_semester_date_bounds(effective_sem)
 
-        # Filter rules for this semester (or matching courses in this semester)
         all_rules = [CourseScheduleRule(**r) for r in raw_rules]
-        semester_course_ids = {
-            cid for cid, cdata in courses_dict.items()
-            if (cdata.get("semester") or semester).upper() == semester.upper()
-        }
-        if seed_courses:
-            semester_course_ids.update(sc.ref_id for sc in seed_courses)
-
-        semester_rules = [
-            r for r in all_rules
-            if r.semester.upper() == semester.upper() or r.course_ref_id in semester_course_ids
-        ]
+        if filter_by_semester:
+            semester_course_ids = {
+                cid for cid, cdata in courses_dict.items()
+                if (cdata.get("semester") or effective_sem).upper() == effective_sem.upper()
+            }
+            if seed_courses:
+                semester_course_ids.update(sc.ref_id for sc in seed_courses)
+            semester_rules = [
+                r for r in all_rules
+                if r.semester.upper() == effective_sem.upper() or r.course_ref_id in semester_course_ids
+            ]
+        else:
+            semester_course_ids = set(courses_dict.keys())
+            if seed_courses:
+                semester_course_ids.update(sc.ref_id for sc in seed_courses)
+            semester_rules = all_rules
 
         rule_counts_by_course: Dict[str, int] = {}
         for r in semester_rules:
@@ -216,12 +233,15 @@ class CalendarService:
         all_imported_events: List[CalendarEvent] = []
 
         for idx, (cid, cdata) in enumerate(courses_dict.items()):
-            c_sem = (cdata.get("semester") or semester).upper()
-            if semester_course_ids and cid not in semester_course_ids and c_sem != semester.upper():
+            c_sem = (cdata.get("semester") or "").upper()
+            if filter_by_semester and semester_course_ids and cid not in semester_course_ids and c_sem != effective_sem.upper():
                 continue
 
             info = CourseCalendarInfo(**cdata)
             info.color = colors_dict.get(cid) or info.color or _default_color_for_course(cid, idx)
+            info.item_type = cdata.get("item_type") or info.item_type or "crs"
+            is_ignored = bool(ignored_dict.get(cid, cdata.get("ignored_missing_schedule", False)))
+            info.ignored_missing_schedule = is_ignored
             course_titles[cid] = info.course_title
 
             raw_evs = imported_map.get(cid, [])
@@ -236,7 +256,7 @@ class CalendarService:
             info.imported_lecture_count = lecture_cnt
             info.imported_deadline_count = deadline_cnt
             info.custom_rule_count = custom_cnt
-            info.needs_manual_schedule = (lecture_cnt == 0 and custom_cnt == 0)
+            info.needs_manual_schedule = (lecture_cnt == 0 and custom_cnt == 0 and not is_ignored)
             info.status_message = _status_message_for_course(info)
             course_infos.append(info)
 
@@ -248,18 +268,31 @@ class CalendarService:
                 course_titles[r.course_ref_id] = c_title
                 c_color = colors_dict.get(r.course_ref_id) or _default_color_for_course(r.course_ref_id, len(course_infos))
                 custom_cnt = rule_counts_by_course.get(r.course_ref_id, 0)
+                is_ignored = bool(ignored_dict.get(r.course_ref_id, False))
                 info = CourseCalendarInfo(
                     course_ref_id=r.course_ref_id,
                     course_title=c_title,
-                    semester=semester,
+                    semester=r.semester or effective_sem,
+                    item_type="crs",
                     color=c_color,
                     status="not_imported",
                     custom_rule_count=custom_cnt,
-                    needs_manual_schedule=(custom_cnt == 0),
+                    ignored_missing_schedule=is_ignored,
+                    needs_manual_schedule=(custom_cnt == 0 and not is_ignored),
                 )
                 info.status_message = _status_message_for_course(info)
                 course_infos.append(info)
                 known_cids.add(r.course_ref_id)
+
+        # Sort courses newest semester first, then undated/groups, then alphabetically
+        course_infos.sort(
+            key=lambda ci: (
+                0 if ci.semester else 1,
+                -semester_order_key(ci.semester or ""),
+                ci.course_title.lower(),
+                ci.course_ref_id,
+            )
+        )
 
         combined_events = combine_calendar_events(
             imported_events=all_imported_events,
@@ -268,10 +301,10 @@ class CalendarService:
         )
 
         token = state.get("subscription_token")
-        sub_url, webcal_url, is_local = self._build_subscription_urls(token, base_url, semester)
+        sub_url, webcal_url, is_local = self._build_subscription_urls(token, base_url, effective_sem)
 
         return SemesterCalendarResponse(
-            semester=semester,
+            semester=effective_sem,
             semester_start_date=start_d.isoformat(),
             semester_end_date=end_d.isoformat(),
             semester_mid_date=mid_d.isoformat(),
@@ -456,11 +489,39 @@ class CalendarService:
         info.status_message = _status_message_for_course(info)
         return info, deduped_events
 
+    def _is_course_cache_fresh(
+        self,
+        existing_info: Optional[Dict[str, Any]],
+        course_semester: Optional[str],
+        current_semester: str,
+    ) -> bool:
+        if not existing_info:
+            return False
+        status = existing_info.get("status")
+        if status not in ("imported_with_lectures", "imported_deadlines_only", "valid_empty"):
+            return False
+        last_imp_raw = existing_info.get("last_imported_at")
+        if not last_imp_raw:
+            return False
+        c_sem = (course_semester or existing_info.get("semester") or "").upper()
+        # Past semesters (or undated groups once checked) never expire automatically
+        if c_sem != current_semester.upper():
+            return True
+        # Current semester courses expire after CURRENT_SEMESTER_TTL_SECONDS
+        try:
+            last_dt = datetime.fromisoformat(str(last_imp_raw).replace("Z", "+00:00"))
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=timezone.utc)
+            age_sec = (datetime.now(timezone.utc) - last_dt).total_seconds()
+            return age_sec < CURRENT_SEMESTER_TTL_SECONDS
+        except Exception:
+            return True
+
     async def sync_semester_calendar(
         self,
         tenant_key: str,
         client: IliasClient,
-        semester: str,
+        semester: Optional[str] = None,
         courses: Optional[List[CourseItem]] = None,
         force_refresh: bool = False,
         base_url: str = "http://localhost:8000",
@@ -468,36 +529,59 @@ class CalendarService:
         state = self._load_tenant_state(tenant_key)
         courses_dict: Dict[str, Any] = state.get("courses", {})
         colors_dict: Dict[str, str] = state.get("colors", {})
+        ignored_dict: Dict[str, bool] = state.get("ignored_missing_schedule", {})
         imported_map: Dict[str, List[Dict[str, Any]]] = state.get("imported_events", {})
 
+        current_sem = get_current_semester()
         target_courses = list(courses or [])
         if not target_courses and client.session_manager.has_cookies():
             try:
-                sem_resp = await client.get_semester_courses(semester=semester)
-                target_courses = sem_resp.courses
+                if semester and semester.upper() != "ALL":
+                    sem_resp = await client.get_semester_courses(semester=semester)
+                    target_courses = sem_resp.courses
+                else:
+                    dash_resp = await client.get_my_courses()
+                    target_courses = dash_resp.courses
             except Exception as e:
-                logger.warning(f"Could not fetch semester courses for {semester}: {e}")
+                logger.warning(f"Could not fetch courses for calendar sync ({semester}): {e}")
+
+        # Sort target_courses newest semester first, then undated groups
+        target_courses.sort(
+            key=lambda c: (
+                0 if c.semester else 1,
+                -semester_order_key(c.semester or ""),
+                c.title.lower(),
+                c.ref_id,
+            )
+        )
 
         for idx, course in enumerate(target_courses):
             cid = course.ref_id
             existing_info = courses_dict.get(cid)
             c_color = colors_dict.get(cid) or (existing_info.get("color") if existing_info else None) or _default_color_for_course(cid, idx)
             colors_dict[cid] = c_color
+            c_sem = course.semester or (existing_info.get("semester") if existing_info else None) or (
+                semester if (semester and semester.upper() != "ALL") else None
+            )
 
-            if (
-                not force_refresh
-                and existing_info
-                and existing_info.get("status") in ("imported_with_lectures", "imported_deadlines_only", "valid_empty")
-            ):
+            if not force_refresh and self._is_course_cache_fresh(existing_info, c_sem, current_sem):
+                if existing_info:
+                    if c_sem and not existing_info.get("semester"):
+                        existing_info["semester"] = c_sem
+                    if course.item_type and existing_info.get("item_type") != course.item_type:
+                        existing_info["item_type"] = course.item_type
                 continue
 
             info, evs = await self._import_single_course(client, course)
             info.color = c_color
-            info.semester = course.semester or semester
+            info.semester = c_sem
+            info.item_type = course.item_type or (existing_info.get("item_type") if existing_info else "crs") or "crs"
+            info.ignored_missing_schedule = bool(ignored_dict.get(cid, existing_info.get("ignored_missing_schedule", False) if existing_info else False))
 
             # If re-import failed or session expired, keep any previously imported events so data isn't lost
             if info.status in ("failed", "session_expired") and cid in imported_map and imported_map[cid]:
-                pass
+                if existing_info and existing_info.get("last_imported_at"):
+                    info.last_imported_at = existing_info.get("last_imported_at")
             else:
                 imported_map[cid] = [e.model_dump(mode="json") for e in evs]
 
@@ -564,7 +648,7 @@ class CalendarService:
             state["colors"] = colors_dict
 
         self._save_tenant_state(tenant_key, state)
-        return self.build_semester_response(tenant_key, rule_in.semester, base_url=base_url)
+        return self.build_semester_response(tenant_key, None, base_url=base_url)
 
     def update_rule(
         self,
@@ -597,7 +681,7 @@ class CalendarService:
 
         state["rules"] = rules
         self._save_tenant_state(tenant_key, state)
-        return self.build_semester_response(tenant_key, rule_in.semester, base_url=base_url)
+        return self.build_semester_response(tenant_key, None, base_url=base_url)
 
     def duplicate_rule(
         self,
@@ -623,14 +707,13 @@ class CalendarService:
         rules.append(target)
         state["rules"] = rules
         self._save_tenant_state(tenant_key, state)
-        sem = semester or target.get("semester") or "HS2026"
-        return self.build_semester_response(tenant_key, sem, base_url=base_url)
+        return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
     def delete_rule(
         self,
         tenant_key: str,
         rule_id: str,
-        semester: str,
+        semester: Optional[str] = None,
         base_url: str = "http://localhost:8000",
     ) -> SemesterCalendarResponse:
         state = self._load_tenant_state(tenant_key)
@@ -647,7 +730,7 @@ class CalendarService:
         tenant_key: str,
         course_ref_id: str,
         color: str,
-        semester: str,
+        semester: Optional[str] = None,
         base_url: str = "http://localhost:8000",
     ) -> SemesterCalendarResponse:
         if not re.match(r"^#[0-9a-fA-F]{6}$", (color or "").strip()):
@@ -663,23 +746,47 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
+    def update_course_ignored_missing_schedule(
+        self,
+        tenant_key: str,
+        course_ref_id: str,
+        ignored: bool,
+        semester: Optional[str] = None,
+        base_url: str = "http://localhost:8000",
+    ) -> SemesterCalendarResponse:
+        state = self._load_tenant_state(tenant_key)
+        ignored_map = state.get("ignored_missing_schedule", {})
+        if ignored:
+            ignored_map[course_ref_id] = True
+        else:
+            ignored_map.pop(course_ref_id, None)
+        courses = state.get("courses", {})
+        if course_ref_id in courses:
+            courses[course_ref_id]["ignored_missing_schedule"] = bool(ignored)
+        state["ignored_missing_schedule"] = ignored_map
+        state["courses"] = courses
+        self._save_tenant_state(tenant_key, state)
+        return self.build_semester_response(tenant_key, semester, base_url=base_url)
+
     def import_raw_ics_for_course(
         self,
         tenant_key: str,
         course_ref_id: str,
         ics_content: str,
         course_title: Optional[str] = None,
-        semester: str = "HS2026",
+        semester: Optional[str] = None,
         base_url: str = "http://localhost:8000",
     ) -> SemesterCalendarResponse:
         state = self._load_tenant_state(tenant_key)
         courses_dict = state.get("courses", {})
         colors_dict = state.get("colors", {})
+        ignored_dict = state.get("ignored_missing_schedule", {})
         imported_map = state.get("imported_events", {})
 
         existing_c = courses_dict.get(course_ref_id, {})
         c_title = course_title or existing_c.get("course_title") or f"Course {course_ref_id}"
         c_color = colors_dict.get(course_ref_id) or existing_c.get("color") or _default_color_for_course(course_ref_id, len(courses_dict))
+        c_sem = semester or existing_c.get("semester")
         colors_dict[course_ref_id] = c_color
 
         parsed_events = parse_ics_feed(ics_content, course_ref_id, c_title)
@@ -693,14 +800,17 @@ class CalendarService:
             if lecture_cnt > 0
             else ("imported_deadlines_only" if deadline_cnt > 0 else "valid_empty")
         )
+        is_ignored = bool(ignored_dict.get(course_ref_id, existing_c.get("ignored_missing_schedule", False)))
 
         info = CourseCalendarInfo(
             course_ref_id=course_ref_id,
             course_title=c_title,
-            semester=semester,
+            semester=c_sem,
+            item_type=existing_c.get("item_type") or "crs",
             color=c_color,
             status=status,
-            needs_manual_schedule=(lecture_cnt == 0),
+            ignored_missing_schedule=is_ignored,
+            needs_manual_schedule=(lecture_cnt == 0 and not is_ignored),
             has_calendar_block=True,
             imported_event_count=len(deduped),
             imported_lecture_count=lecture_cnt,
@@ -714,12 +824,12 @@ class CalendarService:
         state["colors"] = colors_dict
         state["imported_events"] = imported_map
         self._save_tenant_state(tenant_key, state)
-        return self.build_semester_response(tenant_key, semester, base_url=base_url)
+        return self.build_semester_response(tenant_key, None, base_url=base_url)
 
     def export_semester_ics(
         self,
         tenant_key: str,
-        semester: str,
+        semester: Optional[str] = None,
         course_ids: Optional[List[str]] = None,
     ) -> str:
         cal_resp = self.build_semester_response(tenant_key, semester)
@@ -727,16 +837,17 @@ class CalendarService:
         if course_ids:
             allowed = set(course_ids)
             events = [e for e in events if e.course_ref_id in allowed]
-        return generate_ics_feed(events=events, semester=semester)
+        return generate_ics_feed(events=events, semester=semester or get_current_semester())
 
     def rotate_subscription_token(
         self,
         tenant_key: str,
-        semester: str,
+        semester: Optional[str] = None,
         base_url: str = "http://localhost:8000",
     ) -> CalendarSubscriptionResponse:
         state = self._load_tenant_state(tenant_key)
         tokens = self._load_tokens()
+        effective_sem = semester or "ALL"
 
         old_token = state.get("subscription_token")
         if old_token and old_token in tokens:
@@ -746,19 +857,19 @@ class CalendarService:
         now = datetime.now(timezone.utc)
         tokens[new_token] = {
             "tenant_key": tenant_key,
-            "semester": semester,
+            "semester": effective_sem,
             "created_at": now.isoformat(),
         }
         self._save_tokens(tokens)
 
         state["subscription_token"] = new_token
-        state["subscription_semester"] = semester
+        state["subscription_semester"] = effective_sem
         state["subscription_created_at"] = now.isoformat()
         self._save_tenant_state(tenant_key, state)
 
-        sub_url, webcal_url, is_local = self._build_subscription_urls(new_token, base_url, semester)
+        sub_url, webcal_url, is_local = self._build_subscription_urls(new_token, base_url, effective_sem)
         clean_base = base_url.rstrip("/")
-        dl_url = f"{clean_base}/api/calendar/export.ics?semester={semester}"
+        dl_url = f"{clean_base}/api/calendar/export.ics"
 
         return CalendarSubscriptionResponse(
             token=new_token,
@@ -786,9 +897,11 @@ class CalendarService:
         if not meta:
             return None
         tenant_key = meta.get("tenant_key") or "default"
-        semester = semester_override or meta.get("semester") or "HS2026"
+        stored_sem = meta.get("semester")
+        semester = semester_override or (None if stored_sem == "ALL" else stored_sem)
         ics_text = self.export_semester_ics(tenant_key=tenant_key, semester=semester)
-        return semester, ics_text
+        return (semester or get_current_semester()), ics_text
 
 
 calendar_service = CalendarService()
+

@@ -7,6 +7,7 @@ from backend.schemas import (
     CalendarIcsImportRequest,
     CalendarSubscriptionResponse,
     CourseColorUpdateRequest,
+    CourseIgnoreScheduleUpdateRequest,
     CourseScheduleRuleInput,
     SemesterCalendarResponse,
 )
@@ -31,15 +32,14 @@ def _resolve_base_url(request: Request) -> str:
 @router.get("", response_model=SemesterCalendarResponse)
 async def get_semester_calendar(
     request: Request,
-    semester: Optional[str] = Query(None, description="Semester code, e.g. HS2026"),
+    semester: Optional[str] = Query(None, description="Optional semester filter, e.g. HS2026 or ALL"),
     client: IliasClient = Depends(get_ilias_client),
 ):
-    target_sem = semester or get_current_semester()
     tenant_key = _resolve_tenant_key(request, client)
     base_url = _resolve_base_url(request)
     return calendar_service.build_semester_response(
         tenant_key=tenant_key,
-        semester=target_sem,
+        semester=semester,
         base_url=base_url,
     )
 
@@ -55,7 +55,7 @@ async def sync_semester_calendar(
     return await calendar_service.sync_semester_calendar(
         tenant_key=tenant_key,
         client=client,
-        semester=payload.semester or get_current_semester(),
+        semester=payload.semester,
         courses=payload.courses,
         force_refresh=payload.force_refresh,
         base_url=base_url,
@@ -135,7 +135,7 @@ async def delete_schedule_rule(
         return calendar_service.delete_rule(
             tenant_key=tenant_key,
             rule_id=rule_id,
-            semester=semester or get_current_semester(),
+            semester=semester,
             base_url=base_url,
         )
     except KeyError:
@@ -157,11 +157,30 @@ async def update_course_color(
             tenant_key=tenant_key,
             course_ref_id=course_ref_id,
             color=payload.color,
-            semester=semester or get_current_semester(),
+            semester=semester,
             base_url=base_url,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/courses/{course_ref_id}/ignore-schedule", response_model=SemesterCalendarResponse)
+async def update_course_ignore_schedule(
+    course_ref_id: str,
+    payload: CourseIgnoreScheduleUpdateRequest,
+    request: Request,
+    semester: Optional[str] = Query(None),
+    client: IliasClient = Depends(get_ilias_client),
+):
+    tenant_key = _resolve_tenant_key(request, client)
+    base_url = _resolve_base_url(request)
+    return calendar_service.update_course_ignored_missing_schedule(
+        tenant_key=tenant_key,
+        course_ref_id=course_ref_id,
+        ignored=payload.ignored,
+        semester=semester,
+        base_url=base_url,
+    )
 
 
 @router.post("/import-ics", response_model=SemesterCalendarResponse)
@@ -177,7 +196,7 @@ async def import_course_ics(
         course_ref_id=payload.course_ref_id,
         ics_content=(payload.ics_content or payload.ics_text or ''),
         course_title=payload.course_title,
-        semester=payload.semester or get_current_semester(),
+        semester=payload.semester,
         base_url=base_url,
     )
 
@@ -189,15 +208,15 @@ async def export_semester_ics(
     course_ids: Optional[str] = Query(None, description="Comma-separated course ref_ids"),
     client: IliasClient = Depends(get_ilias_client),
 ):
-    target_sem = semester or get_current_semester()
     tenant_key = _resolve_tenant_key(request, client)
     cid_list = [c.strip() for c in course_ids.split(",") if c.strip()] if course_ids else None
     ics_text = calendar_service.export_semester_ics(
         tenant_key=tenant_key,
-        semester=target_sem,
+        semester=semester,
         course_ids=cid_list,
     )
-    filename = f"betterilias-{target_sem}.ics"
+    file_sem = semester or get_current_semester()
+    filename = f"betterilias-{file_sem}.ics"
     return Response(
         content=ics_text,
         media_type="text/calendar; charset=utf-8",
@@ -214,12 +233,11 @@ async def rotate_subscription(
     semester: Optional[str] = Query(None),
     client: IliasClient = Depends(get_ilias_client),
 ):
-    target_sem = semester or get_current_semester()
     tenant_key = _resolve_tenant_key(request, client)
     base_url = _resolve_base_url(request)
     return calendar_service.rotate_subscription_token(
         tenant_key=tenant_key,
-        semester=target_sem,
+        semester=semester,
         base_url=base_url,
     )
 

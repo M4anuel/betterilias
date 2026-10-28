@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -24,6 +24,9 @@ import {
   BookOpen,
   FileText,
   Sparkles,
+  Filter,
+  BellOff,
+  Bell,
 } from 'lucide-react';
 import {
   CalendarEvent,
@@ -39,6 +42,7 @@ import {
 import { api } from '../lib/api';
 import { cache } from '../lib/cache';
 import { t, useLanguage } from '../lib/i18n';
+import { getCurrentSemester, getSemesterOrderKey } from '../lib/semesterUtils';
 import { useMobileViewport } from '../lib/useMobileViewport';
 
 interface CalendarViewProps {
@@ -89,6 +93,8 @@ const WEEKDAY_LONG_KEYS = [
   'calendar.weekday.sun',
 ] as const;
 
+const CURRENT_SEMESTER_TTL_MS = 6 * 3600 * 1000; // 6 hours for current-semester courses
+
 function parseYmd(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1, 12, 0, 0);
@@ -118,6 +124,52 @@ function addDays(d: Date, days: number): Date {
 function timeToMinutes(timeStr: string): number {
   const [h, m] = (timeStr || '00:00').split(':').map(Number);
   return (h || 0) * 60 + (m || 0);
+}
+
+function formatTimestampAge(isoOrMs?: string | number | null, lang: string = 'de'): string {
+  if (!isoOrMs) return '—';
+  const tsMs = typeof isoOrMs === 'number' ? isoOrMs : Date.parse(isoOrMs);
+  if (!Number.isFinite(tsMs)) return '—';
+  const diffSec = Math.max(0, Math.round((Date.now() - tsMs) / 1000));
+  try {
+    const rtf = new Intl.RelativeTimeFormat(lang === 'en' ? 'en' : 'de', { numeric: 'auto' });
+    if (diffSec < 60) return rtf.format(0, 'minute');
+    if (diffSec < 3600) return rtf.format(-Math.floor(diffSec / 60), 'minute');
+    if (diffSec < 86400) return rtf.format(-Math.floor(diffSec / 3600), 'hour');
+    if (diffSec < 86400 * 30) return rtf.format(-Math.floor(diffSec / 86400), 'day');
+    return rtf.format(-Math.floor(diffSec / (86400 * 30)), 'month');
+  } catch {
+    return new Date(tsMs).toLocaleDateString();
+  }
+}
+
+function isCourseAutoSyncNeeded(
+  existing: CourseCalendarInfo | undefined,
+  courseSemester: string | null | undefined,
+  currentSem: string
+): boolean {
+  if (!existing) return true;
+  const status = existing.status || existing.feed_status || 'not_imported';
+  if (status === 'not_imported' || status === 'not_checked' || !existing.last_imported_at) {
+    return true;
+  }
+  const checkedTerminal =
+    status === 'imported_with_lectures' ||
+    status === 'imported_deadlines_only' ||
+    status === 'valid_empty';
+
+  const normCourseSem = (courseSemester || existing.semester || '').trim().toUpperCase();
+  const normCurrSem = currentSem.trim().toUpperCase();
+
+  // Past-semester courses and undated groups are cached indefinitely once checked
+  if (normCourseSem !== normCurrSem) {
+    return !checkedTerminal;
+  }
+
+  // Current-semester courses are re-checked if older than CURRENT_SEMESTER_TTL_MS (6h)
+  const tsMs = Date.parse(existing.last_imported_at);
+  if (!Number.isFinite(tsMs)) return true;
+  return Date.now() - tsMs > CURRENT_SEMESTER_TTL_MS;
 }
 
 interface PositionedEvent {
@@ -212,25 +264,51 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 }) => {
   const language = useLanguage();
   const isMobile = useMobileViewport();
+  const currentSemesterId = useMemo(() => getCurrentSemester(), []);
 
   const [viewMode, setViewMode] = useState<CalendarViewMode>(() => cache.getCalendarViewMode());
   const [mobileWeekSubView, setMobileWeekSubView] = useState<'day' | 'grid'>('day');
   const [selectedWeekday, setSelectedWeekday] = useState<number>(() => {
     const jsDay = new Date().getDay();
-    return jsDay === 0 ? 0 : jsDay - 1; // default Mon..Fri or current day
+    return jsDay === 0 ? 0 : jsDay - 1;
   });
 
-  const [calendarData, setCalendarData] = useState<SemesterCalendarResponse | null>(() =>
-    cache.getCachedCalendar(selectedSemester)
+  const [calendarData, setCalendarData] = useState<SemesterCalendarResponse | null>(() => {
+    return cache.getCachedCalendar('ALL') || cache.getCachedCalendar(selectedSemester);
+  });
+  const [cacheTimestamp, setCacheTimestamp] = useState<number | null>(() =>
+    cache.getCalendarCacheTimestamp('ALL')
   );
+  const [allMemberships, setAllMemberships] = useState<CourseItem[]>(
+    () => cache.getCachedAllMemberships()?.courses || []
+  );
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [syncProgress, setSyncProgress] = useState<{
+    current: number;
+    total: number;
+    title: string;
+  } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
 
   const [hiddenCourses, setHiddenCourses] = useState<string[]>(() =>
-    cache.getHiddenCalendarCourses(selectedSemester)
+    cache.getHiddenCalendarCourses('ALL')
   );
+  const [ignoredCoursesLocal, setIgnoredCoursesLocal] = useState<string[]>(() =>
+    cache.getIgnoredCalendarCourses()
+  );
+
+  // Courses & Calendar Status Panel Filters
+  const [panelSemesterFilter, setPanelSemesterFilter] = useState<string>('ALL');
+  const [panelCategoryFilter, setPanelCategoryFilter] = useState<'all' | 'courses' | 'groups'>(
+    'all'
+  );
+
+  // Manual Recheck Modal State
+  const [isRecheckModalOpen, setIsRecheckModalOpen] = useState<boolean>(false);
+  const [selectedRecheckIds, setSelectedRecheckIds] = useState<string[]>([]);
 
   // Reference date for Week / Timetable / Month navigation
   const [referenceDate, setReferenceDate] = useState<Date>(() => new Date());
@@ -256,7 +334,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   // Export & Subscription Modal State
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
-  const [subscriptionInfo, setSubscriptionInfo] = useState<CalendarSubscriptionResponse | null>(null);
+  const [subscriptionInfo, setSubscriptionInfo] = useState<CalendarSubscriptionResponse | null>(
+    null
+  );
   const [copiedUrl, setCopiedUrl] = useState<boolean>(false);
   const [icsImportCourseId, setIcsImportCourseId] = useState<string>('');
   const [icsImportText, setIcsImportText] = useState<string>('');
@@ -265,101 +345,282 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // Selected Event Details Modal
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
-  // Sync hidden courses when semester changes
+  const syncRunIdRef = useRef<number>(0);
+  const hasInitialLoadedRef = useRef<boolean>(false);
+
   useEffect(() => {
-    setHiddenCourses(cache.getHiddenCalendarCourses(selectedSemester));
-    const cached = cache.getCachedCalendar(selectedSemester);
-    if (cached) {
-      setCalendarData(cached);
-    }
-  }, [selectedSemester]);
+    return () => {
+      syncRunIdRef.current += 1;
+    };
+  }, []);
 
-  const loadCalendar = useCallback(
-    async (autoSyncIfNeeded: boolean = true) => {
-      setIsLoading(true);
+  // Progressive newest-to-oldest course sync that re-renders the calendar after each course
+  const runProgressiveSync = useCallback(
+    async (
+      queue: { ref_id: string; title: string; semester?: string | null; item_type?: string }[],
+      forceRefresh: boolean
+    ) => {
+      if (queue.length === 0) return;
+      const runId = ++syncRunIdRef.current;
+      setIsSyncing(true);
       setErrorMsg(null);
+
+      // Sort newest semester first, then alphabetically
+      const sortedQueue = [...queue].sort((a, b) => {
+        const diff = getSemesterOrderKey(b.semester || '') - getSemesterOrderKey(a.semester || '');
+        if (diff !== 0) return diff;
+        return a.title.localeCompare(b.title);
+      });
+
       try {
-        const fresh = await api.getCalendar(selectedSemester);
-        setCalendarData(fresh);
-        cache.setCachedCalendar(selectedSemester, fresh);
-
-        // Adjust referenceDate if current date is outside semester bounds
-        if (fresh.semester_start_date && fresh.semester_end_date) {
-          const todayStr = formatYmd(new Date());
-          if (todayStr < fresh.semester_start_date || todayStr > fresh.semester_end_date) {
-            const semStart = parseYmd(fresh.semester_start_date);
-            setReferenceDate(semStart);
-            setSelectedMonthDateStr(fresh.semester_start_date);
-          }
+        for (let i = 0; i < sortedQueue.length; i++) {
+          if (syncRunIdRef.current !== runId) break;
+          const item = sortedQueue[i];
+          setSyncProgress({
+            current: i + 1,
+            total: sortedQueue.length,
+            title: item.title,
+          });
+          const synced = await api.syncCalendar({
+            courses: [
+              {
+                ref_id: item.ref_id,
+                title: item.title,
+                semester: item.semester || undefined,
+                item_type: item.item_type || 'crs',
+              },
+            ],
+            force_refresh: forceRefresh,
+          });
+          if (syncRunIdRef.current !== runId) break;
+          setCalendarData(synced);
+          cache.setCachedCalendar('ALL', synced);
+          setCacheTimestamp(Date.now());
         }
-
-        // If we have courses in coursesList that haven't been synced into the calendar yet, sync them automatically
-        if (autoSyncIfNeeded && coursesList.length > 0) {
-          const knownIds = new Set(fresh.courses.map((c) => c.course_ref_id));
-          const missing = coursesList.filter((c) => !knownIds.has(c.ref_id));
-          if (missing.length > 0 || fresh.courses.length === 0) {
-            setIsSyncing(true);
-            try {
-              const synced = await api.syncCalendar({
-                semester: selectedSemester,
-                courses: coursesList.map((c) => ({
-                  ref_id: c.ref_id,
-                  title: cache.getDisplayName(c.ref_id, c.title),
-                  semester: c.semester || selectedSemester,
-                })),
-                force_refresh: false,
-              });
-              setCalendarData(synced);
-              cache.setCachedCalendar(selectedSemester, synced);
-            } finally {
-              setIsSyncing(false);
-            }
-          }
+        if (syncRunIdRef.current === runId && forceRefresh) {
+          setStatusBanner(t('calendar.sync_completed'));
         }
       } catch (err: any) {
-        setErrorMsg(err?.message || t('calendar.load_failed'));
+        if (syncRunIdRef.current === runId) {
+          setErrorMsg(err?.message || t('calendar.sync_failed'));
+        }
       } finally {
-        setIsLoading(false);
+        if (syncRunIdRef.current === runId) {
+          setSyncProgress(null);
+          setIsSyncing(false);
+        }
       }
     },
-    [selectedSemester, coursesList]
+    []
   );
 
-  useEffect(() => {
-    loadCalendar(true);
-  }, [loadCalendar]);
-
-  const handleManualSync = async () => {
-    setIsSyncing(true);
+  // Load global calendar once on mount (independent of selectedSemester)
+  const loadGlobalCalendar = useCallback(async () => {
+    setIsLoading(true);
     setErrorMsg(null);
-    setStatusBanner(null);
     try {
-      const targetCourses =
-        coursesList.length > 0
-          ? coursesList.map((c) => ({
-              ref_id: c.ref_id,
-              title: cache.getDisplayName(c.ref_id, c.title),
-              semester: c.semester || selectedSemester,
-            }))
-          : (calendarData?.courses || []).map((c) => ({
-              ref_id: c.course_ref_id,
-              title: c.course_title,
-              semester: c.semester || selectedSemester,
-            }));
+      const [freshCal, membershipsRes] = await Promise.all([
+        api.getCalendar(),
+        api.getMyCourses().catch(() => null),
+      ]);
 
-      const synced = await api.syncCalendar({
-        semester: selectedSemester,
-        courses: targetCourses,
-        force_refresh: true,
+      setCalendarData(freshCal);
+      cache.setCachedCalendar('ALL', freshCal);
+      setCacheTimestamp(Date.now());
+
+      if (freshCal.semester_start_date && freshCal.semester_end_date) {
+        const todayStr = formatYmd(new Date());
+        if (todayStr < freshCal.semester_start_date || todayStr > freshCal.semester_end_date) {
+          const semStart = parseYmd(freshCal.semester_start_date);
+          setReferenceDate(semStart);
+          setSelectedMonthDateStr(freshCal.semester_start_date);
+        }
+      }
+
+      let discovered: CourseItem[] = [];
+      if (membershipsRes && Array.isArray(membershipsRes) && membershipsRes.length > 0) {
+        discovered = membershipsRes;
+        setAllMemberships(membershipsRes);
+        cache.setCachedAllMemberships(membershipsRes);
+      } else {
+        discovered = cache.getCachedAllMemberships()?.courses || [];
+      }
+
+      // Combine all known courses from memberships, current semester coursesList, and backend calendar
+      const courseMap = new Map<
+        string,
+        { ref_id: string; title: string; semester?: string | null; item_type: string }
+      >();
+      for (const c of discovered) {
+        courseMap.set(c.ref_id, {
+          ref_id: c.ref_id,
+          title: cache.getDisplayName(c.ref_id, c.title),
+          semester: c.semester || null,
+          item_type: c.item_type || 'crs',
+        });
+      }
+      for (const c of coursesList) {
+        if (!courseMap.has(c.ref_id)) {
+          courseMap.set(c.ref_id, {
+            ref_id: c.ref_id,
+            title: cache.getDisplayName(c.ref_id, c.title),
+            semester: c.semester || selectedSemester || null,
+            item_type: c.item_type || 'crs',
+          });
+        }
+      }
+
+      const existingById = new Map<string, CourseCalendarInfo>(
+        freshCal.courses.map((c) => [c.course_ref_id, c])
+      );
+
+      const toAutoSync = Array.from(courseMap.values()).filter((c) => {
+        const existing = existingById.get(c.ref_id);
+        return isCourseAutoSyncNeeded(existing, c.semester, currentSemesterId);
       });
-      setCalendarData(synced);
-      cache.setCachedCalendar(selectedSemester, synced);
-      setStatusBanner(t('calendar.sync_completed'));
+
+      if (toAutoSync.length > 0) {
+        void runProgressiveSync(toAutoSync, false);
+      }
     } catch (err: any) {
-      setErrorMsg(err?.message || t('calendar.sync_failed'));
+      setErrorMsg(err?.message || t('calendar.load_failed'));
     } finally {
-      setIsSyncing(false);
+      setIsLoading(false);
     }
+  }, [coursesList, selectedSemester, currentSemesterId, runProgressiveSync]);
+
+  useEffect(() => {
+    if (!hasInitialLoadedRef.current) {
+      hasInitialLoadedRef.current = true;
+      loadGlobalCalendar();
+    }
+  }, [loadGlobalCalendar]);
+
+  // Merge all courses across all semesters, sorted newest semester to oldest
+  const mergedCourses: CourseCalendarInfo[] = useMemo(() => {
+    const ignoredSet = new Set(ignoredCoursesLocal);
+    const byId = new Map<string, CourseCalendarInfo>();
+
+    for (const c of calendarData?.courses || []) {
+      const isIgnored = Boolean(c.ignored_missing_schedule || ignoredSet.has(c.course_ref_id));
+      const hasLecturesOrRules =
+        (c.imported_lecture_count ?? 0) > 0 || (c.custom_rule_count ?? 0) > 0;
+      byId.set(c.course_ref_id, {
+        ...c,
+        course_title: cache.getDisplayName(c.course_ref_id, c.course_title),
+        item_type: c.item_type || 'crs',
+        ignored_missing_schedule: isIgnored,
+        needs_manual_schedule: !hasLecturesOrRules && !isIgnored,
+      });
+    }
+
+    const combinedSources: CourseItem[] = [...allMemberships, ...coursesList];
+    combinedSources.forEach((c, idx) => {
+      if (!byId.has(c.ref_id)) {
+        const isIgnored = ignoredSet.has(c.ref_id);
+        byId.set(c.ref_id, {
+          course_ref_id: c.ref_id,
+          course_title: cache.getDisplayName(c.ref_id, c.title),
+          semester: c.semester || null,
+          item_type: c.item_type || 'crs',
+          color: COURSE_COLOR_PALETTE[idx % COURSE_COLOR_PALETTE.length],
+          status: 'not_imported',
+          feed_status: 'not_checked',
+          status_message: t('calendar.status.not_checked'),
+          needs_manual_schedule: !isIgnored,
+          ignored_missing_schedule: isIgnored,
+          imported_event_count: 0,
+          imported_lecture_count: 0,
+          imported_deadline_count: 0,
+          custom_rule_count: 0,
+        });
+      }
+    });
+
+    return Array.from(byId.values()).sort((a, b) => {
+      const semDiff =
+        getSemesterOrderKey(b.semester || '') - getSemesterOrderKey(a.semester || '');
+      if (semDiff !== 0) return semDiff;
+      return a.course_title.localeCompare(b.course_title);
+    });
+  }, [calendarData, allMemberships, coursesList, ignoredCoursesLocal, language]);
+
+  // Available semesters that contain courses in the calendar
+  const availableCalendarSemesters = useMemo(() => {
+    const sems = new Set<string>();
+    for (const c of mergedCourses) {
+      if (c.semester && c.semester !== 'ALL') {
+        sems.add(c.semester);
+      }
+    }
+    return Array.from(sems).sort((a, b) => getSemesterOrderKey(b) - getSemesterOrderKey(a));
+  }, [mergedCourses]);
+
+  // Filtered courses for the Courses & ILIAS Calendar Status panel
+  const filteredPanelCourses = useMemo(() => {
+    return mergedCourses.filter((c) => {
+      const isGroupOrUndated = c.item_type === 'grp' || !c.semester;
+      if (panelCategoryFilter === 'courses' && isGroupOrUndated) return false;
+      if (panelCategoryFilter === 'groups' && !isGroupOrUndated) return false;
+      if (panelSemesterFilter !== 'ALL' && c.semester !== panelSemesterFilter) return false;
+      return true;
+    });
+  }, [mergedCourses, panelSemesterFilter, panelCategoryFilter]);
+
+  const handleToggleIgnoreSchedule = async (courseRefId: string, nextIgnored: boolean) => {
+    setIgnoredCoursesLocal((prev) => {
+      const next = nextIgnored
+        ? Array.from(new Set([...prev, courseRefId]))
+        : prev.filter((id) => id !== courseRefId);
+      cache.setIgnoredCalendarCourses(next);
+      return next;
+    });
+    try {
+      const updated = await api.updateCourseIgnoreSchedule(courseRefId, nextIgnored);
+      setCalendarData(updated);
+      cache.setCachedCalendar('ALL', updated);
+    } catch (err: any) {
+      setErrorMsg(err?.message || t('calendar.load_failed'));
+    }
+  };
+
+  const handleRecheckCurrentSemester = () => {
+    const targets = mergedCourses
+      .filter((c) => !c.semester || c.semester === currentSemesterId || c.semester === selectedSemester)
+      .map((c) => ({
+        ref_id: c.course_ref_id,
+        title: c.course_title,
+        semester: c.semester || null,
+        item_type: c.item_type || 'crs',
+      }));
+    setIsRecheckModalOpen(false);
+    void runProgressiveSync(targets, true);
+  };
+
+  const handleRecheckEverything = () => {
+    const targets = mergedCourses.map((c) => ({
+      ref_id: c.course_ref_id,
+      title: c.course_title,
+      semester: c.semester || null,
+      item_type: c.item_type || 'crs',
+    }));
+    setIsRecheckModalOpen(false);
+    void runProgressiveSync(targets, true);
+  };
+
+  const handleRecheckSelectedCourses = () => {
+    const selectedSet = new Set(selectedRecheckIds);
+    const targets = mergedCourses
+      .filter((c) => selectedSet.has(c.course_ref_id))
+      .map((c) => ({
+        ref_id: c.course_ref_id,
+        title: c.course_title,
+        semester: c.semester || null,
+        item_type: c.item_type || 'crs',
+      }));
+    if (targets.length === 0) return;
+    setIsRecheckModalOpen(false);
+    void runProgressiveSync(targets, true);
   };
 
   const handleChangeViewMode = (mode: CalendarViewMode) => {
@@ -372,16 +633,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       const next = prev.includes(courseRefId)
         ? prev.filter((id) => id !== courseRefId)
         : [...prev, courseRefId];
-      cache.setHiddenCalendarCourses(selectedSemester, next);
+      cache.setHiddenCalendarCourses('ALL', next);
       return next;
     });
   };
 
   const handleColorChange = async (courseRefId: string, color: string) => {
     try {
-      const updated = await api.updateCourseColor(courseRefId, color, selectedSemester);
+      const updated = await api.updateCourseColor(courseRefId, color);
       setCalendarData(updated);
-      cache.setCachedCalendar(selectedSemester, updated);
+      cache.setCachedCalendar('ALL', updated);
     } catch (err: any) {
       setErrorMsg(err?.message || t('calendar.load_failed'));
     }
@@ -409,7 +670,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const defaultCourseId =
       courseRefId ||
       ruleToEdit?.course_ref_id ||
-      calendarData?.courses[0]?.course_ref_id ||
+      mergedCourses[0]?.course_ref_id ||
       coursesList[0]?.ref_id ||
       '';
 
@@ -484,14 +745,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       return;
     }
 
-    const courseObj =
-      calendarData?.courses.find((c) => c.course_ref_id === ruleCourseId) ||
-      coursesList.find((c) => c.ref_id === ruleCourseId);
-    const courseTitle = courseObj
-      ? 'course_title' in courseObj
-        ? courseObj.course_title
-        : cache.getDisplayName(courseObj.ref_id, courseObj.title)
-      : `Kurs ${ruleCourseId}`;
+    const courseObj = mergedCourses.find((c) => c.course_ref_id === ruleCourseId);
+    const courseTitle = courseObj ? courseObj.course_title : `Kurs ${ruleCourseId}`;
+    const courseSem = courseObj?.semester || selectedSemester || currentSemesterId;
 
     const payload: CourseScheduleRuleInput = {
       course_ref_id: ruleCourseId,
@@ -504,7 +760,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       start_date: ruleStartDate,
       end_date: ruleEndDate,
       exceptions: ruleExceptions,
-      semester: selectedSemester,
+      semester: courseSem,
     };
 
     setIsSavingRule(true);
@@ -514,7 +770,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         ? await api.updateScheduleRule(editingRule.id, payload)
         : await api.createScheduleRule(payload);
       setCalendarData(updated);
-      cache.setCachedCalendar(selectedSemester, updated);
+      cache.setCachedCalendar('ALL', updated);
       cache.clearScheduleRuleDraft(ruleCourseId, editingRule?.id || null);
       setIsRuleModalOpen(false);
     } catch (err: any) {
@@ -526,9 +782,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const handleDuplicateRule = async (ruleId: string) => {
     try {
-      const updated = await api.duplicateScheduleRule(ruleId, selectedSemester);
+      const updated = await api.duplicateScheduleRule(ruleId);
       setCalendarData(updated);
-      cache.setCachedCalendar(selectedSemester, updated);
+      cache.setCachedCalendar('ALL', updated);
     } catch (err: any) {
       setErrorMsg(err?.message || t('calendar.rule.save_failed'));
     }
@@ -536,9 +792,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const handleDeleteRule = async (ruleId: string) => {
     try {
-      const updated = await api.deleteScheduleRule(ruleId, selectedSemester);
+      const updated = await api.deleteScheduleRule(ruleId);
       setCalendarData(updated);
-      cache.setCachedCalendar(selectedSemester, updated);
+      cache.setCachedCalendar('ALL', updated);
     } catch (err: any) {
       setErrorMsg(err?.message || t('calendar.rule.delete_failed'));
     }
@@ -546,11 +802,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const handleRotateSubscription = async () => {
     try {
-      const sub = await api.rotateCalendarSubscription(selectedSemester);
+      const sub = await api.rotateCalendarSubscription();
       setSubscriptionInfo(sub);
-      const updated = await api.getCalendar(selectedSemester);
+      const updated = await api.getCalendar();
       setCalendarData(updated);
-      cache.setCachedCalendar(selectedSemester, updated);
+      cache.setCachedCalendar('ALL', updated);
     } catch (err: any) {
       setErrorMsg(err?.message || t('calendar.subscription.failed'));
     }
@@ -560,9 +816,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     try {
       await api.revokeCalendarSubscription();
       setSubscriptionInfo(null);
-      const updated = await api.getCalendar(selectedSemester);
+      const updated = await api.getCalendar();
       setCalendarData(updated);
-      cache.setCachedCalendar(selectedSemester, updated);
+      cache.setCachedCalendar('ALL', updated);
     } catch (err: any) {
       setErrorMsg(err?.message || t('calendar.subscription.failed'));
     }
@@ -571,14 +827,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const handleImportIcsFile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!icsImportCourseId || !icsImportText.trim()) return;
-    const courseObj =
-      calendarData?.courses.find((c) => c.course_ref_id === icsImportCourseId) ||
-      coursesList.find((c) => c.ref_id === icsImportCourseId);
-    const courseTitle = courseObj
-      ? 'course_title' in courseObj
-        ? courseObj.course_title
-        : cache.getDisplayName(courseObj.ref_id, courseObj.title)
-      : `Kurs ${icsImportCourseId}`;
+    const courseObj = mergedCourses.find((c) => c.course_ref_id === icsImportCourseId);
+    const courseTitle = courseObj ? courseObj.course_title : `Kurs ${icsImportCourseId}`;
 
     setIsImportingIcs(true);
     setErrorMsg(null);
@@ -586,12 +836,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       await api.importCourseIcs({
         course_ref_id: icsImportCourseId,
         course_title: courseTitle,
-        semester: selectedSemester,
+        semester: courseObj?.semester || selectedSemester,
         ics_text: icsImportText,
       });
-      const updated = await api.getCalendar(selectedSemester);
+      const updated = await api.getCalendar();
       setCalendarData(updated);
-      cache.setCachedCalendar(selectedSemester, updated);
+      cache.setCachedCalendar('ALL', updated);
       setIcsImportText('');
       setStatusBanner(t('calendar.import_ics.success'));
     } catch (err: any) {
@@ -600,36 +850,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       setIsImportingIcs(false);
     }
   };
-
-  // Merge courses from backend calendar response + semester coursesList
-  const mergedCourses: CourseCalendarInfo[] = useMemo(() => {
-    const byId = new Map<string, CourseCalendarInfo>();
-    for (const c of calendarData?.courses || []) {
-      byId.set(c.course_ref_id, {
-        ...c,
-        course_title: cache.getDisplayName(c.course_ref_id, c.course_title),
-      });
-    }
-    coursesList.forEach((c, idx) => {
-      if (!byId.has(c.ref_id)) {
-        byId.set(c.ref_id, {
-          course_ref_id: c.ref_id,
-          course_title: cache.getDisplayName(c.ref_id, c.title),
-          semester: c.semester || selectedSemester,
-          color: COURSE_COLOR_PALETTE[idx % COURSE_COLOR_PALETTE.length],
-          status: 'not_imported',
-          feed_status: 'not_checked',
-          status_message: t('calendar.status.not_checked'),
-          needs_manual_schedule: true,
-          imported_event_count: 0,
-          imported_lecture_count: 0,
-          imported_deadline_count: 0,
-          custom_rule_count: 0,
-        });
-      }
-    });
-    return Array.from(byId.values());
-  }, [calendarData, coursesList, selectedSemester, language]);
 
   const courseColorMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -832,7 +1052,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const jumpToSemesterHalf = (half: 'first' | 'second') => {
     if (half === 'first') {
-      // Pick week 2 of first half so regular weekly lectures are visible
       const dt = addDays(parseYmd(semesterBounds.start), 7);
       setReferenceDate(dt);
     } else {
@@ -844,12 +1063,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const activeSubscriptionUrl =
     subscriptionInfo?.subscription_url || calendarData?.subscription_url || null;
 
+  const effectiveCacheAge = useMemo(
+    () => formatTimestampAge(calendarData?.fetched_at || cacheTimestamp, language),
+    [calendarData?.fetched_at, cacheTimestamp, language]
+  );
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-200">
       {/* Top Header & Primary Actions */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
+          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex flex-wrap items-center gap-2.5">
             <CalendarIcon className="h-6 w-6 shrink-0" style={{ color: 'var(--accent, #0AACA5)' }} />
             <span>{t('calendar.title')}</span>
             <span
@@ -859,18 +1083,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 color: 'var(--accent, #0AACA5)',
               }}
             >
-              {selectedSemester}
+              {t('calendar.all_semesters_badge')}
             </span>
             {(isLoading || isSyncing) && (
               <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />
             )}
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {t('calendar.subtitle', {
-              start: semesterBounds.start,
-              end: semesterBounds.end,
-            })}
-          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <span>
+              {t('calendar.subtitle', {
+                start: semesterBounds.start,
+                end: semesterBounds.end,
+              })}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <Clock className="h-3 w-3" />
+              {t('calendar.cache_age_label', { time: effectiveCacheAge })}
+            </span>
+          </div>
         </div>
 
         {/* Action Buttons (>= 44px height on mobile for comfortable touch targets) */}
@@ -887,12 +1117,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
           <button
             type="button"
-            onClick={handleManualSync}
-            disabled={isSyncing}
-            className="min-h-11 sm:min-h-9 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition cursor-pointer disabled:opacity-50"
+            onClick={() => {
+              setSelectedRecheckIds(
+                mergedCourses
+                  .filter((c) => c.semester === currentSemesterId)
+                  .map((c) => c.course_ref_id)
+              );
+              setIsRecheckModalOpen(true);
+            }}
+            className="min-h-11 sm:min-h-9 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
           >
             <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{t('calendar.sync_ilias')}</span>
+            <span>{t('calendar.recheck.button')}</span>
           </button>
 
           <button
@@ -910,6 +1146,39 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Progressive Sync Live Status Banner */}
+      {syncProgress && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-xl border border-[#0AACA5]/30 bg-[#0AACA5]/10 px-4 py-3 text-xs text-slate-800 dark:text-slate-100 space-y-2"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <RefreshCw className="h-4 w-4 shrink-0 animate-spin text-[#0AACA5]" />
+              <span className="font-bold truncate">
+                {t('calendar.sync_progress', {
+                  current: syncProgress.current,
+                  total: syncProgress.total,
+                  title: syncProgress.title,
+                })}
+              </span>
+            </div>
+            <span className="text-[11px] font-bold text-[#0AACA5] shrink-0">
+              {Math.round((syncProgress.current / Math.max(1, syncProgress.total)) * 100)}%
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+            <div
+              className="h-full bg-[#0AACA5] transition-all duration-200"
+              style={{
+                width: `${Math.min(100, Math.round((syncProgress.current / Math.max(1, syncProgress.total)) * 100))}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Notices & Error Banners */}
       {errorMsg && (
@@ -1632,7 +1901,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           )}
         </div>
 
-        {/* Right 4 cols: Courses, ILIAS Calendar Statuses & Custom Schedule Rules */}
+        {/* Right 4 cols: Courses, ILIAS Calendar Statuses, Semester/Category Filters & Custom Schedule Rules */}
         <div className="xl:col-span-4 space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-4">
             <div className="flex items-center justify-between gap-2">
@@ -1654,12 +1923,57 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </button>
             </div>
 
+            {/* Semester & Category Filter Controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <div className="space-y-1">
+                <label className="flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                  <Filter className="h-3 w-3 text-[#0AACA5]" />
+                  <span>{t('calendar.filter.semester_label')}</span>
+                </label>
+                <select
+                  value={panelSemesterFilter}
+                  onChange={(e) => setPanelSemesterFilter(e.target.value)}
+                  aria-label={t('calendar.filter.semester_label')}
+                  className="min-h-12 sm:min-h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  <option value="ALL">{t('calendar.filter.all_semesters')}</option>
+                  {availableCalendarSemesters.map((sem) => (
+                    <option key={sem} value={sem}>
+                      {sem}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                  <Filter className="h-3 w-3 text-[#0AACA5]" />
+                  <span>{t('calendar.filter.category_label')}</span>
+                </label>
+                <select
+                  value={panelCategoryFilter}
+                  onChange={(e) =>
+                    setPanelCategoryFilter(e.target.value as 'all' | 'courses' | 'groups')
+                  }
+                  aria-label={t('calendar.filter.category_label')}
+                  className="min-h-12 sm:min-h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  <option value="all">{t('calendar.filter.category_all')}</option>
+                  <option value="courses">{t('calendar.filter.category_courses')}</option>
+                  <option value="groups">{t('calendar.filter.category_groups')}</option>
+                </select>
+              </div>
+            </div>
+
             <div className="space-y-3">
-              {mergedCourses.map((course) => {
+              {filteredPanelCourses.map((course) => {
                 const isHidden = hiddenCourses.includes(course.course_ref_id);
                 const courseRules = (calendarData?.rules || []).filter(
                   (r) => r.course_ref_id === course.course_ref_id
                 );
+                const hasLecturesOrRules =
+                  (course.imported_lecture_count ?? 0) > 0 || (course.custom_rule_count ?? 0) > 0;
+                const canToggleIgnore = !hasLecturesOrRules || course.ignored_missing_schedule;
 
                 return (
                   <div
@@ -1688,14 +2002,28 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             className="sr-only"
                           />
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => onSelectCourse(course.course_ref_id)}
-                          className="text-left text-xs font-bold text-slate-900 hover:text-[#0AACA5] dark:text-slate-100 truncate cursor-pointer"
-                          title={course.course_title}
-                        >
-                          {course.course_title}
-                        </button>
+                        <div className="min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => onSelectCourse(course.course_ref_id)}
+                            className="text-left text-xs font-bold text-slate-900 hover:text-[#0AACA5] dark:text-slate-100 truncate block max-w-full cursor-pointer"
+                            title={course.course_title}
+                          >
+                            {course.course_title}
+                          </button>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                              {course.semester || t('my_courses.group')}
+                            </span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                              {course.last_imported_at
+                                ? t('calendar.course_last_checked', {
+                                    time: formatTimestampAge(course.last_imported_at, language),
+                                  })
+                                : t('calendar.course_never_checked')}
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
@@ -1726,18 +2054,53 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     </div>
 
                     {/* ILIAS Calendar Status Badge & Message */}
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       <div className="flex items-center flex-wrap gap-1.5">
-                        {renderFeedStatusBadge(course.status || course.feed_status || 'not_imported')}
+                        {renderFeedStatusBadge(
+                          course.status || course.feed_status || 'not_imported'
+                        )}
+                        {course.ignored_missing_schedule && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                            <BellOff className="h-3 w-3" />
+                            {t('calendar.status.badge_ignored')}
+                          </span>
+                        )}
                         {(course.custom_rule_count ?? 0) > 0 && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-[#0AACA5]/15 px-2 py-0.5 text-[11px] font-semibold text-[#0AACA5]">
-                            {(course.custom_rule_count ?? 0)} {t('calendar.rules_active')}
+                            {course.custom_rule_count ?? 0} {t('calendar.rules_active')}
                           </span>
                         )}
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
                         {course.status_message}
                       </p>
+
+                      {canToggleIgnore && (
+                        <div className="pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleToggleIgnoreSchedule(
+                                course.course_ref_id,
+                                !course.ignored_missing_schedule
+                              )
+                            }
+                            className="min-h-9 sm:min-h-7 inline-flex items-center gap-1.5 rounded-lg border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
+                          >
+                            {course.ignored_missing_schedule ? (
+                              <>
+                                <Bell className="h-3 w-3 text-[#0AACA5]" />
+                                <span>{t('calendar.unignore_missing_schedule')}</span>
+                              </>
+                            ) : (
+                              <>
+                                <BellOff className="h-3 w-3 text-slate-400" />
+                                <span>{t('calendar.ignore_missing_schedule')}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Custom Weekly Schedule Rules for this Course */}
@@ -1804,6 +2167,154 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
       </div>
 
+      {/* MANUAL RECHECK MODAL (Specific courses checkbox list, Current Semester, or Everything) */}
+      {isRecheckModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsRecheckModalOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('calendar.recheck.modal_title')}
+            style={{ colorScheme: 'light dark' }}
+            className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 space-y-5"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
+                {t('calendar.recheck.modal_title')}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsRecheckModalOpen(false)}
+                aria-label={t('Schliessen')}
+                className="min-h-10 min-w-10 inline-flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {t('calendar.recheck.modal_desc')}
+            </p>
+
+            {/* Quick Recheck Buttons: Current Semester vs Everything */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={handleRecheckCurrentSemester}
+                style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
+                className="min-h-11 rounded-xl px-3.5 py-2.5 text-xs font-bold text-white shadow-xs hover:opacity-90 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className="h-4 w-4 shrink-0" />
+                <span>
+                  {t('calendar.recheck.current_semester', { semester: currentSemesterId })}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRecheckEverything}
+                className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className="h-4 w-4 shrink-0" />
+                <span>{t('calendar.recheck.everything')}</span>
+              </button>
+            </div>
+
+            {/* Specific Courses Checkbox List */}
+            <div className="space-y-2.5 border-t border-slate-200 pt-4 dark:border-slate-800">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  {t('calendar.courses_panel.title')}
+                </h3>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedRecheckIds(mergedCourses.map((c) => c.course_ref_id))
+                    }
+                    className="font-semibold text-[#0AACA5] hover:underline cursor-pointer"
+                  >
+                    {t('calendar.recheck.select_all')}
+                  </button>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRecheckIds([])}
+                    className="font-semibold text-slate-500 hover:underline dark:text-slate-400 cursor-pointer"
+                  >
+                    {t('calendar.recheck.deselect_all')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100 dark:border-slate-800 dark:divide-slate-800/70">
+                {mergedCourses.map((course) => {
+                  const checked = selectedRecheckIds.includes(course.course_ref_id);
+                  return (
+                    <label
+                      key={course.course_ref_id}
+                      className="min-h-11 flex items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const isChecked = e.target.checked;
+                            setSelectedRecheckIds((prev) =>
+                              isChecked
+                                ? Array.from(new Set([...prev, course.course_ref_id]))
+                                : prev.filter((id) => id !== course.course_ref_id)
+                            );
+                          }}
+                          className="h-4 w-4 shrink-0 rounded accent-[#0AACA5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0AACA5]"
+                        />
+                        <span className="font-semibold text-slate-800 dark:text-slate-100 truncate">
+                          {course.course_title}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          {course.semester || t('my_courses.group')}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {course.last_imported_at
+                            ? formatTimestampAge(course.last_imported_at, language)
+                            : '—'}
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRecheckModalOpen(false)}
+                  className="min-h-11 sm:min-h-9 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 cursor-pointer"
+                >
+                  {t('Abbrechen')}
+                </button>
+                <button
+                  type="button"
+                  disabled={selectedRecheckIds.length === 0}
+                  onClick={handleRecheckSelectedCourses}
+                  style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
+                  className="min-h-11 sm:min-h-9 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 transition cursor-pointer disabled:opacity-50"
+                >
+                  {t('calendar.recheck.selected', { count: selectedRecheckIds.length })}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SCHEDULE RULE EDITOR MODAL */}
       {isRuleModalOpen && (
         <div
@@ -1849,7 +2360,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 >
                   {mergedCourses.map((c) => (
                     <option key={c.course_ref_id} value={c.course_ref_id}>
-                      {c.course_title}
+                      {c.course_title} {c.semester ? `(${c.semester})` : ''}
                     </option>
                   ))}
                 </select>
@@ -2131,8 +2642,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 {t('calendar.export_modal.download_desc')}
               </p>
               <a
-                href={api.getCalendarExportUrl(selectedSemester)}
-                download={`betterilias-${selectedSemester.toLowerCase()}.ics`}
+                href={api.getCalendarExportUrl('ALL')}
+                download="betterilias-calendar.ics"
                 style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
                 className="min-h-11 sm:min-h-9 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 transition"
               >
@@ -2258,9 +2769,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
                     className="min-h-9 rounded-xl px-4 py-1.5 text-xs font-bold text-white hover:opacity-90 cursor-pointer"
                   >
-                    {isImportingIcs
-                      ? t('Importiert...')
-                      : t('calendar.import_ics.submit')}
+                    {isImportingIcs ? t('Importiert...') : t('calendar.import_ics.submit')}
                   </button>
                 </div>
               )}

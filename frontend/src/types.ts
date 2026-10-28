@@ -579,11 +579,13 @@ export interface CourseCalendarInfo {
   course_ref_id: string;
   course_title: string;
   semester?: string | null;
+  item_type?: string;
   color: string;
   status: CourseCalendarFeedStatus;
   feed_status?: CourseCalendarFeedStatus;
   status_message: string;
   needs_manual_schedule: boolean;
+  ignored_missing_schedule?: boolean;
   has_calendar_block?: boolean;
   ical_modal_url?: string | null;
   ical_feed_url?: string | null;
