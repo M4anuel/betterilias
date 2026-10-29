@@ -1242,7 +1242,7 @@
   "my_courses.clear": "Suche und Filter zurücksetzen",
   "calendar.nav_title": "Kalender & Stundenplan",
   "calendar.title": "Semesterkalender & Stundenplan",
-  "calendar.subtitle": "Kombinierter Stundenplan, ILIAS-Termine und eigene Vorlesungszeiten ({p0})",
+  "calendar.subtitle": "Kombinierter Stundenplan, ILIAS-Termine und eigene Vorlesungszeiten",
   "calendar.view.timetable": "Stundenplan",
   "calendar.view.week": "Woche",
   "calendar.view.month": "Monat",

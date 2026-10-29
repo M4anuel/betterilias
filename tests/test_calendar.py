@@ -782,13 +782,15 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
         playwright.expect(page.get_by_text(tr("calendar.info.synced_from_ilias"), exact=True)).to_be_visible()
         info_btn.click()
 
-        # Verify collapsing and expanding the Courses & ILIAS Calendar Status panel
+        # Verify collapsing and expanding the Courses & ILIAS Calendar Status panel (persisted in localStorage)
         collapse_btn = page.get_by_role("button", name=tr("calendar.courses_panel.collapse"), exact=True)
         collapse_btn.click()
         expand_btn = page.get_by_role("button", name=tr("calendar.courses_panel.expand"), exact=True)
         playwright.expect(expand_btn).to_be_visible()
+        assert page.evaluate("localStorage.getItem('betterilias_calendar_panel_collapsed')") == "true"
         expand_btn.click()
         playwright.expect(collapse_btn).to_be_visible()
+        assert page.evaluate("localStorage.getItem('betterilias_calendar_panel_collapsed')") == "false"
 
         # Open Manual Recheck Modal and verify checkbox list + layout
         page.get_by_role("button", name=tr("calendar.recheck.button"), exact=True).click()
@@ -808,9 +810,10 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
         playwright.expect(loc_input).to_have_value("Hörsaal B001")
         dialog.get_by_role("button", name=tr("Abbrechen"), exact=True).click()
 
-        # Open Export & Subscription modal
+        # Open Export & Subscription modal and verify Escape key dismissal
         page.get_by_role("button", name=tr("calendar.export_subscribe"), exact=True).click()
         exp_dialog = page.get_by_role("dialog", name=tr("calendar.export_modal.title"), exact=True)
         playwright.expect(exp_dialog).to_be_visible()
-        exp_dialog.get_by_role("button", name=tr("Schliessen"), exact=True).click()
+        page.keyboard.press("Escape")
+        playwright.expect(exp_dialog).to_be_hidden()
         browser.close()

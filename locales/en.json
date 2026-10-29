@@ -1242,7 +1242,7 @@
   "my_courses.clear": "Clear search and filters",
   "calendar.nav_title": "Calendar & Timetable",
   "calendar.title": "Semester Calendar & Timetable",
-  "calendar.subtitle": "Combined timetable, ILIAS events, and custom lecture schedules ({p0})",
+  "calendar.subtitle": "Combined timetable, ILIAS events, and custom lecture schedules",
   "calendar.view.timetable": "Timetable",
   "calendar.view.week": "Week",
   "calendar.view.month": "Month",

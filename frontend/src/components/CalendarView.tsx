@@ -345,7 +345,44 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // Selected Event Details Modal
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [openInfoCourseId, setOpenInfoCourseId] = useState<string | null>(null);
-  const [isCoursesPanelCollapsed, setIsCoursesPanelCollapsed] = useState<boolean>(false);
+  const [isCoursesPanelCollapsed, setIsCoursesPanelCollapsed] = useState<boolean>(() =>
+    cache.getCalendarCoursesPanelCollapsed()
+  );
+
+  const toggleCoursesPanelCollapsed = useCallback((collapsed: boolean) => {
+    setIsCoursesPanelCollapsed(collapsed);
+    cache.setCalendarCoursesPanelCollapsed(collapsed);
+  }, []);
+
+  // Close active modal or info popover on Escape key (project-wide modal convention)
+  useEffect(() => {
+    if (
+      !selectedEvent &&
+      !isRecheckModalOpen &&
+      !isRuleModalOpen &&
+      !isExportModalOpen &&
+      !openInfoCourseId
+    ) {
+      return;
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedEvent) setSelectedEvent(null);
+        else if (isRecheckModalOpen) setIsRecheckModalOpen(false);
+        else if (isRuleModalOpen) setIsRuleModalOpen(false);
+        else if (isExportModalOpen) setIsExportModalOpen(false);
+        else if (openInfoCourseId) setOpenInfoCourseId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    selectedEvent,
+    isRecheckModalOpen,
+    isRuleModalOpen,
+    isExportModalOpen,
+    openInfoCourseId,
+  ]);
 
   const syncRunIdRef = useRef<number>(0);
   const syncAbortRef = useRef<AbortController | null>(null);
@@ -1163,67 +1200,40 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   );
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-200">
-      {/* Top Header & Primary Actions */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex flex-wrap items-center gap-2.5">
-            <CalendarIcon className="h-6 w-6 shrink-0" style={{ color: 'var(--accent, #0AACA5)' }} />
-            <span>{t('calendar.title')}</span>
-            <span
-              className="rounded-lg px-2.5 py-0.5 text-xs font-bold"
-              style={{
-                backgroundColor: 'var(--accent-light, rgba(10, 172, 165, 0.14))',
-                color: 'var(--accent, #0AACA5)',
-              }}
-            >
-              {t('calendar.all_semesters_badge')}
-            </span>
-            {(isLoading || isSyncing) && (
-              <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />
-            )}
-          </h1>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
-            <span>
-              {t('calendar.subtitle', {
-                start: semesterBounds.start,
-                end: semesterBounds.end,
-              })}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              <Clock className="h-3 w-3" />
+    <div className="p-4 sm:p-5 lg:p-6 max-w-7xl mx-auto space-y-4 animate-in fade-in duration-200">
+      {/* Compact Single-Row Top Header & Primary Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
+          <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" style={{ color: 'var(--accent, #0AACA5)' }} />
+          <span>{t('calendar.title')}</span>
+          {(isLoading || isSyncing) && (
+            <RefreshCw className="h-4 w-4 animate-spin text-slate-400 shrink-0" />
+          )}
+        </h1>
+
+        {/* Compact Action Toolbar: Last Save Info + Manual Recheck grouped together, plus Export */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-0.5 shadow-2xs dark:border-slate-700 dark:bg-slate-800">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
+              <Clock className="h-3 w-3 shrink-0 text-slate-400" />
               {t('calendar.cache_age_label', { time: effectiveCacheAge })}
             </span>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedRecheckIds(
+                  mergedCourses
+                    .filter((c) => c.semester === currentSemesterId)
+                    .map((c) => c.course_ref_id)
+                );
+                setIsRecheckModalOpen(true);
+              }}
+              className="min-h-10 sm:min-h-7 whitespace-nowrap inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 transition cursor-pointer"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{t('calendar.recheck.button')}</span>
+            </button>
           </div>
-        </div>
-
-        {/* Action Buttons (>= 44px height on mobile for comfortable touch targets) */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => openRuleModal()}
-            style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
-            className="min-h-11 sm:min-h-9 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 transition cursor-pointer"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{t('calendar.add_schedule')}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedRecheckIds(
-                mergedCourses
-                  .filter((c) => c.semester === currentSemesterId)
-                  .map((c) => c.course_ref_id)
-              );
-              setIsRecheckModalOpen(true);
-            }}
-            className="min-h-11 sm:min-h-9 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
-          >
-            <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{t('calendar.recheck.button')}</span>
-          </button>
 
           <button
             type="button"
@@ -1233,9 +1243,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               }
               setIsExportModalOpen(true);
             }}
-            className="min-h-11 sm:min-h-9 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+            className="min-h-11 sm:min-h-8 whitespace-nowrap inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
           >
-            <Share2 className="h-4 w-4" />
+            <Share2 className="h-3.5 w-3.5 shrink-0" />
             <span>{t('calendar.export_subscribe')}</span>
           </button>
         </div>
@@ -2020,13 +2030,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <div className="w-full xl:w-auto shrink-0 xl:sticky xl:top-4">
             <button
               type="button"
-              onClick={() => setIsCoursesPanelCollapsed(false)}
+              onClick={() => toggleCoursesPanelCollapsed(false)}
               aria-label={t('calendar.courses_panel.expand')}
               title={t('calendar.courses_panel.expand')}
-              className="w-full xl:w-11 min-h-11 xl:py-4 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-xs hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/80 flex xl:flex-col items-center justify-between xl:justify-center gap-2.5 text-slate-700 dark:text-slate-200 transition cursor-pointer"
+              className="w-full xl:w-12 min-h-11 xl:py-4 rounded-2xl border border-slate-200 bg-white px-3 xl:px-1.5 py-2.5 shadow-xs hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/80 flex xl:flex-col items-center justify-between xl:justify-center gap-2.5 text-slate-700 dark:text-slate-200 transition cursor-pointer"
             >
               <ChevronLeft className="h-4 w-4 shrink-0 text-[#0AACA5]" />
-              <span className="rounded-full bg-[#0AACA5]/15 px-2 py-0.5 text-[11px] font-extrabold text-[#0AACA5]">
+              <span className="whitespace-nowrap shrink-0 rounded-full bg-[#0AACA5]/15 px-1.5 py-0.5 text-[11px] font-extrabold text-[#0AACA5] leading-none">
                 {filteredPanelCourses.length}
               </span>
               <span className="text-xs font-bold xl:[writing-mode:vertical-rl] xl:rotate-180 whitespace-nowrap">
@@ -2057,7 +2067,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsCoursesPanelCollapsed(true)}
+                    onClick={() => toggleCoursesPanelCollapsed(true)}
                     aria-label={t('calendar.courses_panel.collapse')}
                     title={t('calendar.courses_panel.collapse')}
                     className="min-h-9 min-w-9 sm:min-h-7 sm:min-w-7 shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition cursor-pointer"
@@ -2366,17 +2376,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* MANUAL RECHECK MODAL (Specific courses checkbox list, Current Semester, or Everything) */}
       {isRecheckModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setIsRecheckModalOpen(false);
-          }}
+          className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4 backdrop-blur-xs"
+          onClick={() => setIsRecheckModalOpen(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-label={t('calendar.recheck.modal_title')}
             style={{ colorScheme: 'light dark' }}
-            className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 space-y-5 animate-in fade-in zoom-in-95 duration-150"
           >
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
@@ -2514,10 +2523,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* SCHEDULE RULE EDITOR MODAL */}
       {isRuleModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setIsRuleModalOpen(false);
-          }}
+          className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4 backdrop-blur-xs"
+          onClick={() => setIsRuleModalOpen(false)}
         >
           <div
             role="dialog"
@@ -2525,7 +2532,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             aria-label={
               editingRule ? t('calendar.rule.modal_edit_title') : t('calendar.rule.modal_add_title')
             }
-            className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 space-y-4 animate-in fade-in zoom-in-95 duration-150"
           >
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
@@ -2801,16 +2809,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* EXPORT, SUBSCRIPTION & ICS IMPORT MODAL */}
       {isExportModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setIsExportModalOpen(false);
-          }}
+          className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4 backdrop-blur-xs"
+          onClick={() => setIsExportModalOpen(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-label={t('calendar.export_modal.title')}
-            className="w-full max-w-xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 space-y-5 animate-in fade-in zoom-in-95 duration-150"
           >
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
@@ -2977,16 +2984,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* EVENT DETAILS MODAL */}
       {selectedEvent && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSelectedEvent(null);
-          }}
+          className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4 backdrop-blur-xs"
+          onClick={() => setSelectedEvent(null)}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-label={selectedEvent.title}
-            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900 space-y-4 animate-in fade-in zoom-in-95 duration-150"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-2.5 min-w-0">

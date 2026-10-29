@@ -1151,6 +1151,20 @@ export const cache = {
     }
   },
 
+  getCalendarCoursesPanelCollapsed(): boolean {
+    try {
+      return localStorage.getItem('betterilias_calendar_panel_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  setCalendarCoursesPanelCollapsed(collapsed: boolean) {
+    try {
+      localStorage.setItem('betterilias_calendar_panel_collapsed', collapsed ? 'true' : 'false');
+    } catch {}
+  },
+
   setCachedAllMemberships(courses: any[]) {
     try {
       const scope = this.getSessionId() || 'default';
