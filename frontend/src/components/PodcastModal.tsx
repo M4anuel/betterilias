@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   Clock,
   Search,
+  ArrowDown,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { PodcastEpisode, PodcastSeriesResponse } from '../types';
 import { api } from '../lib/api';
@@ -231,24 +233,24 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
           </div>
         )}
 
-        {series && <div className="grid gap-3 border-b border-slate-100 bg-white px-5 py-3 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2">
-          <label className="min-w-0 text-xs font-semibold text-slate-600 dark:text-slate-300">{t('recordings.sort_by')}
-            <select value={sort.field} onChange={event => changeSort({ ...sort, field: event.target.value as RecordingSort['field'] })}
-              className="player-select mt-1 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 sm:text-sm">
-              <option value="title">{t('recordings.title')}</option><option value="date">{t('recordings.date')}</option>
-            </select>
-          </label>
-          <label className="min-w-0 text-xs font-semibold text-slate-600 dark:text-slate-300">{t('recordings.direction')}
-            <select value={sort.direction} onChange={event => changeSort({ ...sort, direction: event.target.value as RecordingSort['direction'] })}
-              className="player-select mt-1 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 sm:text-sm">
-              <option value="asc">{t('recordings.ascending')}</option><option value="desc">{t('recordings.descending')}</option>
-            </select>
-          </label>
-          {sort.field === 'date' && <p className="text-xs text-slate-500 dark:text-slate-400 sm:col-span-2">{t('recordings.date_hint')}</p>}
+        {series && <div role="group" aria-label={t('recordings.sort_by')} className="flex items-center justify-end gap-1.5 border-b border-slate-100 bg-white px-4 py-1 dark:border-slate-800 dark:bg-slate-900">
+          <button type="button" aria-label={t('recordings.sort_by')} aria-pressed={sort.field === 'title'} aria-describedby="recording-date-hint"
+            onClick={() => changeSort({ ...sort, field: sort.field === 'title' ? 'date' : 'title' })}
+            className="flex min-h-11 items-center gap-2 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-[var(--accent)] dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+            <ArrowLeftRight aria-hidden="true" className="h-3.5 w-3.5" />
+            {t(sort.field === 'title' ? 'recordings.title' : 'recordings.upload_date')}
+          </button>
+          <button type="button" aria-label={t('recordings.direction')} aria-pressed={sort.direction === 'asc'} title={t(sort.direction === 'asc' ? 'recordings.ascending' : 'recordings.descending')}
+            onClick={() => changeSort({ ...sort, direction: sort.direction === 'asc' ? 'desc' : 'asc' })}
+            className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-[var(--accent)] dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
+            <ArrowDown aria-hidden="true" className={`h-4 w-4 transition-transform motion-reduce:transition-none ${sort.direction === 'asc' ? 'rotate-180' : ''}`} />
+            <span className="sr-only">{t(sort.direction === 'asc' ? 'recordings.ascending' : 'recordings.descending')}</span>
+          </button>
+          <span id="recording-date-hint" className="sr-only">{t('recordings.date_hint')}</span>
         </div>}
 
         {/* Modal Body */}
-        <div className="p-5 space-y-3 bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="p-3 sm:p-5 space-y-2 bg-slate-50/50 dark:bg-slate-900/50">
           {loading && (
             <div className="flex h-56 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
               <RefreshCw className="h-6 w-6 animate-spin text-sky-500" />
@@ -296,13 +298,16 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                 <div
                   key={ep.id}
                   data-recording-id={ep.id}
-                  className={`rounded-xl border p-4 transition bg-white dark:bg-slate-900 shadow-2xs hover:shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  className={`rounded-xl border p-3 transition bg-white dark:bg-slate-900 shadow-2xs hover:shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
                     isRecorded
                       ? 'border-slate-200 dark:border-slate-800 hover:border-sky-300 dark:hover:border-sky-700'
                       : 'border-slate-200/80 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/40 opacity-80 hover:opacity-100'
                   }`}
                 >
-                  <div className="space-y-1.5 flex-1 pr-2">
+                  <div className="min-w-0 space-y-1 flex-1 sm:pr-2">
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                      {ep.title}
+                    </h4>
                     <div className="flex items-center gap-2 flex-wrap">
                       {isRecorded ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
@@ -325,10 +330,6 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                       {ep.uploaded_date && <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('recordings.uploaded', { date: ep.uploaded_date })}</span>}
                     </div>
 
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug">
-                      {ep.title}
-                    </h4>
-
                     {(ep.presenter || ep.location) && (
                       <div className="flex items-center gap-4 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
                         {ep.presenter && (
@@ -347,20 +348,20 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                     )}
                   </div>
 
-                  <div className="flex flex-col items-stretch gap-1 shrink-0 self-end sm:self-center">
+                  <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0">
                     {isRecorded && ep.stream_url ? (
                       <>
+                      <a href={ep.stream_url} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center gap-1 rounded-lg px-1 text-xs text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-[var(--accent)] dark:text-slate-400 dark:hover:bg-slate-800">
+                        <ExternalLink className="h-3 w-3" /><span>{t("In ILIAS \u00f6ffnen")}</span>
+                      </a>
                       <button
                         type="button"
                         onClick={() => setActiveEpisode(ep)}
-                        className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs"
+                        className="flex min-h-11 items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs"
                       >
                         <Play className="h-3.5 w-3.5 fill-white" />
                         <span>{t("Streamen")}</span>
                       </button>
-                      <a href={ep.stream_url} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center gap-1 rounded-lg px-2 text-xs text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">
-                        <ExternalLink className="h-3 w-3" /><span>{t("In ILIAS \u00f6ffnen")}</span>
-                      </a>
                       </>
                     ) : (
                       <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 px-2">

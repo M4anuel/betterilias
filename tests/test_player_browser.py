@@ -18,7 +18,7 @@ MEDIA = (Path(__file__).parent / 'fixtures/player-test.mp4').read_bytes()
 def test_preferences_and_recording_sort(local_site,width,height,language,scheme):
     pw=pytest.importorskip('playwright.sync_api')
     tr=json.loads((ROOT/'locales'/f'{language}.json').read_text(encoding='utf-8')).__getitem__
-    episodes=[dict(id='a',title='Lecture 2',recorded_at='2026-09-01T10:00:00Z',uploaded_at='2026-12-01T10:00:00Z'),
+    episodes=[dict(id='a',title='Lecture 2: Human-computer interaction and accessible learning environments',recorded_at='2026-09-01T10:00:00Z',uploaded_at='2026-12-01T10:00:00Z'),
               dict(id='b',title='Lecture 10',date='2. Okt 2026, 09:00'),
               dict(id='c',title='Lecture 1',recorded_at='2027-01-01T10:00:00Z'),
               dict(id='d',title='Undated')]
@@ -45,14 +45,20 @@ def test_preferences_and_recording_sort(local_site,width,height,language,scheme)
             page.wait_for_function("document.querySelectorAll('dialog video').length===2 && Array.from(document.querySelectorAll('dialog video')).every(v=>v.readyState>=3)")
         page.goto(local_site+'/?course=42')
         open_list()
-        field=page.get_by_role('combobox',name=tr('recordings.sort_by'),exact=True)
-        direction=page.get_by_role('combobox',name=tr('recordings.direction'),exact=True)
+        field=page.get_by_role('button',name=tr('recordings.sort_by'),exact=True)
+        direction=page.get_by_role('button',name=tr('recordings.direction'),exact=True)
+        pw.expect(page.get_by_role('region',name=tr('Opencast Vorlesungsaufzeichnungen'),exact=True).get_by_role('combobox')).to_have_count(0)
         assert order()==['c','a','b','d']
-        direction.select_option('asc')
+        direction.focus()
+        direction.press('Enter')
+        pw.expect(direction).to_have_attribute('aria-pressed','true')
+        pw.expect(direction.locator('svg')).to_have_class(re.compile('rotate-180'))
         assert order()==['b','a','c','d']
-        field.select_option('title')
+        field.focus()
+        field.press('Space')
         assert order()==['c','a','b','d']
-        direction.select_option('desc')
+        direction.click()
+        pw.expect(direction).to_have_attribute('aria-pressed','false')
         assert order()==['d','b','a','c']
         search=page.get_by_placeholder(tr('Episode suchen...'),exact=True)
         search.fill('Lecture')
@@ -60,6 +66,17 @@ def test_preferences_and_recording_sort(local_site,width,height,language,scheme)
         assert order()==['b','a','c']
         search.clear()
         assert_no_overflow(page)
+        card=page.locator('[data-recording-id="d"]')
+        card.scroll_into_view_if_needed()
+        heading=card.get_by_role('heading',name='Undated',exact=True).bounding_box()
+        status=card.get_by_text(tr('Aufnahme bereit'),exact=True).bounding_box()
+        assert heading['y']+heading['height'] <= status['y']
+        if width<640:
+            link=card.get_by_role('link').bounding_box()
+            stream=card.get_by_role('button',name=tr('Streamen'),exact=True).bounding_box()
+            assert abs(link['y']-stream['y'])<2 and link['x']+link['width']<stream['x']
+            assert card.bounding_box()['height']<140
+        field.scroll_into_view_if_needed()
         page.screenshot(path=f'.pytest_cache/recording-sort-{width}-{height}-{language}-{scheme}.png',animations='disabled')
         # The last recording remains reachable even in short landscape viewports.
         region=page.get_by_role('region',name=tr('Opencast Vorlesungsaufzeichnungen'),exact=True)
@@ -69,6 +86,8 @@ def test_preferences_and_recording_sort(local_site,width,height,language,scheme)
         viewport=region.bounding_box()
         assert bounds['y']+bounds['height'] <= viewport['y']+viewport['height']+1
         page.screenshot(path=f'.pytest_cache/recording-sort-scrolled-{width}-{height}-{language}-{scheme}.png',animations='disabled')
+        page.locator('[data-recording-id="a"]').scroll_into_view_if_needed()
+        page.screenshot(path=f'.pytest_cache/recording-card-long-title-{width}-{height}-{language}-{scheme}.png',animations='disabled')
         open_player('a')
         dialog=page.locator('dialog.podcast-player-dialog')
         dialog.get_by_role('button',name=tr('player.single'),exact=True).click()
@@ -91,8 +110,8 @@ def test_preferences_and_recording_sort(local_site,width,height,language,scheme)
         # Reload and another episode share preferences, but not playback clocks.
         page.reload()
         open_list()
-        pw.expect(field).to_have_value('title')
-        pw.expect(direction).to_have_value('desc')
+        pw.expect(field).to_have_attribute('aria-pressed','true')
+        pw.expect(direction).to_have_attribute('aria-pressed','false')
         open_player('b')
         pw.expect(dialog.locator('[data-stream=audio]')).to_be_hidden()
         pw.expect(dialog.locator('[data-stream=slides]')).to_be_visible()

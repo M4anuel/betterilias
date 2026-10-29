@@ -1487,6 +1487,7 @@
   "player.controls": "Video and playback controls",
   "recordings.sort_by": "Sort recordings by",
   "recordings.title": "Title",
+  "recordings.upload_date": "Upload date",
   "recordings.date": "Upload / recording date",
   "recordings.direction": "Sort order",
   "recordings.ascending": "Ascending",

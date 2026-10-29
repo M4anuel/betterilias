@@ -104,3 +104,10 @@ phones/short landscape, 256 px larger portrait phones). They clamp inside the
 canvas; larger portrait phones reserve enough height without shifting controls
 when scrubbing. Regression checks cover preview bounds and reload/episode/session
 preference behavior, as well as recording sort selections in both languages/themes.
+
+Recording sorting uses a compact title/upload-date toggle and a separate arrow
+button that rotates when order changes. The upload-date fallback explanation is
+available to assistive technology without occupying a toolbar row. Cards place
+titles before readiness metadata and put ILIAS/Stream actions side by side, left
+and right respectively on phones. Browser regressions check keyboard toggling,
+persisted order, compact phone card height and action/title geometry.
