@@ -212,7 +212,9 @@ def test_overlay_loading_drag_previews_inactivity_and_keyboard(local_site,width)
         volume.press('Home')
         volume.press('ArrowRight')
         assert abs(dialog.locator('[data-stream=audio]').evaluate('v=>v.volume')-.05)<.001
-        assert dialog.locator('.player-volume-cone').evaluate('e=>getComputedStyle(e).clipPath')!='none'
+        assert dialog.locator('.player-volume-cone').count()==0
+        assert dialog.locator('.player-volume-bar').evaluate('e=>getComputedStyle(e).clipPath')=='none'
+        assert dialog.locator('[data-volume-wave=outer]').get_attribute('opacity')=='0.3'
         page.clock.install()
         dialog.get_by_role('button',name='Play',exact=True).click()
         page.wait_for_function("document.querySelector('[data-stream=audio]').currentTime>.2")
@@ -361,8 +363,8 @@ def test_keyboard_canvas_layout_settings_and_subtitles(local_site,width,height,l
         close=dialog.get_by_role('button',name=tr('Schliessen'),exact=True)
         close.focus()
         page.keyboard.press('Space')
-        page.wait_for_function("document.querySelector('[data-stream=audio]').currentTime>.2")
         pw.expect(dialog.locator('[data-feedback=play]')).to_be_visible()
+        page.wait_for_function("document.querySelector('[data-stream=audio]').currentTime>.2")
         page.keyboard.down('Space')
         page.keyboard.down('Space')
         page.keyboard.up('Space')
@@ -453,4 +455,87 @@ def test_keyboard_canvas_layout_settings_and_subtitles(local_site,width,height,l
         pw.expect(dialog).to_have_count(0)
         pw.expect(stream).to_be_focused()
         assert not errors
+        browser.close()
+
+
+@pytest.mark.parametrize('width,height', [(320,740),(390,800),(430,800),(768,850),(1280,900),(740,360)])
+def test_player_resume_volume_and_taller_geometry(local_site,width,height):
+    pw=pytest.importorskip('playwright.sync_api')
+    with pw.sync_playwright() as p:
+        browser=p.chromium.launch(headless=True,channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+        page=browser.new_page(viewport=dict(width=width,height=height),has_touch=width<768)
+        page.set_default_timeout(10000)
+        page.add_init_script("localStorage.setItem('betterilias_language','en')")
+        native_url=[URL]
+        def respond(route):
+            if urlparse(route.request.url).path=='/api/podcasts/60':
+                data=dict(ref_id='60',title='Lecture recordings',total_episodes=1,recorded_count=1,scheduled_count=0,pages_available=[],
+                          episodes=[dict(id='episode-one',title='Recording one',status='available',stream_url=native_url[0])])
+                route.fulfill(content_type='application/json',body=json.dumps(data))
+            else:player_api(route)
+        page.route('**/api/**',respond)
+        page.route('**/media/**',media_route)
+        def open_player():
+            page.get_by_role('button',name='Stream',exact=True).click()
+            page.wait_for_function("document.querySelectorAll('dialog video').length===2 && Array.from(document.querySelectorAll('dialog video')).every(v=>v.readyState>=3 && !v.seeking)")
+        page.goto(local_site+'/?course=42')
+        page.get_by_text('Lecture recordings',exact=True).click()
+        open_player()
+        dialog=page.locator('dialog.podcast-player-dialog')
+        stage=dialog.locator('[data-player-layout]')
+        pw.expect(stage).to_be_visible()
+        assert stage.evaluate('e=>getComputedStyle(e).aspectRatio')=='16 / 10'
+        if width==1280:
+            bounds=stage.bounding_box()
+            assert abs(bounds['width']/bounds['height']-1.6)<.01
+            assert bounds['height']>height*.7
+        stage.hover(position=dict(x=20,y=70))
+        volume=dialog.get_by_role('slider',name='Volume',exact=True)
+        volume.focus()
+        volume.press('Home')
+        volume.press('ArrowRight')
+        pw.expect(dialog.locator('[data-volume-wave=outer]')).to_have_attribute('opacity','0.3')
+        pw.expect(dialog.locator('[data-volume-wave=inner]')).to_have_attribute('opacity','0.3')
+        volume.press('End')
+        pw.expect(dialog.locator('[data-volume-wave=outer]')).to_have_attribute('opacity','1')
+        assert dialog.locator('.player-volume-bar').bounding_box()['height']==8
+        seek=dialog.get_by_role('slider',name='Playback position',exact=True)
+        seek.focus()
+        seek.press('PageUp')
+        page.wait_for_function("Array.from(document.querySelectorAll('dialog video')).every(v=>Math.abs(v.currentTime-6)<.2 && !v.seeking)")
+        page.keyboard.press('Space')
+        page.wait_for_function("document.querySelector('[data-stream=audio]').currentTime>6.3")
+        page.keyboard.press('Space')
+        position=dialog.locator('[data-stream=audio]').evaluate('v=>v.currentTime')
+        page.keyboard.press('Escape')
+        saved=page.evaluate("JSON.parse(localStorage.getItem('betterilias_video_progress_local_60_episode-one'))")
+        assert abs(saved['position']-position)<.2
+        assert saved['lastStartedAt'] and saved['updatedAt'] and not saved['completed']
+        # Routing nodes and tokens change without changing the saved episode.
+        native_url[0]=URL+'&cmdNode=fresh-routing-node&rtoken=do-not-store-this-token'
+        page.reload()
+        page.get_by_text('Lecture recordings',exact=True).click()
+        open_player()
+        page.wait_for_function("Array.from(document.querySelectorAll('dialog video')).every(v=>v.currentTime>6 && !v.seeking)")
+        assert dialog.locator('[data-stream=audio]').evaluate('v=>v.paused')
+        assert page.evaluate("Object.keys(localStorage).filter(k=>k.startsWith('betterilias_video_progress_')).every(k=>!k.includes('rtoken')&&!k.includes('cmdNode'))")
+        # Another tenant must not inherit the previous account's progress.
+        page.keyboard.press('Escape')
+        page.evaluate("localStorage.setItem('betterilias_session_id','another-video-viewer')")
+        open_player()
+        assert dialog.locator('[data-stream=audio]').evaluate('v=>v.currentTime')<.1
+        seek.focus()
+        seek.press('End')
+        seek.press('ArrowLeft')
+        page.keyboard.press('Space')
+        page.wait_for_function("document.querySelector('[data-stream=audio]').ended")
+        page.keyboard.press('Escape')
+        saved=page.evaluate("JSON.parse(localStorage.getItem('betterilias_video_progress_another-video-viewer_60_episode-one'))")
+        assert saved['completed'] and saved['position']==0
+        open_player()
+        assert dialog.locator('[data-stream=audio]').evaluate('v=>v.currentTime')<.1
+        assert_no_overflow(page)
+        dialog.evaluate('e=>e.scrollTop=0')
+        stage.hover(position=dict(x=20,y=70))
+        page.screenshot(path=f'.pytest_cache/player-resume-volume-{width}-{height}.png',animations='disabled')
         browser.close()

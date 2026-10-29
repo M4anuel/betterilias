@@ -6,6 +6,8 @@ Refine the shared podcast/embedded-video player without changing its audio roles
 or synchronization. Reserve the video area during authenticated stream resolution
 and media loading, and display a reduced-motion-aware skeleton until usable video
 frames are available. Keep the canvas geometry stable while the recording loads.
+Use a default 16:10 canvas with a larger vertical allowance; cap it to the visible
+viewport and retain the minimum phone canvas size needed for touch controls.
 
 Move play/pause, seek, volume and playback speed into a translucent overlay over
 the video. Reveal it on pointer movement, tap or keyboard focus. Hide it after
@@ -19,9 +21,10 @@ Replace the separate slide collection with an 8 px seek track containing chapter
 markers at actual frame timestamps. Show the corresponding chapter thumbnail and
 target timestamp while hovering or dragging, and commit a drag seek on release.
 Keep the native range accessible by keyboard, with Page Up/Down navigation between
-slides. Constrain previews at either edge. Give the volume range a tapered cone
-that grows from low to high volume while preserving a 44 px hit area and normal
-keyboard input. Put independent stream quality controls in a scrollable overlay
+slides. Constrain previews at either edge. Use a straight volume track with a
+44 px hit area and normal keyboard input. Dim the speaker's outer wave at 50%
+volume and below, and its inner wave at 15% and below; keep mute visually distinct.
+Put independent stream quality controls in a scrollable overlay
 settings popover. Use three SVG layout buttons and a stream-switch button that
 works in inset, split and single view. Keep the audio-bearing source unchanged
 when changing the visible stream.
@@ -51,6 +54,16 @@ behavior. Compact previews on phones and short viewports leave the timeline
 and control hit areas in place throughout dragging. Layout changes do not
 unmount the media elements or reset playback state.
 
+Playback position is saved in browser storage per session, series `ref_id` and
+episode `eid`, independently of routing nodes, request tokens and signed CDN
+URLs. It is checkpointed at five-second intervals and on play, pause, seeking,
+quality changes, closing, visibility changes and page exit. Records also retain
+the last play-start time and update time. Reopening restores both streams to the
+saved position while paused; an ended recording starts from zero. Saved positions
+are clamped to the actual media duration. Unavailable storage and malformed
+records do not block playback. Progress is local to this browser/session and is
+not synchronized to ILIAS or another device.
+
 Native Paella caption metadata is passed through for WebVTT and SubRip tracks.
 The authenticated caption endpoint re-resolves the native manifest, limits hosts
 to ILIAS and the university Opencast domain, refuses redirects, caps content at
@@ -75,3 +88,6 @@ Additional language/theme cases cover all shortcuts, repeat suppression, canvas
 taps with visible/hidden overlays, animated-feedback lifetime, subtitle toggles
 and language changes, quality menus, swapping in every layout, actual fullscreen
 element identity, and Escape/focus restoration.
+Resume regressions reopen a recording after changing its routing tokens, verify
+tenant isolation and completion reset, and check 16:10 geometry and speaker wave
+thresholds at phone, tablet, desktop and short landscape sizes.

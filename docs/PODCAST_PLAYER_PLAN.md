@@ -107,6 +107,12 @@ audio/camera source; they are not universal size or quality promises.
   Single-stream recordings work without layout controls. Supported native WebVTT
   and SRT subtitles use the audio clock and render over every layout. HLS/DASH-only
   recordings, DFXP subtitles and OS-level picture in picture remain outside scope.
+- The default canvas is 16:10 and uses more of the visible viewport height. A
+  straight volume slider replaces the tapered track; speaker waves dim as volume
+  decreases. Session/series/episode-scoped local checkpoints restore the last
+  playback position without storing native routing tokens or signed stream URLs.
+  Closing, hiding the page, seeking and pausing save immediately; playback saves
+  at five-second intervals. Completed recordings reopen at the beginning.
 - The portable Paella fixture retains the supplied stream/configuration structure
   and 42 chapter timestamps. Unneeded OCR/transcriptions and captions are omitted.
   `tests/fixtures/player-test.mp4` is a synthetic 12-second H.264/AAC test clip

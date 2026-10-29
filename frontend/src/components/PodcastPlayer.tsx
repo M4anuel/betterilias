@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeftRight, Captions, Maximize, Pause, Play, Settings2, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeftRight, Captions, Maximize, Pause, Play, Settings2, VolumeX, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { t, useLanguage } from '../lib/i18n';
 import { VideoStreamInfo } from '../types';
+import { cache } from '../lib/cache';
+import { readVideoProgress, writeVideoProgress } from '../lib/videoProgress';
 
 const timestamp = (time: number) => {
   const seconds = Math.max(0, Math.floor(time));
@@ -14,6 +16,14 @@ function LayoutIcon({ mode }: { mode: 'inset' | 'split' | 'slides' }) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5" aria-hidden="true">
     {mode === 'split' ? <><rect x="2" y="5" width="9" height="14" rx="1" /><rect x="13" y="5" width="9" height="14" rx="1" /></>
       : <><rect x="3" y="5" width="18" height="14" rx="1.5" />{mode === 'inset' && <rect x="13" y="5" width="8" height="6" rx="1" fill="currentColor" />}</>}
+  </svg>;
+}
+
+function SpeakerIcon({ volume }: { volume: number }) {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
+    <path d="M11 5 6 9H3v6h3l5 4Z" />
+    <path data-volume-wave="inner" opacity={volume > .15 ? 1 : .3} d="M15 8a5 5 0 0 1 0 8" />
+    <path data-volume-wave="outer" opacity={volume > .5 ? 1 : .3} d="M18 5a9 9 0 0 1 0 14" />
   </svg>;
 }
 
@@ -53,12 +63,15 @@ export function PodcastPlayer({ url, title, onClose }: { url: string; title: str
     </div>
     <div className="space-y-4 p-3 sm:p-5">
       {error ? <p role="alert">{t('player.resolve_failed')} <button type="button" className={buttonStyle} onClick={() => setRevision(value => value + 1)}>{t('Erneut versuchen')}</button></p> : !data ? <PlayerSkeleton />
-        : <SynchronizedPlayer key={`${url}_${revision}`} data={data} sourceUrl={url} onRetry={() => setRevision(value => value + 1)} />}
+        : <SynchronizedPlayer key={`${cache.getSessionId()}_${url}_${revision}`} data={data} sourceUrl={url} onRetry={() => setRevision(value => value + 1)} />}
     </div>
   </dialog>;
 }
 
 function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInfo; sourceUrl: string; onRetry: () => void }) {
+  const [progressScope] = useState(() => cache.getSessionId());
+  const [savedProgress] = useState(() => readVideoProgress(sourceUrl, progressScope));
+  const initialPosition = savedProgress?.completed ? 0 : savedProgress?.position || 0;
   const audioStream = data.streams.find(stream => stream.main_audio) || data.streams[0];
   const slidesStream = data.streams.find(stream => stream !== audioStream && stream.content === 'presentation')
     || data.streams.find(stream => stream !== audioStream);
@@ -69,7 +82,7 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [time, setTime] = useState(0);
+  const [time, setTime] = useState(initialPosition);
   const [duration, setDuration] = useState(data.duration || 0);
   const [rate, setRate] = useState(1);
   const [volume, setVolume] = useState(1);
@@ -101,13 +114,31 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
   const playerArea = useRef<HTMLDivElement>(null);
   const slides = useRef<HTMLVideoElement>(null);
   const wanted = useRef(false);
-  const position = useRef(0);
+  const position = useRef(initialPosition);
+  const metadataReady = useRef(false);
+  const knownDuration = useRef(data.duration);
+  const lastSaved = useRef(0);
+  const lastStartedAt = useRef(savedProgress?.lastStartedAt || null);
+  const completed = useRef(savedProgress?.completed || false);
   const speed = useRef(1);
   const loudness = useRef(1);
   const controller = useRef<{ toggle: () => void; seek: (value: number) => void } | null>(null);
   const audioUrl = audioStream.renditions[audioQuality].url;
   const slidesUrl = slidesStream?.renditions[slidesQuality].url;
   const revealControls = () => { activity.current = Date.now(); setControlsVisible(true); };
+  const saveProgress = (force = false) => {
+    if (!metadataReady.current || (!force && Date.now() - lastSaved.current < 5000)) return;
+    lastSaved.current = Date.now();
+    writeVideoProgress(sourceUrl, progressScope, { position: position.current, duration: knownDuration.current,
+      updatedAt: lastSaved.current, lastStartedAt: lastStartedAt.current, completed: completed.current });
+  };
+
+  useEffect(() => {
+    const save = () => saveProgress(true);
+    window.addEventListener('pagehide', save);
+    document.addEventListener('visibilitychange', save);
+    return () => { window.removeEventListener('pagehide', save); document.removeEventListener('visibilitychange', save); save(); };
+  }, []);
 
   function togglePlayback() {
     if (!controller.current) return;
@@ -256,9 +287,10 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
     const videos = [master, ...(follower ? [follower] : [])];
     let active = true;
     let starting = false;
+    metadataReady.current = false;
     setError(null);
     setPlaying(false); setBuffering(wanted.current); setMediaReady(false);
-    const pause = () => { videos.forEach(video => video.pause()); setPlaying(false); };
+    const pause = () => { videos.forEach(video => video.pause()); setPlaying(false); saveProgress(true); };
     const resume = async () => {
       if (!active || !wanted.current || starting) return;
       if (!videos.every(video => video.readyState >= 3 && !video.seeking)) { setBuffering(true); return; }
@@ -274,13 +306,18 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
     };
     const seek = (value: number) => {
       position.current = Math.max(0, value);
+      completed.current = false;
       pause();
       for (const video of videos) if (video.readyState >= 1) video.currentTime = position.current;
       setTime(position.current);
       void resume();
     };
     controller.current = {
-      toggle: () => { wanted.current = !wanted.current; setError(null); if (wanted.current) void resume(); else { pause(); setBuffering(false); } },
+      toggle: () => {
+        wanted.current = !wanted.current; setError(null);
+        if (wanted.current) { completed.current = false; lastStartedAt.current = Date.now(); saveProgress(true); void resume(); }
+        else { if (metadataReady.current && !master.seeking) position.current = master.currentTime; pause(); setBuffering(false); }
+      },
       seek,
     };
     const removers: (() => void)[] = [];
@@ -289,7 +326,12 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
     };
     videos.forEach(video => {
       listen(video, 'loadedmetadata', () => {
-        if (Number.isFinite(video.duration) && video === master) setDuration(video.duration);
+        if (Number.isFinite(video.duration) && video === master) {
+          knownDuration.current = video.duration;
+          position.current = Math.min(position.current, Math.max(0, video.duration - .25));
+          setDuration(video.duration); setTime(position.current);
+          metadataReady.current = true;
+        }
         video.currentTime = position.current;
         video.playbackRate = speed.current;
       });
@@ -299,14 +341,18 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
       listen(video, 'error', () => { wanted.current = false; pause(); setBuffering(false); setError(t('player.media_failed')); });
     });
     listen(master, 'timeupdate', () => {
-      position.current = master.currentTime; setTime(master.currentTime);
+      if (!metadataReady.current || master.seeking) return;
+      position.current = completed.current ? 0 : master.currentTime; setTime(master.currentTime);
+      saveProgress();
       if (follower && follower.readyState >= 1 && Math.abs(follower.currentTime - master.currentTime) > 0.3) follower.currentTime = master.currentTime;
     });
-    listen(master, 'ended', () => { wanted.current = false; pause(); setBuffering(false); });
+    listen(master, 'ended', () => { wanted.current = false; pause(); setBuffering(false); completed.current = true; position.current = 0; saveProgress(true); });
     master.muted = mutedRef.current; master.volume = loudness.current; master.src = audioUrl;
     if (follower && slidesUrl) { follower.muted = true; follower.src = slidesUrl; }
     videos.forEach(video => video.load());
     return () => {
+      if (metadataReady.current && !master.seeking && !completed.current) position.current = master.currentTime;
+      saveProgress(true); metadataReady.current = false;
       active = false; controller.current = null; removers.forEach(remove => remove());
       videos.forEach(video => { video.pause(); video.removeAttribute('src'); video.load(); });
     };
@@ -436,9 +482,9 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
           <button type="button" onClick={togglePlayback} aria-label={t(playing || buffering ? 'player.pause' : 'player.play')} aria-keyshortcuts="Space" className={overlayButton}>
             {playing || buffering ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}</button>
           <button type="button" aria-label={t(muted || volume === 0 ? 'player.unmute' : 'player.mute')} aria-pressed={muted || volume === 0} aria-keyshortcuts="m" className={overlayButton} onClick={toggleMute}>
-            {muted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</button>
+            {muted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <SpeakerIcon volume={volume} />}</button>
           <label className="player-volume" title={t('player.volume')}><span className="sr-only">{t('player.volume')}</span>
-            <span className="player-volume-cone" aria-hidden="true" style={{ background: `linear-gradient(to right, #2dd4bf ${volume * 100}%, rgb(255 255 255 / .3) ${volume * 100}%)` }} />
+            <span className="player-volume-bar" aria-hidden="true" style={{ background: `linear-gradient(to right, #2dd4bf ${(muted ? 0 : volume) * 100}%, rgb(255 255 255 / .3) ${(muted ? 0 : volume) * 100}%)` }} />
             <input type="range" min={0} max={1} step={0.05} value={volume} className="player-volume-range" aria-valuetext={t('player.volume_percent', { percent: Math.round(volume * 100) })} onChange={event => {
               const value = Number(event.target.value); setVolume(value); loudness.current = value;
               if (value > 0) { lastVolume.current = value; mutedRef.current = false; setMuted(false); }
