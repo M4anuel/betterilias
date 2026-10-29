@@ -94,6 +94,7 @@ const WEEKDAY_LONG_KEYS = [
 ] as const;
 
 const CURRENT_SEMESTER_TTL_MS = 6 * 3600 * 1000; // 6 hours for current-semester courses
+const HOUR_HEIGHT_PX = 46;
 
 function parseYmd(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -176,6 +177,7 @@ interface PositionedEvent {
   event: CalendarEvent;
   topPct: number;
   heightPct: number;
+  durationMin: number;
   colIndex: number;
   colCount: number;
 }
@@ -242,12 +244,14 @@ function layoutDayEvents(
       const startMin = Math.max(gridStartMin, timeToMinutes(p.event.start_time_str));
       const rawEnd = Math.max(startMin + 30, timeToMinutes(p.event.end_time_str));
       const endMin = Math.min(gridEndMin, rawEnd);
+      const durationMin = Math.max(30, endMin - startMin);
       const topPct = ((startMin - gridStartMin) / totalRange) * 100;
-      const heightPct = Math.max(5, ((endMin - startMin) / totalRange) * 100);
+      const heightPct = Math.max(5, (durationMin / totalRange) * 100);
       result.push({
         event: p.event,
         topPct,
         heightPct,
+        durationMin,
         colIndex: p.colIndex,
         colCount,
       });
@@ -1641,7 +1645,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         gridTemplateColumns: `64px repeat(${displayedWeekdays.length}, minmax(0, 1fr))`,
                       }}
                     >
-                      <div className="p-2 text-center text-[10px] font-bold uppercase text-slate-400">
+                      <div className="py-1.5 px-2 text-center text-[10px] font-bold uppercase text-slate-400 flex items-center justify-center">
                         CET/CEST
                       </div>
                       {displayedWeekdays.map((wd) => {
@@ -1650,14 +1654,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         return (
                           <div
                             key={wd}
-                            className={`border-l border-slate-200/80 p-2.5 text-center dark:border-slate-800 ${
+                            className={`border-l border-slate-200/80 py-1.5 px-2 text-center dark:border-slate-800 ${
                               isToday ? 'bg-[#0AACA5]/10' : ''
                             }`}
                           >
-                            <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                            <div className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-tight">
                               {t(WEEKDAY_SHORT_KEYS[wd])}
                             </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
                               {dayInfo.date.getDate()}.{dayInfo.date.getMonth() + 1}.
                             </div>
                           </div>
@@ -1713,7 +1717,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       className="grid relative"
                       style={{
                         gridTemplateColumns: `64px repeat(${displayedWeekdays.length}, minmax(0, 1fr))`,
-                        height: `${hoursList.length * 56}px`,
+                        height: `${hoursList.length * HOUR_HEIGHT_PX}px`,
                       }}
                     >
                       {/* Hour Labels Column */}
@@ -1721,8 +1725,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         {hoursList.map((hr, idx) => (
                           <div
                             key={hr}
-                            style={{ top: `${idx * 56}px`, height: '56px' }}
-                            className="absolute inset-x-0 border-b border-slate-100 dark:border-slate-800/70 pr-2 pt-1 text-right text-[11px] font-semibold text-slate-400"
+                            style={{ top: `${idx * HOUR_HEIGHT_PX}px`, height: `${HOUR_HEIGHT_PX}px` }}
+                            className="absolute inset-x-0 border-b border-slate-100 dark:border-slate-800/70 pr-2 pt-0.5 text-right text-[11px] font-semibold text-slate-400"
                           >
                             {String(hr).padStart(2, '0')}:00
                           </div>
@@ -1746,7 +1750,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             {hoursList.map((hr, idx) => (
                               <div
                                 key={hr}
-                                style={{ top: `${idx * 56}px`, height: '56px' }}
+                                style={{ top: `${idx * HOUR_HEIGHT_PX}px`, height: `${HOUR_HEIGHT_PX}px` }}
                                 className="absolute inset-x-0 border-b border-slate-100 dark:border-slate-800/60 pointer-events-none"
                               />
                             ))}
@@ -1756,6 +1760,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                               const widthPct = 100 / pos.colCount;
                               const leftPct = pos.colIndex * widthPct;
                               const color = pos.event.color || '#0AACA5';
+                              const isUltraShort = pos.durationMin < 45;
+                              const isShortSession = pos.durationMin >= 45 && pos.durationMin <= 65;
+
                               return (
                                 <button
                                   key={pos.event.uid}
@@ -1769,30 +1776,73 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     backgroundColor: `${color}1F`,
                                     borderLeft: `4px solid ${color}`,
                                   }}
-                                  className="absolute rounded-lg p-1.5 text-left overflow-hidden shadow-2xs hover:shadow-md transition flex flex-col justify-between cursor-pointer bg-white/90 dark:bg-slate-900/90"
+                                  className={`absolute rounded-lg text-left overflow-hidden shadow-2xs hover:shadow-md transition cursor-pointer bg-white/90 dark:bg-slate-900/90 ${
+                                    isUltraShort
+                                      ? 'px-1.5 py-0 flex items-center gap-1.5'
+                                      : isShortSession
+                                        ? 'px-1.5 py-0.5 flex flex-col justify-center gap-0'
+                                        : 'px-1.5 py-1 flex flex-col justify-between'
+                                  }`}
                                   title={`${pos.event.start_time_str}–${pos.event.end_time_str} ${pos.event.title} (${pos.event.course_title})`}
                                 >
-                                  <div className="min-w-0">
-                                    <div
-                                      className="text-[10px] font-extrabold leading-tight truncate"
-                                      style={{ color }}
-                                    >
-                                      {pos.event.start_time_str}–{pos.event.end_time_str}
-                                    </div>
-                                    <div className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-2">
-                                      {pos.event.title}
-                                    </div>
-                                    {pos.event.title !== pos.event.course_title && (
-                                      <div className="text-[10px] font-medium text-slate-600 dark:text-slate-300 truncate">
-                                        {pos.event.course_title}
+                                  {isUltraShort ? (
+                                    <>
+                                      <span
+                                        className="text-[10px] font-extrabold leading-none shrink-0"
+                                        style={{ color }}
+                                      >
+                                        {pos.event.start_time_str}
+                                      </span>
+                                      <span className="text-[11px] font-bold text-slate-900 dark:text-slate-100 leading-none truncate">
+                                        {pos.event.title}
+                                      </span>
+                                    </>
+                                  ) : isShortSession ? (
+                                    <>
+                                      <div className="flex items-center justify-between gap-1 min-w-0 leading-none">
+                                        <span
+                                          className="text-[10px] font-extrabold leading-tight truncate shrink-0"
+                                          style={{ color }}
+                                        >
+                                          {pos.event.start_time_str}–{pos.event.end_time_str}
+                                        </span>
+                                        {pos.event.location && (
+                                          <span className="text-[9px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-0.5 max-w-[55%]">
+                                            <MapPin className="h-2.5 w-2.5 shrink-0" />
+                                            <span className="truncate">{pos.event.location}</span>
+                                          </span>
+                                        )}
                                       </div>
-                                    )}
-                                  </div>
-                                  {pos.event.location && (
-                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-0.5">
-                                      <MapPin className="h-2.5 w-2.5 shrink-0" />
-                                      <span className="truncate">{pos.event.location}</span>
-                                    </div>
+                                      <div className="text-[11px] font-bold text-slate-900 dark:text-slate-100 leading-tight truncate">
+                                        {pos.event.title}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="min-w-0">
+                                        <div
+                                          className="text-[10px] font-extrabold leading-tight truncate"
+                                          style={{ color }}
+                                        >
+                                          {pos.event.start_time_str}–{pos.event.end_time_str}
+                                        </div>
+                                        <div className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-2">
+                                          {pos.event.title}
+                                        </div>
+                                        {pos.event.title !== pos.event.course_title &&
+                                          pos.durationMin >= 95 && (
+                                            <div className="text-[10px] font-medium text-slate-600 dark:text-slate-300 truncate">
+                                              {pos.event.course_title}
+                                            </div>
+                                          )}
+                                      </div>
+                                      {pos.event.location && (
+                                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-0.5">
+                                          <MapPin className="h-2.5 w-2.5 shrink-0" />
+                                          <span className="truncate">{pos.event.location}</span>
+                                        </div>
+                                      )}
+                                    </>
                                   )}
                                 </button>
                               );
