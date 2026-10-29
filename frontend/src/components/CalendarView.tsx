@@ -345,6 +345,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // Selected Event Details Modal
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [openInfoCourseId, setOpenInfoCourseId] = useState<string | null>(null);
+  const [isCoursesPanelCollapsed, setIsCoursesPanelCollapsed] = useState<boolean>(false);
 
   const syncRunIdRef = useRef<number>(0);
   const syncAbortRef = useRef<AbortController | null>(null);
@@ -1110,6 +1111,49 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }
   };
 
+  // Detect block-course weeks (courses that meet in only 1..5 distinct weeks of the semester,
+  // e.g. a 3-block course on Thursday/Friday) so the Timetable header can show quick-jump pills
+  const blockCourseWeeks = useMemo(() => {
+    const courseWeeks = new Map<string, Map<string, { firstDateStr: string; title: string }>>();
+    for (const ev of visibleEvents) {
+      if (ev.kind !== 'lecture') continue;
+      if (ev.date_str < semesterBounds.start || ev.date_str > semesterBounds.end) continue;
+      const mondayStr = formatYmd(getMondayOfWeek(parseYmd(ev.date_str)));
+      if (!courseWeeks.has(ev.course_ref_id)) {
+        courseWeeks.set(ev.course_ref_id, new Map());
+      }
+      const wkMap = courseWeeks.get(ev.course_ref_id)!;
+      const existing = wkMap.get(mondayStr);
+      if (!existing || ev.date_str < existing.firstDateStr) {
+        wkMap.set(mondayStr, { firstDateStr: ev.date_str, title: ev.course_title });
+      }
+    }
+
+    const blockWeekMap = new Map<string, { mondayStr: string; firstDateStr: string; courses: string[] }>();
+    for (const [, wkMap] of courseWeeks.entries()) {
+      if (wkMap.size >= 1 && wkMap.size <= 5) {
+        for (const [mondayStr, info] of wkMap.entries()) {
+          const entry = blockWeekMap.get(mondayStr) || {
+            mondayStr,
+            firstDateStr: info.firstDateStr,
+            courses: [],
+          };
+          if (info.firstDateStr < entry.firstDateStr) {
+            entry.firstDateStr = info.firstDateStr;
+          }
+          if (!entry.courses.includes(info.title)) {
+            entry.courses.push(info.title);
+          }
+          blockWeekMap.set(mondayStr, entry);
+        }
+      }
+    }
+
+    return Array.from(blockWeekMap.values()).sort((a, b) =>
+      a.mondayStr.localeCompare(b.mondayStr)
+    );
+  }, [visibleEvents, semesterBounds.start, semesterBounds.end]);
+
   const activeSubscriptionUrl =
     subscriptionInfo?.subscription_url || calendarData?.subscription_url || null;
 
@@ -1333,21 +1377,41 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         {viewMode !== 'agenda' ? (
           <div className="flex flex-wrap items-center justify-between md:justify-end gap-2">
             {viewMode === 'timetable' && (
-              <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800 text-[11px]">
+              <div className="flex flex-wrap items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800 text-[11px]">
                 <button
                   type="button"
                   onClick={() => jumpToSemesterHalf('first')}
-                  className="min-h-9 sm:min-h-7 rounded-lg px-2.5 py-1 font-semibold text-slate-700 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700 transition cursor-pointer"
+                  className="min-h-9 sm:min-h-7 whitespace-nowrap rounded-lg px-2.5 py-1 font-semibold text-slate-700 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700 transition cursor-pointer"
                 >
                   {t('calendar.period.first_half')}
                 </button>
                 <button
                   type="button"
                   onClick={() => jumpToSemesterHalf('second')}
-                  className="min-h-9 sm:min-h-7 rounded-lg px-2.5 py-1 font-semibold text-slate-700 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700 transition cursor-pointer"
+                  className="min-h-9 sm:min-h-7 whitespace-nowrap rounded-lg px-2.5 py-1 font-semibold text-slate-700 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700 transition cursor-pointer"
                 >
                   {t('calendar.period.second_half')}
                 </button>
+                {blockCourseWeeks.map((bw, idx) => {
+                  const dt = parseYmd(bw.firstDateStr);
+                  const shortDate = `${dt.getDate()}.${dt.getMonth() + 1}.`;
+                  const isCurrentWeek = weekDays[0]?.dateStr === bw.mondayStr;
+                  return (
+                    <button
+                      key={bw.mondayStr}
+                      type="button"
+                      onClick={() => setReferenceDate(parseYmd(bw.mondayStr))}
+                      title={bw.courses.join(', ')}
+                      className={`min-h-9 sm:min-h-7 whitespace-nowrap rounded-lg px-2 py-1 font-semibold transition cursor-pointer ${
+                        isCurrentWeek
+                          ? 'bg-[#0AACA5] text-white shadow-2xs'
+                          : 'text-[#0AACA5] hover:bg-white dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {t('calendar.period.block_week', { index: idx + 1, date: shortDate })}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -1413,10 +1477,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         )}
       </div>
 
-      {/* Main Content Layout: Calendar Viewport + Course Status & Schedule Rules Panel */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-        {/* Left/Center 8 cols: Active Calendar or Timetable View */}
-        <div className="xl:col-span-8 space-y-4 min-w-0">
+      {/* Main Content Layout: Calendar Viewport + Collapsible & Scrollable Course Status Panel */}
+      <div className="flex flex-col xl:flex-row gap-5 items-start">
+        {/* Left/Center: Active Calendar or Timetable View (expands to full width when right panel is collapsed) */}
+        <div className="w-full xl:flex-1 space-y-4 min-w-0">
           {/* TIMETABLE OR WEEK VIEW */}
           {(viewMode === 'timetable' || viewMode === 'week') && (
             <div className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
@@ -1951,71 +2015,101 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           )}
         </div>
 
-        {/* Right 4 cols: Courses, ILIAS Calendar Statuses, Semester/Category Filters & Custom Schedule Rules */}
-        <div className="xl:col-span-4 space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
-                  {t('calendar.courses_panel.title')}
-                </h2>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {t('calendar.courses_panel.subtitle')}
-                </p>
+        {/* Right: Collapsible & Internally Scrollable Courses & ILIAS Calendar Status Panel */}
+        {isCoursesPanelCollapsed ? (
+          <div className="w-full xl:w-auto shrink-0 xl:sticky xl:top-4">
+            <button
+              type="button"
+              onClick={() => setIsCoursesPanelCollapsed(false)}
+              aria-label={t('calendar.courses_panel.expand')}
+              title={t('calendar.courses_panel.expand')}
+              className="w-full xl:w-11 min-h-11 xl:py-4 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-xs hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/80 flex xl:flex-col items-center justify-between xl:justify-center gap-2.5 text-slate-700 dark:text-slate-200 transition cursor-pointer"
+            >
+              <ChevronLeft className="h-4 w-4 shrink-0 text-[#0AACA5]" />
+              <span className="rounded-full bg-[#0AACA5]/15 px-2 py-0.5 text-[11px] font-extrabold text-[#0AACA5]">
+                {filteredPanelCourses.length}
+              </span>
+              <span className="text-xs font-bold xl:[writing-mode:vertical-rl] xl:rotate-180 whitespace-nowrap">
+                {t('calendar.courses_panel.title')}
+              </span>
+            </button>
+          </div>
+        ) : (
+          <div className="w-full xl:w-[380px] shrink-0 xl:sticky xl:top-4">
+            <div className="max-h-[75vh] xl:max-h-[calc(100vh-6rem)] flex flex-col rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+              <div className="shrink-0 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 truncate">
+                    {t('calendar.courses_panel.title')}
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {t('calendar.courses_panel.subtitle')}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => openRuleModal()}
+                    className="min-h-9 sm:min-h-7 shrink-0 whitespace-nowrap inline-flex items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 shrink-0" />
+                    <span>{t('calendar.rule.add_short')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCoursesPanelCollapsed(true)}
+                    aria-label={t('calendar.courses_panel.collapse')}
+                    title={t('calendar.courses_panel.collapse')}
+                    className="min-h-9 min-w-9 sm:min-h-7 sm:min-w-7 shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition cursor-pointer"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => openRuleModal()}
-                className="min-h-10 sm:min-h-8 inline-flex items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>{t('calendar.rule.add_short')}</span>
-              </button>
-            </div>
 
-            {/* Semester & Category Filter Controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-              <div className="space-y-1">
-                <label className="flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                  <Filter className="h-3 w-3 text-[#0AACA5]" />
-                  <span>{t('calendar.filter.semester_label')}</span>
-                </label>
-                <select
-                  value={panelSemesterFilter}
-                  onChange={(e) => setPanelSemesterFilter(e.target.value)}
-                  aria-label={t('calendar.filter.semester_label')}
-                  className="min-h-12 sm:min-h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                >
-                  <option value="ALL">{t('calendar.filter.all_semesters')}</option>
-                  {availableCalendarSemesters.map((sem) => (
-                    <option key={sem} value={sem}>
-                      {sem}
-                    </option>
-                  ))}
-                </select>
+              {/* Semester & Category Filter Controls */}
+              <div className="shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                    <Filter className="h-3 w-3 text-[#0AACA5]" />
+                    <span>{t('calendar.filter.semester_label')}</span>
+                  </label>
+                  <select
+                    value={panelSemesterFilter}
+                    onChange={(e) => setPanelSemesterFilter(e.target.value)}
+                    aria-label={t('calendar.filter.semester_label')}
+                    className="min-h-11 sm:min-h-8 w-full rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    <option value="ALL">{t('calendar.filter.all_semesters')}</option>
+                    {availableCalendarSemesters.map((sem) => (
+                      <option key={sem} value={sem}>
+                        {sem}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                    <Filter className="h-3 w-3 text-[#0AACA5]" />
+                    <span>{t('calendar.filter.category_label')}</span>
+                  </label>
+                  <select
+                    value={panelCategoryFilter}
+                    onChange={(e) =>
+                      setPanelCategoryFilter(e.target.value as 'all' | 'courses' | 'groups')
+                    }
+                    aria-label={t('calendar.filter.category_label')}
+                    className="min-h-11 sm:min-h-8 w-full rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    <option value="all">{t('calendar.filter.category_all')}</option>
+                    <option value="courses">{t('calendar.filter.category_courses')}</option>
+                    <option value="groups">{t('calendar.filter.category_groups')}</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                  <Filter className="h-3 w-3 text-[#0AACA5]" />
-                  <span>{t('calendar.filter.category_label')}</span>
-                </label>
-                <select
-                  value={panelCategoryFilter}
-                  onChange={(e) =>
-                    setPanelCategoryFilter(e.target.value as 'all' | 'courses' | 'groups')
-                  }
-                  aria-label={t('calendar.filter.category_label')}
-                  className="min-h-12 sm:min-h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                >
-                  <option value="all">{t('calendar.filter.category_all')}</option>
-                  <option value="courses">{t('calendar.filter.category_courses')}</option>
-                  <option value="groups">{t('calendar.filter.category_groups')}</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-3">
+              <div className="flex-1 overflow-y-auto min-h-0 pr-1 pt-3 space-y-2.5">
               {filteredPanelCourses.map((course) => {
                 const isHidden = hiddenCourses.includes(course.course_ref_id);
                 const courseRules = (calendarData?.rules || []).filter(
@@ -2093,10 +2187,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         <button
                           type="button"
                           onClick={() => openRuleModal(course.course_ref_id)}
-                          className="min-h-9 sm:min-h-7 whitespace-nowrap shrink-0 inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                          aria-label={t('calendar.add_schedule')}
+                          title={t('calendar.add_schedule')}
+                          className="min-h-9 min-w-9 sm:min-h-7 sm:min-w-7 shrink-0 inline-flex items-center justify-center rounded-lg bg-white text-slate-700 shadow-2xs hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
                         >
-                          <Plus className="h-3 w-3 shrink-0" />
-                          <span>{t('calendar.rule.add_short')}</span>
+                          <Plus className="h-3.5 w-3.5 shrink-0" />
                         </button>
                       </div>
                     </div>
@@ -2262,9 +2357,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* MANUAL RECHECK MODAL (Specific courses checkbox list, Current Semester, or Everything) */}

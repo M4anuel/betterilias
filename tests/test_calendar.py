@@ -782,6 +782,14 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
         playwright.expect(page.get_by_text(tr("calendar.info.synced_from_ilias"), exact=True)).to_be_visible()
         info_btn.click()
 
+        # Verify collapsing and expanding the Courses & ILIAS Calendar Status panel
+        collapse_btn = page.get_by_role("button", name=tr("calendar.courses_panel.collapse"), exact=True)
+        collapse_btn.click()
+        expand_btn = page.get_by_role("button", name=tr("calendar.courses_panel.expand"), exact=True)
+        playwright.expect(expand_btn).to_be_visible()
+        expand_btn.click()
+        playwright.expect(collapse_btn).to_be_visible()
+
         # Open Manual Recheck Modal and verify checkbox list + layout
         page.get_by_role("button", name=tr("calendar.recheck.button"), exact=True).click()
         recheck_dialog = page.get_by_role("dialog", name=tr("calendar.recheck.modal_title"), exact=True)
