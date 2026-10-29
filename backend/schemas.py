@@ -141,6 +141,9 @@ class PodcastEpisode(BaseModel):
     id: str  # eid
     title: str
     date: Optional[str] = None
+    recorded_at: Optional[str] = None
+    uploaded_date: Optional[str] = None
+    uploaded_at: Optional[str] = None
     presenter: Optional[str] = None
     location: Optional[str] = None
     stream_url: Optional[str] = None

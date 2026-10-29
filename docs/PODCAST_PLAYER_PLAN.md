@@ -127,3 +127,10 @@ audio/camera source; they are not universal size or quality promises.
   authenticated episode resolution encountered `SessionExpiredError` in the
   existing local session. Renewed-session live playback, long-recording drift,
   CDN expiry behavior and real iOS/Android acceptance still need validation.
+- Player settings now persist across recordings and reloads per session. The
+  recordings dialog remembers title/date and ascending/descending sort choices.
+  Explicit upload-date metadata takes priority over recording dates; the saved
+  real pages expose only recording dates, so the control explains that fallback.
+  Backend responses include canonical date timestamps for chronological sorting,
+  while older cached responses retain a bilingual recording-date fallback.
+  Undated episodes stay last in either direction; titles sort naturally.

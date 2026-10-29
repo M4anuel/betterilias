@@ -201,6 +201,7 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 ## Completed
 
 - [x] Give the player a taller default 16:10 canvas, save/resume playback positions per session and episode, and replace the cone with a straight volume track and volume-sensitive speaker waves.
+- [x] Remember player layout, visible stream and playback preferences per session; unify mute glyph sizing, double slide preview sizes, and add persistent title/date sorting in either direction to recordings, using upload dates only when explicitly supplied.
 
 - [x] Add whole-player keyboard toggles, canvas-only fullscreen, animated click/tap playback feedback, icon layouts with switching in every mode, overlay quality settings and supplied WebVTT/SRT subtitles; move episode ILIAS links below Stream and remove persistent reload/bandwidth actions.
 
