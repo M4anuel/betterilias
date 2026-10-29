@@ -81,6 +81,11 @@ async function sessionFetch(input: string, init?: RequestInit & { trackPending?:
 const inFlightManagement = new Map<string, Promise<ManagementResponse>>();
 
 export const api = {
+  async getVideoCaptions(url: string, track: number, signal?: AbortSignal): Promise<string> {
+    const res = await sessionFetch(`${API_BASE}/courses/video-captions?url=${encodeURIComponent(url)}&track=${track}`, { cache: 'no-store', signal });
+    if (!res.ok) throw new Error(t('player.captions_failed'));
+    return res.text();
+  },
   async getVideoStream(url: string): Promise<VideoStreamInfo> {
     const res = await sessionFetch(`${API_BASE}/courses/video-stream-info?url=${encodeURIComponent(url)}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(t('player.resolve_failed'));

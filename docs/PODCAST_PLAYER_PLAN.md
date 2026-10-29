@@ -92,17 +92,27 @@ audio/camera source; they are not universal size or quality promises.
   muted. Rejected play promises and media failures have localised retry/fallback
   feedback, and buffering times out after 20 seconds.
 - Picture in picture is an **in-player inset layout**, alongside responsive split
-  view and screen swap. Slides-only keeps the audio-bearing video active but
-  hidden. Bandwidth saver selects the lowest available camera rendition and the
-  highest available slides rendition; it does not promise an audio-only transfer.
-  Quality options come from the recording. Full screen is offered where supported.
+  and single views. All three icon-selected layouts support stream swapping.
+  Selecting a single visible stream preserves the audio-bearing source. Quality
+  options come from the recording and live in the overlay settings menu. The
+  persistent bandwidth/reload buttons were removed; error states retain retry.
+  Fullscreen targets the video canvas and its overlays, never the page/header.
+  Space/F/M/C toggle playback, fullscreen, mute and available subtitles. Canvas
+  taps toggle playback with short, reduced-motion-aware animated feedback.
 - Chapter timestamps mark the timeline, with thumbnails displayed during hover
   and scrubbing instead of a separate slide collection. Keyboard Page Up/Down
   seeks between chapters. The translucent playback controls hide after inactivity
   while preserving touch and keyboard access, and loading skeletons reserve the
   video area. See [the refinement specification](PLAYER_CONTROLS_REFINEMENT.md).
-  Single-stream recordings work without layout controls. HLS/DASH-only
-  recordings, subtitles and OS-level picture in picture remain outside this scope.
+  Single-stream recordings work without layout controls. Supported native WebVTT
+  and SRT subtitles use the audio clock and render over every layout. HLS/DASH-only
+  recordings, DFXP subtitles and OS-level picture in picture remain outside scope.
+- The default canvas is 16:10 and uses more of the visible viewport height. A
+  straight volume slider replaces the tapered track; speaker waves dim as volume
+  decreases. Session/series/episode-scoped local checkpoints restore the last
+  playback position without storing native routing tokens or signed stream URLs.
+  Closing, hiding the page, seeking and pausing save immediately; playback saves
+  at five-second intervals. Completed recordings reopen at the beginning.
 - The portable Paella fixture retains the supplied stream/configuration structure
   and 42 chapter timestamps. Unneeded OCR/transcriptions and captions are omitted.
   `tests/fixtures/player-test.mp4` is a synthetic 12-second H.264/AAC test clip

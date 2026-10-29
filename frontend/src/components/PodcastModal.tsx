@@ -323,8 +323,9 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <div className="flex flex-col items-stretch gap-1 shrink-0 self-end sm:self-center">
                     {isRecorded && ep.stream_url ? (
+                      <>
                       <button
                         type="button"
                         onClick={() => setActiveEpisode(ep)}
@@ -333,6 +334,10 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                         <Play className="h-3.5 w-3.5 fill-white" />
                         <span>{t("Streamen")}</span>
                       </button>
+                      <a href={ep.stream_url} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center gap-1 rounded-lg px-2 text-xs text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">
+                        <ExternalLink className="h-3 w-3" /><span>{t("In ILIAS \u00f6ffnen")}</span>
+                      </a>
+                      </>
                     ) : (
                       <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 px-2">
                         {t("Wird aufgezeichnet")}

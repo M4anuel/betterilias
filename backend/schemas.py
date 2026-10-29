@@ -118,9 +118,17 @@ class MediaChapter(BaseModel):
     text: str = ''
 
 
+class MediaCaption(BaseModel):
+    url: str
+    language: str = 'und'
+    label: str = ''
+    format: str = 'vtt'
+
+
 class VideoStreamResponse(BaseModel):
     streams: List[MediaStream] = Field(default_factory=list)
     chapters: List[MediaChapter] = Field(default_factory=list)
+    captions: List[MediaCaption] = Field(default_factory=list)
     duration: Optional[float] = None
     title: Optional[str] = None
     preview_url: Optional[str] = None

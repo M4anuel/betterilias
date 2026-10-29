@@ -347,6 +347,40 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             return parsed
 
 
+    async def get_video_captions(self, video_url: str, track: int) -> str:
+        from fastapi import HTTPException
+        info = await self.resolve_video_stream(video_url)
+        captions = info.get('captions', [])
+        if track < 0 or track >= len(captions):
+            raise HTTPException(404, t('player.no_captions'))
+        caption = captions[track]
+        target = urllib.parse.urlparse(caption['url'])
+        base = urllib.parse.urlparse(settings.ilias_base_url)
+        trusted = target.hostname == base.hostname or target.hostname == 'opencast.unibe.ch' or (target.hostname or '').endswith('.opencast.unibe.ch')
+        if not trusted or target.scheme != 'https' or target.port not in (None, 443):
+            raise HTTPException(400, t('player.captions_failed'))
+        async with self.session_manager.get_http_client() as client:
+            async with client.stream('GET', caption['url'], follow_redirects=False) as response:
+                if response.status_code in (401, 403):
+                    self._check_response_for_session_loss(response, caption['url'])
+                if response.status_code != 200:
+                    raise HTTPException(502, t('player.captions_failed'))
+                chunks, size = [], 0
+                async for chunk in response.aiter_bytes():
+                    size += len(chunk)
+                    if size > 2 * 1024 * 1024:
+                        raise HTTPException(502, t('player.captions_failed'))
+                    chunks.append(chunk)
+        try:
+            text = b''.join(chunks).decode('utf-8-sig')
+        except UnicodeDecodeError as exc:
+            raise HTTPException(502, t('player.captions_failed')) from exc
+        if caption['format'] == 'srt':
+            text = 'WEBVTT\n\n' + re.sub(r'(\d{2}:\d{2}:\d{2}),(\d{3})', r'\1.\2', text)
+        if not text.lstrip().startswith('WEBVTT'):
+            raise HTTPException(502, t('player.captions_failed'))
+        return text
+
     async def resolve_video_stream(self, video_url: str) -> dict:
         """Resolve an Opencast streamVideo / Paella URL to MP4 stream and metadata."""
         self._ensure_authenticated()
