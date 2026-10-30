@@ -1,4 +1,5 @@
 // background.js - BetterIlias Companion Background Service Worker / Script
+if (typeof importScripts === 'function') importScripts('i18n.js', 'toolbar.js');
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 let syncDebounceTimeout = null;
@@ -96,16 +97,7 @@ async function notifyTabs(frontendUrl, sessionId) {
 }
 
 function updateBadge(status) {
-  try {
-    const action = browserAPI.action || browserAPI.browserAction;
-    if (!action) return;
-    if (status === 'synced') {
-      action.setBadgeText({ text: '✓' });
-      action.setBadgeBackgroundColor({ color: '#0AACA5' });
-    } else if (status === 'unauthenticated') {
-      action.setBadgeText({ text: '' });
-    }
-  } catch (_) {}
+  void BetterIliasToolbar.setStatus(status);
 }
 
 async function checkAndAutoSync(force = false) {
@@ -117,17 +109,19 @@ async function checkAndAutoSync(force = false) {
   isSyncing = true;
   try {
     const settings = await getStoredSettings();
+    BetterIliasI18n.setLanguage(settings.language);
     if (!settings.autoSyncEnabled && !force) {
+      updateBadge('disabled');
       return { status: 'disabled' };
     }
 
+    updateBadge('checking');
     const cookies = await fetchCookies();
     const hasPhp = Boolean(cookies.PHPSESSID);
     const shibEntry = Object.entries(cookies).find(([k]) => k.startsWith('_shibsession_'));
-    const isVerified = hasPhp && Boolean(shibEntry);
-
-    if (!isVerified) {
+    if (!hasPhp) {
       updateBadge('unauthenticated');
+      await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
       return { status: 'unauthenticated', hasPhp, verified: false };
     }
 
@@ -148,6 +142,7 @@ async function checkAndAutoSync(force = false) {
 
     const response = await fetch(`${settings.serverUrl}/api/auth/sync`, {
       method: 'POST',
+      signal: AbortSignal.timeout(20000),
       headers: {
         'Content-Type': 'application/json',
         'Accept-Language': settings.language,
@@ -180,8 +175,17 @@ async function checkAndAutoSync(force = false) {
       };
     }
 
+    if (response.status === 401 || response.status === 403 || (response.ok && data.authenticated === false)) {
+      updateBadge('unauthenticated');
+      await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
+      return { status: 'unauthenticated', hasPhp, verified: false, detail: data.detail || data.message };
+    }
+    updateBadge('error');
+    await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
     return { status: 'failed', detail: data.detail || data.message };
   } catch (err) {
+    updateBadge('error');
+    await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
     console.warn('[BetterIlias Background] Auto-sync encountered error:', err);
     return { status: 'error', error: err.message };
   } finally {
@@ -201,6 +205,10 @@ if (browserAPI.cookies && browserAPI.cookies.onChanged) {
   browserAPI.cookies.onChanged.addListener((changeInfo) => {
     const name = changeInfo?.cookie?.name || '';
     if (name === 'PHPSESSID' || name.startsWith('_shibsession_')) {
+      // Cookie changes invalidate the previous successful verification immediately.
+      updateBadge('checking');
+      lastAttemptTime = 0;
+      browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
       scheduleSyncDebounced(2500);
     }
   });

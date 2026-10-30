@@ -92,6 +92,9 @@ export interface PodcastEpisode {
   id: string;
   title: string;
   date?: string;
+  recorded_at?: string | null;
+  uploaded_date?: string | null;
+  uploaded_at?: string | null;
   presenter?: string;
   location?: string;
   stream_url?: string;

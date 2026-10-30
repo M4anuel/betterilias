@@ -1,4 +1,4 @@
-import { t, useLanguage } from '../lib/i18n';
+import { getLocale, t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useState, useRef } from 'react';
 import {
   X,
@@ -13,11 +13,15 @@ import {
   CheckCircle2,
   Clock,
   Search,
+  ArrowDown,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { PodcastEpisode, PodcastSeriesResponse } from '../types';
 import { api } from '../lib/api';
 import { cache } from '../lib/cache';
 import { PodcastPlayer } from './PodcastPlayer';
+import { readRecordingSort, RecordingSort, writeRecordingSort } from '../lib/playerPreferences';
+import { sortRecordings } from '../lib/recordingSort';
 
 interface PodcastModalProps {
   refId: string;
@@ -40,6 +44,9 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
   const [series, setSeries] = useState<PodcastSeriesResponse | null>(null);
   const [filter, setFilter] = useState<'available' | 'scheduled' | 'all'>('available');
   const [search, setSearch] = useState('');
+  const [sortScope] = useState(() => cache.getSessionId());
+  const [sort, setSort] = useState(() => readRecordingSort(sortScope));
+  const changeSort = (next: RecordingSort) => { setSort(next); writeRecordingSort(sortScope, next); };
   const backdropMouseDownRef = useRef(false);
 
   const fetchPodcasts = async () => {
@@ -103,7 +110,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
   }, [onClose, activeEpisode]);
 
   const episodes = series?.episodes || [];
-  const filteredEpisodes = episodes.filter((ep) => {
+  const filteredEpisodes = sortRecordings(episodes.filter((ep) => {
     if (filter === 'available' && ep.status !== 'available') return false;
     if (filter === 'scheduled' && ep.status !== 'scheduled') return false;
     if (search.trim()) {
@@ -115,7 +122,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
       return matchTitle || matchPresenter || matchLoc || matchDate;
     }
     return true;
-  });
+  }), sort, getLocale());
 
   return (
     <>
@@ -139,14 +146,14 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 p-5 bg-gradient-to-r from-slate-50 to-white dark:from-slate-900 dark:to-slate-800/80">
+        <div className="flex shrink-0 items-start justify-between border-b border-slate-100 dark:border-slate-800 p-5 bg-gradient-to-r from-slate-50 to-white dark:from-slate-900 dark:to-slate-800/80">
           <div className="flex items-start gap-3.5 pr-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 shrink-0 shadow-2xs">
               <Radio className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 px-2 py-0.5 rounded-md">
+                <span className="hidden sm:inline-flex text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 px-2 py-0.5 rounded-md">
                   {t("Opencast Vorlesungsaufzeichnungen")}
                 </span>
                 {series && series.pages_available.length > 0 && (
@@ -171,10 +178,11 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
           </button>
         </div>
 
+        <div role="region" aria-label={t('Opencast Vorlesungsaufzeichnungen')} tabIndex={0} className="min-h-0 flex-1 overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:outline-[var(--accent)]">
         {/* Filter bar & Stats */}
         {series && (
           <div className="border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-800 p-1 rounded-xl self-start">
+            <div className="flex max-w-full flex-wrap items-center gap-1.5 bg-slate-100/80 dark:bg-slate-800 p-1 rounded-xl self-start">
               <button
                 onClick={() => setFilter('available')}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
@@ -225,8 +233,24 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
           </div>
         )}
 
+        {series && <div role="group" aria-label={t('recordings.sort_by')} className="flex items-center justify-end gap-1.5 border-b border-slate-100 bg-white px-4 py-1 dark:border-slate-800 dark:bg-slate-900">
+          <button type="button" aria-label={t('recordings.sort_by')} aria-pressed={sort.field === 'title'} aria-describedby="recording-date-hint"
+            onClick={() => changeSort({ ...sort, field: sort.field === 'title' ? 'date' : 'title' })}
+            className="flex min-h-11 items-center gap-2 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-[var(--accent)] dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+            <ArrowLeftRight aria-hidden="true" className="h-3.5 w-3.5" />
+            {t(sort.field === 'title' ? 'recordings.title' : 'recordings.upload_date')}
+          </button>
+          <button type="button" aria-label={t('recordings.direction')} aria-pressed={sort.direction === 'asc'} title={t(sort.direction === 'asc' ? 'recordings.ascending' : 'recordings.descending')}
+            onClick={() => changeSort({ ...sort, direction: sort.direction === 'asc' ? 'desc' : 'asc' })}
+            className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-[var(--accent)] dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
+            <ArrowDown aria-hidden="true" className={`h-4 w-4 transition-transform motion-reduce:transition-none ${sort.direction === 'asc' ? 'rotate-180' : ''}`} />
+            <span className="sr-only">{t(sort.direction === 'asc' ? 'recordings.ascending' : 'recordings.descending')}</span>
+          </button>
+          <span id="recording-date-hint" className="sr-only">{t('recordings.date_hint')}</span>
+        </div>}
+
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="p-3 sm:p-5 space-y-2 bg-slate-50/50 dark:bg-slate-900/50">
           {loading && (
             <div className="flex h-56 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
               <RefreshCw className="h-6 w-6 animate-spin text-sky-500" />
@@ -273,13 +297,17 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
               return (
                 <div
                   key={ep.id}
-                  className={`rounded-xl border p-4 transition bg-white dark:bg-slate-900 shadow-2xs hover:shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  data-recording-id={ep.id}
+                  className={`rounded-xl border p-3 transition bg-white dark:bg-slate-900 shadow-2xs hover:shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
                     isRecorded
                       ? 'border-slate-200 dark:border-slate-800 hover:border-sky-300 dark:hover:border-sky-700'
                       : 'border-slate-200/80 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/40 opacity-80 hover:opacity-100'
                   }`}
                 >
-                  <div className="space-y-1.5 flex-1 pr-2">
+                  <div className="min-w-0 space-y-1 flex-1 sm:pr-2">
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                      {ep.title}
+                    </h4>
                     <div className="flex items-center gap-2 flex-wrap">
                       {isRecorded ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
@@ -299,11 +327,8 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                           {ep.date}
                         </span>
                       )}
+                      {ep.uploaded_date && <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('recordings.uploaded', { date: ep.uploaded_date })}</span>}
                     </div>
-
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug">
-                      {ep.title}
-                    </h4>
 
                     {(ep.presenter || ep.location) && (
                       <div className="flex items-center gap-4 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
@@ -323,20 +348,20 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                     )}
                   </div>
 
-                  <div className="flex flex-col items-stretch gap-1 shrink-0 self-end sm:self-center">
+                  <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0">
                     {isRecorded && ep.stream_url ? (
                       <>
+                      <a href={ep.stream_url} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center gap-1 rounded-lg px-1 text-xs text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-[var(--accent)] dark:text-slate-400 dark:hover:bg-slate-800">
+                        <ExternalLink className="h-3 w-3" /><span>{t("In ILIAS \u00f6ffnen")}</span>
+                      </a>
                       <button
                         type="button"
                         onClick={() => setActiveEpisode(ep)}
-                        className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs"
+                        className="flex min-h-11 items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs"
                       >
                         <Play className="h-3.5 w-3.5 fill-white" />
                         <span>{t("Streamen")}</span>
                       </button>
-                      <a href={ep.stream_url} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center gap-1 rounded-lg px-2 text-xs text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">
-                        <ExternalLink className="h-3 w-3" /><span>{t("In ILIAS \u00f6ffnen")}</span>
-                      </a>
                       </>
                     ) : (
                       <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 px-2">
@@ -349,8 +374,9 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
             })}
         </div>
 
+        </div>
         {/* Modal Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-3">
+        <div className="flex shrink-0 items-center justify-between border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-3">
           <a
             href={`https://ilias.unibe.ch/ilias.php?baseClass=ilobjplugindispatchgui&cmdClass=xoctEventGUI&ref_id=${refId}`}
             target="_blank"

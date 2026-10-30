@@ -71,6 +71,13 @@ Committed fixtures and mock-native/browser tests do not establish live support
 for every ILIAS installation. If the default temporary directory is unavailable,
 pytest accepts a fresh writable `--basetemp` directory.
 
+`tests/test_extension_popup_browser.py` loads the Chrome package in an isolated
+Chromium profile and opens its actual toolbar popup. It checks intrinsic width,
+header/badge wrapping and login access at normal and doubled CSS magnification.
+This catches viewport-dependent sizing that ordinary popup-as-tab tests miss.
+The Firefox markup must match; native Firefox toolbar sizing and live ILIAS
+authentication remain separate manual checks.
+
 ## Repairing a changed ILIAS page
 
 1. Inspect `logs/failed_html_dump_*.html`, or use `/api/system/logs` and its

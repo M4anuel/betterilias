@@ -91,3 +91,23 @@ element identity, and Escape/focus restoration.
 Resume regressions reopen a recording after changing its routing tokens, verify
 tenant isolation and completion reset, and check 16:10 geometry and speaker wave
 thresholds at phone, tablet, desktop and short landscape sizes.
+
+Player preferences persist in localStorage per BetterIlias session, separately
+from episode progress: layout, visible stream, speed, volume/mute, preferred
+camera/slides resolutions, and caption visibility/language. Only explicit user
+changes are saved; missing streams, resolutions or languages can fall back
+without overwriting a preference for the next recording. Muted and audible
+speaker icons share the same SVG size, body and stroke.
+
+Chapter previews are twice their previous width (288 px desktop, 192 px narrow
+phones/short landscape, 256 px larger portrait phones). They clamp inside the
+canvas; larger portrait phones reserve enough height without shifting controls
+when scrubbing. Regression checks cover preview bounds and reload/episode/session
+preference behavior, as well as recording sort selections in both languages/themes.
+
+Recording sorting uses a compact title/upload-date toggle and a separate arrow
+button that rotates when order changes. The upload-date fallback explanation is
+available to assistive technology without occupying a toolbar row. Cards place
+titles before readiness metadata and put ILIAS/Stream actions side by side, left
+and right respectively on phones. Browser regressions check keyboard toggling,
+persisted order, compact phone card height and action/title geometry.

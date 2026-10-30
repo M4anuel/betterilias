@@ -37,12 +37,14 @@ Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzun
 
 1. Melde dich ganz normal in deinem Browser auf [ilias.unibe.ch](https://ilias.unibe.ch) mit deiner SWITCH edu-ID an.
 2. Klicke auf das **BetterIlias-Icon** in der Browser-Symbolleiste.
-3. Klicke auf **"Sitzung mit BetterIlias synchronisieren"**.
+3. Beim Öffnen wird die Sitzung über das Backend bei ILIAS geprüft und synchronisiert. Mit **"Sitzung mit BetterIlias synchronisieren"** kannst du die Prüfung erneut starten.
 4. Sobald das grüne Häkchen erscheint, klicke auf **"BetterIlias öffnen"**. BetterIlias lädt deine Kurse und Materialien sofort!
 
 ---
 
 ## 🎨 Features
+
+- **Sitzungsstatus**: Ein kleiner Punkt am Toolbar-Logo ist amber während der Prüfung oder wenn sie nicht möglich ist, grün nach erfolgreicher Prüfung und rot bei einer fehlenden oder ungültigen Sitzung. Die genaue Bedeutung steht in der Kurzinfo und im Popup. **"Bei ILIAS anmelden"** öffnet die Anmeldung. Vorhandene Cookies allein gelten nicht als erfolgreiche Anmeldung.
 
 - **Dark Mode Support**: Erkennt automatisch die Systemeinstellungen deines Betriebssystems (`prefers-color-scheme`).
 - **Sicher & Datenschutzfreundlich**: Liest ausschließlich Cookies für `ilias.unibe.ch`. Keine Passwörter werden abgefangen oder gespeichert.

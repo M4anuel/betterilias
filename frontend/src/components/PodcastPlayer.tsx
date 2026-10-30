@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeftRight, Captions, Maximize, Pause, Play, Settings2, VolumeX, X } from 'lucide-react';
+import { ArrowLeftRight, Captions, Maximize, Pause, Play, Settings2, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { t, useLanguage } from '../lib/i18n';
 import { VideoStreamInfo } from '../types';
 import { cache } from '../lib/cache';
 import { readVideoProgress, writeVideoProgress } from '../lib/videoProgress';
+import { PlayerPreferences, preferredRendition, readPlayerPreferences, writePlayerPreferences } from '../lib/playerPreferences';
 
 const timestamp = (time: number) => {
   const seconds = Math.max(0, Math.floor(time));
@@ -19,11 +20,13 @@ function LayoutIcon({ mode }: { mode: 'inset' | 'split' | 'slides' }) {
   </svg>;
 }
 
-function SpeakerIcon({ volume }: { volume: number }) {
+function SpeakerIcon({ volume, muted }: { volume: number; muted: boolean }) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
     <path d="M11 5 6 9H3v6h3l5 4Z" />
-    <path data-volume-wave="inner" opacity={volume > .15 ? 1 : .3} d="M15 8a5 5 0 0 1 0 8" />
-    <path data-volume-wave="outer" opacity={volume > .5 ? 1 : .3} d="M18 5a9 9 0 0 1 0 14" />
+    {muted ? <path data-volume-muted d="m16 9 6 6m0-6-6 6" /> : <>
+      <path data-volume-wave="inner" opacity={volume > .15 ? 1 : .3} d="M15 8a5 5 0 0 1 0 8" />
+      <path data-volume-wave="outer" opacity={volume > .5 ? 1 : .3} d="M18 5a9 9 0 0 1 0 14" />
+    </>}
   </svg>;
 }
 
@@ -70,33 +73,39 @@ export function PodcastPlayer({ url, title, onClose }: { url: string; title: str
 
 function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInfo; sourceUrl: string; onRetry: () => void }) {
   const [progressScope] = useState(() => cache.getSessionId());
+  const [savedPreferences] = useState(() => readPlayerPreferences(progressScope));
+  const preferences = useRef(savedPreferences);
+  const remember = (patch: Partial<PlayerPreferences>) => {
+    preferences.current = { ...preferences.current, ...patch };
+    writePlayerPreferences(progressScope, preferences.current);
+  };
   const [savedProgress] = useState(() => readVideoProgress(sourceUrl, progressScope));
   const initialPosition = savedProgress?.completed ? 0 : savedProgress?.position || 0;
   const audioStream = data.streams.find(stream => stream.main_audio) || data.streams[0];
   const slidesStream = data.streams.find(stream => stream !== audioStream && stream.content === 'presentation')
     || data.streams.find(stream => stream !== audioStream);
-  const [audioQuality, setAudioQuality] = useState(() => Math.max(0, audioStream.renditions.findIndex(source => source.height === 720)));
-  const [slidesQuality, setSlidesQuality] = useState((slidesStream?.renditions.length || 1) - 1);
-  const [layout, setLayout] = useState<'inset' | 'split' | 'slides'>('inset');
-  const [swapped, setSwapped] = useState(false);
+  const [audioQuality, setAudioQuality] = useState(() => preferredRendition(audioStream.renditions, savedPreferences.audioHeight, Math.max(0, audioStream.renditions.findIndex(source => source.height === 720))));
+  const [slidesQuality, setSlidesQuality] = useState(() => preferredRendition(slidesStream?.renditions || [], savedPreferences.slidesHeight, (slidesStream?.renditions.length || 1) - 1));
+  const [layout, setLayout] = useState(savedPreferences.layout);
+  const [swapped, setSwapped] = useState(savedPreferences.swapped);
   const [playing, setPlaying] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [time, setTime] = useState(initialPosition);
   const [duration, setDuration] = useState(data.duration || 0);
-  const [rate, setRate] = useState(1);
-  const [volume, setVolume] = useState(1);
+  const [rate, setRate] = useState(savedPreferences.rate);
+  const [volume, setVolume] = useState(savedPreferences.volume);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pointerInside, setPointerInside] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [captionsEnabled, setCaptionsEnabled] = useState(false);
-  const [captionIndex, setCaptionIndex] = useState(0);
+  const [muted, setMuted] = useState(savedPreferences.muted);
+  const [captionsEnabled, setCaptionsEnabled] = useState(savedPreferences.captions);
+  const [captionIndex, setCaptionIndex] = useState(() => Math.max(0, data.captions?.findIndex(item => item.language === savedPreferences.captionLanguage) ?? 0));
   const [captionText, setCaptionText] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ kind: 'play' | 'pause'; id: number } | null>(null);
   const feedbackId = useRef(0);
-  const mutedRef = useRef(false);
-  const lastVolume = useRef(1);
+  const mutedRef = useRef(savedPreferences.muted);
+  const lastVolume = useRef(savedPreferences.volume || 1);
   const settingsButton = useRef<HTMLButtonElement>(null);
   const settingsPanel = useRef<HTMLDivElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
@@ -120,8 +129,8 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
   const lastSaved = useRef(0);
   const lastStartedAt = useRef(savedProgress?.lastStartedAt || null);
   const completed = useRef(savedProgress?.completed || false);
-  const speed = useRef(1);
-  const loudness = useRef(1);
+  const speed = useRef(savedPreferences.rate);
+  const loudness = useRef(savedPreferences.volume);
   const controller = useRef<{ toggle: () => void; seek: (value: number) => void } | null>(null);
   const audioUrl = audioStream.renditions[audioQuality].url;
   const slidesUrl = slidesStream?.renditions[slidesQuality].url;
@@ -152,6 +161,7 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
     mutedRef.current = next; setMuted(next);
     if (!next && loudness.current === 0) { loudness.current = lastVolume.current; setVolume(lastVolume.current); }
     if (audio.current) { audio.current.muted = next; audio.current.volume = loudness.current; }
+    remember({ muted: next, volume: loudness.current });
     revealControls();
   }
   function toggleFullscreen() {
@@ -165,7 +175,7 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
   function toggleCaptions() {
     revealControls();
     if (!data.captions?.length) { setNotice(t('player.no_captions')); return; }
-    setCaptionsEnabled(value => !value);
+    const next = !captionsEnabled; setCaptionsEnabled(next); remember({ captions: next });
   }
   function closeSettings(restore = true) {
     setSettingsOpen(false); setControlsFocused(false); revealControls();
@@ -245,6 +255,7 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
         else {
           const value = Math.max(0, Math.min(1, loudness.current + (key === 'arrowup' ? .05 : -.05)));
           loudness.current = value; setVolume(value); if (audio.current) audio.current.volume = value;
+          remember({ volume: value });
         }
       } else if (key === 'enter' && target === playerArea.current) { event.preventDefault(); togglePlayback(); }
     };
@@ -417,13 +428,13 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
             {(['inset', 'split', 'slides'] as const).map(mode => <button type="button" key={mode} aria-pressed={layout === mode}
               aria-label={t(mode === 'inset' ? 'player.inset' : mode === 'split' ? 'player.split' : 'player.single')}
               title={t(mode === 'inset' ? 'player.inset' : mode === 'split' ? 'player.split' : 'player.single')}
-              className={`${overlayButton} ${layout === mode ? 'bg-white/20' : ''}`} onClick={() => { setLayout(mode); closeSettings(false); }}><LayoutIcon mode={mode} /></button>)}
+              className={`${overlayButton} ${layout === mode ? 'bg-white/20' : ''}`} onClick={() => { setLayout(mode); remember({ layout: mode }); closeSettings(false); }}><LayoutIcon mode={mode} /></button>)}
           </div>
-          <button type="button" className={overlayButton} aria-label={t('player.swap')} title={t('player.swap')} onClick={() => setSwapped(value => !value)}><ArrowLeftRight className="h-5 w-5" /></button>
+          <button type="button" className={overlayButton} aria-label={t('player.swap')} title={t('player.swap')} onClick={() => { setSwapped(!swapped); remember({ swapped: !swapped }); }}><ArrowLeftRight className="h-5 w-5" /></button>
         </>}
         <span className="flex-1" />
         <button type="button" className={overlayButton} aria-label={t('player.captions')} title={t(data.captions?.length ? 'player.captions' : 'player.no_captions')}
-          aria-pressed={captionsEnabled} aria-keyshortcuts="c" onClick={toggleCaptions}><Captions className="h-5 w-5" /></button>
+          aria-pressed={captionsEnabled && Boolean(data.captions?.length)} aria-keyshortcuts="c" onClick={toggleCaptions}><Captions className="h-5 w-5" /></button>
         <button ref={settingsButton} type="button" className={overlayButton} aria-label={t('player.settings')} title={t('player.settings')}
           aria-expanded={settingsOpen} aria-haspopup="dialog" aria-controls="player-settings-panel"
           onClick={() => { if (settingsOpen) closeSettings(); else { setSettingsOpen(true); revealControls(); } }}><Settings2 className="h-5 w-5" /></button>
@@ -433,11 +444,11 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
           <h3 className="text-sm font-semibold">{t('player.settings')}</h3>
           <button type="button" className={overlayButton} aria-label={t('Schliessen')} onClick={() => closeSettings()}><X className="h-5 w-5" /></button>
         </div>
-        <label className="block min-w-0 text-sm">{t('player.camera_quality')}<select value={audioQuality} className="player-menu-select" onChange={event => setAudioQuality(Number(event.target.value))}>
+        <label className="block min-w-0 text-sm">{t('player.camera_quality')}<select value={audioQuality} className="player-menu-select" onChange={event => { const index = Number(event.target.value); setAudioQuality(index); remember({ audioHeight: audioStream.renditions[index].height }); }}>
           {audioStream.renditions.map((source, index) => <option key={index} value={index}>{source.height ? `${source.height}p` : t('player.original')}</option>)}</select></label>
-        {slidesStream && <label className="mt-3 block min-w-0 text-sm">{t('player.slides_quality')}<select value={slidesQuality} className="player-menu-select" onChange={event => setSlidesQuality(Number(event.target.value))}>
+        {slidesStream && <label className="mt-3 block min-w-0 text-sm">{t('player.slides_quality')}<select value={slidesQuality} className="player-menu-select" onChange={event => { const index = Number(event.target.value); setSlidesQuality(index); remember({ slidesHeight: slidesStream.renditions[index].height }); }}>
           {slidesStream.renditions.map((source, index) => <option key={index} value={index}>{source.height ? `${source.height}p` : t('player.original')}</option>)}</select></label>}
-        {Boolean(data.captions?.length) && <label className="mt-3 block min-w-0 text-sm">{t('player.subtitle_language')}<select value={captionIndex} className="player-menu-select" onChange={event => setCaptionIndex(Number(event.target.value))}>
+        {Boolean(data.captions?.length) && <label className="mt-3 block min-w-0 text-sm">{t('player.subtitle_language')}<select value={captionIndex} className="player-menu-select" onChange={event => { const index = Number(event.target.value); setCaptionIndex(index); remember({ captionLanguage: data.captions![index].language }); }}>
           {data.captions!.map((caption, index) => <option key={index} value={index}>{caption.label || caption.language}</option>)}</select></label>}
         <p className="mt-3 text-xs leading-relaxed text-slate-300">{t('player.shortcuts')}</p>
       </div>}
@@ -473,7 +484,7 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
             }}
             onChange={event => { const value = Number(event.target.value); setPreviewTime(value); if (!dragging.current) controller.current?.seek(value); }} />
           <span id="player-seek-help" className="sr-only">{t('player.seek_help')}</span>
-          {previewTime !== null && <div className="player-preview" data-preview-time={previewTime} style={{ left: `clamp(76px, ${previewPercent}%, calc(100% - 76px))` }}>
+          {previewTime !== null && <div className="player-preview" data-preview-time={previewTime} style={{ left: `clamp(calc(var(--player-preview-half) + 4px), ${previewPercent}%, calc(100% - var(--player-preview-half) - 4px))` }}>
             {previewChapter && <img src={previewChapter.image} alt={t('player.chapter', { number: previewChapterIndex + 1, time: timestamp(previewChapter.time) })} className="aspect-video w-full rounded object-contain" />}
             <span className="block py-1 text-center text-[10px] tabular-nums text-white">{timestamp(previewTime)}</span>
           </div>}
@@ -482,16 +493,17 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
           <button type="button" onClick={togglePlayback} aria-label={t(playing || buffering ? 'player.pause' : 'player.play')} aria-keyshortcuts="Space" className={overlayButton}>
             {playing || buffering ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}</button>
           <button type="button" aria-label={t(muted || volume === 0 ? 'player.unmute' : 'player.mute')} aria-pressed={muted || volume === 0} aria-keyshortcuts="m" className={overlayButton} onClick={toggleMute}>
-            {muted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <SpeakerIcon volume={volume} />}</button>
+            <SpeakerIcon volume={volume} muted={muted || volume === 0} /></button>
           <label className="player-volume" title={t('player.volume')}><span className="sr-only">{t('player.volume')}</span>
             <span className="player-volume-bar" aria-hidden="true" style={{ background: `linear-gradient(to right, #2dd4bf ${(muted ? 0 : volume) * 100}%, rgb(255 255 255 / .3) ${(muted ? 0 : volume) * 100}%)` }} />
             <input type="range" min={0} max={1} step={0.05} value={volume} className="player-volume-range" aria-valuetext={t('player.volume_percent', { percent: Math.round(volume * 100) })} onChange={event => {
               const value = Number(event.target.value); setVolume(value); loudness.current = value;
               if (value > 0) { lastVolume.current = value; mutedRef.current = false; setMuted(false); }
               if (audio.current) { audio.current.volume = value; audio.current.muted = mutedRef.current; }
+              remember({ volume: value, muted: mutedRef.current });
             }} /></label>
           <label className="min-w-0"><span className="sr-only">{t('player.speed')}</span><select value={rate} className="player-speed" onChange={event => {
-            const value = Number(event.target.value); setRate(value); speed.current = value;
+            const value = Number(event.target.value); setRate(value); speed.current = value; remember({ rate: value });
             if (lastInput.current === 'pointer') setControlsFocused(false);
             [audio.current, slides.current].forEach(video => { if (video) video.playbackRate = value; });
           }}>{[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(value => <option key={value} value={value}>{value}×</option>)}</select></label>

@@ -14,6 +14,126 @@ URL = 'https://ilias.unibe.ch/ilias.php?cmdClass=xoctPlayerGUI&cmd=streamVideo&r
 MEDIA = (Path(__file__).parent / 'fixtures/player-test.mp4').read_bytes()
 
 
+@pytest.mark.parametrize('width,height,language,scheme', [(320,740,'de','dark'),(390,800,'en','light'),(430,800,'de','light'),(768,850,'en','dark'),(1280,900,'de','dark'),(740,360,'en','light')])
+def test_preferences_and_recording_sort(local_site,width,height,language,scheme):
+    pw=pytest.importorskip('playwright.sync_api')
+    tr=json.loads((ROOT/'locales'/f'{language}.json').read_text(encoding='utf-8')).__getitem__
+    episodes=[dict(id='a',title='Lecture 2: Human-computer interaction and accessible learning environments',recorded_at='2026-09-01T10:00:00Z',uploaded_at='2026-12-01T10:00:00Z'),
+              dict(id='b',title='Lecture 10',date='2. Okt 2026, 09:00'),
+              dict(id='c',title='Lecture 1',recorded_at='2027-01-01T10:00:00Z'),
+              dict(id='d',title='Undated')]
+    for ep in episodes:
+        ep.update(status='available',stream_url=URL.replace('episode-one',ep['id']))
+    with pw.sync_playwright() as p:
+        browser=p.chromium.launch(headless=True,channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+        page=browser.new_page(viewport=dict(width=width,height=height),color_scheme=scheme,has_touch=width<768)
+        page.set_default_timeout(10000)
+        page.add_init_script(f"localStorage.setItem('betterilias_language','{language}');localStorage.setItem('betterilias_theme_mode','{scheme}')")
+        def respond(route):
+            if urlparse(route.request.url).path=='/api/podcasts/60':
+                route.fulfill(content_type='application/json',body=json.dumps(dict(ref_id='60',title='Lecture recordings',total_episodes=4,recorded_count=4,scheduled_count=0,pages_available=[],episodes=episodes)))
+            else:player_api(route,captions=True)
+        page.route('**/api/**',respond)
+        page.route('**/media/**',media_route)
+        def open_list():
+            page.get_by_text('Lecture recordings',exact=True).click()
+            pw.expect(page.locator('[data-recording-id]')).to_have_count(4)
+        def order():
+            return page.locator('[data-recording-id]').evaluate_all("es=>es.map(e=>e.dataset.recordingId)")
+        def open_player(identifier):
+            page.locator(f'[data-recording-id="{identifier}"]').get_by_role('button',name=tr('Streamen'),exact=True).click()
+            page.wait_for_function("document.querySelectorAll('dialog video').length===2 && Array.from(document.querySelectorAll('dialog video')).every(v=>v.readyState>=3)")
+        page.goto(local_site+'/?course=42')
+        open_list()
+        field=page.get_by_role('button',name=tr('recordings.sort_by'),exact=True)
+        direction=page.get_by_role('button',name=tr('recordings.direction'),exact=True)
+        pw.expect(page.get_by_role('region',name=tr('Opencast Vorlesungsaufzeichnungen'),exact=True).get_by_role('combobox')).to_have_count(0)
+        assert order()==['c','a','b','d']
+        direction.focus()
+        direction.press('Enter')
+        pw.expect(direction).to_have_attribute('aria-pressed','true')
+        pw.expect(direction.locator('svg')).to_have_class(re.compile('rotate-180'))
+        assert order()==['b','a','c','d']
+        field.focus()
+        field.press('Space')
+        assert order()==['c','a','b','d']
+        direction.click()
+        pw.expect(direction).to_have_attribute('aria-pressed','false')
+        assert order()==['d','b','a','c']
+        search=page.get_by_placeholder(tr('Episode suchen...'),exact=True)
+        search.fill('Lecture')
+        pw.expect(page.locator('[data-recording-id]')).to_have_count(3)
+        assert order()==['b','a','c']
+        search.clear()
+        assert_no_overflow(page)
+        card=page.locator('[data-recording-id="d"]')
+        card.scroll_into_view_if_needed()
+        heading=card.get_by_role('heading',name='Undated',exact=True).bounding_box()
+        status=card.get_by_text(tr('Aufnahme bereit'),exact=True).bounding_box()
+        assert heading['y']+heading['height'] <= status['y']
+        if width<640:
+            link=card.get_by_role('link').bounding_box()
+            stream=card.get_by_role('button',name=tr('Streamen'),exact=True).bounding_box()
+            assert abs(link['y']-stream['y'])<2 and link['x']+link['width']<stream['x']
+            assert card.bounding_box()['height']<140
+        field.scroll_into_view_if_needed()
+        page.screenshot(path=f'.pytest_cache/recording-sort-{width}-{height}-{language}-{scheme}.png',animations='disabled')
+        # The last recording remains reachable even in short landscape viewports.
+        region=page.get_by_role('region',name=tr('Opencast Vorlesungsaufzeichnungen'),exact=True)
+        last=page.locator('[data-recording-id="c"]')
+        last.scroll_into_view_if_needed()
+        bounds=last.bounding_box()
+        viewport=region.bounding_box()
+        assert bounds['y']+bounds['height'] <= viewport['y']+viewport['height']+1
+        page.screenshot(path=f'.pytest_cache/recording-sort-scrolled-{width}-{height}-{language}-{scheme}.png',animations='disabled')
+        page.locator('[data-recording-id="a"]').scroll_into_view_if_needed()
+        page.screenshot(path=f'.pytest_cache/recording-card-long-title-{width}-{height}-{language}-{scheme}.png',animations='disabled')
+        open_player('a')
+        dialog=page.locator('dialog.podcast-player-dialog')
+        dialog.get_by_role('button',name=tr('player.single'),exact=True).click()
+        dialog.get_by_role('combobox',name=tr('player.speed'),exact=True).select_option('1.5')
+        volume=dialog.get_by_role('slider',name=tr('player.volume'),exact=True)
+        volume.focus()
+        volume.press('Home')
+        volume.press('ArrowRight')
+        mute=dialog.get_by_role('button',name=tr('player.mute'),exact=True)
+        icon=mute.locator('svg').bounding_box()
+        mute.click()
+        muted_icon=dialog.get_by_role('button',name=tr('player.unmute'),exact=True).locator('svg').bounding_box()
+        assert icon['width']==muted_icon['width']==20 and icon['height']==muted_icon['height']==20
+        page.keyboard.press('c')
+        dialog.get_by_role('button',name=tr('player.settings'),exact=True).click()
+        dialog.get_by_role('combobox',name=tr('player.camera_quality'),exact=True).select_option('0')
+        dialog.get_by_role('combobox',name=tr('player.subtitle_language'),exact=True).select_option('1')
+        page.keyboard.press('Escape')
+        page.keyboard.press('Escape')
+        # Reload and another episode share preferences, but not playback clocks.
+        page.reload()
+        open_list()
+        pw.expect(field).to_have_attribute('aria-pressed','true')
+        pw.expect(direction).to_have_attribute('aria-pressed','false')
+        open_player('b')
+        pw.expect(dialog.locator('[data-stream=audio]')).to_be_hidden()
+        pw.expect(dialog.locator('[data-stream=slides]')).to_be_visible()
+        assert dialog.locator('[data-stream=audio]').evaluate('v=>v.muted && v.volume===.05 && v.playbackRate===1.5 && v.currentTime<.1')
+        assert dialog.locator('[data-stream=audio]').evaluate("v=>v.currentSrc.endsWith('presenter-480.mp4')")
+        pw.expect(dialog.get_by_role('button',name=tr('player.captions'),exact=True)).to_have_attribute('aria-pressed','true')
+        dialog.get_by_role('button',name=tr('player.settings'),exact=True).click()
+        pw.expect(dialog.get_by_role('combobox',name=tr('player.subtitle_language'),exact=True)).to_have_value('1')
+        page.keyboard.press('Escape')
+        dialog.get_by_role('button',name=tr('player.swap'),exact=True).click()
+        page.keyboard.press('Escape')
+        open_player('c')
+        pw.expect(dialog.locator('[data-stream=audio]')).to_be_visible()
+        pw.expect(dialog.locator('[data-stream=slides]')).to_be_hidden()
+        page.keyboard.press('Escape')
+        page.evaluate("localStorage.setItem('betterilias_session_id','another-preference-viewer')")
+        open_player('c')
+        pw.expect(dialog.get_by_role('button',name=tr('player.inset'),exact=True)).to_have_attribute('aria-pressed','true')
+        assert dialog.locator('[data-stream=audio]').evaluate('v=>!v.muted && v.volume===1 && v.playbackRate===1')
+        browser.close()
+
+
 def player_api(route, single=False, failure=False, embedded=False, captions=False):
     path = urlparse(route.request.url).path
     if path.endswith('/video-stream-info'):
@@ -116,6 +236,13 @@ def test_dual_stream_playback_quality_layouts_and_chapters(local_site, width, he
         seek.focus()
         seek.press('PageUp')
         pw.expect(dialog.locator('.player-preview img')).to_be_visible()
+        preview = dialog.locator('.player-preview').bounding_box()
+        expected_width = 192 if width == 320 or height <= 450 else 256 if width < 640 else 288
+        assert preview['width'] >= expected_width - 1
+        canvas = stage.bounding_box()
+        assert preview['x'] >= canvas['x'] and preview['x'] + preview['width'] <= canvas['x'] + canvas['width'] + 1
+        assert preview['y'] >= canvas['y'] - 1
+        page.screenshot(path=f'.pytest_cache/player-large-preview-{width}-{height}-{language}-{scheme}.png',animations='disabled')
         page.wait_for_function("Array.from(document.querySelectorAll('dialog video')).every(v => Math.abs(v.currentTime-6) < .2 && !v.seeking)")
         assert audio.evaluate('v => v.paused')
         dialog.get_by_role('button',name=tr('player.split'),exact=True).click()
