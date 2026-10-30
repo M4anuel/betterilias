@@ -201,6 +201,7 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 ## Completed
 
 - [x] Enlarge the toolbar logo within its icon canvas and replace covering text badges with small corner status dots; retain full localized status in the tooltip and popup in both extensions.
+- [x] Increase the corner status dot diameter by 25% for clearer visibility while preserving the toolbar logo.
 
 - [x] Fix intrinsic extension popup sizing and header/badge wrapping; verify an installed Chromium action popup at normal and doubled content scaling, with matching Firefox markup.
 

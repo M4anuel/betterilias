@@ -40,7 +40,7 @@ def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, sc
               return {results};
             }''')
             for result in icon['results']:
-                assert 0<result['changed']<=36 and result['outside']==0
+                assert 0<result['changed']<=49 and result['outside']==0
                 assert result['sizes']==['16','32','48','64']
             assert icon['results'][1]['color']==[220,38,38,255]
             worker.evaluate('(language)=>chrome.storage.local.set({language})',language)

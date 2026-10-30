@@ -25,10 +25,10 @@ globalThis.BetterIliasToolbar = (() => {
       context.drawImage(image, 20, 11, 88, 102, .5, .5, 15 * 88 / 102, 15);
       if (colors[status]) {
         context.beginPath();
-        context.arc(13.4, 13.4, 2, 0, Math.PI * 2);
+        context.arc(12.9, 12.9, 2.5, 0, Math.PI * 2);
         context.fillStyle = colors[status];
         context.strokeStyle = '#ffffff';
-        context.lineWidth = 1;
+        context.lineWidth = .8;
         context.stroke();
         context.fill();
       }
