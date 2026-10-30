@@ -23,6 +23,11 @@ const api = {
   tabs:{query:async()=>[],sendMessage:async()=>{}},runtime:{onMessage:{addListener:()=>{}}}
 };
 const context = vm.createContext({chrome:api,console:{warn:()=>{}},AbortSignal,
+  BetterIliasI18n:{setLanguage:()=>{}},
+  BetterIliasToolbar:{setStatus:status=>{
+    badge.text=({synced:'✓',unauthenticated:'!',checking:'…',error:'?'})[status]||'';
+    badge.color=status==='synced'?'#0AACA5':status==='unauthenticated'?'#dc2626':'#d97706';
+  }},
   setTimeout:()=>1,clearTimeout:()=>{},fetch:async()=>{
     assert.equal(badge.text,'…'); assert.equal(badge.color,'#d97706');
     if(hold) await hold;

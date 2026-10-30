@@ -124,7 +124,10 @@ def test_extension_checking_invalid_recovery_and_unavailable(local_site, directo
             storage:{local:{get:async()=>JSON.parse(localStorage.getItem('mock-extension')||'{}'),
               set:async value=>localStorage.setItem('mock-extension',JSON.stringify({...JSON.parse(localStorage.getItem('mock-extension')||'{}'),...value}))}},
             cookies:{getAll:async()=>mockCookies},
-            action:{setBadgeText:value=>badge.text=value.text,setBadgeBackgroundColor:value=>badge.color=value.color},
+            action:{setBadgeText:value=>badge.text=value.text,setIcon:value=>{
+              badge.images=value.imageData;
+              badge.color=Array.from(value.imageData[16].data.slice((13*16+13)*4,(13*16+13)*4+4));
+            }},
             tabs:{query:async()=>[],sendMessage:async()=>{},create:()=>{}}
           };
         ''' + f"localStorage.setItem('mock-extension',JSON.stringify({{language:'{language}',autoSyncEnabled:false}}));" + ("globalThis.browser=chrome;" if directory=='extension-firefox' else ''))
@@ -141,7 +144,7 @@ def test_extension_checking_invalid_recovery_and_unavailable(local_site, directo
         pw.expect(badge).to_have_class('status-badge badge-warning')
         pw.expect(page.locator('#auto-sync-badge')).to_have_text(tr('Disabled'))
         pw.expect(page.locator('#auto-sync-badge')).to_have_class('status-badge badge-neutral')
-        page.wait_for_function("badge.text==='…' && badge.color==='#d97706'")
+        page.wait_for_function("badge.text==='' && badge.color?.join(',')==='217,119,6,255'")
         page.get_by_label(tr('Language'),exact=True).select_option('en' if language=='de' else 'de')
         pw.expect(badge).to_have_class('status-badge badge-warning')
         page.locator('#language').select_option(language)
@@ -149,7 +152,7 @@ def test_extension_checking_invalid_recovery_and_unavailable(local_site, directo
         held.pop().fulfill(content_type='application/json',body=json.dumps(dict(success=True,authenticated=False,message='Expired')))
         pw.expect(badge).to_have_class('status-badge badge-danger')
         pw.expect(badge).to_have_text(tr('Nicht angemeldet'))
-        page.wait_for_function("badge.text==='!' && badge.color==='#dc2626'")
+        page.wait_for_function("badge.text==='' && badge.color?.join(',')==='220,38,38,255'")
         login=page.get_by_role('link',name=tr('Bei ILIAS anmelden'),exact=True)
         pw.expect(login).to_be_visible()
         assert login.bounding_box()['height']>=48 and login.bounding_box()['width']>=260
@@ -163,11 +166,11 @@ def test_extension_checking_invalid_recovery_and_unavailable(local_site, directo
         page.locator('#sync-btn').click()
         pw.expect(badge).to_have_class('status-badge badge-success')
         pw.expect(login).to_be_hidden()
-        page.wait_for_function("badge.text==='✓'")
+        page.wait_for_function("badge.text==='' && badge.color?.join(',')==='10,172,165,255'")
         mode[0]='error'
         page.locator('#sync-btn').click()
         pw.expect(badge).to_have_class('status-badge badge-warning')
-        page.wait_for_function("badge.text==='?' && badge.color==='#d97706'")
+        page.wait_for_function("badge.text==='' && badge.color?.join(',')==='217,119,6,255'")
         pw.expect(login).to_be_hidden()
         page.evaluate('mockCookies=[]')
         page.locator('#sync-btn').click()

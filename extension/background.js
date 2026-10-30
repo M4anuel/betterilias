@@ -1,4 +1,5 @@
 // background.js - BetterIlias Companion Background Service Worker / Script
+if (typeof importScripts === 'function') importScripts('i18n.js', 'toolbar.js');
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 let syncDebounceTimeout = null;
@@ -96,22 +97,7 @@ async function notifyTabs(frontendUrl, sessionId) {
 }
 
 function updateBadge(status) {
-  try {
-    const action = browserAPI.action || browserAPI.browserAction;
-    if (!action) return;
-    if (status === 'synced') {
-      action.setBadgeText({ text: '✓' });
-      action.setBadgeBackgroundColor({ color: '#0AACA5' });
-    } else if (status === 'unauthenticated') {
-      action.setBadgeText({ text: '!' });
-      action.setBadgeBackgroundColor({ color: '#dc2626' });
-    } else if (status === 'checking' || status === 'error') {
-      action.setBadgeText({ text: status === 'checking' ? '…' : '?' });
-      action.setBadgeBackgroundColor({ color: '#d97706' });
-    } else {
-      action.setBadgeText({ text: '' });
-    }
-  } catch (_) {}
+  void BetterIliasToolbar.setStatus(status);
 }
 
 async function checkAndAutoSync(force = false) {
@@ -123,6 +109,7 @@ async function checkAndAutoSync(force = false) {
   isSyncing = true;
   try {
     const settings = await getStoredSettings();
+    BetterIliasI18n.setLanguage(settings.language);
     if (!settings.autoSyncEnabled && !force) {
       updateBadge('disabled');
       return { status: 'disabled' };

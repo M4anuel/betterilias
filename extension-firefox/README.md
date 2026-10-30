@@ -41,7 +41,7 @@ Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzun
 
 ## 🎨 Features & Sicherheit
 
-- **Sitzungsstatus**: Amber mit `…` bedeutet Prüfung, grün mit `✓` eine erfolgreich geprüfte Sitzung und rot mit `!` eine fehlende oder ungültige Sitzung. Dann öffnet **„Bei ILIAS anmelden“** die Anmeldung. Amber mit `?` bedeutet, dass die Prüfung gerade nicht möglich ist, etwa bei einem nicht erreichbaren Backend. Vorhandene Cookies allein gelten nicht als erfolgreiche Anmeldung.
+- **Sitzungsstatus**: Ein kleiner Punkt am Toolbar-Logo ist amber während der Prüfung oder wenn sie nicht möglich ist, grün nach erfolgreicher Prüfung und rot bei einer fehlenden oder ungültigen Sitzung. Die genaue Bedeutung steht in der Kurzinfo und im Popup. **„Bei ILIAS anmelden“** öffnet die Anmeldung. Vorhandene Cookies allein gelten nicht als erfolgreiche Anmeldung.
 
 - **Manifest V3 & Gecko-optimiert**: Entwickelt nach den neuesten Mozilla WebExtension MV3 Standards.
 - **Dark Mode Support**: Passt sich automatisch den Systemeinstellungen an (`prefers-color-scheme`).

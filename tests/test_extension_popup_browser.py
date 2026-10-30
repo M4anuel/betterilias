@@ -23,6 +23,26 @@ def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, sc
             color_scheme=scheme,args=[f'--disable-extensions-except={ROOT/"extension"}',f'--load-extension={ROOT/"extension"}'])
         try:
             worker=context.service_workers[0] if context.service_workers else context.wait_for_event('serviceworker')
+            icon=worker.evaluate('''async()=>{
+              const base=(await BetterIliasToolbar.iconData('disabled'))[16];
+              const results=[];
+              for(const state of ['synced','unauthenticated','checking','error']) {
+                const images=await BetterIliasToolbar.iconData(state), data=images[16].data;
+                let changed=0, outside=0;
+                for(let y=0;y<16;y++) for(let x=0;x<16;x++) {
+                  const i=(y*16+x)*4;
+                  if([0,1,2,3].some(channel=>data[i+channel]!==base.data[i+channel])) {
+                    changed++; if(x<10||y<10) outside++;
+                  }
+                }
+                results.push({changed,outside,sizes:Object.keys(images),color:Array.from(data.slice((13*16+13)*4,(13*16+13)*4+4))});
+              }
+              return {results};
+            }''')
+            for result in icon['results']:
+                assert 0<result['changed']<=36 and result['outside']==0
+                assert result['sizes']==['16','32','48','64']
+            assert icon['results'][1]['color']==[220,38,38,255]
             worker.evaluate('(language)=>chrome.storage.local.set({language})',language)
             worker.evaluate('chrome.action.openPopup()')
             driver=context.pages[0]
@@ -72,6 +92,9 @@ def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, sc
             assert metrics['header']['height']<=metrics['headerLine']*scale+1
             assert metrics['badge']['height']<25*scale
             assert metrics['login']['width']>=340*scale and metrics['login']['height']>=48*scale
+            assert worker.evaluate('chrome.action.getBadgeText({})')==''
+            title=worker.evaluate('chrome.action.getTitle({})')
+            assert ('Nicht angemeldet' if language=='de' else 'Signed out') in title
             # Even in the vertically constrained magnified window, login is reachable.
             evaluate("document.querySelector('#login-btn').scrollIntoView({block:'nearest'})")
             shot=send('Page.captureScreenshot')

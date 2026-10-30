@@ -51,11 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function setSessionState(state) {
     sessionState = state;
     render();
-    try {
-      const action = browserAPI.action || browserAPI.browserAction;
-      action?.setBadgeText({ text: state === 'valid' ? '✓' : state === 'invalid' ? '!' : state === 'checking' ? '…' : '?' });
-      action?.setBadgeBackgroundColor({ color: state === 'valid' ? '#0AACA5' : state === 'invalid' ? '#dc2626' : '#d97706' });
-    } catch (_) { /* Toolbar APIs are unavailable in some popup previews. */ }
+    void BetterIliasToolbar.setStatus(state === 'valid' ? 'synced' : state === 'invalid' ? 'unauthenticated' : state);
   }
   function isIliasAuthCookie(name) {
     if (!name || typeof name !== 'string') return false;
@@ -79,7 +75,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return Object.fromEntries(cookies);
   }
   language.addEventListener('change', async () => {
-    setLanguage(language.value); feedback.className = 'feedback'; render();
+    setLanguage(language.value); feedback.className = 'feedback'; setSessionState(sessionState);
     try { await browserAPI.storage.local.set({ language: getLanguage() }); }
     catch (_) { showFeedback(t('Could not save language preference.'), 'error'); }
   });

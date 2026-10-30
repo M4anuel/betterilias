@@ -200,6 +200,8 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 
 ## Completed
 
+- [x] Enlarge the toolbar logo within its icon canvas and replace covering text badges with small corner status dots; retain full localized status in the tooltip and popup in both extensions.
+
 - [x] Fix intrinsic extension popup sizing and header/badge wrapping; verify an installed Chromium action popup at normal and doubled content scaling, with matching Firefox markup.
 
 - [x] Verify extension session cookies before showing success; use amber checking/unavailable and red invalid toolbar/popup states, invalidate stale success caches and show a prominent ILIAS login action in both Chrome and Firefox.
