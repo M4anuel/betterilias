@@ -176,3 +176,163 @@ def test_clean_rich_html_pdf_embeds():
     assert 'pdf-embed' in res2
     assert 'toolbar=0' in res2
     assert 'view=FitH' in res2
+
+
+def test_parse_exercise_submissions_german_actions_and_fallback_and_teams():
+    german_html = """
+    <html><body>
+    <form id="form_exc_mem" action="ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilExerciseManagementGUI&cmd=post&ref_id=3803739&ass_id=53188&rtoken=abcdef1234567890abcdef1234567890">
+    <select name="ass_id"><option value="53188" selected>1. Übung</option></select>
+    <table id="exc_mem" class="table">
+    <thead>
+        <tr>
+            <th>Auswahl</th><th>Name / Login</th><th>Abgabe gesendet am</th><th>Abgegeben am</th><th>Individuelle Abgabefrist</th>
+            <th>Status</th><th>Note</th><th>Bewertet am</th><th>Bewertung am</th><th>Bewertung</th><th>Hinweis für Tutoren</th><th>Aktionen</th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- Student 1: German action button 'Abgaben herunterladen (1)' -->
+        <tr>
+            <td><input type="checkbox" name="id[]" value="1001" /></td>
+            <td>Muster, Max (1001)</td>
+            <td>01.10.2026</td>
+            <td>24. Sep 2026, 10:29:56</td>
+            <td>-</td>
+            <td>Nicht bewertet</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>
+                <div class="dropdown">
+                    <button class="btn btn-default dropdown-toggle" type="button">Aktionen</button>
+                    <ul class="dropdown-menu">
+                        <li><button class="btn btn-link" data-action="ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd:d1&cmdClass=ilexsubmissionfilegui&cmd=downloadReturned&ref_id=3803739&ass_id=53188&vw=1&member_id=1001&part_id=0">Abgaben herunterladen (1)</button></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>
+        <!-- Student 2: Action via dynamic script click handler -->
+        <tr>
+            <td><input type="checkbox" name="id[]" value="1002" /></td>
+            <td>Meier, Eva (1002)</td>
+            <td>01.10.2026</td>
+            <td>25. Sep 2026, 14:15:00</td>
+            <td>-</td>
+            <td>Nicht bewertet</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>
+                <div class="dropdown">
+                    <button class="btn btn-link" id="btn_script_dl_1002">Download</button>
+                </div>
+            </td>
+        </tr>
+        <!-- Student 3: Team partner 1 with direct download button -->
+        <tr>
+            <td><input type="checkbox" name="id[]" value="1003" /></td>
+            <td>Team Alpha (99)</td>
+            <td>01.10.2026</td>
+            <td>26. Sep 2026, 18:00:00</td>
+            <td>-</td>
+            <td>Bestanden</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>
+                <button class="btn btn-link" data-action="ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd:d1&cmdClass=ilexsubmissionfilegui&cmd=downloadReturned&ref_id=3803739&ass_id=53188&vw=1&member_id=1003&part_id=0">Herunterladen (2)</button>
+            </td>
+        </tr>
+        <!-- Student 4: Team partner 2 without direct button, shares Team 99 -->
+        <tr>
+            <td><input type="checkbox" name="id[]" value="1004" /></td>
+            <td>Team Alpha Partner (99)</td>
+            <td>01.10.2026</td>
+            <td>-</td>
+            <td>-</td>
+            <td>Bestanden</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>
+                <span>Keine Aktionen</span>
+            </td>
+        </tr>
+        <!-- Student 5: Submitted on timestamp present, but action button omitted (fallback synthesis) -->
+        <tr>
+            <td><input type="checkbox" name="id[]" value="1005" /></td>
+            <td>Solo, Hans (1005)</td>
+            <td>01.10.2026</td>
+            <td>27. Sep 2026, 11:00:00</td>
+            <td>-</td>
+            <td>Nicht bewertet</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>
+                <span>Keine Aktionen</span>
+            </td>
+        </tr>
+    </tbody>
+    </table>
+    </form>
+    <script>
+    $('#btn_script_dl_1002').on('click', function(event) {
+        window.location = 'ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd:d1&cmdClass=ilexsubmissionfilegui&cmd=downloadReturned&ref_id=3803739&ass_id=53188&vw=1&member_id=1002&part_id=0';
+        return false;
+    });
+    </script>
+    </body></html>
+    """
+
+    res = parse_exercise_submissions(german_html, exercise_ref_id="3803739")
+    assert len(res.submissions) == 5
+
+    # 1. German button parsed
+    s1 = res.submissions[0]
+    assert "Muster, Max" in s1.student_name
+    assert s1.submission_status == "submitted"
+    assert s1.download_url is not None
+    assert "downloadReturned" in s1.download_url
+    assert "member_id=1001" in s1.download_url
+
+    # 2. Script click handler parsed
+    s2 = res.submissions[1]
+    assert "Meier, Eva" in s2.student_name
+    assert s2.submission_status == "submitted"
+    assert s2.download_url is not None
+    assert "downloadReturned" in s2.download_url
+    assert "member_id=1002" in s2.download_url
+
+    # 3. Team partner 1
+    s3 = res.submissions[2]
+    assert s3.team_id == "99"
+    assert s3.download_url is not None
+    assert "member_id=1003" in s3.download_url
+
+    # 4. Team partner 2 inherits download URL and submission status from team
+    s4 = res.submissions[3]
+    assert s4.team_id == "99"
+    assert s4.download_url is not None
+    assert s4.download_url == s3.download_url
+    assert s4.submission_status == "submitted"
+    assert s4.submission_time == "26. Sep 2026, 18:00:00"
+
+    # 5. Fallback synthesis for submitted student without explicit action button
+    s5 = res.submissions[4]
+    assert "Solo, Hans" in s5.student_name
+    assert s5.submission_status == "submitted"
+    assert s5.download_url is not None
+    assert "downloadReturned" in s5.download_url
+    assert "member_id=1005" in s5.download_url
+

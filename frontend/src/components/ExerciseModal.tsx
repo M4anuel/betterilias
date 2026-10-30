@@ -593,20 +593,23 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
 
                           {/* Direct Actions: Download, Mail, Team Log */}
                           <div className="flex items-center gap-2 flex-wrap self-end sm:self-auto">
-                            {sub.download_url ? (
-                              <a
-                                href={sub.download_url}
-                                download
-                                className="flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-600 hover:text-white transition shadow-2xs border border-indigo-200"
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                                <span>{t("Abgabe herunterladen")}</span>
-                              </a>
-                            ) : (
-                              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-400">
-                                {t("Keine Datei")}
-                              </span>
-                            )}
+                            {(() => {
+                              const dlUrl = sub.download_url || (sub.files && sub.files.length > 0 ? sub.files[0].download_url : null);
+                              return dlUrl ? (
+                                <a
+                                  href={api.getDownloadUrl(exerciseRefId, dlUrl)}
+                                  download
+                                  className="flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-600 hover:text-white transition shadow-2xs border border-indigo-200"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  <span>{t("Abgabe herunterladen")}</span>
+                                </a>
+                              ) : (
+                                <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-400">
+                                  {t("Keine Datei")}
+                                </span>
+                              );
+                            })()}
 
                             {sub.feedback_mail_url && (
                               <a
@@ -837,7 +840,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                               </span>
                             </div>
                             <a
-                              href={f.download_url}
+                              href={api.getDownloadUrl(exerciseRefId, f.download_url)}
                               download
                               className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition shadow-2xs"
                             >
@@ -932,7 +935,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
                           >
                             <span className="text-xs font-bold text-emerald-900">{sf.filename}</span>
                             <a
-                              href={sf.download_url}
+                              href={api.getDownloadUrl(exerciseRefId, sf.download_url)}
                               download
                               className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
                             >

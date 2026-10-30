@@ -1533,11 +1533,13 @@ class IliasClient(AuthoringMixin, ManagementMixin):
         Stream a file download from ILIAS through the authenticated client.
         Returns (stream_generator, headers_dict, status_code).
         """
+        import html
         self._ensure_authenticated()
         client = self.session_manager.get_http_client()
 
         # Build full URL if relative
-        full_url = urllib.parse.urljoin(settings.ilias_base_url, download_url)
+        clean_url = html.unescape(download_url).strip()
+        full_url = urllib.parse.urljoin(settings.ilias_base_url, clean_url)
 
         req = client.build_request("GET", full_url)
         resp = await client.send(req, stream=True)
@@ -1546,6 +1548,14 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             await resp.aclose()
             await client.aclose()
             raise ValueError(t('ILIAS returned error {p0} for download {p1}', p0=resp.status_code, p1=full_url))
+
+        # Detect when ILIAS returns an HTML error/login page instead of the actual file download
+        content_type = resp.headers.get("content-type", "").lower()
+        content_disp = resp.headers.get("content-disposition", "")
+        if "text/html" in content_type and "attachment" not in content_disp.lower():
+            await resp.aclose()
+            await client.aclose()
+            raise ValueError(t('ILIAS did not return a downloadable file (received HTML error or login page).'))
 
         filtered_headers = {
             "Content-Type": resp.headers.get("content-type", "application/octet-stream"),

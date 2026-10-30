@@ -570,7 +570,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                     </div>
 
                     <a
-                      href={file.download_url} aria-label={t("Download")}
+                      href={exerciseRefId ? api.getDownloadUrl(exerciseRefId, file.download_url) : file.download_url} aria-label={t("Download")}
                       download
                       className="flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition shrink-0 border border-indigo-200 dark:border-indigo-800"
                     >
@@ -584,7 +584,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
               <div className="flex items-center justify-between rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 p-3.5">
                 <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">{t("Abgabe-Archiv verfügbar")}</span>
                 <a
-                  href={submission.download_url} aria-label={t("Download")}
+                  href={exerciseRefId ? api.getDownloadUrl(exerciseRefId, submission.download_url) : submission.download_url} aria-label={t("Download")}
                   download
                   className="flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition border border-indigo-200 dark:border-indigo-800"
                 >

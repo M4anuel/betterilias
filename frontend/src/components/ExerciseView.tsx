@@ -2240,21 +2240,24 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           <Info className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                           <span>{t("Details")}</span>
                         </button>
-                        {sub.download_url ? (
-                          <a
-                            href={sub.download_url}
-                            aria-label={t("Abgabe herunterladen")}
-                            download
-                            className="submission-download flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition shadow-2xs border border-indigo-200 dark:border-indigo-800"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            <span className="desktop-only">{t("Abgabe herunterladen")}</span><span className="phone-only">{t("Download")}</span>
-                          </a>
-                        ) : (
-                          <span className="rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                            {t("Keine Datei")}
-                          </span>
-                        )}
+                        {(() => {
+                          const dlUrl = sub.download_url || (sub.files && sub.files.length > 0 ? sub.files[0].download_url : null);
+                          return dlUrl ? (
+                            <a
+                              href={api.getDownloadUrl(exerciseRefId, dlUrl)}
+                              aria-label={t("Abgabe herunterladen")}
+                              download
+                              className="submission-download flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition shadow-2xs border border-indigo-200 dark:border-indigo-800"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              <span className="desktop-only">{t("Abgabe herunterladen")}</span><span className="phone-only">{t("Download")}</span>
+                            </a>
+                          ) : (
+                            <span className="rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                              {t("Keine Datei")}
+                            </span>
+                          );
+                        })()}
 
 
                       </div>

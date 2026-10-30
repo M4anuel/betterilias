@@ -828,6 +828,7 @@
   "ILIAS bietet diese Kursaktion aktuell nicht an. Die Anmeldung wird möglicherweise über KSL verwaltet.": "ILIAS does not currently offer this course action. Registration may be managed through KSL.",
   "Failed to fetch exercise with ref_id {p0}": "Failed to fetch exercise with ref_id {p0}",
   "ILIAS returned error {p0} for download {p1}": "ILIAS returned error {p0} for download {p1}",
+  "ILIAS did not return a downloadable file (received HTML error or login page).": "ILIAS did not return a downloadable file (received HTML error or login page).",
   "No cookies stored.": "No cookies stored.",
   "Diese Kursaktion muss direkt in ILIAS abgeschlossen werden.": "This course action must be completed directly in ILIAS.",
   "Unbekannte Felder in der Kursanmeldung": "Unknown fields in course registration",

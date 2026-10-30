@@ -1,4 +1,5 @@
 from backend.i18n import t
+import html
 import re
 import urllib.parse
 from typing import Dict, List, Optional, Tuple
@@ -126,6 +127,26 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
         m_tok_all = re.search(r"rtoken=([a-f0-9]{32,64})", html_content)
         if m_tok_all:
             rtoken = m_tok_all.group(1)
+
+    # Locate exercise cmdNode for robust fallback download link synthesis
+    page_cmd_node: Optional[str] = None
+    m_node = re.search(r"cmdNode=([a-zA-Z0-9_:]+).*?cmdClass=ilexsubmissionfilegui", html_content, re.I)
+    if m_node:
+        page_cmd_node = m_node.group(1)
+    else:
+        m_node_any = re.search(r"baseClass=ilexercisehandlergui.*?cmdNode=([a-zA-Z0-9_:]+)", html_content, re.I)
+        if m_node_any:
+            base_n = m_node_any.group(1)
+            page_cmd_node = f"{base_n}:d1" if not base_n.endswith(":d1") else base_n
+
+    # Extract dynamic script click actions (e.g. $('#btn_id').on('click', function() { window.location = '...'; }))
+    script_action_map: Dict[str, str] = {}
+    for m in re.finditer(
+        r"\$\(['\"]#([^'\"]+)['\"]\)\.on\(['\"]click['\"].*?window\.location\s*=\s*['\"]([^'\"]+)['\"]",
+        html_content,
+        re.DOTALL,
+    ):
+        script_action_map[m.group(1)] = m.group(2)
 
     # 4. Locate Submissions Table
     table = (
@@ -359,25 +380,73 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
         for el in row.find_all(["button", "a"]):
             el_text = _clean_text(el).lower()
             raw_act = el.get("data-action") or el.get("href")
+            el_id = el.get("id")
+            if (not raw_act or raw_act == "#") and el_id and el_id in script_action_map:
+                raw_act = script_action_map[el_id]
+            if not raw_act or raw_act == "#":
+                onclick_attr = el.get("onclick") or ""
+                m_oc = re.search(r"window\.location\s*=\s*['\"]([^'\"]+)['\"]", onclick_attr)
+                if m_oc:
+                    raw_act = m_oc.group(1)
+
             if not raw_act or raw_act == "#":
                 continue
 
+            raw_act = html.unescape(raw_act)
             full_url = urllib.parse.urljoin(settings.ilias_base_url, raw_act)
+            act_lower = raw_act.lower()
 
-            if "download" in el_text:
+            is_dl = (
+                "downloadreturned" in act_lower
+                or "cmd=download" in act_lower
+                or "cmd=downloadfile" in act_lower
+                or "cmd=downloadall" in act_lower
+                or any(k in el_text for k in [
+                    "download",
+                    "herunterladen",
+                    "abgabe herunterladen",
+                    "abgaben herunterladen",
+                    "datei herunterladen",
+                    "dateien herunterladen",
+                    "télécharger",
+                    "scarica",
+                ])
+            )
+            is_mail = "redirectfeedbackmail" in act_lower or "mail" in el_text or "email" in el_text
+            is_file_eval = "resourcecollection" in act_lower or "evaluation by file" in el_text or "bewertung per datei" in el_text or "datei-evaluation" in el_text
+            is_team_log = "showteamlog" in act_lower or "log" in el_text
+
+            if is_dl and not (is_mail or is_file_eval or is_team_log):
                 download_url = full_url
                 fname = f"Submission_{student_name}.zip"
                 m_count = re.search(r"\((\d+)\)", el_text)
                 if m_count and m_count.group(1) == "1":
                     fname = f"Submission_{student_name}"
-                files.append(SubmissionFile(filename=fname, download_url=full_url))
+                if not any(f.download_url == full_url for f in files):
+                    files.append(SubmissionFile(filename=fname, download_url=full_url))
                 submission_status = "submitted"
-            elif "mail" in el_text or "email" in el_text:
+            elif is_mail:
                 feedback_mail_url = full_url
-            elif "evaluation by file" in el_text or "file" in el_text or "datei" in el_text:
+            elif is_file_eval:
                 evaluation_by_file_url = full_url
-            elif urllib.parse.parse_qs(urllib.parse.urlparse(full_url).query).get("cmd", [""])[0].lower() == "showteamlog" or "log" in el_text:
+            elif is_team_log or urllib.parse.parse_qs(urllib.parse.urlparse(full_url).query).get("cmd", [""])[0].lower() == "showteamlog":
                 team_log_url = full_url
+
+        if not download_url and files:
+            download_url = files[0].download_url
+            submission_status = "submitted"
+
+        # Fallback synthesis: if ILIAS shows there was a submission, synthesize downloadReturned URL
+        if not download_url and (submission_status in ["submitted", "late"] or submission_time) and member_id and active_assignment_id and page_cmd_node:
+            node = page_cmd_node if ":d1" in page_cmd_node else f"{page_cmd_node}:d1"
+            synth_url = (
+                f"{settings.ilias_base_url}/ilias.php?"
+                f"baseClass=ilexercisehandlergui&cmdNode={node}&cmdClass=ilexsubmissionfilegui"
+                f"&cmd=downloadReturned&ref_id={exercise_ref_id}&ass_id={active_assignment_id}&vw=1&member_id={member_id}&part_id=0"
+            )
+            download_url = synth_url
+            if not files:
+                files.append(SubmissionFile(filename=f"Submission_{student_name}.zip", download_url=synth_url))
 
         if submission_status in ["submitted", "late"]:
             submitted_count += 1
@@ -429,6 +498,24 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
                 additional_columns=additional_columns,
             )
         )
+
+    # Propagate download_url and files across members of the same team
+    team_downloads: Dict[str, Tuple[str, List[SubmissionFile], str, Optional[str]]] = {}
+    for s in submissions:
+        if s.team_id and s.download_url:
+            team_downloads[s.team_id] = (s.download_url, s.files, s.submission_status, s.submission_time)
+
+    for s in submissions:
+        if s.team_id and s.team_id in team_downloads:
+            dl_url, f_list, sub_stat, sub_time = team_downloads[s.team_id]
+            if not s.download_url:
+                s.download_url = dl_url
+            if not s.files:
+                s.files = list(f_list)
+            if s.submission_status == "not_submitted" and sub_stat in ["submitted", "late"]:
+                s.submission_status = sub_stat
+            if not s.submission_time and sub_time:
+                s.submission_time = sub_time
 
     return ExerciseSubmissionsResponse(
         exercise=ExerciseInfo(
