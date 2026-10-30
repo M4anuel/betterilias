@@ -2,6 +2,10 @@
 
 Unchecked items are unfinished; completed work is listed separately below. Current behavior and limitations are also recorded in [`docs/ILIAS_SUPPORT_MATRIX.md`](docs/ILIAS_SUPPORT_MATRIX.md) and [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECIFICATION.md).
 
+## Teaching-assistant work distribution
+
+- [ ] Implement the reviewed [TA work distribution, downloads and feedback-return plan](docs/TA_WORK_DISTRIBUTION_PLAN.md), starting with native capability/identity probes. Planning and read-only source/fixture research are complete; the feature is not implemented.
+
 ## Calendar and timetable
 
 Goal: combine all courses from the current semester into a calendar, a weekly
