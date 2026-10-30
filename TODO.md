@@ -200,6 +200,8 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 
 ## Completed
 
+- [x] Fix intrinsic extension popup sizing and header/badge wrapping; verify an installed Chromium action popup at normal and doubled content scaling, with matching Firefox markup.
+
 - [x] Verify extension session cookies before showing success; use amber checking/unavailable and red invalid toolbar/popup states, invalidate stale success caches and show a prominent ILIAS login action in both Chrome and Firefox.
 
 - [x] Give the player a taller default 16:10 canvas, save/resume playback positions per session and episode, and replace the cone with a straight volume track and volume-sensitive speaker waves.
