@@ -105,5 +105,73 @@ def test_extension_language_selection_and_safe_sync_feedback(local_site, directo
         page.locator('#sync-btn').click()
         playwright.expect(page.locator('#feedback-box')).to_contain_text('<b>Anna</b>')
         assert page.locator('#feedback-box b').count() == 0
-        assert request_languages == ['de']
+        assert request_languages == ['en', 'de', 'de']
+        browser.close()
+
+
+@pytest.mark.parametrize('directory', ['extension', 'extension-firefox'])
+@pytest.mark.parametrize('language,scheme', [('de','dark'), ('de','light'), ('en','dark'), ('en','light')])
+def test_extension_checking_invalid_recovery_and_unavailable(local_site, directory, language, scheme):
+    pw=pytest.importorskip('playwright.sync_api')
+    tr=json.loads((ROOT/'locales'/f'{language}.json').read_text(encoding='utf-8')).__getitem__
+    with pw.sync_playwright() as p:
+        browser=p.chromium.launch(headless=True,channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+        page=browser.new_page(viewport=dict(width=320 if language=='de' else 430,height=740),color_scheme=scheme)
+        page.add_init_script('''
+          globalThis.mockCookies=[{name:'PHPSESSID',value:'stale'},{name:'_shibsession_test',value:'stale'}];
+          globalThis.badge={text:'✓',color:'#0AACA5'};
+          globalThis.chrome={
+            storage:{local:{get:async()=>JSON.parse(localStorage.getItem('mock-extension')||'{}'),
+              set:async value=>localStorage.setItem('mock-extension',JSON.stringify({...JSON.parse(localStorage.getItem('mock-extension')||'{}'),...value}))}},
+            cookies:{getAll:async()=>mockCookies},
+            action:{setBadgeText:value=>badge.text=value.text,setBadgeBackgroundColor:value=>badge.color=value.color},
+            tabs:{query:async()=>[],sendMessage:async()=>{},create:()=>{}}
+          };
+        ''' + f"localStorage.setItem('mock-extension',JSON.stringify({{language:'{language}',autoSyncEnabled:false}}));" + ("globalThis.browser=chrome;" if directory=='extension-firefox' else ''))
+        held=[]
+        mode=['held']
+        def respond(route):
+            if mode[0]=='held':held.append(route)
+            elif mode[0]=='valid':route.fulfill(content_type='application/json',body=json.dumps(dict(success=True,authenticated=True,session_id='fresh-session',user_name='Anna')))
+            else:route.fulfill(status=503,content_type='application/json',body='{}')
+        page.route('**/api/auth/sync',respond)
+        page.goto(f'{local_site}/{directory}/popup.html')
+        badge=page.locator('#ilias-status-badge')
+        pw.expect(badge).to_have_text(tr('Prüfe...'))
+        pw.expect(badge).to_have_class('status-badge badge-warning')
+        pw.expect(page.locator('#auto-sync-badge')).to_have_text(tr('Disabled'))
+        pw.expect(page.locator('#auto-sync-badge')).to_have_class('status-badge badge-neutral')
+        page.wait_for_function("badge.text==='…' && badge.color==='#d97706'")
+        page.get_by_label(tr('Language'),exact=True).select_option('en' if language=='de' else 'de')
+        pw.expect(badge).to_have_class('status-badge badge-warning')
+        page.locator('#language').select_option(language)
+        assert held
+        held.pop().fulfill(content_type='application/json',body=json.dumps(dict(success=True,authenticated=False,message='Expired')))
+        pw.expect(badge).to_have_class('status-badge badge-danger')
+        pw.expect(badge).to_have_text(tr('Nicht angemeldet'))
+        page.wait_for_function("badge.text==='!' && badge.color==='#dc2626'")
+        login=page.get_by_role('link',name=tr('Bei ILIAS anmelden'),exact=True)
+        pw.expect(login).to_be_visible()
+        assert login.bounding_box()['height']>=48 and login.bounding_box()['width']>=260
+        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        page.screenshot(path=f'.pytest_cache/{directory}-expired-{language}-{scheme}.png')
+        page.context.route('https://ilias.unibe.ch/**',lambda route:route.fulfill(content_type='text/html',body='<h1>Mock ILIAS sign in</h1>'))
+        with page.expect_popup() as opened:login.click()
+        assert opened.value.url.startswith('https://ilias.unibe.ch/')
+        opened.value.close()
+        mode[0]='valid'
+        page.locator('#sync-btn').click()
+        pw.expect(badge).to_have_class('status-badge badge-success')
+        pw.expect(login).to_be_hidden()
+        page.wait_for_function("badge.text==='✓'")
+        mode[0]='error'
+        page.locator('#sync-btn').click()
+        pw.expect(badge).to_have_class('status-badge badge-warning')
+        page.wait_for_function("badge.text==='?' && badge.color==='#d97706'")
+        pw.expect(login).to_be_hidden()
+        page.evaluate('mockCookies=[]')
+        page.locator('#sync-btn').click()
+        pw.expect(badge).to_have_class('status-badge badge-danger')
+        pw.expect(login).to_be_visible()
+        pw.expect(page.locator('#sync-btn')).to_be_disabled()
         browser.close()

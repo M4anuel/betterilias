@@ -5,18 +5,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   const badge = byId('ilias-status-badge'), subtitle = byId('ilias-status-sub');
   const autoSyncBadge = byId('auto-sync-badge');
   const feedback = byId('feedback-box'), sync = byId('sync-btn'), language = byId('language');
-  let syncing = false;
+  let syncing = false, autoSyncEnabled = true;
+  let sessionState = 'checking', cookiePresent = false, sessionUser = null;
+  setSessionState('checking');
   try {
     const stored = await browserAPI.storage.local.get(['serverUrl', 'frontendUrl', 'language', 'autoSyncEnabled']);
     for (const [key, id] of [['serverUrl', 'server-url'], ['frontendUrl', 'frontend-url']]) {
       if (stored[key]) byId(id).value = stored[key];
     }
     if (stored.language) setLanguage(stored.language);
-    if (autoSyncBadge) {
-      const isAuto = stored.autoSyncEnabled !== false;
-      autoSyncBadge.textContent = isAuto ? t('Aktiv') : t('Deaktivieren');
-      autoSyncBadge.className = `status-badge ${isAuto ? 'badge-success' : 'badge-warning'}`;
-    }
+    autoSyncEnabled = stored.autoSyncEnabled !== false;
   } catch (error) { console.warn('Could not load settings:', error); }
   const serverUrl = () => (byId('server-url').value || 'http://localhost:8000').replace(/\/+$/, '');
   const frontendUrl = () => (byId('frontend-url').value || 'http://localhost:5173').replace(/\/+$/, '');
@@ -34,8 +32,30 @@ document.addEventListener('DOMContentLoaded', async () => {
       language.append(option);
     }
     language.value = getLanguage();
+    if (autoSyncBadge) {
+      autoSyncBadge.textContent = autoSyncEnabled ? t('Aktiv') : t('Disabled');
+      autoSyncBadge.className = 'status-badge badge-neutral';
+    }
     sync.textContent = syncing ? t('Synchronisiere...') : t('Sitzung mit BetterIlias synchronisieren');
-    sync.disabled = syncing;
+    sync.disabled = syncing || !cookiePresent;
+    sync.className = `btn ${sessionState === 'invalid' ? 'btn-secondary' : 'btn-primary'}`;
+    byId('login-btn').hidden = sessionState !== 'invalid';
+    badge.textContent = sessionState === 'valid' ? t('Synchronisiert') : sessionState === 'invalid'
+      ? t('Nicht angemeldet') : sessionState === 'error' ? t('Nicht verifiziert') : t('Prüfe...');
+    badge.className = `status-badge ${sessionState === 'valid' ? 'badge-success' : sessionState === 'invalid' ? 'badge-danger' : 'badge-warning'}`;
+    subtitle.textContent = sessionState === 'valid' ? t('Angemeldet als {user}', { user: sessionUser || t('Benutzer') })
+      : sessionState === 'invalid' ? (cookiePresent ? t('Gast-Sitzung oder abgelaufen. Bitte auf ilias.unibe.ch mit SWITCH edu-ID einloggen.') : t('Keine Sitzung gefunden. Bitte logge dich zuerst auf ilias.unibe.ch ein.'))
+      : sessionState === 'error' ? t('Session verification unavailable. Check your connection and the backend, then retry.')
+      : t('Verifying your ILIAS session...');
+  }
+  function setSessionState(state) {
+    sessionState = state;
+    render();
+    try {
+      const action = browserAPI.action || browserAPI.browserAction;
+      action?.setBadgeText({ text: state === 'valid' ? '✓' : state === 'invalid' ? '!' : state === 'checking' ? '…' : '?' });
+      action?.setBadgeBackgroundColor({ color: state === 'valid' ? '#0AACA5' : state === 'invalid' ? '#dc2626' : '#d97706' });
+    } catch (_) { /* Toolbar APIs are unavailable in some popup previews. */ }
   }
   function isIliasAuthCookie(name) {
     if (!name || typeof name !== 'string') return false;
@@ -58,44 +78,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!cookies.has('ilClientId')) cookies.set('ilClientId', 'ilias3_unibe');
     return Object.fromEntries(cookies);
   }
-  async function checkCookies() {
-    try {
-      const cookies = await fetchCookies(), present = Boolean(cookies.PHPSESSID);
-      const verified = present && Object.keys(cookies).some(key => key.startsWith('_shibsession_'));
-      badge.textContent = verified ? t('Bereit') : present ? t('Nicht verifiziert') : t('Nicht angemeldet');
-      badge.className = `status-badge ${verified ? 'badge-success' : present ? 'badge-warning' : 'badge-danger'}`;
-      subtitle.textContent = verified ? t('Aktive SWITCH edu-ID Sitzung gefunden.') : present
-        ? t('Gast-Sitzung oder abgelaufen. Bitte auf ilias.unibe.ch mit SWITCH edu-ID einloggen.')
-        : t('Keine Sitzung gefunden. Bitte logge dich zuerst auf ilias.unibe.ch ein.');
-      if (!verified) {
-        const link = document.createElement('a'); link.href = 'https://ilias.unibe.ch';
-        link.target = '_blank'; link.rel = 'noreferrer'; link.textContent = t('Bei ILIAS anmelden');
-        link.style.cssText = 'display:block;color:var(--accent);text-decoration:underline;margin-top:6px';
-        subtitle.append(link);
-      }
-      sync.disabled = syncing || !present;
-    } catch (error) {
-      badge.textContent = t('Fehler'); badge.className = 'status-badge badge-danger';
-      subtitle.textContent = t('Fehler beim Prüfen der Cookies: {error}', { error: error.message });
-      sync.disabled = true;
-    }
-  }
   language.addEventListener('change', async () => {
     setLanguage(language.value); feedback.className = 'feedback'; render();
     try { await browserAPI.storage.local.set({ language: getLanguage() }); }
     catch (_) { showFeedback(t('Could not save language preference.'), 'error'); }
-    await checkCookies();
   });
-  sync.addEventListener('click', async () => {
-    feedback.className = 'feedback'; syncing = true; render();
+  async function verifySession(manual = false) {
+    if (syncing) return;
+    feedback.className = 'feedback'; syncing = true; setSessionState('checking');
     try {
       const cookies = await fetchCookies();
-      if (!cookies.PHPSESSID) throw new Error(t('Kein PHPSESSID Cookie gefunden. Bitte zuerst bei ILIAS (ilias.unibe.ch) einloggen.'));
+      cookiePresent = Boolean(cookies.PHPSESSID);
+      if (!cookiePresent) {
+        setSessionState('invalid');
+        await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
+        return;
+      }
       const stored = await browserAPI.storage.local.get(['sessionId']);
       let response;
       try {
         response = await fetch(`${serverUrl()}/api/auth/sync`, {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': getLanguage() },
+          signal: AbortSignal.timeout(20000),
           body: JSON.stringify({ cookies, session_id: stored.sessionId || null,
             source: typeof browser !== 'undefined' ? 'firefox_extension' : 'chrome_extension', user_agent: navigator.userAgent }),
         });
@@ -103,10 +107,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         throw new Error(t('Verbindung zum Backend fehlgeschlagen ({error}). Läuft das Backend auf {url}?', { error: error.message, url: serverUrl() }));
       }
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : t('Server Fehler ({status})', { status: response.status }));
-      if (!data.success || !data.authenticated) {
-        showFeedback(data.message || t('Sitzung konnte auf ILIAS nicht verifiziert werden.'), 'error'); return;
+      if (response.status === 401 || response.status === 403 || (response.ok && data.authenticated === false)) {
+        setSessionState('invalid');
+        await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
+        if (manual) showFeedback(data.message || t('Sitzung konnte auf ILIAS nicht verifiziert werden.'), 'error');
+        return;
       }
+      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : t('Server Fehler ({status})', { status: response.status }));
+      if (!data.success || !data.authenticated || !data.session_id) throw new Error(t('Sitzung konnte auf ILIAS nicht verifiziert werden.'));
       const shibKey = Object.keys(cookies).find(k => k.startsWith('_shibsession_')) || '';
       await browserAPI.storage.local.set({
         sessionId: data.session_id,
@@ -114,26 +122,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         lastSyncTime: Date.now(),
         userName: data.user_name || null,
       });
-      try {
-        const action = browserAPI.action || browserAPI.browserAction;
-        if (action?.setBadgeText) {
-          action.setBadgeText({ text: '✓' });
-          action.setBadgeBackgroundColor({ color: '#0AACA5' });
-        }
-      } catch (_) {}
       const user = data.user_name || t('Benutzer');
-      showFeedback(t('Erfolgreich synchronisiert als "{user}"!', { user }));
-      badge.textContent = t('Synchronisiert'); badge.className = 'status-badge badge-success';
-      subtitle.textContent = t('Angemeldet als {user}', { user });
+      sessionUser = user; setSessionState('valid');
+      if (manual) showFeedback(t('Erfolgreich synchronisiert als "{user}"!', { user }));
       for (const tab of await browserAPI.tabs.query({})) {
         if (tab.url && tab.url.startsWith(frontendUrl()) && tab.id) {
           try { await browserAPI.tabs.sendMessage(tab.id, { type: 'BETTERILIAS_SESSION_SYNCED', sessionId: data.session_id }); }
           catch (_) { /* Tab may have closed. */ }
         }
       }
-    } catch (error) { showFeedback(error.message, 'error'); }
-    finally { syncing = false; sync.textContent = t('Sitzung mit BetterIlias synchronisieren'); sync.disabled = false; }
-  });
+    } catch (error) {
+      setSessionState('error');
+      await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
+      if (manual) showFeedback(error.message, 'error');
+    }
+    finally { syncing = false; render(); }
+  }
+  sync.addEventListener('click', () => verifySession(true));
   byId('open-app-btn').addEventListener('click', async () => {
     const stored = await browserAPI.storage.local.get(['sessionId']), target = new URL(frontendUrl());
     if (stored.sessionId) target.searchParams.set('session_id', stored.sessionId);
@@ -145,5 +150,5 @@ document.addEventListener('DOMContentLoaded', async () => {
       showFeedback(t('Einstellungen gespeichert.'));
     } catch (_) { showFeedback(t('Could not save settings.'), 'error'); }
   });
-  render(); await checkCookies();
+  render(); await verifySession();
 });
