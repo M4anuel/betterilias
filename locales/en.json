@@ -1611,5 +1611,7 @@
   "auth.session_required": "Connect your ILIAS session using the browser extension.",
   "auth.handoff_expired": "This connection link has expired or was already used. Create a new link in BetterIlias.",
   "auth.handoff_hint": "Valid for 60 seconds and one connection only.",
-  "coordination.busy": "Another operation is still running. Please try again shortly."
+  "coordination.busy": "Another operation is still running. Please try again shortly.",
+  "Keine neuen Feedback-Dateien gefunden": "No new feedback files found",
+  "Bitte legen Sie Ihre Feedback-Dateien in die jeweiligen Ordner unter feedback/ ab.": "Please place your feedback files into the respective folders under feedback/."
 }

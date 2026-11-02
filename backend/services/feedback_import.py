@@ -41,6 +41,16 @@ METADATA_FILENAMES = {
     "desktop.ini",
     ".keep",
     "download_failures.txt",
+    "download_failures.log",
+    "instructions.txt",
+    "readme.txt",
+}
+
+MANIFEST_FILENAMES = {
+    "betterilias-feedback.json",
+    "betterilias_feedback.json",
+    "feedback.json",
+    "manifest.json",
 }
 
 
@@ -254,16 +264,20 @@ async def preview_feedback_import(
     blockers: List[str] = list(errors)
     unmatched_files: List[str] = []
 
-    # 3. Check for BetterIlias manifest
+    # 3. Check for BetterIlias manifest / metadata files
     manifest_data: Optional[Dict[str, Any]] = None
     files_to_process: List[Tuple[str, bytes]] = []
 
     for path, data in valid_files:
-        if path.lower() == "betterilias-feedback.json":
+        filename_lower = path.split("/")[-1].lower()
+        if filename_lower in MANIFEST_FILENAMES:
             try:
                 manifest_data = json.loads(data.decode("utf-8"))
+                skipped_files.append(f"{path} (manifest)")
             except Exception as e:
-                errors.append(f"Invalid betterilias-feedback.json manifest: {e}")
+                errors.append(f"Invalid manifest file {path}: {e}")
+        elif filename_lower in METADATA_FILENAMES:
+            skipped_files.append(f"{path} (metadata)")
         else:
             files_to_process.append((path, data))
 
@@ -597,3 +611,4 @@ async def commit_feedback_import(
             p2=failed_count,
         ),
     )
+

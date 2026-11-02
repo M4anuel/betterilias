@@ -144,8 +144,15 @@ async def create_submissions_zip_bundle(
             }
             manifest["units"].append(unit_info)
 
-            # Create empty feedback placeholder folder in zip
-            zf.writestr(f"feedback/{unit_folder}/.keep", "")
+            # Create feedback placeholder folder in zip with instructions in the .keep file
+            keep_explanation = (
+                "# Feedback-Ordner fuer diese Einheit / Feedback folder for this unit\n"
+                "# -------------------------------------------------------------------\n"
+                "# Legen Sie Ihre Korrektur- oder Feedbackdateien (z.B. PDF, DOCX, Code) hier ab.\n"
+                "# Diese .keep-Datei dient nur als Platzhalter fuer leere Ordner und wird ignoriert.\n"
+                "# Place your review/feedback files here. This .keep file is just a placeholder and will be ignored.\n"
+            )
+            zf.writestr(f"feedback/{unit_folder}/.keep", keep_explanation)
 
             # Queue submitted files for bounded concurrent download
             for sf in sub.files:
@@ -190,6 +197,23 @@ async def create_submissions_zip_bundle(
             error_log = "The following files could not be downloaded successfully from ILIAS:\n\n"
             error_log += "\n".join(f"- {msg}" for msg in failed_downloads)
             zf.writestr("DOWNLOAD_FAILURES.txt", error_log)
+
+        # Instructions file
+        instructions_text = (
+            "BetterIlias Feedback Workflow\n"
+            "=============================\n\n"
+            "DEUTSCH:\n"
+            "1. Finden Sie den jeweiligen Studierenden- oder Gruppen-Ordner unter 'feedback/'.\n"
+            "2. Legen Sie Ihre Rueckmeldungsdateien (z.B. PDF, Word, Code) direkt in diesen Ordner.\n"
+            "3. Zippen Sie diesen Ordner wieder und laden Sie die ZIP-Datei in BetterIlias ueber 'Feedback hochladen' hoch.\n"
+            "4. Das Manifest (betterilias-feedback.json), Platzhalter (.keep) und Anleitungen werden beim Import automatisch ignoriert.\n\n"
+            "ENGLISH:\n"
+            "1. Locate the student or team folder under 'feedback/'.\n"
+            "2. Place your feedback files (e.g. PDF, Word, code) directly into that folder.\n"
+            "3. Zip this folder again and upload the ZIP archive in BetterIlias via 'Upload feedback'.\n"
+            "4. The manifest file (betterilias-feedback.json), placeholder files (.keep) and instructions are automatically ignored.\n"
+        )
+        zf.writestr("INSTRUCTIONS.txt", instructions_text)
 
         # Write manifest file
         zf.writestr("betterilias-feedback.json", json.dumps(manifest, ensure_ascii=False, indent=2))
