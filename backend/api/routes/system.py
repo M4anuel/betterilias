@@ -1,5 +1,5 @@
 from backend.i18n import t
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
 from typing import List
 
@@ -7,7 +7,12 @@ from backend.schemas import FailedDumpSummary, FailedDumpDetail
 from backend.scrapers.dumper import list_failed_dumps, get_dump_content
 from backend.config import settings
 
-router = APIRouter(prefix="/system", tags=["System & AI Maintenance"])
+def development_only():
+    if settings.app_env != 'development':
+        raise HTTPException(404, detail=t('Not Found'))
+
+
+router = APIRouter(prefix="/system", tags=["System & AI Maintenance"], dependencies=[Depends(development_only)])
 
 
 @router.get("/logs", response_model=List[FailedDumpSummary])
@@ -30,7 +35,7 @@ async def view_dump_html(filename: str):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=t("Dump file '{p0}' not found.", p0=filename)
         )
-    return HTMLResponse(content=content)
+    return HTMLResponse(content=content, headers={"Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'", "Cache-Control": "no-store"})
 
 
 @router.get("/logs/{filename}", response_model=FailedDumpDetail)

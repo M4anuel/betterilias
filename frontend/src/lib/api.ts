@@ -67,6 +67,7 @@ export async function sessionFetch(input: string, init?: RequestInit & { trackPe
   try {
     const response = await fetch(input, {
       ...init,
+      credentials: 'same-origin',
       headers,
     });
 
@@ -180,7 +181,7 @@ export const api = {
       xhr.send(body);
     }).finally(() => navigationGuard.decrementPending());
   },
-  async prepareMobileSession(): Promise<{ session_id: string }> {
+  async prepareMobileSession(): Promise<{ handoff_token: string; expires_in: number }> {
     const res = await sessionFetch(`${API_BASE}/auth/mobile-session`, { method: 'POST', cache: 'no-store' });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -218,56 +219,8 @@ export const api = {
   async getAuthStatus(): Promise<AuthStatus> {
     const res = await sessionFetch(`${API_BASE}/auth/status`);
     if (!res.ok) throw new Error(t("Failed to fetch auth status"));
-    return res.json();
-  },
-
-  async triggerBrowserLogin(): Promise<{ success: boolean; session_id?: string; message: string }> {
-    const res = await sessionFetch(`${API_BASE}/auth/login-browser`, { method: 'POST' });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(apiError(err) || t("Browser login failed"));
-    }
-    const data = await res.json();
-    if (data.session_id) {
-      cache.setSessionId(data.session_id);
-    }
-    return data;
-  },
-
-  async syncExtensionCookies(payload: {
-    cookies: Record<string, string>;
-    sessionId?: string;
-  }): Promise<{ success: boolean; session_id: string; authenticated: boolean; user_name?: string; message: string }> {
-    const res = await sessionFetch(`${API_BASE}/auth/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(apiError(err) || t("Fehler beim Synchronisieren der Cookies"));
-    }
-    const data = await res.json();
-    if (data.session_id) {
-      cache.setSessionId(data.session_id);
-    }
-    return data;
-  },
-
-  async setManualCookies(phpsessid: string, ilClientId: string = 'ilias3_unibe'): Promise<{ success: boolean; session_id?: string; message: string }> {
-    const res = await sessionFetch(`${API_BASE}/auth/cookies`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phpsessid, il_client_id: ilClientId }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(apiError(err) || t("Fehler beim Speichern der Cookies"));
-    }
-    const data = await res.json();
-    if (data.session_id) {
-      cache.setSessionId(data.session_id);
-    }
+    const data: AuthStatus = await res.json();
+    if (data.authenticated && data.session_id) cache.setSessionId(data.session_id);
     return data;
   },
 
@@ -508,8 +461,6 @@ export const api = {
   getTAExportZipUrl(exerciseId: string, assId: string, taId?: string): string {
     const params = new URLSearchParams();
     if (taId) params.append('ta_id', taId);
-    const sessionId = cache.getSessionId();
-    if (sessionId) params.append('session_id', sessionId);
     return `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignments/${encodeURIComponent(assId)}/export-zip?${params.toString()}`;
   },
 
@@ -677,8 +628,6 @@ export const api = {
     const params = new URLSearchParams();
     params.set('lang', getLanguage());
     if (customUrl) params.set('custom_url', customUrl);
-    const sessionId = cache.getSessionId();
-    if (sessionId) params.set('session_id', sessionId);
     const qs = params.toString() ? `?${params.toString()}` : '';
     return `${API_BASE}/materials/${encodeURIComponent(refId)}/download${qs}`;
   },
@@ -965,8 +914,6 @@ export const api = {
     const params = new URLSearchParams();
     if (semester) params.set('semester', semester);
     if (courseIds && courseIds.length > 0) params.set('course_ids', courseIds.join(','));
-    const sessionId = cache.getSessionId();
-    if (sessionId) params.set('session_id', sessionId);
     const qs = params.toString() ? `?${params.toString()}` : '';
     return `${API_BASE}/calendar/export.ics${qs}`;
   },

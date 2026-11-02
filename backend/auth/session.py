@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import secrets
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -11,6 +12,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from backend.config import settings
+from backend.coordination import coordinated, atomic_json
 
 logger = logging.getLogger("ilias.auth")
 
@@ -19,8 +21,9 @@ def sanitize_session_id(session_id: Optional[str]) -> str:
     """Sanitize session_id to avoid path traversal."""
     if not session_id:
         return "default"
-    cleaned = re.sub(r"[^a-zA-Z0-9_\-]", "", str(session_id))
-    return cleaned if cleaned else "default"
+    if not re.fullmatch(r"[a-zA-Z0-9_-]{1,256}", str(session_id)):
+        raise ValueError("Invalid session identifier")
+    return str(session_id)
 
 
 class SessionManager:
@@ -33,6 +36,11 @@ class SessionManager:
     @property
     def session_id(self) -> str:
         return self._session_id
+
+    @property
+    def native_view_lock_key(self) -> str:
+        native = self.load_cookies().get('PHPSESSID', self.session_id)
+        return 'ilias-view:' + hashlib.sha256(native.encode()).hexdigest()
 
     @property
     def cookie_file(self) -> Path:
@@ -57,6 +65,7 @@ class SessionManager:
             logger.error(f"Failed to read session data from {self.cookie_file}: {e}")
             return {}
 
+    @coordinated(lambda self, *args, **kwargs: "session:" + str(self.cookie_file.resolve()))
     def save_cookies(self, cookies: Dict[str, str], metadata: Optional[Dict[str, Any]] = None) -> None:
         """Save cookies dictionary to JSON file."""
         self.cookie_file.parent.mkdir(parents=True, exist_ok=True)
@@ -72,9 +81,8 @@ class SessionManager:
             "cookies": cookies,
             "metadata": merged_meta,
         }
-        with open(self.cookie_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        logger.info(f"Saved {len(cookies)} session cookies for session '{self.session_id}' to {self.cookie_file}")
+        atomic_json(self.cookie_file, data)
+        logger.debug("Session cookies saved")
 
     def load_cookies(self) -> Dict[str, str]:
         """Load cookies dictionary from JSON file."""
@@ -86,6 +94,7 @@ class SessionManager:
         data = self._read_data()
         return data.get("metadata", {})
 
+    @coordinated(lambda self, *args, **kwargs: "session:" + str(self.cookie_file.resolve()))
     def save_metadata(self, metadata: Dict[str, Any]) -> None:
         """Update session metadata."""
         if not self.cookie_file.exists():
@@ -95,20 +104,20 @@ class SessionManager:
         merged.update(metadata)
         data["metadata"] = merged
         data["last_accessed"] = datetime.now(timezone.utc).isoformat()
-        with open(self.cookie_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+        atomic_json(self.cookie_file, data)
 
     def has_cookies(self) -> bool:
         """Check if cookies file exists and has PHPSESSID."""
         cookies = self.load_cookies()
         return bool(cookies.get("PHPSESSID"))
 
+    @coordinated(lambda self, *args, **kwargs: "session:" + str(self.cookie_file.resolve()))
     def clear_session(self) -> bool:
         """Delete stored cookies file."""
         if self.cookie_file.exists():
             try:
                 self.cookie_file.unlink()
-                logger.info(f"Session cookies cleared for session '{self.session_id}'")
+                logger.debug("Session cookies cleared")
                 return True
             except Exception as e:
                 logger.error(f"Failed to delete session file {self.cookie_file}: {e}")

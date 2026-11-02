@@ -1,3 +1,4 @@
+from backend.coordination import coordinated
 import asyncio
 import hashlib
 import io
@@ -5,6 +6,8 @@ import json
 import logging
 import os
 import shutil
+import secrets
+import re
 import time
 import zipfile
 from pathlib import Path
@@ -355,7 +358,8 @@ async def preview_feedback_import(
         await asyncio.gather(*check_tasks)
 
     # 6. Stage files on disk
-    import_id = f"imp_{int(time.time())}_{hashlib.sha256(file_bytes[:256]).hexdigest()[:8]}"
+    # Parallel previews of the same file must never share a staging directory.
+    import_id = 'imp_' + secrets.token_urlsafe(24)
     stage_dir = STAGING_ROOT / session_id / import_id
     stage_dir.mkdir(parents=True, exist_ok=True)
 
@@ -464,6 +468,9 @@ async def preview_feedback_import(
     )
 
 
+@coordinated(lambda exercise_ref_id, *args, **kwargs: 'exercise-write:' + exercise_ref_id)
+@coordinated(lambda exercise_ref_id, ass_id, *args, **kwargs: 'assignment:' + exercise_ref_id + ':' + ass_id)
+@coordinated(lambda exercise_ref_id, ass_id, session_id, request, client: 'feedback:' + session_id + ':' + request.staged_import_id)
 async def commit_feedback_import(
     exercise_ref_id: str,
     ass_id: str,
@@ -476,6 +483,8 @@ async def commit_feedback_import(
     Verifies the snapshot token before making any writes, handles conflict
     actions (overwrite vs skip vs upload), and cleans up staged files.
     """
+    if not re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', request.staged_import_id):
+        raise ValueError(t("Staged feedback import expired or not found. Please re-upload."))
     stage_dir = STAGING_ROOT / session_id / request.staged_import_id
     meta_path = stage_dir / "meta.json"
 

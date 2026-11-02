@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -11,6 +11,13 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    app_env: Literal['production', 'development', 'test'] = 'production'
+    coordination_dir: str = '.coordination'
+
+    @property
+    def coordination_path(self) -> Path:
+        return BASE_DIR / self.coordination_dir
 
     # ILIAS Configuration
     ilias_base_url: str = "https://ilias.unibe.ch"

@@ -10,6 +10,6 @@ if __name__ == "__main__":
         "backend.main:app",
         host=settings.api_host,
         port=settings.api_port,
-        reload=True
+        reload=settings.app_env == 'development'
     )
 

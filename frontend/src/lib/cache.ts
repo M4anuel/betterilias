@@ -94,6 +94,11 @@ export const cache = {
   setSessionId(sessionId: string | null) {
     inMemorySessionId = sessionId?.trim() || null;
     try {
+      if (localStorage.getItem('betterilias_cache_owner') !== inMemorySessionId) {
+        cache.clearSessionContent();
+      }
+      if (inMemorySessionId) localStorage.setItem('betterilias_cache_owner', inMemorySessionId);
+      else localStorage.removeItem('betterilias_cache_owner');
       if (sessionId && sessionId.trim()) {
         localStorage.setItem(SESSION_ID_KEY, sessionId.trim());
       } else {
@@ -107,7 +112,8 @@ export const cache = {
   clearSessionContent() {
     try {
       const prefixes = ['ilias_materials_cache_', 'ilias_semester_cache_', 'ilias_podcast_cache_', CACHE_TS_PREFIX,
-        EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX, EXERCISE_INFO_PREFIX, STUDENT_ASSIGNMENT_PREFIX, 'ilias_repository_', MANAGEMENT_CACHE_PREFIX, TA_ASSIGNMENTS_CACHE_PREFIX];
+        EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX, EXERCISE_INFO_PREFIX, STUDENT_ASSIGNMENT_PREFIX, 'ilias_repository_', MANAGEMENT_CACHE_PREFIX, TA_ASSIGNMENTS_CACHE_PREFIX,
+        TEAM_CANDIDATES_CACHE_PREFIX, TA_ASSIGNMENT_DETAIL_CACHE_PREFIX, MEMBERSHIP_FORM_CACHE_PREFIX, DELETE_REVIEW_CACHE_PREFIX, 'ilias_calendar_'];
       for (const key of Object.keys(localStorage)) {
         if (prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
       }
@@ -1178,3 +1184,6 @@ export const cache = {
     } catch {}
   },
 };
+
+// Clear cached content before any component renders after an extension account change.
+cache.setSessionId(cache.getSessionId());

@@ -1,3 +1,4 @@
+from backend.coordination import coordinated
 from backend.i18n import t
 import logging
 import httpx
@@ -445,6 +446,9 @@ async def delete_ta_instruction_file(
 
 
 @router.post("/{exercise_id}/assignments/{ass_id}/allocation/apply", response_model=ApplyAllocationResponse)
+@coordinated(lambda exercise_id, *args, **kwargs: 'exercise-write:' + exercise_id)
+@coordinated(lambda exercise_id, ass_id, *args, **kwargs: 'assignment:' + exercise_id + ':' + ass_id)
+@coordinated(lambda exercise_id, ass_id, req, client: client.session_manager.native_view_lock_key)
 async def apply_ta_allocation(
     exercise_id: str,
     ass_id: str,

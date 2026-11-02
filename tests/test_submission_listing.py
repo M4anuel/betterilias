@@ -89,6 +89,8 @@ class NativeTable:
     def service(self, session='listing-test'):
         manager = MagicMock()
         manager.has_cookies.return_value = True
+        manager.load_cookies.return_value = {'PHPSESSID': 'this-session'}
+        manager.native_view_lock_key = 'ilias-view:this-session'
         manager.session_id = session
 
         @asynccontextmanager

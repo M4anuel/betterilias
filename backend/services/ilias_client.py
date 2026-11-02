@@ -1,10 +1,10 @@
+from backend.coordination import SharedLock, coordinated
 import asyncio
 from backend.i18n import t
 import logging
 import re
 import urllib.parse
 from contextlib import nullcontext
-from weakref import WeakValueDictionary
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from bs4 import BeautifulSoup
@@ -109,7 +109,6 @@ class IliasClient(AuthoringMixin, ManagementMixin):
     """High-level async client for interacting with Uni Bern ILIAS."""
 
     # Native exc_mem filter/offset storage is shared across exercises in a session.
-    _submission_view_locks = WeakValueDictionary()
 
     # Class-level cache of course participants per exercise_ref_id for enriching team member names
     _course_user_cache: Dict[str, List[CourseUserCandidate]] = {}
@@ -630,9 +629,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             f"{settings.ilias_base_url}/ilias.php?ref_id={ref_id}&cmd=viewMembers{extra}",
         ]
 
-        session_key = str(self.session_manager.session_id)
-        lock = self._submission_view_locks.setdefault(session_key, asyncio.Lock())
-        async with lock, self.session_manager.get_http_client() as client:
+        # ILIAS table state belongs to PHPSESSID, including aliases paired to it.
+        async with SharedLock(self.session_manager.native_view_lock_key).async_(), self.session_manager.get_http_client() as client:
             for url in urls_to_try:
                 resp = await client.get(url)
                 self._check_response_for_session_loss(resp, url)
@@ -1358,6 +1356,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
 
         return await self.get_student_assignment_detail(exercise_ref_id, ass_id)
 
+    @coordinated(lambda self, exercise_ref_id, *args, **kwargs: 'exercise-write:' + exercise_ref_id)
+    @coordinated(lambda self, *args, **kwargs: self.session_manager.native_view_lock_key)
     async def grade_student_submission(
         self, exercise_ref_id: str, grade_data: GradeSubmissionRequest
     ) -> GradeSubmissionResponse:
@@ -1728,6 +1728,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
 
 
 
+    @coordinated(lambda self, *args, **kwargs: self.session_manager.native_view_lock_key)
     async def apply_ta_allocation_batch(
         self,
         exercise_ref_id: str,

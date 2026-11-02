@@ -22,31 +22,14 @@ def test_mobile_session_reuses_current_tenant_key(tmp_path, monkeypatch):
         response = TestClient(app).post('/api/auth/mobile-session')
         assert response.status_code == 200
         assert response.headers['cache-control'] == 'no-store'
-        assert response.json() == {'session_id': 'desktop-test-key'}
+        assert response.json()['expires_in'] == 60
+        assert 'session_id' not in response.json()
+        token = response.json()['handoff_token']
+        claimed = TestClient(app).post('/api/auth/claim', json={'token': token})
+        assert claimed.json() == {'session_id': 'desktop-test-key'}
+        assert TestClient(app).post('/api/auth/claim', json={'token': token}).status_code == 401
         assert manager.cookie_file.read_bytes() == before
         assert len(list(tmp_path.glob('*.json'))) == 1
-    finally:
-        app.dependency_overrides.pop(get_session_manager, None)
-        app.dependency_overrides.pop(get_ilias_client, None)
-
-
-def test_legacy_desktop_session_gets_a_shareable_key(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, 'sessions_dir', str(tmp_path / 'tenants'))
-    manager = SessionManager(cookie_file=tmp_path / 'legacy.json')
-    manager.save_cookies({'PHPSESSID': 'dummy-cookie', 'ilClientId': 'ilias3_unibe'}, metadata={'user_name': 'Test user'})
-    service = AsyncMock()
-    service.get_auth_status.return_value = AuthStatus(authenticated=True, cookies_present=True)
-    app.dependency_overrides[get_session_manager] = lambda: manager
-    app.dependency_overrides[get_ilias_client] = lambda: service
-    try:
-        response = TestClient(app).post('/api/auth/mobile-session')
-        assert response.status_code == 200
-        session_id = response.json()['session_id']
-        assert session_id != 'default' and len(session_id) >= 32
-        transferred = SessionManager(session_id=session_id)
-        assert transferred.load_cookies() == manager.load_cookies()
-        assert transferred.load_metadata()['user_name'] == 'Test user'
-        assert set(response.json()) == {'session_id'}
     finally:
         app.dependency_overrides.pop(get_session_manager, None)
         app.dependency_overrides.pop(get_ilias_client, None)

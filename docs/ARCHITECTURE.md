@@ -27,7 +27,7 @@ services verify the resulting state rather than treating HTTP 200 as success.
 
 The frontend uses React 19, TypeScript, Vite, Tailwind CSS and Lucide icons.
 The backend uses FastAPI/Uvicorn, async `httpx`, BeautifulSoup/lxml and Pydantic.
-Playwright supports interactive login and browser regression tests; routine
+Playwright supports browser regression tests; routine
 course browsing and native writes use HTTP rather than browser automation.
 Both browser extensions use Manifest V3, with browser-specific session handoff.
 
@@ -40,12 +40,14 @@ Both browser extensions use Manifest V3, with browser-specific session handoff.
   under `.sessions/<session_id>.json` and constructs authenticated HTTP clients.
 - Extension sync and phone sharing use tenant sessions. A shared phone/desktop
   session expires or logs out together.
-- The interactive `login.py` helper writes the legacy default
-  `session_cookies.json`. Running it does not refresh an existing tenant ID.
-  The browser-login API can target the request's resolved tenant.
-- With no explicit session ID, dependency resolution uses the default session
-  when available, then the most recently saved tenant session as a local
-  development fallback. This fallback does not change explicit tenant routing.
+- Authentication uses the companion extensions only. Local browser and manual
+  cookie login routes have been removed. Requests never use a default/latest
+  tenant fallback. Native GET resources use an HttpOnly browser cookie; mutations
+  require an explicit credential.
+- Phone and extension navigation use single-use, 60-second handoff codes instead
+  of long-lived session IDs in URLs. Shared filesystem locks and SQLite handoff
+  transactions coordinate replicas on one VPS. See
+  [deployment security](DEPLOYMENT_SECURITY.md) for the precise deployment limits.
 
 Session-loss detection and scraper safety rules are maintained in
 [AGENTS.md](../AGENTS.md). In particular, an access-denied notice inside a
@@ -130,7 +132,7 @@ rules are in AGENTS.md; the old project's Uni Bern crest description is obsolete
 
 | Location | Responsibility |
 | --- | --- |
-| `start.py`, `start.bat`, `run.py`, `login.py` | Local launchers and interactive login entry point |
+| `start.py`, `start.bat`, `run.py` | Local launchers; development mode is explicit |
 | `backend/config.py`, `.env.example` | Settings and local configuration defaults |
 | `backend/main.py`, `backend/api/` | App, middleware, session dependencies and REST routes |
 | `backend/auth/` | Session storage and Playwright login |

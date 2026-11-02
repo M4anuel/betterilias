@@ -49,3 +49,5 @@ scratch/
 node_modules/
 dist/
 dist-ssr/
+
+.coordination/

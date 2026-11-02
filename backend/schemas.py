@@ -13,12 +13,6 @@ class AuthStatus(BaseModel):
     user_name: Optional[str] = None
     session_id: Optional[str] = None
 
-class ManualCookiesInput(BaseModel):
-    phpsessid: str = Field(..., description="Value of PHPSESSID cookie")
-    il_client_id: Optional[str] = Field("ilias3_unibe", description="Value of ilClientId cookie")
-    additional_cookies: Optional[Dict[str, str]] = Field(default_factory=dict)
-    session_id: Optional[str] = Field(None, description="Existing session ID to update, or None to create new")
-
 class ExtensionSyncInput(BaseModel):
     cookies: Dict[str, str] = Field(..., description="Cookies dictionary from ILIAS")
     session_id: Optional[str] = Field(None, description="Existing session ID to refresh or update")
@@ -34,7 +28,8 @@ class ExtensionSyncResponse(BaseModel):
 
 
 class MobileSessionResponse(BaseModel):
-    session_id: str
+    handoff_token: str
+    expires_in: int = 60
 
 # ---------------------------------------------------------
 # Dashboard & Course Schemas
@@ -660,7 +655,7 @@ class FeedbackImportPreviewResponse(BaseModel):
     has_conflicts: bool = False
 
 class FeedbackImportCommitRequest(BaseModel):
-    staged_import_id: str
+    staged_import_id: str = Field(pattern=r'^[a-zA-Z0-9_-]{1,128}$')
     snapshot_token: str
     conflict_actions: Dict[str, str] = Field(default_factory=dict) # "{unit_id}:{filename}" -> "overwrite" | "skip" | "keep_both"
     manual_mappings: Dict[str, str] = Field(default_factory=dict) # "{source_path}" -> "{target_unit_id}"
