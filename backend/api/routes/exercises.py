@@ -451,11 +451,26 @@ async def apply_ta_allocation(
     """
     Submits batch allocation markers into tutor notices via cmd[saveStatusAll]
     while preserving existing marks and grades.
+    Validates fingerprint to detect concurrent tutor modifications.
     """
-    from backend.services.ta_allocation import ApplyAllocationResponse
-    # Fetch current submissions to verify fingerprint and get status/mark
+    from backend.services.ta_allocation import ApplyAllocationResponse, compute_distribution_fingerprint
+    # Fetch current fresh submissions from ILIAS
     subs_resp = await client.get_exercise_submissions(ref_id=exercise_id, ass_id=ass_id)
     sub_map = {s.member_id: s for s in subs_resp.submissions}
+
+    # Verify fingerprint against current ILIAS state
+    current_unit_ids = [s.member_id for s in subs_resp.submissions]
+    current_notices = [s.notice or "" for s in subs_resp.submissions]
+    server_fp = compute_distribution_fingerprint(current_unit_ids, current_notices)
+
+    if req.fingerprint and req.fingerprint != server_fp:
+        return ApplyAllocationResponse(
+            success=False,
+            updated_count=0,
+            failed_count=len(req.items),
+            message=t("Die Abgaben oder Notizen wurden zwischenzeitlich geändert. Bitte laden Sie die Vorschau neu."),
+            errors=["Conflict: Fingerprint mismatch. Notes or submissions changed concurrently."],
+        )
 
     target_updates = []
     for item in req.items:
@@ -517,7 +532,7 @@ async def export_submissions_zip(
     target_subs = [s for s in target_subs if s.submission_status in ["submitted", "late"] or s.files]
 
     async with client.session_manager.get_http_client() as http_client:
-        zip_bytes = await create_submissions_zip_bundle(
+        zip_bytes, is_complete, failed_files = await create_submissions_zip_bundle(
             assignment_title=subs_resp.exercise.title,
             exercise_ref_id=exercise_id,
             ass_id=ass_id,

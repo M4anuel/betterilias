@@ -505,6 +505,8 @@ export const api = {
   getTAExportZipUrl(exerciseId: string, assId: string, taId?: string): string {
     const params = new URLSearchParams();
     if (taId) params.append('ta_id', taId);
+    const sessionId = cache.getSessionId();
+    if (sessionId) params.append('session_id', sessionId);
     return `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignments/${encodeURIComponent(assId)}/export-zip?${params.toString()}`;
   },
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Users, ArrowUp, ArrowDown, Shuffle, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, Users, ArrowUp, ArrowDown, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { t } from '../lib/i18n';
 import { SubmissionItem, TAInfo, ApplyAllocationRequest } from '../types';
 import { api } from '../lib/api';
@@ -11,6 +11,17 @@ interface DistributeWorkModalProps {
   assId: string;
   submissions: SubmissionItem[];
   onDistributionComplete: () => void;
+}
+
+// Unit representing either a team or an individual student
+interface CanonicalUnit {
+  unitId: string;
+  representativeMemberId: string;
+  displayName: string;
+  teamId?: string;
+  submissionTime?: string;
+  memberIds: string[];
+  members: SubmissionItem[];
 }
 
 export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
@@ -27,12 +38,39 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
   ]);
   const [priorityOrder, setPriorityOrder] = useState<string[]>(['ta1', 'ta2']);
   const [sortMethod, setSortMethod] = useState<'native' | 'team' | 'time' | 'random'>('native');
+  const [randomSeed, setRandomSeed] = useState<number>(() => Date.now());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Eligible work: submitted work
-  const eligibleItems = useMemo(() => {
-    return submissions.filter((s) => s.submission_status === 'submitted' || s.submission_status === 'late');
+  // Group submissions by unit_id to treat teams as single indivisible units
+  const canonicalUnits = useMemo(() => {
+    const unitsMap = new Map<string, CanonicalUnit>();
+
+    submissions.forEach((s) => {
+      const isEligible = s.submission_status === 'submitted' || s.submission_status === 'late' || Boolean(s.files?.length);
+      if (!isEligible) return;
+
+      const unitId = s.team_id ? `team:${s.team_id}` : `user:${s.member_id}`;
+      if (!unitsMap.has(unitId)) {
+        unitsMap.set(unitId, {
+          unitId,
+          representativeMemberId: s.member_id,
+          displayName: s.team_name ? `${s.team_name} (${s.student_name})` : s.student_name,
+          teamId: s.team_id,
+          submissionTime: s.submission_time,
+          memberIds: [s.member_id],
+          members: [s],
+        });
+      } else {
+        const u = unitsMap.get(unitId)!;
+        if (!u.memberIds.includes(s.member_id)) {
+          u.memberIds.push(s.member_id);
+          u.members.push(s);
+        }
+      }
+    });
+
+    return Array.from(unitsMap.values());
   }, [submissions]);
 
   // Handle priority reordering
@@ -46,39 +84,76 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
     setPriorityOrder(newOrder);
   };
 
+  // Add assistant using monotonically unique IDs
   const addAssistant = () => {
-    const nextNum = assistants.length + 1;
+    let nextNum = 1;
+    const existingNums = assistants
+      .map((a) => {
+        const m = a.id.match(/^ta(\d+)$/);
+        return m ? parseInt(m[1], 10) : 0;
+      })
+      .filter((n) => !isNaN(n));
+
+    if (existingNums.length > 0) {
+      nextNum = Math.max(...existingNums) + 1;
+    }
+
     const newId = `ta${nextNum}`;
     const newTA: TAInfo = { id: newId, name: `TA ${nextNum}` };
-    setAssistants([...assistants, newTA]);
-    setPriorityOrder([...priorityOrder, newId]);
+    setAssistants((prev) => [...prev, newTA]);
+    setPriorityOrder((prev) => [...prev, newId]);
   };
 
   const removeAssistant = (id: string) => {
     if (assistants.length <= 1) return;
-    setAssistants(assistants.filter((a) => a.id !== id));
-    setPriorityOrder(priorityOrder.filter((pid) => pid !== id));
+    setAssistants((prev) => prev.filter((a) => a.id !== id));
+    setPriorityOrder((prev) => prev.filter((pid) => pid !== id));
   };
 
   const updateAssistantName = (id: string, name: string) => {
-    setAssistants(assistants.map((a) => (a.id === id ? { ...a, name } : a)));
+    setAssistants((prev) => prev.map((a) => (a.id === id ? { ...a, name } : a)));
   };
+
+  // Compute distribution fingerprint based on current notes
+  const currentFingerprint = useMemo(() => {
+    let hash = 0;
+    submissions.forEach((s) => {
+      const str = `${s.member_id}:${s.notice || ''};`;
+      for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
+      }
+    });
+    return Math.abs(hash).toString(16);
+  }, [submissions]);
 
   // Preview distribution calculation
   const distributionPlan = useMemo(() => {
-    const M = eligibleItems.length;
+    const M = canonicalUnits.length;
     const N = assistants.length;
-    if (N === 0) return { quotas: {}, assignedItems: [] };
+    if (N === 0) return { quotas: {}, assignedUnits: [], memberUpdates: [] };
 
-    // Sort items based on chosen method
-    const sorted = [...eligibleItems];
+    // Sort units based on chosen method
+    const sorted = [...canonicalUnits];
     if (sortMethod === 'team') {
-      sorted.sort((a, b) => (Number(a.team_id || 0) - Number(b.team_id || 0)));
+      sorted.sort((a, b) => Number(a.teamId || 0) - Number(b.teamId || 0));
     } else if (sortMethod === 'time') {
-      sorted.sort((a, b) => ((b.submission_time || '').localeCompare(a.submission_time || '')));
+      sorted.sort((a, b) => {
+        const timeA = a.submissionTime ? Date.parse(a.submissionTime) : 0;
+        const timeB = b.submissionTime ? Date.parse(b.submissionTime) : 0;
+        return timeB - timeA;
+      });
     } else if (sortMethod === 'random') {
-      // Deterministic pseudorandom by member_id
-      sorted.sort((a, b) => a.member_id.localeCompare(b.member_id));
+      // Seeded pseudorandom shuffle
+      let seed = randomSeed;
+      const pseudoRandom = () => {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+      };
+      for (let i = sorted.length - 1; i > 0; i--) {
+        const j = Math.floor(pseudoRandom() * (i + 1));
+        [sorted[i], sorted[j]] = [sorted[j], sorted[i]];
+      }
     }
 
     const baseQuota = Math.floor(M / N);
@@ -92,41 +167,46 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
       quotas[ta.id] = baseQuota + (idx < remainder ? 1 : 0);
     });
 
-    const assignedItems: Array<{
-      member_id: string;
-      student_name: string;
-      team_id?: string;
+    const assignedUnits: Array<{
+      unitId: string;
+      displayName: string;
       assigned_ta_id: string;
       assigned_ta_name: string;
-      newNotice: string;
     }> = [];
+
+    const memberUpdates: Array<{ member_id: string; notice: string }> = [];
 
     let currentItemIdx = 0;
     for (const ta of orderedTAs) {
       const q = quotas[ta.id] || 0;
       for (let i = 0; i < q; i++) {
         if (currentItemIdx < sorted.length) {
-          const item = sorted[currentItemIdx];
-          // Strip old marker if present
-          const cleanNotice = (item.notice || '').replace(/\[BI:[^\]]+\]/g, '').trim();
-          const marker = `[BI:${ta.id}|${ta.name}]`;
-          const newNotice = cleanNotice ? `${cleanNotice} ${marker}` : marker;
-
-          assignedItems.push({
-            member_id: item.member_id,
-            student_name: item.student_name,
-            team_id: item.team_id,
+          const unit = sorted[currentItemIdx];
+          assignedUnits.push({
+            unitId: unit.unitId,
+            displayName: unit.displayName,
             assigned_ta_id: ta.id,
             assigned_ta_name: ta.name,
-            newNotice,
           });
+
+          // Propagate notice marker to all members of this unit
+          unit.members.forEach((m) => {
+            const cleanNotice = (m.notice || '').replace(/\[BI:[^\]]+\]/g, '').trim();
+            const marker = `[BI:${ta.id}|${ta.name}]`;
+            const newNotice = cleanNotice ? `${cleanNotice} ${marker}` : marker;
+            memberUpdates.push({
+              member_id: m.member_id,
+              notice: newNotice,
+            });
+          });
+
           currentItemIdx++;
         }
       }
     }
 
-    return { quotas, assignedItems };
-  }, [eligibleItems, assistants, priorityOrder, sortMethod]);
+    return { quotas, assignedUnits, memberUpdates };
+  }, [canonicalUnits, assistants, priorityOrder, sortMethod, randomSeed]);
 
   const handleApply = async () => {
     setIsSubmitting(true);
@@ -135,11 +215,8 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
       const payload: ApplyAllocationRequest = {
         exercise_ref_id: exerciseRefId,
         ass_id: assId,
-        fingerprint: 'manual_apply',
-        items: distributionPlan.assignedItems.map((item) => ({
-          member_id: item.member_id,
-          notice: item.newNotice,
-        })),
+        fingerprint: currentFingerprint,
+        items: distributionPlan.memberUpdates,
       };
 
       const res = await api.applyTAAllocation(exerciseRefId, assId, payload);
@@ -172,7 +249,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
                 {t("Arbeit verteilen")}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {t("{p0} eingereichte Abgaben gleichmäßig aufteilen", { p0: eligibleItems.length })}
+                {t("{p0} eingereichte Abgaben gleichmäßig aufteilen", { p0: canonicalUnits.length })}
               </p>
             </div>
           </div>
@@ -273,9 +350,20 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
 
           {/* Section: Sorting Method */}
           <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-2">
-              {t("Sortierung vor Aufteilung")}
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {t("Sortierung vor Aufteilung")}
+              </label>
+              {sortMethod === 'random' && (
+                <button
+                  type="button"
+                  onClick={() => setRandomSeed(Date.now())}
+                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                >
+                  {t("Neu mischen")}
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(
                 [
@@ -315,10 +403,10 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {distributionPlan.assignedItems.map((item, idx) => (
+                  {distributionPlan.assignedUnits.map((item, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                       <td className="py-2 px-3 font-medium text-slate-800 dark:text-slate-200">
-                        {item.student_name}
+                        {item.displayName}
                       </td>
                       <td className="py-2 px-3">
                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 font-semibold text-indigo-700 dark:text-indigo-300">
@@ -346,7 +434,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
           <button
             type="button"
             onClick={handleApply}
-            disabled={isSubmitting || eligibleItems.length === 0}
+            disabled={isSubmitting || canonicalUnits.length === 0}
             className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 cursor-pointer shadow-xs"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}

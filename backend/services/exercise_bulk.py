@@ -1,6 +1,10 @@
+import io
+import json
+import logging
 import re
 import urllib.parse
-from typing import Dict, List, Optional, Tuple
+import zipfile
+from typing import Any, Dict, List, Optional, Tuple
 from bs4 import BeautifulSoup
 import httpx
 
@@ -10,20 +14,22 @@ from backend.scrapers.forms import extract_grading_form, verify_grading_success
 from backend.schemas import SubmissionItem
 from backend.services.ta_allocation import MAX_NOTICE_LENGTH
 
+logger = logging.getLogger(__name__)
+
 def build_bulk_note_payload(
     form_html: str,
     target_updates: List[Tuple[str, str, str, Optional[str]]],
     # target_updates: list of (member_id, new_notice, existing_status, existing_mark)
-) -> Tuple[str, List[Tuple[str, str]]]:
+) -> Tuple[str, bytes]:
     """
-    Builds a list of (key, value) pairs for an HTTP POST to cmd[saveStatusAll].
+    Builds URL-encoded bytes body for an HTTP POST to cmd[saveStatusAll].
     
     Safety guarantees:
     - Retains ALL CSRF tokens, rtoken, and structural hidden inputs.
-    - Preserves repeated inputs where applicable.
-    - Excludes non-targeted student IDs from listed_part_ids[] so we only touch target rows.
-    - Crucially: ECHOS existing status[id] and mark[id] for every targeted participant
-      so ILIAS does NOT revert graded work to 'not graded' / None!
+    - Preserves repeated inputs (listed_part_ids[], sel_part_ids[]).
+    - Echos existing status[id] and mark[id] for every targeted participant
+      so ILIAS does NOT revert graded work to 'not graded' / None.
+    - Encodes as application/x-www-form-urlencoded bytes to prevent httpx AsyncClient errors.
     """
     form_data = extract_grading_form(form_html)
     soup = BeautifulSoup(form_html, "lxml")
@@ -39,33 +45,25 @@ def build_bulk_note_payload(
 
     action_url = form_data.action_url
 
-    # Collect base hidden inputs, skipping listed_part_ids and sel_part_ids which we customize
-    payload: List[Tuple[str, str]] = []
+    payload_pairs: List[Tuple[str, str]] = []
     
-    # We copy hidden fields from raw_hidden_fields
+    # 1. Copy hidden fields from raw_hidden_fields, skipping existing listed_part_ids and sel_part_ids
     for k, v in form_data.raw_hidden_fields:
         if k in ["listed_part_ids[]", "sel_part_ids[]"]:
             continue
-        # Also skip any member-specific hidden fields if not in targets
-        payload.append((k, v))
+        payload_pairs.append((k, v))
 
-    # Add targeted updates
-    target_member_ids = set()
+    # 2. Add targeted updates
     for member_id, new_notice, existing_status, existing_mark in target_updates:
-        target_member_ids.add(str(member_id))
-        
-        # 1. Add to listed_part_ids[] and sel_part_ids[]
-        payload.append(("listed_part_ids[]", str(member_id)))
-        payload.append(("sel_part_ids[]", str(member_id)))
+        m_str = str(member_id)
+        payload_pairs.append(("listed_part_ids[]", m_str))
+        payload_pairs.append(("sel_part_ids[]", m_str))
 
-        # 2. Set notice[<member_id>]
         if len(new_notice) > MAX_NOTICE_LENGTH:
-            raise ValueError(f"Notice for member {member_id} exceeds {MAX_NOTICE_LENGTH} characters.")
-        payload.append((f"notice[{member_id}]", new_notice))
+            raise ValueError(f"Notice for member {m_str} exceeds {MAX_NOTICE_LENGTH} characters.")
+        payload_pairs.append((f"notice[{m_str}]", new_notice))
 
-        # 3. Echo status[<member_id>]
-        # Map our status string to ILIAS status value
-        # In ILIAS, values are 'passed', 'failed', 'notgraded'
+        # Echo status[<member_id>]
         ilias_status = "notgraded"
         if existing_status == "passed":
             ilias_status = "passed"
@@ -74,25 +72,20 @@ def build_bulk_note_payload(
         elif existing_status in ["not_graded", "notgraded"]:
             ilias_status = "notgraded"
         
-        payload.append((f"status[{member_id}]", ilias_status))
+        payload_pairs.append((f"status[{m_str}]", ilias_status))
 
-        # 4. Echo mark[<member_id>]
+        # Echo mark[<member_id>]
         if existing_mark is not None and existing_mark != "-":
-            payload.append((f"mark[{member_id}]", str(existing_mark)))
+            payload_pairs.append((f"mark[{m_str}]", str(existing_mark)))
 
-    # Set save command
-    payload.append(("cmd[saveStatusAll]", "Save All"))
-    payload.append(("select_cmd", "saveStatusSelected"))
+    # 3. Set save commands
+    payload_pairs.append(("cmd[saveStatusAll]", "Save All"))
+    payload_pairs.append(("select_cmd", "saveStatusSelected"))
 
-    return action_url, payload
+    # Encode to bytes
+    encoded_body = urllib.parse.urlencode(payload_pairs).encode("utf-8")
+    return action_url, encoded_body
 
-import io
-import json
-import zipfile
-from typing import List, Tuple, Dict, Any, AsyncGenerator
-import httpx
-
-from backend.schemas import SubmissionItem
 
 async def create_submissions_zip_bundle(
     assignment_title: str,
@@ -100,25 +93,40 @@ async def create_submissions_zip_bundle(
     ass_id: str,
     submissions: List[SubmissionItem],
     http_client: httpx.AsyncClient,
-) -> bytes:
+) -> Tuple[bytes, bool, List[str]]:
     """
     Creates an export ZIP archive containing:
     - betterilias-feedback.json manifest with canonical IDs and mappings
     - submissions/team-<id>/ or submissions/user-<id>/ containing downloaded student files
     - feedback/team-<id>/ or feedback/user-<id>/ directory placeholders for return feedback
+    
+    Deduplicates team files so team submissions are not downloaded multiple times.
+    Validates download responses to reject HTML error/login pages.
+    Returns (zip_bytes, is_complete, failure_messages).
     """
     zip_buffer = io.BytesIO()
+    failed_downloads: List[str] = []
 
     manifest: Dict[str, Any] = {
         "format": "betterilias-feedback-v1",
         "exercise_ref_id": exercise_ref_id,
         "assignment_id": ass_id,
         "assignment_title": assignment_title,
+        "status": "complete",
         "units": [],
     }
 
+    # Deduplicate submissions by unit_id to prevent duplicate team downloads
+    seen_units = set()
+    unique_submissions: List[SubmissionItem] = []
+    for sub in submissions:
+        uid = f"team:{sub.team_id}" if sub.team_id else f"user:{sub.member_id}"
+        if uid not in seen_units:
+            seen_units.add(uid)
+            unique_submissions.append(sub)
+
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for sub in submissions:
+        for sub in unique_submissions:
             unit_folder = f"team-{sub.team_id}" if sub.team_id else f"user-{sub.member_id}"
             unit_info = {
                 "unit_id": f"team:{sub.team_id}" if sub.team_id else f"user:{sub.member_id}",
@@ -130,6 +138,7 @@ async def create_submissions_zip_bundle(
                 "submission_path": f"submissions/{unit_folder}/",
                 "feedback_path": f"feedback/{unit_folder}/",
                 "files": [],
+                "missing_files": [],
             }
 
             # Create empty feedback placeholder folder in zip
@@ -137,20 +146,45 @@ async def create_submissions_zip_bundle(
 
             # Download submitted files into submissions/
             for sf in sub.files:
-                if sf.download_url:
-                    try:
-                        resp = await http_client.get(sf.download_url, follow_redirects=True)
-                        if resp.status_code == 200:
-                            file_path = f"submissions/{unit_folder}/{sf.filename}"
-                            zf.writestr(file_path, resp.content)
-                            unit_info["files"].append(sf.filename)
-                    except Exception:
-                        pass
+                if not sf.download_url:
+                    continue
+
+                try:
+                    resp = await http_client.get(sf.download_url, follow_redirects=True)
+                    if resp.status_code >= 400:
+                        err_msg = f"HTTP {resp.status_code} for {sf.filename} ({sub.student_name})"
+                        failed_downloads.append(err_msg)
+                        unit_info["missing_files"].append(sf.filename)
+                        continue
+
+                    # Verify not an HTML login or error page
+                    content_type = resp.headers.get("content-type", "").lower()
+                    content_disp = resp.headers.get("content-disposition", "").lower()
+                    if "text/html" in content_type and "attachment" not in content_disp:
+                        err_msg = f"Invalid HTML response (likely session expired) for {sf.filename} ({sub.student_name})"
+                        failed_downloads.append(err_msg)
+                        unit_info["missing_files"].append(sf.filename)
+                        continue
+
+                    file_path = f"submissions/{unit_folder}/{sf.filename}"
+                    zf.writestr(file_path, resp.content)
+                    unit_info["files"].append(sf.filename)
+                except Exception as e:
+                    err_msg = f"Error downloading {sf.filename} ({sub.student_name}): {str(e)}"
+                    failed_downloads.append(err_msg)
+                    unit_info["missing_files"].append(sf.filename)
 
             manifest["units"].append(unit_info)
+
+        if failed_downloads:
+            manifest["status"] = "partial"
+            manifest["failed_downloads"] = failed_downloads
+            error_log = "The following files could not be downloaded successfully from ILIAS:\n\n"
+            error_log += "\n".join(f"- {msg}" for msg in failed_downloads)
+            zf.writestr("DOWNLOAD_FAILURES.txt", error_log)
 
         # Write manifest file
         zf.writestr("betterilias-feedback.json", json.dumps(manifest, ensure_ascii=False, indent=2))
 
     zip_buffer.seek(0)
-    return zip_buffer.getvalue()
+    return zip_buffer.getvalue(), len(failed_downloads) == 0, failed_downloads

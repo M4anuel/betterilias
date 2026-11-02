@@ -612,7 +612,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
     async def get_exercise_submissions(self, ref_id: str, ass_id: Optional[str] = None, include_ilias_order: bool = False) -> ExerciseSubmissionsResponse:
         """Fetch and parse exercise participant submissions list (TA grading view)."""
         self._ensure_authenticated()
-        extra = f"&ass_id={ass_id}&member_id=0&part_id=0" if ass_id else ""
+        extra = f"&ass_id={ass_id}&member_id=0&part_id=0&exc_mem_trows=800" if ass_id else "&exc_mem_trows=800"
         urls_to_try = [
             f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilExerciseManagementGUI&cmd=members&ref_id={ref_id}{extra}",
             f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilexercisemanagementgui&cmd=members&ref_id={ref_id}{extra}",
@@ -1736,6 +1736,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
     ) -> Tuple[int, List[str]]:
         """
         Submits batch note updates via cmd[saveStatusAll] while echoing existing status/mark.
+        Uses application/x-www-form-urlencoded bytes to preserve repeated keys.
+        Performs read-back verification of written notices.
         Returns (updated_count, list_of_errors).
         """
         from backend.services.exercise_bulk import build_bulk_note_payload
@@ -1747,26 +1749,44 @@ class IliasClient(AuthoringMixin, ManagementMixin):
         )
 
         async with self.session_manager.get_http_client() as client:
+            # 1. Fresh GET to fetch latest CSRF tokens and participant table
             resp = await client.get(exercise_url)
             self._check_response_for_session_loss(resp, exercise_url)
 
-            action_url, payload = build_bulk_note_payload(resp.text, target_updates)
+            action_url, encoded_body = build_bulk_note_payload(resp.text, target_updates)
 
-            # Submit batch POST
+            # 2. Submit batch POST with form-urlencoded content bytes
             post_resp = await client.post(
                 action_url,
-                data=payload,
-                headers={"Referer": exercise_url},
+                content=encoded_body,
+                headers={
+                    "Referer": exercise_url,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
             )
             self._check_response_for_session_loss(post_resp, action_url)
 
-            # Verify response
-            from backend.scrapers.forms import verify_grading_success
-            ok, msg = verify_grading_success(post_resp.text)
-            if not ok:
-                return 0, [msg or "Failed to verify grading success in response."]
+            # 3. Read-back verification: fetch the table afresh to verify actual saved notices
+            verify_resp = await client.get(exercise_url)
+            self._check_response_for_session_loss(verify_resp, exercise_url)
+            verified_subs = parse_exercise_submissions(verify_resp.text, exercise_ref_id=exercise_ref_id)
+            verified_map = {s.member_id: s for s in verified_subs.submissions}
 
-            return len(target_updates), []
+            verified_count = 0
+            errors: List[str] = []
+            for member_id, expected_notice, _, _ in target_updates:
+                m_str = str(member_id)
+                sub = verified_map.get(m_str)
+                if not sub:
+                    errors.append(f"Member {m_str} missing in read-back verification.")
+                    continue
+                # Check that marker is present in the actual saved notice
+                if expected_notice and expected_notice not in (sub.notice or ""):
+                    errors.append(f"Notice for member {m_str} was not persisted correctly in ILIAS.")
+                else:
+                    verified_count += 1
+
+            return verified_count, errors
 
     # ---------------------------------------------------------
     # TA Exercise Editor & Assignment Management

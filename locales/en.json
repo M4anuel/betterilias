@@ -1542,5 +1542,7 @@
   "Alle Tutoren": "All tutors",
   "Nicht zugewiesen": "Unassigned",
   "Abgaben als ZIP-Paket exportieren": "Export submissions as ZIP package",
-  "ZIP-Paket": "ZIP package"
+  "ZIP-Paket": "ZIP package",
+  "Neu mischen": "Reshuffle",
+  "Die Abgaben oder Notizen wurden zwischenzeitlich geändert. Bitte laden Sie die Vorschau neu.": "Submissions or notes have been changed in the meantime. Please reload the preview."
 }

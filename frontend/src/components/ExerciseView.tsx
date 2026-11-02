@@ -1209,6 +1209,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     taSortOrder,
     teamSortNames,
     getEditKey,
+    selectedTAFilter,
   ]);
 
   // TA Grading Handlers
