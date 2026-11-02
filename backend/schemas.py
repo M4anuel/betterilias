@@ -393,6 +393,7 @@ class ExerciseSubmissionsResponse(BaseModel):
     submissions: List[SubmissionItem]
     form_action_url: Optional[str] = None
     rtoken: Optional[str] = None
+    fingerprint: Optional[str] = None
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class GradeSubmissionRequest(BaseModel):

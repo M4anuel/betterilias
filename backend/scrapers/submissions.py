@@ -537,6 +537,10 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
         submissions=submissions,
         form_action_url=form_action_url,
         rtoken=rtoken,
+        fingerprint=__import__('backend.services.ta_allocation', fromlist=['compute_distribution_fingerprint']).compute_distribution_fingerprint(
+            [s.member_id for s in submissions],
+            [s.notice or "" for s in submissions]
+        ),
     )
 
 

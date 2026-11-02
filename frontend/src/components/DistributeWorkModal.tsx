@@ -10,6 +10,7 @@ interface DistributeWorkModalProps {
   exerciseRefId: string;
   assId: string;
   submissions: SubmissionItem[];
+  fingerprint?: string;
   onDistributionComplete: () => void;
 }
 
@@ -30,6 +31,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
   exerciseRefId,
   assId,
   submissions,
+  fingerprint,
   onDistributionComplete,
 }) => {
   const [assistants, setAssistants] = useState<TAInfo[]>([
@@ -114,18 +116,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
     setAssistants((prev) => prev.map((a) => (a.id === id ? { ...a, name } : a)));
   };
 
-  // Compute distribution fingerprint based on current notes
-  const currentFingerprint = useMemo(() => {
-    let hash = 0;
-    submissions.forEach((s) => {
-      const str = `${s.member_id}:${s.notice || ''};`;
-      for (let i = 0; i < str.length; i++) {
-        hash = (hash << 5) - hash + str.charCodeAt(i);
-        hash |= 0;
-      }
-    });
-    return Math.abs(hash).toString(16);
-  }, [submissions]);
+
 
   // Preview distribution calculation
   const distributionPlan = useMemo(() => {
@@ -215,7 +206,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
       const payload: ApplyAllocationRequest = {
         exercise_ref_id: exerciseRefId,
         ass_id: assId,
-        fingerprint: currentFingerprint,
+        fingerprint: fingerprint || '',
         items: distributionPlan.memberUpdates,
       };
 

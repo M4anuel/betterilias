@@ -322,6 +322,7 @@ export interface ExerciseSubmissionsResponse {
   submissions: SubmissionItem[];
   form_action_url?: string;
   rtoken?: string;
+  fingerprint?: string;
   fetched_at: string;
 }
 

@@ -2816,6 +2816,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           exerciseRefId={exerciseRefId}
           assId={selectedTaAssId || taSubmissionsData?.active_assignment_id || ''}
           submissions={taSubmissionsData?.submissions || []}
+          fingerprint={taSubmissionsData?.fingerprint}
           onDistributionComplete={() => {
             loadTaSubmissions(selectedTaAssId || undefined, false, true);
           }}
