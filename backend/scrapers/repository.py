@@ -39,11 +39,11 @@ def parse_repository(html_content: str, container_ref_id: str) -> RepositoryResp
             seen.add(ref_id)
             icon = el.select_one("img")
             meta = f"{href} {icon.get('src', '') if icon else ''} {icon.get('alt', '') if icon else ''}".lower()
-            if "/go/cat/" in meta or "icon_cat" in meta or "category" in meta:
+            if "/go/cat/" in meta or "icon_cat" in meta or "category" in meta or (icon and icon.get('alt', '').casefold() == 'kategorie'):
                 item_type = "cat"
-            elif "/go/crs/" in meta or "icon_crs" in meta or "course" in meta:
+            elif "/go/crs/" in meta or "icon_crs" in meta or "course" in meta or (icon and icon.get('alt', '').casefold() == 'kurs'):
                 item_type = "crs"
-            elif "/go/grp/" in meta or "icon_grp" in meta or "group" in meta:
+            elif "/go/grp/" in meta or "icon_grp" in meta or "group" in meta or (icon and icon.get('alt', '').casefold() == 'gruppe'):
                 item_type = "grp"
             else:
                 item_type = _detect_material_type(href, "", meta)

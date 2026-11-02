@@ -18,6 +18,7 @@ from backend.schemas import (
 )
 from backend.scrapers.dashboard import _extract_ref_id_from_url
 from backend.scrapers.dumper import safe_parser
+from backend.scrapers.native_text import DATE_TOKEN, RELATIVE_DATE_TOKEN, PREVIOUS_SESSIONS, MONTH_MAP, parse_native_date, strip_page_prefix
 
 
 def _last_sunday(year: int, month: int) -> date:
@@ -78,21 +79,6 @@ WEEKDAY_MAP = {
     "FR": 4,
     "SA": 5,
     "SU": 6,
-}
-
-MONTH_MAP = {
-    "jan": 1, "januar": 1, "january": 1,
-    "feb": 2, "februar": 2, "february": 2,
-    "mär": 3, "maer": 3, "märz": 3, "mar": 3, "march": 3,
-    "apr": 4, "april": 4,
-    "mai": 5, "may": 5,
-    "jun": 6, "juni": 6, "june": 6,
-    "jul": 7, "juli": 7, "july": 7,
-    "aug": 8, "august": 8,
-    "sep": 9, "sept": 9, "september": 9,
-    "okt": 10, "oktober": 10, "oct": 10, "october": 10,
-    "nov": 11, "november": 11,
-    "dez": 12, "dezember": 12, "dec": 12, "december": 12,
 }
 
 
@@ -181,39 +167,8 @@ class ParsedIliasAgendaPage:
 
 
 def _parse_date_token(raw_date_str: str, reference_date: Optional[date] = None) -> Optional[date]:
-    """Parse ILIAS date strings like '21. Oct 2026', '30. Sep 2026', 'Today', 'Tomorrow', 'Heute', 'Morgen'."""
-    if not raw_date_str:
-        return None
-    s = raw_date_str.strip()
-    s_lower = s.lower()
-    ref = reference_date or date.today()
-    if s_lower in ("today", "heute"):
-        return ref
-    if s_lower in ("tomorrow", "morgen"):
-        return ref + timedelta(days=1)
-    if s_lower in ("yesterday", "gestern"):
-        return ref - timedelta(days=1)
+    return parse_native_date(raw_date_str, reference_date) if raw_date_str else None
 
-    m = re.search(r"(\d{1,2})\.\s*([A-Za-zäöüÄÖÜ]+)\.?\s*(\d{4})", s)
-    if m:
-        day = int(m.group(1))
-        month_raw = m.group(2).lower()
-        year = int(m.group(3))
-        month = MONTH_MAP.get(month_raw) or MONTH_MAP.get(month_raw[:3])
-        if month:
-            try:
-                return date(year, month, day)
-            except ValueError:
-                return None
-
-    m_iso = re.search(r"(\d{4})-(\d{2})-(\d{2})", s)
-    if m_iso:
-        try:
-            return date(int(m_iso.group(1)), int(m_iso.group(2)), int(m_iso.group(3)))
-        except ValueError:
-            return None
-
-    return None
 
 
 def _build_timed_event(
@@ -310,7 +265,7 @@ def parse_course_calendar_discovery(
         )
         if title_elem:
             raw_t = title_elem.get_text(" ", strip=True)
-            course_title = re.sub(r"^(View:\s*)?(Content:\s*)?(Inhalt:\s*)?", "", raw_t, flags=re.I).strip()
+            course_title = strip_page_prefix(raw_t).strip()
         if not course_title:
             course_title = f"Course {course_ref_id}"
 
@@ -395,7 +350,7 @@ def parse_course_calendar_discovery(
     # 5. Extract Course Session (sess) items directly from the course page
     session_lis = [
         li for li in soup.select("li.ilObjListRow, .ilContainerItemsContainer > li")
-        if "sess" in li.get("id", "") or li.find("img", alt="Session") or li.select_one("img[src*='icon_sess']")
+        if "sess" in li.get("id", "") or li.find("img", alt=re.compile(r"^(?:Session|Sitzung)$", re.I)) or li.select_one("img[src*='icon_sess']")
     ]
     seen_sess_ids: Set[str] = set()
     covered_dates: Set[str] = set()
@@ -411,7 +366,7 @@ def parse_course_calendar_discovery(
             continue
 
         raw_sess_title = " ".join(title_a.get_text(" ", strip=True).split())
-        if not raw_sess_title or "previous sessions" in raw_sess_title.lower() or "upcoming sessions" in raw_sess_title.lower():
+        if not raw_sess_title or re.search(PREVIOUS_SESSIONS, raw_sess_title, re.I) or re.search(r"upcoming sessions|kommende[nr]? sitzungen", raw_sess_title, re.I):
             continue
 
         raw_sess_id = sli.get("id", "")
@@ -427,7 +382,7 @@ def parse_course_calendar_discovery(
         # "Today, 09:15 - 12:00: Mensch-Maschine-Schnittstelle"
         # "18. Feb 2025, 14:15 - 16:00"
         date_part_m = re.match(
-            r"^((?:\d{1,2}\.\s*[A-Za-zäöüÄÖÜ]+\.?\s*\d{4})|Today|Tomorrow|Yesterday|Heute|Morgen|Gestern)\s*(?:,\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2}))?(?:\s*:\s*(.*))?$",
+            rf"^({DATE_TOKEN}|{RELATIVE_DATE_TOKEN})\s*(?:,\s*(\d{{1,2}}:\d{{2}})\s*-\s*(\d{{1,2}}:\d{{2}}))?(?:\s*:\s*(.*))?$",
             raw_sess_title,
             flags=re.I,
         )
@@ -447,7 +402,7 @@ def parse_course_calendar_discovery(
                 clean_label = strip_course_code_prefix(course_title)
         else:
             # Fallback regex search
-            dm = re.search(r"(\d{1,2}\.\s*[A-Za-zäöüÄÖÜ]+\.?\s*\d{4})", raw_sess_title)
+            dm = re.search(rf"({DATE_TOKEN})", raw_sess_title)
             if dm:
                 ev_date = _parse_date_token(dm.group(1), discovery.reference_date)
             tm = re.search(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})", raw_sess_title)

@@ -193,7 +193,7 @@ def parse_ta_assignments_list(html_content: str, exercise_ref_id: str) -> TAAssi
                 wi_text = _clean_text(tds[8])
                 if wi_text:
                     has_work_instructions = True
-                    m_f = re.search(r"(\d+)\s*file", wi_text, re.I)
+                    m_f = re.search(r"(\d+)\s*(?:files?\b|datei(?:en)?\b)", wi_text, re.I)
                     if m_f:
                         instruction_files_count = int(m_f.group(1))
 

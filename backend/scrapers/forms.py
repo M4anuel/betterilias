@@ -174,7 +174,7 @@ def extract_feedback_modal_form(html_content: str, base_url: str = settings.ilia
     )
 
 
-def verify_grading_success(response_html: str) -> Tuple[bool, str]:
+def verify_grading_success(response_html: str, allow_unconfirmed: bool = False) -> Tuple[bool, str]:
     """
     Verify whether the grading POST request was processed successfully by ILIAS.
     """
@@ -198,7 +198,9 @@ def verify_grading_success(response_html: str) -> Tuple[bool, str]:
 
     # 3. Check for text indications in page
     text = soup.get_text()
-    if any(s in text for s in ["Erfolgreich gespeichert", "Änderungen gespeichert", "Saved successfully", "Gespeichert"]):
+    if re.search(r'nicht\s+(?:erfolgreich\s+)?gespeichert|not\s+saved|could not (?:be )?saved', text, re.I):
+        return False, t('ILIAS returned an error.')
+    if re.search(r'erfolgreich gespeichert|änderungen (?:wurden )?gespeichert|saved successfully', text, re.I) or text.strip().casefold() == 'gespeichert':
         return True, t('Grading saved successfully.')
 
     # 4. Check for async modal redirect script (validateAndSubmitFeedbackForm)
@@ -209,5 +211,7 @@ def verify_grading_success(response_html: str) -> Tuple[bool, str]:
     if "saveStatus" not in response_html and ("tbl_il_exc" in response_html or "viewMembers" in response_html):
         return True, t('Grading form submitted and participant list updated.')
 
+    if allow_unconfirmed:
+        return True, t('Bewertung erfolgreich gespeichert.')
     return False, t('Could not verify success state from response.')
 

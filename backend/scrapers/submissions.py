@@ -1,4 +1,5 @@
 from backend.i18n import t
+from backend.scrapers.native_text import grade_status, label_key
 import html
 import re
 import urllib.parse
@@ -195,13 +196,13 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
     submitted_col = col_idx(r"(submitted on|abgegeben am|abgabezeit)")
     if submitted_col is None:
         submitted_col = col_idx(r"(submitted|abgegeben|abgabe)")
-    indiv_deadline_col = col_idx(r"(individual deadline|individuelle frist)")
+    indiv_deadline_col = col_idx(r"(individual deadline|individuelle frist|individueller abgabetermin)")
     mark_col = col_idx(r"^(mark|note|punkte|points)$")
     graded_on_col = col_idx(r"(graded on|bewertet am|korrigiert am)")
     eval_on_col = col_idx(r"(evaluation on|rückmeldung am)")
     grade_col = col_idx(r"^(grade|bewertung|status)")
-    eval_col = col_idx(r"(evaluation statement|kommentar|feedback)")
-    notice_col = col_idx(r"(note for tutors|notiz für tutoren|notice|notiz)")
+    eval_col = col_idx(r"(evaluation statement|kommentar|text-feedback|rückmeldung für teilnehmer|feedback)")
+    notice_col = col_idx(r"(note for tutors|notiz für tutoren|interne (?:anmerkung|bemerkung)|notice|notiz)")
     files_col = col_idx(r"(datei|files|upload|abgelieferte)")
     actions_col = col_idx(r"(actions|aktionen)")
 
@@ -330,18 +331,10 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
             if selected_opt:
                 val = selected_opt.get("value", "").lower()
                 text = _clean_text(selected_opt).lower()
-                if "passed" in val or "bestanden" in text:
-                    passed_status = "passed"
-                elif "failed" in val or "nicht bestanden" in text:
-                    passed_status = "failed"
-                elif "not" in val or "nicht bewertet" in text:
-                    passed_status = "not_graded"
+                passed_status = grade_status(val, text) or 'not_graded'
         elif grade_col is not None and grade_col < len(cells):
             grade_text = _clean_text(cells[grade_col]).lower()
-            if "passed" in grade_text or "bestanden" in grade_text:
-                passed_status = "passed"
-            elif "failed" in grade_text or "nicht bestanden" in grade_text:
-                passed_status = "failed"
+            passed_status = grade_status(label=grade_text) or 'not_graded'
 
         mark = None
         mark_input = row.select_one(f"input[name*='mark[{member_id}]'], input[name*='grade[']")
@@ -604,7 +597,7 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
                 val = cap_line.split(":", 1)[1].strip()
                 if any(w in low for w in ["startzeit", "start time"]) and val:
                     start_time = val
-                elif any(w in low for w in ["ended on", "edit until", "abgabetermin", "abgabe bis", "bearbeiten bis"]) and val:
+                elif any(w in low for w in ["ended on", "edit until", "beendet am", "abgabetermin", "abgabe bis", "bearbeiten bis"]) and val:
                     ended_on = val
                 elif any(w in low for w in ["remaining", "verbleibende"]) and val:
                     time_remaining = val
@@ -618,7 +611,7 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
                         val = raw_lines[idx + 1].strip()
                     if any(w in low for w in ["startzeit", "start time"]) and val and not start_time:
                         start_time = val
-                    elif any(w in low for w in ["ended on", "edit until", "abgabetermin", "abgabe bis", "bearbeiten bis"]) and val and not ended_on:
+                    elif any(w in low for w in ["ended on", "edit until", "beendet am", "abgabetermin", "abgabe bis", "bearbeiten bis"]) and val and not ended_on:
                         ended_on = val
                     elif any(w in low for w in ["remaining", "verbleibende"]) and val and not time_remaining:
                         time_remaining = val
@@ -720,23 +713,26 @@ def parse_student_assignment_detail(html_content: str, exercise_ref_id: str, ass
                 submission_status = "submitted"
 
         # 5. Tutor Feedback & Evaluation
-        elif any(w in p_title for w in ["evaluation", "bewertung"]):
+        elif any(w in p_title for w in ["evaluation", "bewertung", "rückmeldung"]):
             text = body.get_text(separator="\n")
-            if "passed" in text.lower() or "bestanden" in text.lower():
-                passed_status = "passed"
-            elif "failed" in text.lower() or "nicht bestanden" in text.lower():
-                passed_status = "failed"
-
             # Parse lines for the statement
             lines = [l.strip() for l in text.split("\n") if l.strip()]
+            for index, line in enumerate(lines):
+                if label_key(line.split(':', 1)[0]) == 'status':
+                    value = line.split(':', 1)[1].strip() if ':' in line else ''
+                    value = value or (lines[index + 1] if index + 1 < len(lines) else '')
+                    passed_status = grade_status(label=value) or 'not_graded'
+                    break
+            else:
+                passed_status = next((state for line in lines if (state := grade_status(label=line))), 'not_graded')
             stmt_lines = []
             capturing = False
             for l in lines:
-                if any(h in l.lower() for h in ["evaluation statement", "rückmeldung"]):
+                if label_key(l) in {'evaluation statement', 'rückmeldung', 'rückmeldung für teilnehmer', 'text-feedback'}:
                     capturing = True
                     continue
                 if capturing:
-                    if l.lower() in ["status", "passed", "failed", "not graded", "bestanden"]:
+                    if label_key(l.split(':', 1)[0]) == 'status' or grade_status(label=l):
                         break
                     stmt_lines.append(l)
 
@@ -1225,6 +1221,9 @@ def parse_exercise_overview(html_content: str, exercise_ref_id: str) -> Exercise
                 val = pv.get_text(strip=True)
                 if key and val:
                     props[key] = val
+        native_props = {label_key(key): value for key, value in props.items()}
+        def prop(*names):
+            return next((native_props[label_key(name)] for name in names if label_key(name) in native_props), None)
 
         # Check for Create Team button
         create_team_url = None
@@ -1236,10 +1235,10 @@ def parse_exercise_overview(html_content: str, exercise_ref_id: str) -> Exercise
 
         # Classification
         time_text = (time_remaining or "").lower()
-        is_ended = "ended" in time_text or "beendet" in time_text or any("ended" in k.lower() for k in props.keys())
-        is_upcoming = "starting on" in time_text or "beginnt am" in time_text or any("starting" in k.lower() for k in props.keys())
-        is_ongoing = not is_ended and not is_upcoming and bool(time_remaining or props.get("Edit Until"))
-        ass_type = props.get("Type") or props.get("Typ")
+        is_ended = "ended" in time_text or "beendet" in time_text or bool(prop('Ended On', 'Beendet am'))
+        is_upcoming = any(word in time_text for word in ('starting on', 'beginnt am', 'startet am')) or bool(prop('Starting On', 'Startet am'))
+        is_ongoing = not is_ended and not is_upcoming and bool(time_remaining or prop('Edit Until', 'Abgabetermin', 'Abgabe bis'))
+        ass_type = prop('Type', 'Typ')
 
         assignments.append(
             AssignmentItem(
@@ -1247,9 +1246,9 @@ def parse_exercise_overview(html_content: str, exercise_ref_id: str) -> Exercise
                 title=title,
                 url=full_url,
                 time_remaining=time_remaining,
-                edit_until=props.get("Edit Until") or props.get("Abgabe bis") or props.get("Ended On"),
-                requirement=props.get("Requirement") or props.get("Verpflichtend"),
-                status=props.get("Status"),
+                edit_until=prop('Edit Until', 'Abgabetermin', 'Abgabe bis', 'Ended On', 'Beendet am'),
+                requirement=prop('Requirement', 'Anforderung', 'Verpflichtend'),
+                status=prop('Status'),
                 is_ongoing=is_ongoing,
                 is_ended=is_ended,
                 create_team_url=create_team_url,

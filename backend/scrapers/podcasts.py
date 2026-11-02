@@ -8,6 +8,7 @@ from backend.config import settings
 from backend.schemas import PodcastEpisode, PodcastSeriesResponse
 from backend.scrapers.dumper import safe_parser
 from backend.scrapers.calendar import ZURICH_TZ
+from backend.scrapers.native_text import label_key, parse_native_date, strip_page_prefix
 
 
 def _date_iso(value: Optional[str]) -> Optional[str]:
@@ -16,20 +17,13 @@ def _date_iso(value: Optional[str]) -> Optional[str]:
     try:
         parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
     except ValueError:
-        months = {'jan': 1, 'januar': 1, 'january': 1, 'feb': 2, 'februar': 2, 'february': 2,
-                  'mar': 3, 'march': 3, 'mär': 3, 'märz': 3, 'maerz': 3, 'apr': 4, 'april': 4,
-                  'may': 5, 'mai': 5, 'jun': 6, 'juni': 6, 'june': 6, 'jul': 7, 'juli': 7, 'july': 7,
-                  'aug': 8, 'august': 8, 'sep': 9, 'sept': 9, 'september': 9, 'oct': 10, 'okt': 10,
-                  'october': 10, 'oktober': 10, 'nov': 11, 'november': 11, 'dec': 12, 'dez': 12,
-                  'december': 12, 'dezember': 12}
-        match = re.fullmatch(r'(\d{1,2})\.\s*(\w+)\.?\s+(\d{4})(?:,?\s+(\d{1,2}):(\d{2}))?', value.strip())
+        day = parse_native_date(value)
+        if day is None:
+            return None
+        clock = re.search(r'(\d{1,2}):(\d{2})', value)
         try:
-            if match:
-                day, month, year, hour, minute = match.groups()
-                parsed = datetime(int(year), months[month.lower()], int(day), int(hour or 0), int(minute or 0))
-            else:
-                parsed = datetime.strptime(value.strip(), '%d.%m.%Y, %H:%M')
-        except (ValueError, KeyError):
+            parsed = datetime(day.year, day.month, day.day, int(clock[1]) if clock else 0, int(clock[2]) if clock else 0)
+        except ValueError:
             return None
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=ZURICH_TZ)
@@ -50,7 +44,7 @@ def parse_podcast_series(html_content: str, ref_id: str) -> PodcastSeriesRespons
         soup.select_one("h1.il_Header, h1.il-page-content-header, .ilTopTitle, h1")
     )
     raw_title = title_elem.get_text(strip=True) if title_elem else f"Podcast {ref_id}"
-    title = re.sub(r"^(Content:\s*)?(Podcast\s*(?:[A-Z0-9]+:\s*)?)?", "", raw_title).strip()
+    title = re.sub(r"^Podcast\s*(?:[A-Z0-9]+:\s*)?", "", strip_page_prefix(raw_title)).strip()
     if not title:
         title = raw_title
 
@@ -77,7 +71,7 @@ def parse_podcast_series(html_content: str, ref_id: str) -> PodcastSeriesRespons
         if not title_el:
             continue
         ep_title = title_el.get_text(strip=True)
-        if not ep_title or ep_title in seen_identifiers or ep_title in ["Content", "Functions"]:
+        if not ep_title or ep_title in seen_identifiers or label_key(ep_title) in {'content', 'functions', 'inhalt', 'funktionen'}:
             continue
 
         details_el = c.select_one(".c-entity__main-details")
@@ -87,24 +81,24 @@ def parse_podcast_series(html_content: str, ref_id: str) -> PodcastSeriesRespons
             for label in details_el.select('dt'):
                 value = label.find_next_sibling('dd')
                 if value:
-                    properties[label.get_text(' ', strip=True).strip(':').casefold()] = value.get_text(' ', strip=True)
+                    properties[label_key(label.get_text(' ', strip=True))] = value.get_text(' ', strip=True)
 
-        # Date extraction: e.g. "Date 30. Sep 2026, 16:13" or "Date 15. Dec 2026, 09:13"
-        date_match = re.search(
-            r"Date\s+([0-9]{1,2}\.\s+[A-Za-z]+\s+[0-9]{4}(?:,\s+[0-9]{2}:[0-9]{2})?)",
-            details_text,
-        )
-        ep_date = next((properties[label] for label in ('date', 'datum', 'recording date', 'aufnahmedatum') if label in properties), None)
-        ep_date = ep_date or (date_match.group(1).strip() if date_match else None)
+        field_labels = r'Date|Datum|Recording Date|Aufnahmedatum|Presenter|Vortragende[r]?|Referent(?:en)?|Location|Ort|Standort|Uploaded(?: on)?|Upload Date|Hochgeladen(?: am)?'
+        def field(*names):
+            direct = next((properties[label_key(name)] for name in names if label_key(name) in properties), None)
+            if direct:
+                return direct
+            labels = '|'.join(re.escape(name) for name in names)
+            match = re.search(rf'(?:^|\s)(?:{labels})\s*:?\s+(.+?)(?=\s+(?:{field_labels})\s*:?\s+|$)', details_text, re.I)
+            return match[1].strip() if match else None
+        ep_date = field('date', 'datum', 'recording date', 'aufnahmedatum')
         uploaded_date = next((properties[label] for label in ('uploaded', 'uploaded on', 'upload date', 'date uploaded', 'hochgeladen', 'hochgeladen am', 'hochladedatum', 'upload-datum') if label in properties), None)
 
         # Presenter extraction
-        pres_match = re.search(r"Presenter\s+(.+?)(?:\s+Location|$)", details_text)
-        ep_pres = pres_match.group(1).strip() if pres_match else None
+        ep_pres = field('presenter', 'vortragende', 'vortragender', 'referent', 'referenten')
 
         # Location extraction
-        loc_match = re.search(r"Location\s+(.+)$", details_text)
-        ep_loc = loc_match.group(1).strip() if loc_match else None
+        ep_loc = field('location', 'ort', 'standort')
 
         # Stream / Player URL
         stream_elem = c.select_one("a[href*='streamVideo'], a[href*='xoctPlayerGUI'], a[href*='play']")

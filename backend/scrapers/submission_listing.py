@@ -86,9 +86,12 @@ def parse_submission_listing(html: str, page_url: str) -> SubmissionListingPage:
         page.navigation = navigation
         page.offset = int(navigation.rsplit(':', 1)[1])
     for summary in scope.select('.ilTableFootLight'):
-        match = re.search(r'(\d+)\s*[-–]\s*(\d+)\D+(\d+)', summary.get_text(' ', strip=True))
+        match = re.search(r"(\d+)\s*[-–]\s*(\d+)\s+(?:of|von)\s+([\d'’.,\u00a0\u202f]+)", summary.get_text(' ', strip=True), re.I)
+        if not match:
+            match = re.search(r'(\d+)\s*[-–]\s*(\d+)\D+(\d+)', summary.get_text(' ', strip=True))
         if match:
-            start, _, page.total = map(int, match.groups())
+            start, _, total = match.groups()
+            start, page.total = int(start), int(re.sub(r'\D', '', total))
             page.offset = max(0, start - 1)
             break
     valid = [value for value in candidates if re.fullmatch(r'[^:]*:(?:asc|desc):\d+', value, re.I)]
