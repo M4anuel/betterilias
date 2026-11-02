@@ -12,6 +12,10 @@ const definitions = JSON.parse(fs.readFileSync(path.join(root, 'locales/language
 const en = JSON.parse(fs.readFileSync(path.join(root, 'locales/en.json')));
 const de = JSON.parse(fs.readFileSync(path.join(root, 'locales/de.json')));
 
+test('German application text uses Swiss spelling', () => {
+  for (const value of Object.values(de)) assert.doesNotMatch(value, /[\u00df\u1e9e]/u);
+});
+
 test('regional language selection and unsupported languages', () => {
   assert.equal(resolveLanguage('de-CH', definitions), 'de');
   assert.equal(resolveLanguage('en-US', definitions), 'en');

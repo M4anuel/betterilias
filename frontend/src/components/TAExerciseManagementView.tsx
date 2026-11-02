@@ -264,7 +264,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
         <div ref={feedbackRef} role="status" aria-label={t('assignment.confirmation')} aria-live="polite" aria-atomic="true" className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-sm">
           <CheckCircle2 className="h-5 w-5 shrink-0" />
           <span className="flex-1">{feedback ? t(`assignment.${feedback.kind}`, { title: feedback.title }) : saveSuccessMsg}</span>
-          <button type="button" aria-label={t('Schließen')} onClick={() => { onFeedbackChange(null); setSaveSuccessMsg(null); }}
+          <button type="button" aria-label={t('Schliessen')} onClick={() => { onFeedbackChange(null); setSaveSuccessMsg(null); }}
             className="rounded-lg p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 focus-visible:outline-2 focus-visible:outline-emerald-600">
             <X className="h-4 w-4" />
           </button>

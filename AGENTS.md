@@ -90,6 +90,7 @@ python start.py --help  # or verify python start.py syntax
 * **Full Dark Mode Support:** Every new component, modal, drawer, or badge must support both light mode and dark mode (`dark:...` classes in Tailwind CSS).
 
 ### 3.5 Localisation
+* Use Swiss Standard German for application text: write ss instead of the German sharp s. Preserve names and lecturer/student content as supplied.
 * Localise every user-facing label, hint, tooltip, accessibility label and application-generated error using the existing `t(...)` helpers and shared `locales/en.json` / `locales/de.json` catalogues. Translate known ILIAS interface messages (including deadline/status text); preserve lecturer content, titles, names and dates. Verify both languages and run `npm.cmd --prefix frontend run check:locales` when adding or changing strings.
 
 ### 3.6 Mobile Usability (Required for Every Feature)

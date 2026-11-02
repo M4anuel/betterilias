@@ -129,8 +129,8 @@ export const GradingFeedbackBar: React.FC<GradingFeedbackBarProps> = ({
           type="button"
           onClick={onDismiss}
           className="rounded-lg p-1 text-emerald-700 hover:text-emerald-950 dark:text-emerald-300 dark:hover:text-white hover:bg-emerald-200/60 dark:hover:bg-emerald-900/60 transition cursor-pointer ml-1"
-          title={t("Schließen")}
-          aria-label={t("Schließen")}
+          title={t("Schliessen")}
+          aria-label={t("Schliessen")}
         >
           <X className="h-4 w-4" />
         </button>

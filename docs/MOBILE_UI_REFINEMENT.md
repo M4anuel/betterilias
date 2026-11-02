@@ -84,6 +84,18 @@ and desktop widths.
 Physical iOS Safari/Android Chrome and live ILIAS acceptance must be recorded
 separately from automated browser emulation.
 
+Submission-detail Save and Close controls keep their labels on one line and do
+not shrink under pressure from secondary links. The grading header stacks on
+phones, and footer links wrap separately from the primary action row. This avoids
+inheriting the overlay's anywhere-word-wrapping rule on action labels. Application
+text and locale keys use Swiss ss spelling; supplied lecturer/student content and
+captured native HTML fixtures remain unchanged.
+`tests/test_submission_detail_browser.py` checks both Save controls and Close,
+including a real form interaction against mocked APIs, at 320/390/430/768/1280 px
+and 667 x 375 landscape in German/English and light/dark mode. It captures
+screenshots and checks text ranges to catch labels wrapping within buttons.
+These checks use headless Chrome emulation, not physical devices or live ILIAS.
+
 ## Custom Confirmation & Navigation Dialog System
 
 Browser-native window.confirm and window.alert dialogs have been entirely replaced across student and TA workflows with a responsive custom dialog system (ConfirmModal.tsx and dialog.ts):
