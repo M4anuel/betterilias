@@ -370,6 +370,9 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
         if notice_input:
             notice = notice_input.get_text(strip=True) or notice_input.get("value") or notice
 
+        from backend.services.ta_allocation import parse_ta_marker
+        assigned_ta_id, assigned_ta_name, _ = parse_ta_marker(notice)
+
         # Action Buttons in this row
         download_url = None
         feedback_mail_url = None
@@ -490,6 +493,8 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
                 passed_status=passed_status,
                 feedback=feedback,
                 notice=notice,
+                assigned_ta_id=assigned_ta_id,
+                assigned_ta_name=assigned_ta_name,
                 feedback_mail_url=feedback_mail_url,
                 team_log_url=team_log_url,
                 evaluation_by_file_url=evaluation_by_file_url,

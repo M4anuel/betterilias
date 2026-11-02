@@ -2,6 +2,7 @@ from backend.i18n import t
 import logging
 import httpx
 from typing import Optional
+from fastapi.responses import Response, StreamingResponse
 from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,11 @@ from backend.schemas import (
     SaveTAAssignmentRequest,
 )
 from backend.services.ilias_client import IliasClient, StudentUploadError, SessionExpiredError, AssignmentDeletionError
+from backend.services.ta_allocation import (
+    AllocationPreviewResponse,
+    ApplyAllocationRequest,
+    ApplyAllocationResponse,
+)
 from backend.scrapers.dumper import ScrapingParsingError
 
 router = APIRouter(prefix="/exercises", tags=["Exercises & Grading"])
@@ -433,3 +439,97 @@ async def delete_ta_instruction_file(
             detail=t('Failed to delete instruction file.')
         )
     return {"success": True, "file_id": file_id}
+
+
+@router.post("/{exercise_id}/assignments/{ass_id}/allocation/apply", response_model=ApplyAllocationResponse)
+async def apply_ta_allocation(
+    exercise_id: str,
+    ass_id: str,
+    req: ApplyAllocationRequest,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Submits batch allocation markers into tutor notices via cmd[saveStatusAll]
+    while preserving existing marks and grades.
+    """
+    from backend.services.ta_allocation import ApplyAllocationResponse
+    # Fetch current submissions to verify fingerprint and get status/mark
+    subs_resp = await client.get_exercise_submissions(ref_id=exercise_id, ass_id=ass_id)
+    sub_map = {s.member_id: s for s in subs_resp.submissions}
+
+    target_updates = []
+    for item in req.items:
+        m_id = item.get("member_id")
+        notice = item.get("notice", "")
+        if not m_id or m_id not in sub_map:
+            continue
+        sub = sub_map[m_id]
+        target_updates.append((m_id, notice, sub.passed_status or "not_graded", sub.mark))
+
+    if not target_updates:
+        return ApplyAllocationResponse(success=True, updated_count=0, failed_count=0, message="No updates needed.")
+
+    updated_count, errors = await client.apply_ta_allocation_batch(
+        exercise_ref_id=exercise_id,
+        ass_id=ass_id,
+        target_updates=target_updates,
+    )
+
+    if errors:
+        return ApplyAllocationResponse(
+            success=False,
+            updated_count=updated_count,
+            failed_count=len(target_updates) - updated_count,
+            message=errors[0],
+            errors=errors,
+        )
+
+    return ApplyAllocationResponse(
+        success=True,
+        updated_count=updated_count,
+        failed_count=0,
+        message=t("Successfully distributed work to {p0} submissions in ILIAS.", p0=updated_count),
+    )
+
+
+@router.get("/{exercise_id}/assignments/{ass_id}/export-zip")
+async def export_submissions_zip(
+    exercise_id: str,
+    ass_id: str,
+    ta_id: Optional[str] = Query(None, description="Optional TA slot ID to filter exported submissions"),
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Exports submission files for all or a specific TA in a structured ZIP archive
+    with betterilias-feedback.json manifest and feedback/ placeholder directories.
+    """
+    from backend.services.exercise_bulk import create_submissions_zip_bundle
+    subs_resp = await client.get_exercise_submissions(ref_id=exercise_id, ass_id=ass_id)
+
+    target_subs = subs_resp.submissions
+    if ta_id and ta_id != "all":
+        if ta_id == "unassigned":
+            target_subs = [s for s in target_subs if not s.assigned_ta_id]
+        else:
+            target_subs = [s for s in target_subs if s.assigned_ta_id == ta_id]
+
+    # Only include submitted items
+    target_subs = [s for s in target_subs if s.submission_status in ["submitted", "late"] or s.files]
+
+    async with client.session_manager.get_http_client() as http_client:
+        zip_bytes = await create_submissions_zip_bundle(
+            assignment_title=subs_resp.exercise.title,
+            exercise_ref_id=exercise_id,
+            ass_id=ass_id,
+            submissions=target_subs,
+            http_client=http_client,
+        )
+
+    ta_suffix = f"_{ta_id}" if ta_id and ta_id != "all" else "_all"
+    filename = f"Submissions_{exercise_id}_{ass_id}{ta_suffix}.zip"
+
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )

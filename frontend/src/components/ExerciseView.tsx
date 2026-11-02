@@ -48,6 +48,7 @@ import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { StudentAssignmentModal } from './StudentAssignmentModal';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { TAFilterSettingsModal } from './TAFilterSettingsModal';
+import { DistributeWorkModal } from './DistributeWorkModal';
 import { NotificationToast, ChangeNotification } from './NotificationToast';
 import { GradingFeedbackBar, GradeSavedFeedback } from './GradingFeedbackBar';
 import { TAExerciseManagementView, AssignmentFeedback } from './TAExerciseManagementView';
@@ -245,6 +246,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   // Settings modal open state
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isDistributeModalOpen, setIsDistributeModalOpen] = useState(false);
+  const [selectedTAFilter, setSelectedTAFilter] = useState<string>('all');
 
   const handleSetSubmissionFilter = (val: 'all' | 'submitted' | 'not_submitted') => {
     setTaSubmissionFilter(val);
@@ -1071,7 +1074,15 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       );
     }
 
-    if (taGradeFilter.length > 0) {
+    if (selectedTAFilter !== 'all') {
+        if (selectedTAFilter === 'unassigned') {
+          list = list.filter((s) => !s.assigned_ta_id);
+        } else {
+          list = list.filter((s) => s.assigned_ta_id === selectedTAFilter);
+        }
+      }
+
+      if (taGradeFilter.length > 0) {
       list = list.filter((s) => {
         if (savedSuccessId === s.member_id) {
           return true;
@@ -1408,6 +1419,17 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     }
   }, [activeTab, loadOverview, loadTaSubmissions, selectedTaAssId, exerciseRefId]);
 
+  // Extract distinct assigned TAs from submissions
+  const assignedTAsList = useMemo(() => {
+    const map = new Map<string, string>();
+    (taSubmissionsData?.submissions || []).forEach((s) => {
+      if (s.assigned_ta_id && s.assigned_ta_name) {
+        map.set(s.assigned_ta_id, s.assigned_ta_name);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [taSubmissionsData?.submissions]);
+
   const advancedGradingFilters = (
     <div className="flex items-center gap-2.5 flex-wrap">
       {/* Submission Radio Group */}
@@ -1510,6 +1532,28 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           {t("Nicht bestanden (")}{filterCounts.failed})
         </button>
       </div>
+
+      {/* TA Assignment Filter Dropdown */}
+      {assignedTAsList.length > 0 && (
+        <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
+            {t("Tutor:")}
+          </span>
+          <select
+            value={selectedTAFilter}
+            onChange={(e) => setSelectedTAFilter(e.target.value)}
+            className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 py-1 px-2 rounded-lg cursor-pointer focus:outline-hidden"
+          >
+            <option value="all">{t("Alle Tutoren")}</option>
+            <option value="unassigned">{t("Nicht zugewiesen")}</option>
+            {assignedTAsList.map((ta) => (
+              <option key={ta.id} value={ta.id}>
+                {ta.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 
@@ -2075,6 +2119,34 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   <span className="font-bold">{taSortOrder === 'asc' ? '↑' : '↓'}</span>
                 </div>
               </div>
+
+              {/* Export ZIP Trigger */}
+              {(selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
+                <a
+                  href={api.getTAExportZipUrl(
+                    exerciseRefId,
+                    selectedTaAssId || taSubmissionsData?.active_assignment_id || '',
+                    selectedTAFilter !== 'all' ? selectedTAFilter : undefined
+                  )}
+                  download
+                  className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-bold transition cursor-pointer shrink-0"
+                  title={t("Abgaben als ZIP-Paket exportieren")}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="desktop-only">{t("ZIP-Paket")}</span>
+                </a>
+              )}
+
+              {/* Distribute Work Trigger */}
+              <button
+                type="button"
+                onClick={() => setIsDistributeModalOpen(true)}
+                className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-bold transition cursor-pointer shrink-0"
+                title={t("Arbeit auf Tutoren verteilen")}
+              >
+                <Users className="h-3.5 w-3.5" />
+                <span className="desktop-only">{t("Arbeit verteilen")}</span>
+              </button>
 
               {/* 3-Dot Settings Dialog Trigger */}
               <button
@@ -2732,6 +2804,20 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           }}
           onSave={handleSaveFromModal}
           onClose={() => setDetailModalSubmission(null)}
+        />
+      )}
+
+      {/* Distribute Work Modal */}
+      {(selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
+        <DistributeWorkModal
+          isOpen={isDistributeModalOpen}
+          onClose={() => setIsDistributeModalOpen(false)}
+          exerciseRefId={exerciseRefId}
+          assId={selectedTaAssId || taSubmissionsData?.active_assignment_id || ''}
+          submissions={taSubmissionsData?.submissions || []}
+          onDistributionComplete={() => {
+            loadTaSubmissions(selectedTaAssId || undefined, false, true);
+          }}
         />
       )}
 

@@ -2,7 +2,7 @@ from backend.i18n import t
 import re
 import urllib.parse
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from bs4 import BeautifulSoup
 
 from backend.config import settings
@@ -13,6 +13,7 @@ from backend.scrapers.dumper import safe_parser
 class GradingFormData:
     action_url: str
     hidden_fields: Dict[str, str] = field(default_factory=dict)
+    raw_hidden_fields: List[Tuple[str, str]] = field(default_factory=list)
     mark_field_name: Optional[str] = None
     status_field_name: Optional[str] = None
     feedback_field_name: Optional[str] = None
@@ -66,10 +67,13 @@ def extract_grading_form(html_content: str, member_id: Optional[str] = None) -> 
 
     # Scrape all hidden input fields
     hidden_fields: Dict[str, str] = {}
+    raw_hidden_fields: List[Tuple[str, str]] = []
     for hidden in form.select("input[type='hidden']"):
         name = hidden.get("name")
         if name:
-            hidden_fields[name] = hidden.get("value", "")
+            val = hidden.get("value", "")
+            hidden_fields[name] = val
+            raw_hidden_fields.append((name, val))
 
     # Identify field names for mark, status, notice, and feedback
     mark_field_name = None
@@ -122,6 +126,7 @@ def extract_grading_form(html_content: str, member_id: Optional[str] = None) -> 
     return GradingFormData(
         action_url=full_action_url,
         hidden_fields=hidden_fields,
+        raw_hidden_fields=raw_hidden_fields,
         mark_field_name=mark_field_name or "mark",
         status_field_name=status_field_name or "status",
         feedback_field_name=feedback_field_name or "feedback",

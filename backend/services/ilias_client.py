@@ -1727,6 +1727,47 @@ class IliasClient(AuthoringMixin, ManagementMixin):
 
 
 
+
+    async def apply_ta_allocation_batch(
+        self,
+        exercise_ref_id: str,
+        ass_id: str,
+        target_updates: List[Tuple[str, str, str, Optional[str]]],
+    ) -> Tuple[int, List[str]]:
+        """
+        Submits batch note updates via cmd[saveStatusAll] while echoing existing status/mark.
+        Returns (updated_count, list_of_errors).
+        """
+        from backend.services.exercise_bulk import build_bulk_note_payload
+        self._ensure_authenticated()
+
+        exercise_url = (
+            f"{settings.ilias_base_url}/ilias.php?"
+            f"baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilExerciseManagementGUI&cmd=members&ref_id={exercise_ref_id}&ass_id={ass_id}&part_id=0&exc_mem_trows=800"
+        )
+
+        async with self.session_manager.get_http_client() as client:
+            resp = await client.get(exercise_url)
+            self._check_response_for_session_loss(resp, exercise_url)
+
+            action_url, payload = build_bulk_note_payload(resp.text, target_updates)
+
+            # Submit batch POST
+            post_resp = await client.post(
+                action_url,
+                data=payload,
+                headers={"Referer": exercise_url},
+            )
+            self._check_response_for_session_loss(post_resp, action_url)
+
+            # Verify response
+            from backend.scrapers.forms import verify_grading_success
+            ok, msg = verify_grading_success(post_resp.text)
+            if not ok:
+                return 0, [msg or "Failed to verify grading success in response."]
+
+            return len(target_updates), []
+
     # ---------------------------------------------------------
     # TA Exercise Editor & Assignment Management
     # ---------------------------------------------------------

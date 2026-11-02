@@ -264,3 +264,10 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 - [x] Universal custom confirmation and alert dialog system (ConfirmModal.tsx, dialog.ts): Replaced all browser-native window.confirm and window.alert dialogs across the application (ExerciseView, CourseView, CourseManagement, SubmissionDetailModal, StudentAssignmentModal, TAExerciseEditorView, ExerciseModal). Implemented semantic dialog styling (danger, warning, info), keyboard trapping, backdrop blur, light/dark themes, and stacked 44px mobile touch targets.
 - [x] Unsaved changes navigation guard lifecycle & duplicate warning fix: Added onDiscard handler to navigation guards. When a user confirms leaving a view with unsaved grading notes or form edits, 
 avigationGuard invokes onDiscard to synchronously clear dirty flags, preventing double prompts and ghost warnings when switching between tabs or navigating across courses.
+
+- [x] TA work distribution, allocation notes, and submission export (TA_WORK_DISTRIBUTION_PLAN.md):
+  - [x] Added DistributeWorkModal.tsx for configurable tutor quotas, priority reordering, and preview before saving.
+  - [x] Implemented compact versioned tutor notice markers ([BI:<ta_id>|<ta_name>]) preserving human note text and respecting the 200-character native ILIAS limit.
+  - [x] Implemented native multi-row note updates (cmd[saveStatusAll]) echoing existing status and marks for every targeted row to prevent grade degradation.
+  - [x] Added structured submission bundle export (GET /exercises/{exercise_id}/assignments/{ass_id}/export-zip) containing etterilias-feedback.json manifest, organized files, and return feedback placeholders.
+  - [x] Added TA filter selector (All / Unassigned / per-TA) in the submissions overview.

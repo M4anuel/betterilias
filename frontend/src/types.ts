@@ -295,6 +295,8 @@ export interface SubmissionItem {
   passed_status?: string; // 'passed' | 'failed' | 'not_graded'
   feedback?: string;
   notice?: string;
+  assigned_ta_id?: string;
+  assigned_ta_name?: string;
   feedback_mail_url?: string;
   feedback_recipient_surname?: string | null;
   team_log_url?: string;
@@ -624,4 +626,26 @@ export interface CalendarSubscriptionResponse {
   download_url?: string;
   export_url?: string;
   is_local_host?: boolean;
+}
+
+export interface TAInfo {
+  id: string;
+  name: string;
+  quota?: number;
+  assigned_count?: number;
+}
+
+export interface ApplyAllocationRequest {
+  exercise_ref_id: string;
+  ass_id: string;
+  fingerprint: string;
+  items: Array<{ member_id: string; notice: string }>;
+}
+
+export interface ApplyAllocationResponse {
+  success: boolean;
+  updated_count: number;
+  failed_count: number;
+  message: string;
+  errors?: string[];
 }

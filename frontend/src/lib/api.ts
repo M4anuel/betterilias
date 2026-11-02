@@ -25,6 +25,8 @@ import {
   TAInstructionFileItem,
   TAAssignmentDetailResponse,
   SaveTAAssignmentRequest,
+  ApplyAllocationRequest,
+  ApplyAllocationResponse,
   SemesterCalendarResponse,
   CourseScheduleRuleInput,
   CourseCalendarInfo,
@@ -495,6 +497,33 @@ export const api = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(apiError(err) || t("Fehler beim Löschen des Teams"));
+    }
+    return res.json();
+  },
+
+
+  getTAExportZipUrl(exerciseId: string, assId: string, taId?: string): string {
+    const params = new URLSearchParams();
+    if (taId) params.append('ta_id', taId);
+    return `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignments/${encodeURIComponent(assId)}/export-zip?${params.toString()}`;
+  },
+
+  async applyTAAllocation(
+    exerciseId: string,
+    assId: string,
+    req: ApplyAllocationRequest
+  ): Promise<ApplyAllocationResponse> {
+    const res = await sessionFetch(
+      `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignments/${encodeURIComponent(assId)}/allocation/apply`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.message || 'Failed to apply TA allocation');
     }
     return res.json();
   },

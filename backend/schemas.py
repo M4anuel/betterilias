@@ -349,6 +349,8 @@ class SubmissionItem(BaseModel):
     passed_status: Optional[str] = None  # passed, failed, not_graded
     feedback: Optional[str] = None
     notice: Optional[str] = None
+    assigned_ta_id: Optional[str] = None
+    assigned_ta_name: Optional[str] = None
     feedback_mail_url: Optional[str] = None
     feedback_recipient_surname: Optional[str] = None
     team_log_url: Optional[str] = None
