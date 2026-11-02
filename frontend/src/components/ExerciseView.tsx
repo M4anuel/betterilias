@@ -1434,14 +1434,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const advancedGradingFilters = (
     <div className="flex items-center gap-2.5 flex-wrap">
       {/* Submission Radio Group */}
-      <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
+      <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs shrink-0">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline whitespace-nowrap shrink-0">
           {t("Abgabe:")}
         </span>
         <button
           type="button"
           onClick={() => handleSetSubmissionFilter('all')}
-          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
+          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
             taSubmissionFilter === 'all'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -1453,7 +1453,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         <button
           type="button"
           onClick={() => handleSetSubmissionFilter('submitted')}
-          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
+          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
             taSubmissionFilter === 'submitted'
               ? 'bg-sky-600 text-white shadow-2xs font-bold'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -1465,7 +1465,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         <button
           type="button"
           onClick={() => handleSetSubmissionFilter('not_submitted')}
-          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
+          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
             taSubmissionFilter === 'not_submitted'
               ? 'bg-slate-700 dark:bg-slate-600 text-white shadow-2xs font-bold'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -1477,8 +1477,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       </div>
 
       {/* Grade Status Multi-Select Group */}
-      <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
+      <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs shrink-0">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline whitespace-nowrap shrink-0">
           {t("Bewertung:")}
         </span>
         <button
@@ -1487,7 +1487,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             setTaGradeFilter([]);
             localStorage.setItem('ilias_ta_filter_grade', JSON.stringify([]));
           }}
-          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
+          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
             taGradeFilter.length === 0
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -1499,7 +1499,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         <button
           type="button"
           onClick={() => handleToggleGradeFilter('not_graded')}
-          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
+          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
             taGradeFilter.includes('not_graded')
               ? 'bg-amber-600 text-white shadow-2xs font-bold'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -1511,7 +1511,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         <button
           type="button"
           onClick={() => handleToggleGradeFilter('passed')}
-          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
+          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
             taGradeFilter.includes('passed')
               ? 'bg-emerald-600 text-white shadow-2xs font-bold'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -1523,7 +1523,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         <button
           type="button"
           onClick={() => handleToggleGradeFilter('failed')}
-          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer ${
+          className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
             taGradeFilter.includes('failed')
               ? 'bg-rose-600 text-white shadow-2xs font-bold'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -1536,14 +1536,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
       {/* TA Assignment Filter Dropdown */}
       {assignedTAsList.length > 0 && (
-        <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline">
+        <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs shrink-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline whitespace-nowrap shrink-0">
             {t("Tutor:")}
           </span>
           <select
             value={selectedTAFilter}
             onChange={(e) => setSelectedTAFilter(e.target.value)}
-            className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 py-1 px-2 rounded-lg cursor-pointer focus:outline-hidden"
+            className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 py-1 px-2 rounded-lg cursor-pointer focus:outline-hidden whitespace-nowrap shrink-0"
           >
             <option value="all">{t("Alle Tutoren")}</option>
             <option value="unassigned">{t("Nicht zugewiesen")}</option>
@@ -1743,7 +1743,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               <button
                 type="button"
                 onClick={() => setAssignmentFilterMode('all')}
-                className={`rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer ${
+                className={`rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
                   assignmentFilterMode === 'all'
                     ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-2xs'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -1755,7 +1755,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               <button
                 type="button"
                 onClick={() => setAssignmentFilterMode('ongoing')}
-                className={`flex items-center gap-1 rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer ${
+                className={`flex items-center gap-1 rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
                   assignmentFilterMode === 'ongoing'
                     ? 'bg-emerald-600 text-white shadow-2xs'
                     : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60'
@@ -1768,7 +1768,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               <button
                 type="button"
                 onClick={() => setAssignmentFilterMode('future')}
-                className={`rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer ${
+                className={`rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
                   assignmentFilterMode === 'future'
                     ? 'bg-sky-600 text-white shadow-2xs'
                     : 'bg-sky-50 dark:bg-sky-950/50 text-sky-800 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60'
@@ -1780,7 +1780,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               <button
                 type="button"
                 onClick={() => setAssignmentFilterMode('past')}
-                className={`rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer ${
+                className={`rounded-xl px-3 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
                   assignmentFilterMode === 'past'
                     ? 'bg-slate-700 dark:bg-slate-600 text-white shadow-2xs'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -2063,47 +2063,50 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             </div>
           </div>
 
-          {/* TA Grading Menu Bar (Left: Quick-Filters, Middle: Radio & Multi-select, Right: Search, Sorting indicator, Settings 3-dot) */}
-          <div className="grading-toolbar flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            {/* Left: Quick-Filters collection */}
-            <div className="single-row-filters flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 hidden sm:inline">
-                {t("Schnellfilter:")}
-              </span>
-              {quickFilters.map((qf) => {
-                const isActive =
-                  taSubmissionFilter === qf.submissionStatus &&
-                  taGradeFilter.length === qf.gradeStatus.length &&
-                  taGradeFilter.every((g) => qf.gradeStatus.includes(g));
+          {/* TA Grading Menu Bar (Left/Center: Quick-Filters + Advanced Filters, Right: Search, Sorting indicator, Action buttons) */}
+          <div className="grading-toolbar flex flex-col xl:flex-row xl:items-start justify-between gap-3.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+            {/* Left/Middle: All Filters (Quick-Filters + Advanced Filters) */}
+            <div className="flex flex-wrap items-center gap-2.5 min-w-0 flex-1">
+              {/* Quick-Filters collection */}
+              <div className="single-row-filters flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 hidden sm:inline whitespace-nowrap shrink-0">
+                  {t("Schnellfilter:")}
+                </span>
+                {quickFilters.map((qf) => {
+                  const isActive =
+                    taSubmissionFilter === qf.submissionStatus &&
+                    taGradeFilter.length === qf.gradeStatus.length &&
+                    taGradeFilter.every((g) => qf.gradeStatus.includes(g));
 
-                return (
-                  <button
-                    key={qf.id}
-                    type="button"
-                    onClick={() => handleApplyQuickFilter(qf)}
-                    className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${getQuickFilterClasses(
-                      qf.color,
-                      isActive
-                    )}`}
-                    title={t("Schnellfilter: {p0} (Klicken zum {p1})", { p0: qf.label, p1: isActive ? t('Deaktivieren') : t('Aktivieren') })}
-                  >
-                    {qf.id === 'to_grade' && <Clock className="h-3.5 w-3.5 shrink-0" />}
-                    <span>{qf.label}</span>
-                    {qf.id === 'to_grade' && (
-                      <span className="text-[10px] opacity-80">({filterCounts.toGrade})</span>
-                    )}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={qf.id}
+                      type="button"
+                      onClick={() => handleApplyQuickFilter(qf)}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${getQuickFilterClasses(
+                        qf.color,
+                        isActive
+                      )}`}
+                      title={t("Schnellfilter: {p0} (Klicken zum {p1})", { p0: qf.label, p1: isActive ? t('Deaktivieren') : t('Aktivieren') })}
+                    >
+                      {qf.id === 'to_grade' && <Clock className="h-3.5 w-3.5 shrink-0" />}
+                      <span className="whitespace-nowrap">{qf.label}</span>
+                      {qf.id === 'to_grade' && (
+                        <span className="text-[10px] opacity-80 shrink-0">({filterCounts.toGrade})</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Advanced Filters: Submission Radio toggle + Grade Multi-select + Tutor */}
+              <div className="desktop-only">{advancedGradingFilters}</div>
             </div>
 
-            {/* Middle: Submission Radio toggle + Grade Multi-select */}
-            <div className="desktop-only">{advancedGradingFilters}</div>
-
-            {/* Right: Search, Sorting Indicator & 3-Dot Settings Menu */}
-            <div className="grading-search flex items-center gap-2 shrink-0">
+            {/* Right: Search, Sorting Indicator & Action Buttons (reorganized on top of / below each other) */}
+            <div className="grading-search flex flex-col gap-2 shrink-0 self-stretch sm:self-auto">
               <div className="flex flex-col gap-0.5">
-                <div className="relative w-full sm:w-44">
+                <div className="relative w-full sm:w-56">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                   <input
                     type="text"
@@ -2121,43 +2124,49 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                 </div>
               </div>
 
-              {/* Export ZIP Trigger */}
-              {(selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
-                <a
-                  href={api.getTAExportZipUrl(
-                    exerciseRefId,
-                    selectedTaAssId || taSubmissionsData?.active_assignment_id || '',
-                    selectedTAFilter !== 'all' ? selectedTAFilter : undefined
-                  )}
-                  download
-                  className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-bold transition cursor-pointer shrink-0"
-                  title={t("Abgaben als ZIP-Paket exportieren")}
+              {/* Action Buttons: ZIP, Distribute, 3-Dot (reorganized on top of / below each other) */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Export ZIP Trigger */}
+                {(selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
+                  <a
+                    href={api.getTAExportZipUrl(
+                      exerciseRefId,
+                      selectedTaAssId || taSubmissionsData?.active_assignment_id || '',
+                      selectedTAFilter !== 'all' ? selectedTAFilter : undefined
+                    )}
+                    download
+                    className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap"
+                    title={t("Abgaben als ZIP-Paket exportieren")}
+                    aria-label={t("Abgaben als ZIP-Paket exportieren")}
+                  >
+                    <Download className="h-3.5 w-3.5 shrink-0" />
+                    <span className="desktop-only">{t("ZIP-Paket")}</span>
+                  </a>
+                )}
+
+                {/* Distribute Work Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setIsDistributeModalOpen(true)}
+                  className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap"
+                  title={t("Arbeit auf Tutoren verteilen")}
+                  aria-label={t("Arbeit auf Tutoren verteilen")}
                 >
-                  <Download className="h-3.5 w-3.5" />
-                  <span className="desktop-only">{t("ZIP-Paket")}</span>
-                </a>
-              )}
+                  <Users className="h-3.5 w-3.5 shrink-0" />
+                  <span className="desktop-only">{t("Arbeit verteilen")}</span>
+                </button>
 
-              {/* Distribute Work Trigger */}
-              <button
-                type="button"
-                onClick={() => setIsDistributeModalOpen(true)}
-                className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-bold transition cursor-pointer shrink-0"
-                title={t("Arbeit auf Tutoren verteilen")}
-              >
-                <Users className="h-3.5 w-3.5" />
-                <span className="desktop-only">{t("Arbeit verteilen")}</span>
-              </button>
-
-              {/* 3-Dot Settings Dialog Trigger */}
-              <button
-                type="button"
-                onClick={() => setIsSettingsModalOpen(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 transition shadow-2xs cursor-pointer shrink-0"
-                title={t("Filter-, Sortier- & Kursansicht-Einstellungen öffnen")}
-              >
-                <MoreVertical className="h-4 w-4" />
-              </button>
+                {/* 3-Dot Settings Dialog Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsModalOpen(true)}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 transition shadow-2xs cursor-pointer shrink-0"
+                  title={t("Filter-, Sortier- & Kursansicht-Einstellungen öffnen")}
+                  aria-label={t("Filter-, Sortier- & Kursansicht-Einstellungen öffnen")}
+                >
+                  <MoreVertical className="h-4 w-4 shrink-0" />
+                </button>
+              </div>
             </div>
           </div>
 

@@ -766,6 +766,9 @@ dialog.settings-panel {
   max-height: calc(var(--visible-height, 100dvh) - 5rem);
 }
 .sidebar-course-title { min-width: 0; overflow-wrap: break-word; }
+.single-row-filters > button { flex-shrink: 0; white-space: nowrap; }
+.grading-toolbar button, .grading-toolbar select { white-space: nowrap; flex-shrink: 0; }
+.grading-settings-body button { white-space: nowrap; }
 @media (max-width: 767px) {
   .desktop-only { display: none; }
   .phone-only { display: block; }
@@ -791,7 +794,7 @@ dialog.settings-panel {
   .single-row-filters > button { flex-shrink: 0; white-space: nowrap; }
   .grading-toolbar { gap: .5rem; }
   .grading-search { width: 100%; }
-  .grading-search > div:first-child { min-width: 0; flex: 1; }
+  .grading-search > div:first-child { min-width: 0; width: 100%; }
   .grading-settings-body { overflow-wrap: normal; }
   .grading-settings-body .sort-choices { grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
   .grading-settings-body > .phone-only > div { flex-direction: column; align-items: stretch; }
