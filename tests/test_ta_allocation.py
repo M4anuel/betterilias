@@ -82,3 +82,34 @@ def test_build_bulk_note_payload_encoded_bytes():
     assert "status%5B9999999%5D=notgraded" in body_str
     assert "mark%5B3216297%5D=5.5" in body_str
     assert "cmd%5BsaveStatusAll%5D=Save+All" in body_str
+
+
+def test_format_ta_marker_200_char_budget_truncation():
+    # Long existing note that would exceed 200 chars with marker
+    long_note = "A" * 195
+    formatted = format_ta_marker(long_note, "ta1", "VeryLongAssistantName")
+    assert len(formatted) <= MAX_NOTICE_LENGTH
+    assert "[BI:ta1|VeryLongAssistantName]" in formatted
+    assert formatted.endswith("[BI:ta1|VeryLongAssistantName]")
+    assert "..." in formatted
+
+def test_distribute_units_more_tas_than_units():
+    # 2 units, 5 TAs
+    items = [
+        AllocationItem(unit_id=f"team:{i}", member_id=str(100 + i), student_name=f"Student {i}", submission_status="submitted")
+        for i in range(2)
+    ]
+    assistants = [
+        TAInfo(id=f"ta{i}", name=f"TA {i}")
+        for i in range(1, 6)
+    ]
+    priority = [f"ta{i}" for i in range(1, 6)]
+
+    distributed = distribute_units(items, assistants, priority)
+    assert len(distributed) == 2
+    quotas = {a.id: a.quota for a in assistants}
+    assert quotas["ta1"] == 1
+    assert quotas["ta2"] == 1
+    assert quotas["ta3"] == 0
+    assert quotas["ta4"] == 0
+    assert quotas["ta5"] == 0

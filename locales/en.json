@@ -1609,5 +1609,16 @@
   "Uploaded successfully.": "Uploaded successfully.",
   "Successfully uploaded {p0} feedback files ({p1} skipped, {p2} failed).": "Successfully uploaded {p0} feedback files ({p1} skipped, {p2} failed).",
   "Keine neuen Feedback-Dateien gefunden": "No new feedback files found",
-  "Bitte legen Sie Ihre Feedback-Dateien in die jeweiligen Ordner unter feedback/ ab.": "Please place your feedback files into the respective folders under feedback/."
+  "Bitte legen Sie Ihre Feedback-Dateien in die jeweiligen Ordner unter feedback/ ab.": "Please place your feedback files into the respective folders under feedback/.",
+  "Sie können nicht zugeordnete Dateien hier manuell einem Teilnehmer oder Team zuweisen:": "You can manually assign unmatched files to a participant or team here:",
+  "Empfänger auswählen...": "Select recipient...",
+  "Zuweisung aufheben": "Clear assignment",
+  "CSV exportieren": "Export CSV",
+  "Zugeordnet zu: {p0}": "Assigned to: {p0}",
+  "Manuell zugeordnet": "Manually assigned",
+  "Unmatched file not found in staging metadata.": "Unmatched file not found in staging metadata.",
+  "Staged file not found on disk.": "Staged file not found on disk.",
+  "Recipient not found in assignment.": "Recipient not found in assignment.",
+  "Uploaded successfully via manual mapping.": "Uploaded successfully via manual mapping.",
+  "Upload failed.": "Upload failed."
 }

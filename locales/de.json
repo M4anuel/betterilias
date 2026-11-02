@@ -1609,5 +1609,16 @@
   "Uploaded successfully.": "Erfolgreich hochgeladen.",
   "Successfully uploaded {p0} feedback files ({p1} skipped, {p2} failed).": "{p0} Feedback-Dateien erfolgreich hochgeladen ({p1} übersprungen, {p2} fehlgeschlagen).",
   "Keine neuen Feedback-Dateien gefunden": "Keine neuen Feedback-Dateien gefunden",
-  "Bitte legen Sie Ihre Feedback-Dateien in die jeweiligen Ordner unter feedback/ ab.": "Bitte legen Sie Ihre Feedback-Dateien in die jeweiligen Ordner unter feedback/ ab."
+  "Bitte legen Sie Ihre Feedback-Dateien in die jeweiligen Ordner unter feedback/ ab.": "Bitte legen Sie Ihre Feedback-Dateien in die jeweiligen Ordner unter feedback/ ab.",
+  "Sie können nicht zugeordnete Dateien hier manuell einem Teilnehmer oder Team zuweisen:": "Sie können nicht zugeordnete Dateien hier manuell einem Teilnehmer oder Team zuweisen:",
+  "Empfänger auswählen...": "Empfänger auswählen...",
+  "Zuweisung aufheben": "Zuweisung aufheben",
+  "CSV exportieren": "CSV exportieren",
+  "Zugeordnet zu: {p0}": "Zugeordnet zu: {p0}",
+  "Manuell zugeordnet": "Manuell zugeordnet",
+  "Unmatched file not found in staging metadata.": "Nicht zugeordnete Datei nicht in den Staging-Metadaten gefunden.",
+  "Staged file not found on disk.": "Bereitgestellte Datei nicht auf der Festplatte gefunden.",
+  "Recipient not found in assignment.": "Empfänger in dieser Übung nicht gefunden.",
+  "Uploaded successfully via manual mapping.": "Erfolgreich über manuelle Zuweisung hochgeladen.",
+  "Upload failed.": "Hochladen fehlgeschlagen."
 }

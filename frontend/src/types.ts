@@ -549,6 +549,7 @@ export interface FeedbackImportCommitRequest {
   staged_import_id: string;
   snapshot_token: string;
   conflict_actions: Record<string, 'overwrite' | 'skip' | 'keep_both'>;
+  manual_mappings?: Record<string, string>;
 }
 
 export interface FeedbackImportCommitResultItem {

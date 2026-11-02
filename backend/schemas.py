@@ -663,6 +663,7 @@ class FeedbackImportCommitRequest(BaseModel):
     staged_import_id: str
     snapshot_token: str
     conflict_actions: Dict[str, str] = Field(default_factory=dict) # "{unit_id}:{filename}" -> "overwrite" | "skip" | "keep_both"
+    manual_mappings: Dict[str, str] = Field(default_factory=dict) # "{source_path}" -> "{target_unit_id}"
 
 class FeedbackImportCommitResultItem(BaseModel):
     unit_id: str

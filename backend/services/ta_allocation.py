@@ -78,11 +78,23 @@ def parse_ta_marker(notice: Optional[str]) -> Tuple[Optional[str], Optional[str]
 def format_ta_marker(clean_notice: str, ta_id: str, ta_name: str) -> str:
     """
     Appends compact [BI:ta_id|ta_name] to the clean notice.
+    Guarantees that total length does not exceed MAX_NOTICE_LENGTH (200 chars),
+    gracefully truncating clean_notice with an ellipsis if required.
     """
     # Sanitize ta_id and ta_name to avoid delimiter issues
     clean_id = re.sub(r"[\|\]\[]", "", ta_id).strip()
     clean_name = re.sub(r"[\|\]\[]", "", ta_name).strip()
     marker = f"{MARKER_PREFIX}{clean_id}|{clean_name}{MARKER_SUFFIX}"
+
+    if not clean_notice:
+        return marker
+
+    max_clean_len = MAX_NOTICE_LENGTH - len(marker) - 1
+    if len(clean_notice) > max_clean_len:
+        if max_clean_len > 3:
+            clean_notice = clean_notice[: max_clean_len - 3].rstrip() + "..."
+        else:
+            clean_notice = ""
 
     if clean_notice:
         return f"{clean_notice} {marker}"

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Users, ArrowUp, ArrowDown, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, Users, ArrowUp, ArrowDown, CheckCircle, AlertTriangle, Loader2, Download } from 'lucide-react';
 import { t } from '../lib/i18n';
 import { SubmissionItem, TAInfo, ApplyAllocationRequest } from '../types';
 import { api } from '../lib/api';
@@ -180,11 +180,20 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
             assigned_ta_name: ta.name,
           });
 
-          // Propagate notice marker to all members of this unit
+          // Propagate notice marker to all members of this unit with 200-character budget guard
           unit.members.forEach((m) => {
-            const cleanNotice = (m.notice || '').replace(/\[BI:[^\]]+\]/g, '').trim();
+            let cleanNotice = (m.notice || '').replace(/\[BI:[^\]]+\]/g, '').trim();
             const marker = `[BI:${ta.id}|${ta.name}]`;
-            const newNotice = cleanNotice ? `${cleanNotice} ${marker}` : marker;
+            let newNotice = cleanNotice ? `${cleanNotice} ${marker}` : marker;
+            if (newNotice.length > 200) {
+              const maxClean = 200 - marker.length - 4; // allow space + '...'
+              if (maxClean > 0) {
+                cleanNotice = cleanNotice.slice(0, maxClean).trimEnd() + '...';
+                newNotice = `${cleanNotice} ${marker}`;
+              } else {
+                newNotice = marker;
+              }
+            }
             memberUpdates.push({
               member_id: m.member_id,
               notice: newNotice,
@@ -198,6 +207,31 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
 
     return { quotas, assignedUnits, memberUpdates };
   }, [canonicalUnits, assistants, priorityOrder, sortMethod, randomSeed]);
+
+  const exportAllocationCsv = () => {
+    const headers = ['Unit ID', 'Typ', 'Name/Team', 'Zugewiesener TA', 'Abgabestatus', 'Abgabezeitpunkt'];
+    const rows = distributionPlan.assignedUnits.map((item) => {
+      const canonical = canonicalUnits.find((u) => u.unitId === item.unitId);
+      return [
+        item.unitId,
+        canonical?.teamId ? 'Team' : 'Einzeln',
+        `"${(item.displayName || '').replace(/"/g, '""')}"`,
+        `"${(item.assigned_ta_name || '').replace(/"/g, '""')}"`,
+        canonical?.members[0]?.submission_status || '',
+        canonical?.submissionTime || '',
+      ];
+    });
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TA_Zuweisung_${assId}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const handleApply = async () => {
     setIsSubmitting(true);
@@ -413,7 +447,17 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="border-t border-slate-100 dark:border-slate-800 px-5 py-3.5 bg-slate-50 dark:bg-slate-900 flex items-center justify-end gap-3">
+        <div className="border-t border-slate-100 dark:border-slate-800 px-5 py-3.5 bg-slate-50 dark:bg-slate-900 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={exportAllocationCsv}
+            disabled={distributionPlan.assignedUnits.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="h-3.5 w-3.5 text-slate-500" />
+            <span>{t("CSV exportieren")}</span>
+          </button>
+          <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onClose}
@@ -431,6 +475,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             <span>{t("Verteilung in ILIAS speichern")}</span>
           </button>
+          </div>
         </div>
       </div>
     </div>

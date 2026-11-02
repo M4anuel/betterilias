@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   X,
   Upload,
@@ -23,12 +23,14 @@ import {
   FeedbackImportPreviewResponse,
   FeedbackImportCommitResponse,
   FeedbackUnitImportPreview,
+  SubmissionItem,
 } from '../types';
 
 interface ReturnFeedbackModalProps {
   exerciseRefId: string;
   assId: string;
   assignmentTitle: string;
+  submissions?: SubmissionItem[];
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -40,6 +42,7 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
   exerciseRefId,
   assId,
   assignmentTitle,
+  submissions,
   isOpen,
   onClose,
   onSuccess,
@@ -49,10 +52,40 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<FeedbackImportPreviewResponse | null>(null);
   const [conflictActions, setConflictActions] = useState<Record<string, 'overwrite' | 'skip' | 'keep_both'>>({});
+  const [manualMappings, setManualMappings] = useState<Record<string, string>>({});
   const [commitResult, setCommitResult] = useState<FeedbackImportCommitResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
   const [showUnmatched, setShowUnmatched] = useState(false);
+
+  interface AssignmentUnitOption {
+    unitId: string;
+    label: string;
+  }
+
+  const availableUnits = useMemo<AssignmentUnitOption[]>(() => {
+    const unitsMap = new Map<string, AssignmentUnitOption>();
+    (submissions || []).forEach((s) => {
+      if (s.team_id) {
+        const uId = `team:${s.team_id}`;
+        if (!unitsMap.has(uId)) {
+          unitsMap.set(uId, {
+            unitId: uId,
+            label: s.team_name ? `${s.team_name} (${s.student_name})` : `Team ${s.team_id}`,
+          });
+        }
+      } else {
+        const uId = `user:${s.member_id}`;
+        if (!unitsMap.has(uId)) {
+          unitsMap.set(uId, {
+            unitId: uId,
+            label: s.student_name ? `${s.student_name} (${s.member_id})` : `User ${s.member_id}`,
+          });
+        }
+      }
+    });
+    return Array.from(unitsMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [submissions]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,6 +95,7 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
       setSelectedFile(null);
       setPreviewData(null);
       setConflictActions({});
+      setManualMappings({});
       setCommitResult(null);
       setErrorMessage(null);
       setShowSkipped(false);
@@ -115,6 +149,7 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
         staged_import_id: previewData.staged_import_id,
         snapshot_token: previewData.snapshot_token,
         conflict_actions: conflictActions,
+        manual_mappings: manualMappings,
       });
       setCommitResult(res);
       setStep('completed');
@@ -126,8 +161,9 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
   };
 
   const hasBlockers = (previewData?.blockers && previewData.blockers.length > 0) || false;
-  const totalUnits = previewData?.units.length || 0;
-  const totalFiles = previewData?.total_files || 0;
+  const manualMappedCount = Object.keys(manualMappings).filter((k) => manualMappings[k]).length;
+  const totalUnits = (previewData?.units.length || 0) + (manualMappedCount > 0 ? 1 : 0);
+  const totalFiles = (previewData?.total_files || 0) + manualMappedCount;
 
   return (
     <div
@@ -296,9 +332,9 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                 </div>
               </div>
 
-              {/* Unmatched Files Warning */}
+              {/* Unmatched Files Section */}
               {previewData.unmatched_files.length > 0 && (
-                <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 p-3.5 text-xs space-y-2">
+                <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 p-3.5 text-xs space-y-2.5">
                   <div
                     onClick={() => setShowUnmatched(!showUnmatched)}
                     className="flex items-center justify-between cursor-pointer font-bold text-amber-800 dark:text-amber-300"
@@ -310,11 +346,66 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                     {showUnmatched ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </div>
                   {showUnmatched && (
-                    <ul className="space-y-1 text-slate-600 dark:text-slate-400 text-[11px] list-disc list-inside max-h-32 overflow-y-auto pt-1">
-                      {previewData.unmatched_files.map((f, idx) => (
-                        <li key={idx} className="truncate">{f}</li>
-                      ))}
-                    </ul>
+                    <div className="space-y-2 pt-1">
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                        {t("Sie können nicht zugeordnete Dateien hier manuell einem Teilnehmer oder Team zuweisen:")}
+                      </p>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {previewData.unmatched_files.map((filePath, idx) => {
+                          const mappedUnitId = manualMappings[filePath] || '';
+                          const mappedOption = availableUnits.find((u: AssignmentUnitOption) => u.unitId === mappedUnitId);
+                          return (
+                            <div
+                              key={idx}
+                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-amber-200/60 dark:border-amber-900/40 text-[11px]"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileText className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                <span className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={filePath}>
+                                  {filePath.split('/').pop()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <select
+                                  value={mappedUnitId}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setManualMappings((prev) => ({
+                                      ...prev,
+                                      [filePath]: val,
+                                    }));
+                                  }}
+                                  className="text-[11px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-slate-700 dark:text-slate-200 cursor-pointer max-w-[200px] truncate"
+                                >
+                                  <option value="">-- {t("Empfänger auswählen...")} --</option>
+                                  {availableUnits.map((u: AssignmentUnitOption) => (
+                                    <option key={u.unitId} value={u.unitId}>
+                                      {u.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                {mappedUnitId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setManualMappings((prev) => {
+                                        const copy = { ...prev };
+                                        delete copy[filePath];
+                                        return copy;
+                                      });
+                                    }}
+                                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md cursor-pointer"
+                                    title={t("Zuweisung aufheben")}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
