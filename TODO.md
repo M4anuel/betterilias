@@ -208,6 +208,8 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 
 ## Completed
 
+- [x] Keep submission-details Save/Close labels on one line with responsive action rows, and use Swiss ss spelling throughout application text and locale keys.
+
 - [x] Enlarge the toolbar logo within its icon canvas and replace covering text badges with small corner status dots; retain full localized status in the tooltip and popup in both extensions.
 - [x] Increase the corner status dot diameter by 25% for clearer visibility while preserving the toolbar logo.
 

@@ -189,7 +189,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
     id: `submission-detail-${submission.member_id}`,
     isDirty: () => isDirty,
     isPending: () => isUploadingFile || isSaving || deletingFileId !== null,
-    message: () => t("Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?"),
+    message: () => t("Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schliessen?"),
     onDiscard: () => {
       setIsDirty(false);
     },
@@ -199,7 +199,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
     if (isDirty) {
       const confirmed = await confirmDialog({
         title: t("Ungespeicherte Änderungen"),
-        message: t("Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schließen?"),
+        message: t("Sie haben ungespeicherte Änderungen in dieser Bewertung. Möchten Sie wirklich schliessen?"),
         confirmLabel: t("Änderungen verwerfen"),
         cancelLabel: t("Abbrechen"),
         variant: 'warning',
@@ -209,7 +209,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
       const confirmed = await confirmDialog({
         title: t("Vorgang abbrechen?"),
         message: t("Ein Vorgang oder Upload wird gerade ausgeführt. Wenn Sie die Seite jetzt verlassen, wird er möglicherweise abgebrochen. Möchten Sie wirklich fortfahren?"),
-        confirmLabel: t("Trotzdem schließen"),
+        confirmLabel: t("Trotzdem schliessen"),
         cancelLabel: t("Abbrechen"),
         variant: 'warning',
       });
@@ -337,7 +337,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
             type="button"
             onClick={handleSafeClose}
             className="rounded-full p-2 text-slate-400 hover:bg-slate-200/70 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
-            aria-label={t("Schließen")}
+            aria-label={t("Schliessen")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -377,7 +377,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
 
           {/* EDITABLE GRADING & EVALUATION CARD */}
           <div className="rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/40 via-white to-slate-50 dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-indigo-100 dark:border-slate-800 pb-3">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-indigo-100 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-2xs">
                   <Award className="h-4 w-4" />
@@ -398,7 +398,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                   onClick={handleSave}
                   disabled={isSaving || isUpdating}
                   title={isUpdating ? t("Aktualisierung läuft... Bitte warten") : t("Speichern")}
-                  className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer ${
+                  className={`submission-detail-save flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer ${
                     isSaved
                       ? 'bg-emerald-600'
                       : isDirty
@@ -833,8 +833,8 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
         </div>
 
         {/* Modal Footer / Actions */}
-        <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 px-6 py-4">
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="submission-detail-footer flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 px-6 py-4">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:min-w-0 sm:flex-1">
             {submission.evaluation_by_file_url && (
               <a
                 href={submission.evaluation_by_file_url}
@@ -875,14 +875,14 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto">
             {onSave && (
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={isSaving || isUpdating}
                 title={isUpdating ? t("Aktualisierung läuft... Bitte warten") : t("Speichern")}
-                className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer ${
+                className={`submission-detail-save flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer ${
                   isSaved
                     ? 'bg-emerald-600'
                     : isDirty
@@ -917,9 +917,9 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-2xs cursor-pointer"
+              className="shrink-0 whitespace-nowrap rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-2xs cursor-pointer"
             >
-              {t("Schließen")}
+              {t("Schliessen")}
             </button>
           </div>
         </div>

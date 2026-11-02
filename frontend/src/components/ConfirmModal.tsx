@@ -141,7 +141,7 @@ export const ConfirmModal: React.FC = () => {
         <button
           type="button"
           onClick={handleCancel}
-          aria-label={t("Schließen")}
+          aria-label={t("Schliessen")}
           className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
         >
           <X className="h-4 w-4" />

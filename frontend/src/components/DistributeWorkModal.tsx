@@ -240,7 +240,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
                 {t("Arbeit verteilen")}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {t("{p0} eingereichte Abgaben gleichmäßig aufteilen", { p0: canonicalUnits.length })}
+                {t("{p0} eingereichte Abgaben gleichmässig aufteilen", { p0: canonicalUnits.length })}
               </p>
             </div>
           </div>

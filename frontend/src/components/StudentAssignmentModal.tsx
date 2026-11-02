@@ -632,7 +632,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                 onClick={onClose}
                 className="mt-2 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 transition"
               >
-                {t("Schließen")}
+                {t("Schliessen")}
               </button>
             </div>
           ) : detail ? (
@@ -767,7 +767,7 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                         >
                           <UserPlus className="h-3.5 w-3.5" />
                           <span>
-                            {isAddMemberOpen ? t("Suche schließen") : t("Mitglieder hinzufügen")}
+                            {isAddMemberOpen ? t("Suche schliessen") : t("Mitglieder hinzufügen")}
                           </span>
                         </button>
 
@@ -1314,13 +1314,13 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
 
         {/* Modal Footer */}
         <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-6 py-3.5 bg-slate-50/70 dark:bg-slate-800/80 shrink-0">
-          <span className="desktop-only text-[11px] text-slate-400 dark:text-slate-500">{t("Drücke Esc zum Schließen")}</span>
+          <span className="desktop-only text-[11px] text-slate-400 dark:text-slate-500">{t("Drücke Esc zum Schliessen")}</span>
           <button
             type="button"
             onClick={handleSafeClose}
             className="rounded-xl bg-slate-900 dark:bg-slate-800 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:hover:bg-slate-700 transition cursor-pointer"
           >
-            {t("Schließen")}
+            {t("Schliessen")}
           </button>
         </div>
       </div>

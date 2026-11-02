@@ -156,7 +156,7 @@ def test_compact_settings_semesters_materials_and_exercises(local_site, language
         actions = team.locator('button').all()
         assert len(actions) == 2
         assert abs(actions[0].bounding_box()['y'] - actions[1].bounding_box()['y']) < 1
-        pw.expect(page.get_by_text(tr('Drücke Esc zum Schließen'), exact=True)).to_be_hidden()
+        pw.expect(page.get_by_text(tr('Drücke Esc zum Schliessen'), exact=True)).to_be_hidden()
         page.keyboard.press('Escape')
         views.select_option('submissions')
         pw.expect(page.get_by_text('Student, Test', exact=True)).to_be_visible()

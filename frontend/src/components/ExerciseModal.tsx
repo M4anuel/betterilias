@@ -383,7 +383,7 @@ export const ExerciseModal: React.FC<ExerciseModalProps> = ({
             <button
               onClick={onClose}
               className="rounded-xl p-2 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 transition cursor-pointer"
-              title={t("Schließen")}
+              title={t("Schliessen")}
             >
               <X className="h-5 w-5" />
             </button>

@@ -45,5 +45,5 @@ Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzun
 
 - **Manifest V3 & Gecko-optimiert**: Entwickelt nach den neuesten Mozilla WebExtension MV3 Standards.
 - **Dark Mode Support**: Passt sich automatisch den Systemeinstellungen an (`prefers-color-scheme`).
-- **Sicher & Datenschutzfreundlich**: Liest ausschließlich Cookies für `ilias.unibe.ch`. Passwörter oder persönliche Daten werden zu keinem Zeitpunkt abgefangen.
+- **Sicher & Datenschutzfreundlich**: Liest ausschliesslich Cookies für `ilias.unibe.ch`. Passwörter oder persönliche Daten werden zu keinem Zeitpunkt abgefangen.
 
