@@ -1607,5 +1607,7 @@
   "Assignment context mismatch for staged import.": "Übungskontext stimmt nicht mit dem zwischengespeicherten Import überein.",
   "Skipped by user choice.": "Auf Wunsch übersprungen.",
   "Uploaded successfully.": "Erfolgreich hochgeladen.",
-  "Successfully uploaded {p0} feedback files ({p1} skipped, {p2} failed).": "{p0} Feedback-Dateien erfolgreich hochgeladen ({p1} übersprungen, {p2} fehlgeschlagen)."
+  "Successfully uploaded {p0} feedback files ({p1} skipped, {p2} failed).": "{p0} Feedback-Dateien erfolgreich hochgeladen ({p1} übersprungen, {p2} fehlgeschlagen).",
+  "Keine neuen Feedback-Dateien gefunden": "Keine neuen Feedback-Dateien gefunden",
+  "Bitte legen Sie Ihre Feedback-Dateien in die jeweiligen Ordner unter feedback/ ab.": "Bitte legen Sie Ihre Feedback-Dateien in die jeweiligen Ordner unter feedback/ ab."
 }

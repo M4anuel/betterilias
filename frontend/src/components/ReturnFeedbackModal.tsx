@@ -347,8 +347,18 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                   {t("Zugeordnete Feedback-Dateien:")}
                 </p>
 
-                <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden max-h-72 overflow-y-auto">
-                  {previewData.units.map((unit) => {
+                {previewData.units.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-6 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1 bg-slate-50/50 dark:bg-slate-900/50">
+                    <p className="font-semibold text-slate-700 dark:text-slate-300">
+                      {t("Keine neuen Feedback-Dateien gefunden")}
+                    </p>
+                    <p>
+                      {t("Bitte legen Sie Ihre Feedback-Dateien in die jeweiligen Ordner unter feedback/ ab.")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden max-h-72 overflow-y-auto">
+                    {previewData.units.map((unit) => {
                     const isTeam = Boolean(unit.team_id);
                     return (
                       <div key={unit.unit_id} className="p-3 space-y-2 text-xs">
@@ -425,7 +435,8 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -530,3 +541,4 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
     </div>
   );
 };
+

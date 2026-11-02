@@ -12,6 +12,7 @@ from backend.schemas import (
     ExerciseSubmissionsResponse,
     ExerciseInfo,
 )
+from backend.services.ilias_client import IliasClient
 from backend.services.feedback_import import (
     safe_inspect_zip,
     parse_unit_from_path,
@@ -178,3 +179,43 @@ async def test_preview_and_commit_feedback_import():
 
     # Verify upload was called for both
     assert mock_client.upload_submission_feedback_file.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_re_zip_empty_and_feedback_json_manifest_ignored():
+    mock_client = AsyncMock(spec=IliasClient)
+    mock_client.get_exercise_submissions.return_value = ExerciseSubmissionsResponse(
+        exercise=ExerciseInfo(ref_id="999", title="Test"),
+        submissions=[
+            SubmissionItem(member_id="101", student_name="Alice", submission_status="submitted"),
+        ],
+    )
+
+    # Simulate re-zipping download package without adding files:
+    # only feedback.json / betterilias-feedback.json, submissions/ files, INSTRUCTIONS.txt, and .keep files
+    zip_content = {
+        "feedback.json": json.dumps({"ass_id": "42", "exercise_ref_id": "999"}).encode("utf-8"),
+        "INSTRUCTIONS.txt": b"Instructions",
+        "submissions/user-101/solution.py": b"student code",
+        "feedback/user-101/.keep": b"# placeholder",
+    }
+    zip_bytes = create_test_zip(zip_content)
+
+    preview = await preview_feedback_import(
+        exercise_ref_id="999",
+        ass_id="42",
+        session_id="test_sess",
+        file_bytes=zip_bytes,
+        client=mock_client,
+    )
+
+    # Nothing should be unmatched or uploaded
+    assert preview.total_files == 0
+    assert preview.total_units == 0
+    assert len(preview.unmatched_files) == 0
+    assert "feedback.json" not in preview.unmatched_files
+    assert any("feedback.json" in s and "manifest" in s for s in preview.skipped_files)
+    assert any(".keep" in s for s in preview.skipped_files)
+    assert any("submissions" in s for s in preview.skipped_files)
+
+
