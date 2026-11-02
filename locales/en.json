@@ -1546,5 +1546,16 @@
   "Neu mischen": "Reshuffle",
   "Die Abgaben oder Notizen wurden zwischenzeitlich geändert. Bitte laden Sie die Vorschau neu.": "Submissions or notes have been changed in the meantime. Please reload the preview.",
   "Tutor auswählen": "Select tutor",
-  "Abgaben für ausgewählten Tutor als ZIP-Paket exportieren": "Export submissions for selected tutor as ZIP package"
+  "Abgaben für ausgewählten Tutor als ZIP-Paket exportieren": "Export submissions for selected tutor as ZIP package",
+  "ZIP wird erstellt...": "Creating ZIP...",
+  "Wird geladen...": "Loading...",
+  "Vorbereiten...": "Preparing...",
+  "Heruntergeladen": "Downloaded",
+  "Downloads": "Downloads",
+  "Backend bereitet Datei vor...": "Backend is preparing file...",
+  "empfangen...": "received...",
+  "Wird im Browser gespeichert...": "Saving to browser...",
+  "Download abgeschlossen ({p0})": "Download complete ({p0})",
+  "Download fehlgeschlagen": "Download failed",
+  "Download fehlgeschlagen (HTTP {p0})": "Download failed (HTTP {p0})"
 }

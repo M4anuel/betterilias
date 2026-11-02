@@ -24,6 +24,7 @@ import { api } from '../lib/api';
 import { cache, TEAM_CANDIDATES_CACHE_PREFIX } from '../lib/cache';
 import { useNavigationGuard } from '../lib/navigationGuard';
 import { confirmDialog, alertDialog } from '../lib/dialog';
+import { SubmissionDownloadButton } from './DownloadButtons';
 
 interface StudentAssignmentModalProps {
   exerciseRefId: string;
@@ -1155,15 +1156,12 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
                               </div>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              <a
-                                href={downloadTarget}
-                                download={subFile.filename}
-                                className="flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-2.5 py-1 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-700 dark:hover:text-indigo-300 hover:border-indigo-200 dark:hover:border-indigo-700 transition shadow-2xs shrink-0"
-                                title={t("Abgabe direkt herunterladen")}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                                <span>{t("Download")}</span>
-                              </a>
+                              <SubmissionDownloadButton
+                                exerciseRefId={exerciseRefId}
+                                downloadUrl={subFile.download_url}
+                                fallbackFilename={subFile.filename}
+                                className="flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-2.5 py-1 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-700 dark:hover:text-indigo-300 hover:border-indigo-200 dark:border-indigo-700 transition shadow-2xs shrink-0 cursor-pointer"
+                              />
                               {subFile.delivered_id && (
                                 <button
                                   type="button"

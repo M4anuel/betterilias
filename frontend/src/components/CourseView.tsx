@@ -39,6 +39,8 @@ import { navigationGuard } from '../lib/navigationGuard';
 import { SessionDrawer } from './SessionDrawer';
 import { ContentOrderModal } from './ContentOrderModal';
 import { ExerciseView } from './ExerciseView';
+import { MaterialDownloadButton } from './DownloadButtons';
+import { downloadManager } from '../lib/downloadManager';
 import { api } from '../lib/api';
 import { cache, CourseBlocksCustomization } from '../lib/cache';
 
@@ -1091,15 +1093,13 @@ export const CourseView: React.FC<CourseViewProps> = ({
               <span>{t("Übungen")}</span>
             </button>
           ) : isFile && downloadUrl ? (
-            <a
-              href={downloadUrl} aria-label={t("Download")}
-              download
+            <MaterialDownloadButton
+              refId={item.ref_id}
+              downloadUrl={item.download_url}
+              title={item.title}
+              fileSize={item.file_size}
               style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
-              className="flex items-center gap-1 rounded-lg text-white px-2.5 py-1 text-xs font-semibold hover:opacity-90 transition shadow-2xs"
-            >
-              <Download className="h-3 w-3" />
-              <span>{t("Download")}</span>
-            </a>
+            />
           ) : (
             <a
               href={item.url}
@@ -1221,7 +1221,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
       } else if (isExercise) {
         setActiveExerciseRefId(item.ref_id);
       } else if (isFile && downloadUrl) {
-        window.open(downloadUrl, '_blank');
+        downloadManager.startDownload(downloadUrl, { fallbackFilename: item.title, knownSize: item.file_size });
       } else if (item.url) {
         window.open(item.url, '_blank', 'noreferrer');
       }
@@ -1556,14 +1556,13 @@ export const CourseView: React.FC<CourseViewProps> = ({
             </span>
           )}
           {isFile && downloadUrl ? (
-            <a
-              href={downloadUrl} aria-label={t("Download")}
-              download
-              className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-[var(--accent)] hover:text-white transition shadow-2xs"
-            >
-              <Download className="h-3 w-3" />
-              <span>{t("Download")}</span>
-            </a>
+            <MaterialDownloadButton
+              refId={item.ref_id}
+              downloadUrl={item.download_url}
+              title={item.title}
+              fileSize={item.file_size}
+              className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-[var(--accent)] hover:text-white"
+            />
           ) : (
             <a
               href={item.url}

@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { CourseSessionItem, MaterialItem } from '../types';
 import { api } from '../lib/api';
+import { MaterialDownloadButton } from './DownloadButtons';
+import { downloadManager } from '../lib/downloadManager';
 
 interface SessionDrawerProps {
   sessions: CourseSessionItem[];
@@ -302,14 +304,14 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                           >
                             <div className="flex items-center gap-2.5 truncate">
                               <FileText className="h-4 w-4 text-teal-600 dark:text-teal-400 shrink-0" />
-                              <a
-                                href={downloadUrl}
-                                download
-                                className="text-xs font-bold text-slate-800 dark:text-slate-100 hover:text-emerald-700 dark:hover:text-emerald-400 transition truncate"
+                              <button
+                                type="button"
+                                onClick={() => downloadManager.startDownload(downloadUrl, { fallbackFilename: mat.title, knownSize: mat.file_size })}
+                                className="text-xs font-bold text-slate-800 dark:text-slate-100 hover:text-emerald-700 dark:hover:text-emerald-400 transition truncate text-left cursor-pointer"
                                 title={mat.title}
                               >
                                 {mat.title}
-                              </a>
+                              </button>
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0">
@@ -318,14 +320,13 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                                   {mat.file_size}
                                 </span>
                               )}
-                              <a
-                                href={downloadUrl} aria-label={t("Download")}
-                                download
-                                className="flex items-center gap-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white transition shadow-2xs"
-                              >
-                                <Download className="h-3 w-3" />
-                                <span>{t("Download")}</span>
-                              </a>
+                              <MaterialDownloadButton
+                                refId={mat.ref_id}
+                                downloadUrl={mat.download_url}
+                                title={mat.title}
+                                fileSize={mat.file_size}
+                                className="bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white"
+                              />
                             </div>
                           </div>
                         );

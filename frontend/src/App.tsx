@@ -12,6 +12,7 @@ import { CourseMembershipModal } from './components/CourseMembershipModal';
 import { NicknameModal } from './components/NicknameModal';
 import { ExtensionInfoModal } from './components/ExtensionInfoModal';
 import { ConfirmModal } from './components/ConfirmModal';
+import { DownloadProgressBar } from './components/DownloadProgressBar';
 import { NotificationToast, ChangeNotification } from './components/NotificationToast';
 import {
   AuthStatus,
@@ -1095,6 +1096,9 @@ export const App: React.FC = () => {
           onDismiss={() => setChangeNotifications([])}
         />
       )}
+
+      {/* Global Download Progress Bar & Dock */}
+      <DownloadProgressBar />
 
       {/* Global Confirmation & Alert Dialog */}
       <ConfirmModal />

@@ -39,14 +39,14 @@ import { navigationGuard } from './navigationGuard';
 
 const API_BASE = '/api';
 
-function apiError(error: { detail?: unknown }): string | undefined {
+export function apiError(error: { detail?: unknown }): string | undefined {
   if (typeof error.detail === 'string') return error.detail;
   if (Array.isArray(error.detail)) return error.detail.map(item => item.msg).filter(Boolean).join(' ');
   return undefined;
 }
 
 // Protected API responses confirm the current session, including expiry.
-async function sessionFetch(input: string, init?: RequestInit & { trackPending?: boolean }): Promise<Response> {
+export async function sessionFetch(input: string, init?: RequestInit & { trackPending?: boolean }): Promise<Response> {
   const sessionId = cache.getSessionId();
   const headers = new Headers(init?.headers);
   headers.set('Accept-Language', getLanguage());

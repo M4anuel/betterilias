@@ -49,6 +49,7 @@ import { StudentAssignmentModal } from './StudentAssignmentModal';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { TAFilterSettingsModal } from './TAFilterSettingsModal';
 import { DistributeWorkModal } from './DistributeWorkModal';
+import { TAExportZipButton, SubmissionDownloadButton, FeedbackFileDownloadButton } from './DownloadButtons';
 import { NotificationToast, ChangeNotification } from './NotificationToast';
 import { GradingFeedbackBar, GradeSavedFeedback } from './GradingFeedbackBar';
 import { TAExerciseManagementView, AssignmentFeedback } from './TAExerciseManagementView';
@@ -1564,27 +1565,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
           {/* Download ZIP button next to the dropdown for the respective TA (or default if 'all') */}
           {(selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
-            <a
-              href={api.getTAExportZipUrl(
-                exerciseRefId,
-                selectedTaAssId || taSubmissionsData?.active_assignment_id || '',
-                selectedTAFilter !== 'all' ? selectedTAFilter : undefined
-              )}
-              download
-              className="flex items-center justify-center h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-700 transition cursor-pointer shrink-0 ml-1 mr-0.5"
-              title={
-                selectedTAFilter === 'all'
-                  ? t("Abgaben als ZIP-Paket exportieren")
-                  : t("Abgaben für ausgewählten Tutor als ZIP-Paket exportieren")
-              }
-              aria-label={
-                selectedTAFilter === 'all'
-                  ? t("Abgaben als ZIP-Paket exportieren")
-                  : t("Abgaben für ausgewählten Tutor als ZIP-Paket exportieren")
-              }
-            >
-              <Download className="h-3.5 w-3.5 shrink-0" />
-            </a>
+            <TAExportZipButton
+              exerciseRefId={exerciseRefId}
+              assId={selectedTaAssId || taSubmissionsData?.active_assignment_id || ''}
+              taId={selectedTAFilter}
+              variant="compact"
+            />
           )}
         </div>
       )}
@@ -2161,20 +2147,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Export ZIP Trigger */}
                 {(selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
-                  <a
-                    href={api.getTAExportZipUrl(
-                      exerciseRefId,
-                      selectedTaAssId || taSubmissionsData?.active_assignment_id || '',
-                      selectedTAFilter !== 'all' ? selectedTAFilter : undefined
-                    )}
-                    download
-                    className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap"
-                    title={t("Abgaben als ZIP-Paket exportieren")}
-                    aria-label={t("Abgaben als ZIP-Paket exportieren")}
-                  >
-                    <Download className="h-3.5 w-3.5 shrink-0" />
-                    <span className="desktop-only">{t("ZIP-Paket")}</span>
-                  </a>
+                  <TAExportZipButton
+                    exerciseRefId={exerciseRefId}
+                    assId={selectedTaAssId || taSubmissionsData?.active_assignment_id || ''}
+                    taId={selectedTAFilter}
+                    variant="toolbar"
+                  />
                 )}
 
                 {/* Distribute Work Trigger */}
@@ -2368,15 +2346,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                         {(() => {
                           const dlUrl = sub.download_url || (sub.files && sub.files.length > 0 ? sub.files[0].download_url : null);
                           return dlUrl ? (
-                            <a
-                              href={api.getDownloadUrl(exerciseRefId, dlUrl)}
-                              aria-label={t("Abgabe herunterladen")}
-                              download
-                              className="submission-download flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition shadow-2xs border border-indigo-200 dark:border-indigo-800"
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              <span className="desktop-only">{t("Abgabe herunterladen")}</span><span className="phone-only">{t("Download")}</span>
-                            </a>
+                            <SubmissionDownloadButton
+                              exerciseRefId={exerciseRefId}
+                              downloadUrl={dlUrl}
+                              fallbackFilename={sub.files && sub.files.length > 0 ? sub.files[0].filename : undefined}
+                              knownSize={sub.files && sub.files.length > 0 ? sub.files[0].file_size : undefined}
+                            />
                           ) : (
                             <span className="rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">
                               {t("Keine Datei")}
@@ -2604,15 +2579,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
                                   <div className="flex items-center gap-1.5 shrink-0">
                                     {ff.download_url && (
-                                      <a
-                                        href={api.getDownloadUrl(exerciseRefId, ff.download_url)}
-                                        download
+                                      <FeedbackFileDownloadButton
+                                        exerciseRefId={exerciseRefId}
+                                        downloadUrl={ff.download_url}
+                                        filename={ff.title}
+                                        size={ff.size}
                                         className="flex items-center gap-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2 py-1 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition border border-indigo-200 dark:border-indigo-800"
-                                        title={t("Korrekturdatei herunterladen")}
-                                      >
-                                        <Download className="h-3 w-3" />
-                                        <span>{t("Download")}</span>
-                                      </a>
+                                      />
                                     )}
                                     <button
                                       type="button"

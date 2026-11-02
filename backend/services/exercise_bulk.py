@@ -1,3 +1,4 @@
+import asyncio
 import io
 import json
 import logging
@@ -126,6 +127,7 @@ async def create_submissions_zip_bundle(
             unique_submissions.append(sub)
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        download_tasks = []
         for sub in unique_submissions:
             unit_folder = f"team-{sub.team_id}" if sub.team_id else f"user-{sub.member_id}"
             unit_info = {
@@ -140,41 +142,47 @@ async def create_submissions_zip_bundle(
                 "files": [],
                 "missing_files": [],
             }
+            manifest["units"].append(unit_info)
 
             # Create empty feedback placeholder folder in zip
             zf.writestr(f"feedback/{unit_folder}/.keep", "")
 
-            # Download submitted files into submissions/
+            # Queue submitted files for bounded concurrent download
             for sf in sub.files:
-                if not sf.download_url:
-                    continue
+                if sf.download_url:
+                    download_tasks.append((unit_folder, unit_info, sub.student_name, sf.filename, sf.download_url))
 
+        # Bounded concurrent download workers
+        semaphore = asyncio.Semaphore(5)
+
+        async def fetch_file(unit_folder, unit_info, student_name, filename, dl_url):
+            async with semaphore:
                 try:
-                    resp = await http_client.get(sf.download_url, follow_redirects=True)
+                    resp = await http_client.get(dl_url, follow_redirects=True)
                     if resp.status_code >= 400:
-                        err_msg = f"HTTP {resp.status_code} for {sf.filename} ({sub.student_name})"
-                        failed_downloads.append(err_msg)
-                        unit_info["missing_files"].append(sf.filename)
-                        continue
+                        return False, unit_info, filename, f"HTTP {resp.status_code} for {filename} ({student_name})", None, None
 
                     # Verify not an HTML login or error page
                     content_type = resp.headers.get("content-type", "").lower()
                     content_disp = resp.headers.get("content-disposition", "").lower()
                     if "text/html" in content_type and "attachment" not in content_disp:
-                        err_msg = f"Invalid HTML response (likely session expired) for {sf.filename} ({sub.student_name})"
-                        failed_downloads.append(err_msg)
-                        unit_info["missing_files"].append(sf.filename)
-                        continue
+                        return False, unit_info, filename, f"Invalid HTML response (likely session expired) for {filename} ({student_name})", None, None
 
-                    file_path = f"submissions/{unit_folder}/{sf.filename}"
-                    zf.writestr(file_path, resp.content)
-                    unit_info["files"].append(sf.filename)
+                    file_path = f"submissions/{unit_folder}/{filename}"
+                    return True, unit_info, filename, None, file_path, resp.content
                 except Exception as e:
-                    err_msg = f"Error downloading {sf.filename} ({sub.student_name}): {str(e)}"
-                    failed_downloads.append(err_msg)
-                    unit_info["missing_files"].append(sf.filename)
+                    return False, unit_info, filename, f"Error downloading {filename} ({student_name}): {str(e)}", None, None
 
-            manifest["units"].append(unit_info)
+        if download_tasks:
+            results = await asyncio.gather(*(fetch_file(*task) for task in download_tasks))
+            for ok, u_info, fn, err_msg, f_path, content in results:
+                if ok and f_path and content is not None:
+                    zf.writestr(f_path, content)
+                    u_info["files"].append(fn)
+                else:
+                    if err_msg:
+                        failed_downloads.append(err_msg)
+                    u_info["missing_files"].append(fn)
 
         if failed_downloads:
             manifest["status"] = "partial"

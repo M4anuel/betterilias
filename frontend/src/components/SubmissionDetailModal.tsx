@@ -26,6 +26,7 @@ import { SubmissionItem, FeedbackFileItem } from '../types';
 import { api } from '../lib/api';
 import { useNavigationGuard } from '../lib/navigationGuard';
 import { confirmDialog, alertDialog } from '../lib/dialog';
+import { SubmissionDownloadButton, FeedbackFileDownloadButton } from './DownloadButtons';
 
 interface SubmissionDetailModalProps {
   submission: SubmissionItem;
@@ -569,28 +570,24 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                       </div>
                     </div>
 
-                    <a
-                      href={exerciseRefId ? api.getDownloadUrl(exerciseRefId, file.download_url) : file.download_url} aria-label={t("Download")}
-                      download
-                      className="flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition shrink-0 border border-indigo-200 dark:border-indigo-800"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>{t("Download")}</span>
-                    </a>
+                    <SubmissionDownloadButton
+                      exerciseRefId={exerciseRefId || ''}
+                      downloadUrl={file.download_url}
+                      fallbackFilename={file.filename}
+                      className="flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition shrink-0 border border-indigo-200 dark:border-indigo-800 cursor-pointer"
+                    />
                   </div>
                 ))}
               </div>
             ) : submission.download_url ? (
               <div className="flex items-center justify-between rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 p-3.5">
                 <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">{t("Abgabe-Archiv verfügbar")}</span>
-                <a
-                  href={exerciseRefId ? api.getDownloadUrl(exerciseRefId, submission.download_url) : submission.download_url} aria-label={t("Download")}
-                  download
-                  className="flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition border border-indigo-200 dark:border-indigo-800"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>{t("Gesamtabgabe herunterladen")}</span>
-                </a>
+                <SubmissionDownloadButton
+                  exerciseRefId={exerciseRefId || ''}
+                  downloadUrl={submission.download_url}
+                  fallbackFilename={`Submission_${submission.student_name}.zip`}
+                  className="flex items-center gap-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition border border-indigo-200 dark:border-indigo-800 cursor-pointer"
+                />
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-4 text-center text-xs text-slate-400 dark:text-slate-500">
@@ -689,14 +686,13 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {ff.download_url && (
-                          <a
-                            href={exerciseRefId ? api.getDownloadUrl(exerciseRefId, ff.download_url) : ff.download_url} aria-label={t("Download")}
-                            download
+                          <FeedbackFileDownloadButton
+                            exerciseRefId={exerciseRefId || ''}
+                            downloadUrl={ff.download_url}
+                            filename={ff.title}
+                            size={ff.size}
                             className="flex items-center gap-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition border border-indigo-200 dark:border-indigo-800"
-                          >
-                            <Download className="h-3 w-3" />
-                            <span>{t("Download")}</span>
-                          </a>
+                          />
                         )}
                         <button
                           type="button"

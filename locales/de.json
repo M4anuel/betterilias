@@ -1546,5 +1546,16 @@
   "Neu mischen": "Neu mischen",
   "Die Abgaben oder Notizen wurden zwischenzeitlich geändert. Bitte laden Sie die Vorschau neu.": "Die Abgaben oder Notizen wurden zwischenzeitlich geändert. Bitte laden Sie die Vorschau neu.",
   "Tutor auswählen": "Tutor auswählen",
-  "Abgaben für ausgewählten Tutor als ZIP-Paket exportieren": "Abgaben für ausgewählten Tutor als ZIP-Paket exportieren"
+  "Abgaben für ausgewählten Tutor als ZIP-Paket exportieren": "Abgaben für ausgewählten Tutor als ZIP-Paket exportieren",
+  "ZIP wird erstellt...": "ZIP wird erstellt...",
+  "Wird geladen...": "Wird geladen...",
+  "Vorbereiten...": "Vorbereiten...",
+  "Heruntergeladen": "Heruntergeladen",
+  "Downloads": "Downloads",
+  "Backend bereitet Datei vor...": "Backend bereitet Datei vor...",
+  "empfangen...": "empfangen...",
+  "Wird im Browser gespeichert...": "Wird im Browser gespeichert...",
+  "Download abgeschlossen ({p0})": "Download abgeschlossen ({p0})",
+  "Download fehlgeschlagen": "Download fehlgeschlagen",
+  "Download fehlgeschlagen (HTTP {p0})": "Download fehlgeschlagen (HTTP {p0})"
 }
