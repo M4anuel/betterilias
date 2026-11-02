@@ -137,7 +137,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   sync.addEventListener('click', () => verifySession(true));
   byId('open-app-btn').addEventListener('click', async () => {
     const stored = await browserAPI.storage.local.get(['sessionId']), target = new URL(frontendUrl());
-    if (stored.sessionId) target.searchParams.set('session_id', stored.sessionId);
+    if (stored.sessionId) {
+      try {
+        const response = await fetch(`${serverUrl()}/api/auth/mobile-session`, {
+          method: 'POST', headers: { 'X-Session-Id': stored.sessionId },
+        });
+        const data = await response.json();
+        if (!response.ok || !data.handoff_token) throw new Error();
+        target.hash = new URLSearchParams({ connect: data.handoff_token }).toString();
+      } catch (_) { showFeedback(t('Sitzung konnte auf ILIAS nicht verifiziert werden.'), 'error'); return; }
+    }
     browserAPI.tabs.create({ url: target.href });
   });
   byId('save-settings-btn').addEventListener('click', async () => {

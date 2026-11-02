@@ -1607,5 +1607,9 @@
   "Assignment context mismatch for staged import.": "Übungskontext stimmt nicht mit dem zwischengespeicherten Import überein.",
   "Skipped by user choice.": "Auf Wunsch übersprungen.",
   "Uploaded successfully.": "Erfolgreich hochgeladen.",
-  "Successfully uploaded {p0} feedback files ({p1} skipped, {p2} failed).": "{p0} Feedback-Dateien erfolgreich hochgeladen ({p1} übersprungen, {p2} fehlgeschlagen)."
+  "Successfully uploaded {p0} feedback files ({p1} skipped, {p2} failed).": "{p0} Feedback-Dateien erfolgreich hochgeladen ({p1} übersprungen, {p2} fehlgeschlagen).",
+  "auth.session_required": "Verbinde deine ILIAS-Sitzung mit der Browser-Erweiterung.",
+  "auth.handoff_expired": "Dieser Verbindungslink ist abgelaufen oder wurde bereits verwendet. Erstelle in BetterIlias einen neuen Link.",
+  "auth.handoff_hint": "60 Sekunden und nur für eine Verbindung gültig.",
+  "coordination.busy": "Ein anderer Vorgang läuft noch. Bitte versuche es gleich erneut."
 }

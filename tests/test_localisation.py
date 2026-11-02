@@ -30,7 +30,7 @@ def test_partial_catalogue_falls_back_without_replacing_content(monkeypatch):
 def test_error_responses_and_validation_use_requested_language():
     client = TestClient(app)
     for language, expected in [('de-CH', 'Dieses Feld ist erforderlich.'), ('en', 'This field is required.')]:
-        response = client.post('/api/auth/cookies', json={}, headers={'Accept-Language': language})
+        response = client.post('/api/auth/sync', json={}, headers={'Accept-Language': language})
         assert response.status_code == 422
         assert response.json()['detail'][0]['msg'] == expected
         assert response.headers['content-language'] == language.split('-')[0]

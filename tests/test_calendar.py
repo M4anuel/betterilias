@@ -274,7 +274,11 @@ def test_calendar_api_endpoints_and_subscription_revocation(tmp_path, monkeypatc
     monkeypatch.setattr("backend.api.routes.calendar.calendar_service", test_service)
 
     client = TestClient(app)
+    from backend.auth.session import SessionManager
+    from backend.config import settings
+    monkeypatch.setattr(settings, 'sessions_dir', str(tmp_path / 'sessions'))
     headers = {"X-Session-Id": "test-cal-tenant-1"}
+    SessionManager(headers["X-Session-Id"]).save_cookies({"PHPSESSID": "fake"})
 
     # 1. Create a schedule rule
     rule_payload = {
@@ -343,7 +347,11 @@ def test_cross_semester_calendar_ignore_schedule_and_tiered_caching(tmp_path, mo
     monkeypatch.setattr("backend.api.routes.calendar.calendar_service", test_service)
 
     client = TestClient(app)
+    from backend.auth.session import SessionManager
+    from backend.config import settings
+    monkeypatch.setattr(settings, 'sessions_dir', str(tmp_path / 'sessions'))
     headers = {"X-Session-Id": "test-cal-tiered-1"}
+    SessionManager(headers["X-Session-Id"]).save_cookies({"PHPSESSID": "fake"})
 
     # Seed tenant with courses from HS2025, HS2026, FS2026, and an undated group
     state = test_service._load_tenant_state("test-cal-tiered-1")

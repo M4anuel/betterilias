@@ -83,6 +83,7 @@ def main():
         backend_proc = subprocess.Popen(
             [PYTHON_BIN, "run.py"],
             cwd=str(BASE_DIR),
+            env={**os.environ, "APP_ENV": "development"},
             stdout=sys.stdout,
             stderr=sys.stderr,
         )

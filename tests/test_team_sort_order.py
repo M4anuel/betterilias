@@ -47,6 +47,8 @@ async def test_recipient_navigation_is_opt_in_and_uses_native_evaluation_links()
 
     manager = MagicMock()
     manager.has_cookies.return_value = True
+    manager.load_cookies.return_value = {'PHPSESSID': 'this-session'}
+    manager.native_view_lock_key = 'ilias-view:this-session'
 
     @asynccontextmanager
     async def http_client():

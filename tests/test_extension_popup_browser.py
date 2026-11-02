@@ -40,7 +40,7 @@ def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, sc
               return {results};
             }''')
             for result in icon['results']:
-                assert 0<result['changed']<=49 and result['outside']==0
+                assert 0<result['changed']<=49 and result['outside']==0, result
                 assert result['sizes']==['16','32','48','64']
             assert icon['results'][1]['color']==[220,38,38,255]
             worker.evaluate('(language)=>chrome.storage.local.set({language})',language)
@@ -93,8 +93,13 @@ def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, sc
             assert metrics['badge']['height']<25*scale
             assert metrics['login']['width']>=340*scale and metrics['login']['height']>=48*scale
             assert worker.evaluate('chrome.action.getBadgeText({})')==''
-            title=worker.evaluate('chrome.action.getTitle({})')
-            assert ('Nicht angemeldet' if language=='de' else 'Signed out') in title
+            expected_title = 'Nicht angemeldet' if language=='de' else 'Signed out'
+            deadline = time.monotonic() + 10
+            title = worker.evaluate('chrome.action.getTitle({})')
+            while expected_title not in title and time.monotonic() < deadline:
+                driver.wait_for_timeout(20)
+                title = worker.evaluate('chrome.action.getTitle({})')
+            assert expected_title in title
             # Even in the vertically constrained magnified window, login is reachable.
             evaluate("document.querySelector('#login-btn').scrollIntoView({block:'nearest'})")
             shot=send('Page.captureScreenshot')

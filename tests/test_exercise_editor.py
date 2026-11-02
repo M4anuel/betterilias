@@ -61,8 +61,12 @@ def test_parse_instruction_files():
     assert "05-conditional-handout.pdf" in files[0].filename
 
 
-def test_api_ta_assignments():
-    client = TestClient(app)
+def test_api_ta_assignments(tmp_path, monkeypatch):
+    from backend.config import settings
+    from backend.auth.session import SessionManager
+    monkeypatch.setattr(settings, 'sessions_dir', str(tmp_path / 'sessions'))
+    SessionManager('editor-test').save_cookies({'PHPSESSID': 'fake'})
+    client = TestClient(app, headers={'X-Session-Id': 'editor-test'})
     mock_list = TAAssignmentListResponse(
         exercise_ref_id="2978156",
         assignments=[
@@ -87,8 +91,12 @@ def test_api_ta_assignments():
 
 
 
-def test_api_save_ta_assignment_handles_error():
-    client = TestClient(app)
+def test_api_save_ta_assignment_handles_error(tmp_path, monkeypatch):
+    from backend.config import settings
+    from backend.auth.session import SessionManager
+    monkeypatch.setattr(settings, 'sessions_dir', str(tmp_path / 'sessions'))
+    SessionManager('editor-test').save_cookies({'PHPSESSID': 'fake'})
+    client = TestClient(app, headers={'X-Session-Id': 'editor-test'})
     with patch("backend.api.routes.exercises.IliasClient.save_ta_assignment", new_callable=AsyncMock) as m:
         m.side_effect = ValueError("ILIAS Fehler: Invalid deadline")
         resp = client.post("/api/exercises/2978156/ta/assignment-detail", json={

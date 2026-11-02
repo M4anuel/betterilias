@@ -12,6 +12,7 @@ from backend.scrapers.dumper import ScrapingParsingError
 from backend.services.ilias_client import SessionExpiredError
 from backend.services.submission_listing import SubmissionListingError
 from backend.i18n import LanguageMiddleware, t
+from backend.coordination import CoordinationBusy
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,8 +24,16 @@ app = FastAPI(
     title="ILIAS Alternative API",
     description="High-performance backend & scraper bridge for Uni Bern ILIAS",
     version="1.0.0",
+    docs_url='/docs' if settings.app_env == 'development' else None,
+    redoc_url='/redoc' if settings.app_env == 'development' else None,
+    openapi_url='/openapi.json' if settings.app_env == 'development' else None,
 )
 app.add_middleware(LanguageMiddleware)
+
+
+@app.exception_handler(CoordinationBusy)
+async def coordination_busy_handler(request: Request, exc: CoordinationBusy):
+    return JSONResponse(status_code=503, content={'detail': t('coordination.busy')}, headers={'Retry-After': '1'})
 
 
 @app.exception_handler(RequestValidationError)
@@ -45,7 +54,8 @@ async def http_error_handler(request: Request, exc: HTTPException):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_origin_regex=r"^(chrome-extension://.*|moz-extension://.*|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?)$",
+    allow_origin_regex=(r"^(chrome-extension://.*|moz-extension://.*)$" if settings.app_env == 'production'
+                        else r"^(chrome-extension://.*|moz-extension://.*|http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?)$"),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,7 +90,7 @@ async def scraping_error_handler(request: Request, exc: ScrapingParsingError):
             "error": t('Scraping Parsing Failed'),
             "detail": exc.message,
             "context": exc.context,
-            "dump_file": str(exc.dump_path) if exc.dump_path else None,
+            "dump_file": str(exc.dump_path) if exc.dump_path and settings.app_env == 'development' else None,
             "code": "PARSING_FAILED"
         }
     )

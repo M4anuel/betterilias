@@ -1,3 +1,4 @@
+from backend.coordination import coordinated, atomic_json
 from datetime import date, datetime, timezone
 import json
 import logging
@@ -97,11 +98,11 @@ class CalendarService:
     def _sanitize_tenant_key(self, session_id: Optional[str]) -> str:
         if not session_id:
             return "default"
-        cleaned = re.sub(r"[^a-zA-Z0-9_-]", "_", session_id.strip())
-        return cleaned[:64] or "default"
+        from backend.auth.session import sanitize_session_id
+        return sanitize_session_id(session_id)
 
     def _tenant_path(self, tenant_key: str) -> Path:
-        return self.tenants_dir / f"{tenant_key}.json"
+        return self.tenants_dir / f"{self._sanitize_tenant_key(tenant_key)}.json"
 
     def _load_tenant_state(self, tenant_key: str) -> Dict[str, Any]:
         path = self._tenant_path(tenant_key)
@@ -124,7 +125,7 @@ class CalendarService:
     def _save_tenant_state(self, tenant_key: str, state: Dict[str, Any]) -> None:
         self.tenants_dir.mkdir(parents=True, exist_ok=True)
         path = self._tenant_path(tenant_key)
-        path.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+        atomic_json(path, state)
 
     def _load_tokens(self) -> Dict[str, Dict[str, Any]]:
         if self.tokens_file.exists():
@@ -136,7 +137,7 @@ class CalendarService:
 
     def _save_tokens(self, tokens: Dict[str, Dict[str, Any]]) -> None:
         self.storage_dir.mkdir(parents=True, exist_ok=True)
-        self.tokens_file.write_text(json.dumps(tokens, indent=2, ensure_ascii=False), encoding="utf-8")
+        atomic_json(self.tokens_file, tokens)
 
     def _is_local_host(self, base_url: str) -> bool:
         lower = (base_url or "").lower()
@@ -153,6 +154,7 @@ class CalendarService:
         webcal_url = re.sub(r"^https?://", "webcal://", sub_url, flags=re.I)
         return sub_url, webcal_url, is_local
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     def build_semester_response(
         self,
         tenant_key: str,
@@ -527,6 +529,7 @@ class CalendarService:
             return f"{m.group(1).upper()}{m.group(2)}"
         return None
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     async def discover_courses_from_agenda_and_memberships(
         self,
         tenant_key: str,
@@ -661,6 +664,7 @@ class CalendarService:
             base_url=base_url,
         )
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     async def ingest_course_page_html(
         self,
         tenant_key: str,
@@ -780,6 +784,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return True
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     async def sync_semester_calendar(
         self,
         tenant_key: str,
@@ -874,6 +879,7 @@ class CalendarService:
         if rule_in.end_date < rule_in.start_date:
             raise ValueError(t("calendar.validation.end_after_start_date"))
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     def create_rule(
         self,
         tenant_key: str,
@@ -913,6 +919,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, None, base_url=base_url)
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     def update_rule(
         self,
         tenant_key: str,
@@ -946,6 +953,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, None, base_url=base_url)
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     def duplicate_rule(
         self,
         tenant_key: str,
@@ -972,6 +980,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     def delete_rule(
         self,
         tenant_key: str,
@@ -988,6 +997,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     def update_course_color(
         self,
         tenant_key: str,
@@ -1009,6 +1019,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     def update_course_ignored_missing_schedule(
         self,
         tenant_key: str,
@@ -1031,6 +1042,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     def import_raw_ics_for_course(
         self,
         tenant_key: str,
@@ -1102,6 +1114,8 @@ class CalendarService:
             events = [e for e in events if e.course_ref_id in allowed]
         return generate_ics_feed(events=events, semester=semester or get_current_semester())
 
+    @coordinated(lambda self, *args, **kwargs: "calendar-tokens:" + str(self.storage_dir.resolve()))
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     def rotate_subscription_token(
         self,
         tenant_key: str,
@@ -1143,6 +1157,8 @@ class CalendarService:
             created_at=now,
         )
 
+    @coordinated(lambda self, *args, **kwargs: "calendar-tokens:" + str(self.storage_dir.resolve()))
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     def revoke_subscription_token(self, tenant_key: str) -> None:
         state = self._load_tenant_state(tenant_key)
         tokens = self._load_tokens()

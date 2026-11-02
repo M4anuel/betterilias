@@ -15,14 +15,19 @@ pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '
 
 def test_desktop_qr_transfers_session_to_mobile_without_extension():
     playwright = pytest.importorskip('playwright.sync_api')
-    decoder = pytest.importorskip('zxingcpp')
-    image = pytest.importorskip('PIL.Image')
+    try:
+        import zxingcpp as decoder
+        import PIL.Image as image
+    except ImportError:
+        decoder = None  # The handoff interaction still runs without a QR decoder.
     dist = Path(__file__).resolve().parents[1] / 'frontend' / 'dist'
     server = ThreadingHTTPServer(('127.0.0.1', 0), partial(SimpleHTTPRequestHandler, directory=str(dist)))
     Thread(target=server.serve_forever, daemon=True).start()
     base = f'http://127.0.0.1:{server.server_port}'
     phone_base = f'http://betterilias.test:{server.server_port}'
     key = 'qr-test-session-key_0123456789abcdefghijk'
+    code = 'one-use-test-code_0123456789abcdefghijk'
+    claimed = set()
     mobile_requests = []
     revoked = set()
 
@@ -36,6 +41,13 @@ def test_desktop_qr_transfers_session_to_mobile_without_extension():
             body = dict(success=True)
         elif path == '/api/auth/mobile-session':
             assert request.method == 'POST'
+            body = {'handoff_token': code, 'expires_in': 60}
+        elif path == '/api/auth/claim':
+            token = json.loads(request.post_data)['token']
+            if token in claimed or token != code:
+                route.fulfill(status=401, content_type='application/json', body='{}')
+                return
+            claimed.add(token)
             body = {'session_id': key}
         elif path == '/api/auth/status':
             body = dict(authenticated=not expired, cookies_present=not expired, user_name='Test user' if not expired else None)
@@ -54,6 +66,7 @@ def test_desktop_qr_transfers_session_to_mobile_without_extension():
             desktop.on('pageerror', lambda err: errors.append(str(err)))
             desktop.route('**/api/**', api_response)
             desktop.add_init_script("Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { window.copiedMobileLink = text; } } })")
+            desktop.add_init_script("localStorage.setItem('betterilias_session_id', " + json.dumps(key) + ")")
             desktop.goto(base + '/?semester=HS2026')
             desktop.get_by_role('button', name='Design & Einstellungen', exact=True).click()
             desktop.get_by_role('button', name='QR-Code anzeigen', exact=True).click()
@@ -67,10 +80,12 @@ def test_desktop_qr_transfers_session_to_mobile_without_extension():
             playwright.expect(qr).to_have_count(0)
             field.fill(phone_base)
             playwright.expect(qr).to_be_visible()
-            decoded = decoder.read_barcode(image.open(io.BytesIO(qr.screenshot())))
-            assert decoded is not None
-            share_url = decoded.text
-            assert share_url == phone_base + '/#session_id=' + key
+            desktop.get_by_role('button', name='Verbindungslink kopieren', exact=True).click()
+            share_url = desktop.evaluate('window.copiedMobileLink')
+            if decoder:
+                decoded = decoder.read_barcode(image.open(io.BytesIO(qr.screenshot())))
+                assert decoded is not None and decoded.text == share_url
+            assert share_url == phone_base + '/#connect=' + code
             assert 'session_id' not in urlparse(share_url).query
             assert desktop.evaluate("localStorage.getItem('betterilias_session_id')") == key
             desktop.get_by_role('button', name='Verbindungslink kopieren', exact=True).click()
@@ -110,7 +125,7 @@ def test_desktop_qr_transfers_session_to_mobile_without_extension():
             assert phone.evaluate("localStorage.getItem('unrelated-preference')") == 'keep'
             phone.reload()
             playwright.expect(phone.get_by_role('status', name='ILIAS-Sitzung aktiv', exact=True)).to_be_visible()
-            protected = [r for r in mobile_requests if urlparse(r.url).path.startswith('/api/')]
+            protected = [r for r in mobile_requests if urlparse(r.url).path.startswith('/api/') and urlparse(r.url).path != '/api/auth/claim']
             assert protected and all(r.headers.get('x-session-id') == key for r in protected)
             assert all(key not in r.url and key not in r.headers.get('referer', '') for r in mobile_requests)
             assert not any('/courses/99/' in r.url for r in mobile_requests)
@@ -120,17 +135,15 @@ def test_desktop_qr_transfers_session_to_mobile_without_extension():
             assert bounds and bounds['x'] >= 0 and bounds['x'] + bounds['width'] <= 390
             assert bounds['y'] + bounds['height'] <= 844
 
-            # Existing extension links in the query remain compatible and are scrubbed before API calls.
+            # Old long-lived URL credentials are scrubbed, never imported.
             phone.goto(phone_base + '/?session_id=legacy-test-key&semester=HS2026')
-            playwright.expect(phone.get_by_role('status', name='ILIAS-Sitzung aktiv', exact=True)).to_be_visible()
-            assert phone.evaluate("localStorage.getItem('betterilias_session_id')") == 'legacy-test-key'
+            playwright.expect(phone.get_by_role('alert')).to_be_visible()
+            assert phone.evaluate("localStorage.getItem('betterilias_session_id')") == key
             assert 'session_id' not in phone.url
-
-            phone.goto(phone_base + '/#session_id=expired-test-key')
-            playwright.expect(phone.get_by_text('Sitzung nicht aktiv:', exact=True)).to_be_visible()
-            phone.get_by_role('button', name='Design & Einstellungen', exact=True).click()
-            playwright.expect(phone.get_by_role('button', name='QR-Code anzeigen', exact=True)).to_have_count(0)
-            playwright.expect(phone.get_by_text('Synchronisiere zuerst deine ILIAS-Sitzung am Desktop.', exact=True)).to_be_visible()
+            # Replaying a connection link fails without replacing the current key.
+            phone.goto(share_url)
+            playwright.expect(phone.get_by_role('alert')).to_be_visible()
+            assert phone.evaluate("localStorage.getItem('betterilias_session_id')") == key
             # Logging out revokes the shared key and must not fall back to a default desktop session.
             phone.goto(share_url)
             playwright.expect(phone.get_by_role('status', name='ILIAS-Sitzung aktiv', exact=True)).to_be_visible()

@@ -22,25 +22,30 @@ export function mobileAppUrl(address: string): URL {
 export function mobileSessionUrl(address: string, sessionId: string): string {
   if (!/^[a-zA-Z0-9_-]{1,256}$/.test(sessionId) || sessionId === 'default') throw new Error(t("Diese Sitzung hat keinen gültigen Verbindungsschlüssel. Bitte synchronisiere sie erneut."));
   const url = mobileAppUrl(address);
-  url.hash = new URLSearchParams({ session_id: sessionId }).toString();
+  url.hash = new URLSearchParams({ connect: sessionId }).toString();
   return url.toString();
 }
 
-// Run before React renders or starts any API request. The fragment never reaches the server.
-export function importSessionFromUrl() {
+// Scrub URL credentials synchronously, then exchange the one-use code before React starts.
+export async function importSessionFromUrl() {
   const url = new URL(window.location.href);
   const fragment = new URLSearchParams(url.hash.slice(1));
-  const hasFragmentKey = fragment.has('session_id');
-  const hasQueryKey = url.searchParams.has('session_id');
-  if (!hasFragmentKey && !hasQueryKey) return;
-  const sessionId = (hasFragmentKey ? fragment.get('session_id') : url.searchParams.get('session_id'))?.trim();
+  const token = fragment.get('connect');
+  const legacy = fragment.has('session_id') || url.searchParams.has('session_id');
+  if (!token && !legacy) return;
+  fragment.delete('connect');
+  fragment.delete('session_id');
   url.searchParams.delete('session_id');
-  if (hasFragmentKey) {
-    fragment.delete('session_id');
-    url.hash = fragment.toString();
-  }
+  url.hash = fragment.toString();
   window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
-  if (!sessionId || !/^[a-zA-Z0-9_-]{1,256}$/.test(sessionId)) return;
-  if (cache.getSessionId() !== sessionId) cache.clearSessionContent();
-  cache.setSessionId(sessionId);
+  if (!token) throw new Error(t('auth.handoff_expired'));
+  const response = await fetch('/api/auth/claim', {
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }), cache: 'no-store',
+  });
+  if (!response.ok) throw new Error(t('auth.handoff_expired'));
+  const data = await response.json();
+  if (!/^[a-zA-Z0-9_-]{1,256}$/.test(data.session_id) || data.session_id === 'default') throw new Error(t('auth.handoff_expired'));
+  if (cache.getSessionId() !== data.session_id) cache.clearSessionContent();
+  cache.setSessionId(data.session_id);
 }

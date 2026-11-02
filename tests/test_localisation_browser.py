@@ -106,6 +106,73 @@ def test_extension_language_selection_and_safe_sync_feedback(local_site, directo
         playwright.expect(page.locator('#feedback-box')).to_contain_text('<b>Anna</b>')
         assert page.locator('#feedback-box b').count() == 0
         assert request_languages == ['en', 'de', 'de']
+        opened = []
+        page.evaluate('() => { chrome.tabs.create = ({url}) => { window.openedAppUrl = url; }; }')
+        def handoff(route):
+            assert route.request.method == 'POST'
+            assert route.request.headers['x-session-id'] == 'test-key'
+            route.fulfill(content_type='application/json', body=json.dumps({
+                'handoff_token': 'short-lived-connect-code_0123456789', 'expires_in': 60}))
+        page.route('**/api/auth/mobile-session', handoff)
+        page.locator('#open-app-btn').click()
+        page.wait_for_function('window.openedAppUrl')
+        opened.append(page.evaluate('window.openedAppUrl'))
+        assert '#connect=short-lived-connect-code_0123456789' in opened[0]
+        assert 'test-key' not in opened[0] and 'session_id' not in opened[0]
+        browser.close()
+
+
+@pytest.mark.parametrize('language,scheme', [('de', 'dark'), ('de', 'light'), ('en', 'dark'), ('en', 'light')])
+def test_connection_panel_resizes_without_losing_address(local_site, language, scheme):
+    pw = pytest.importorskip('playwright.sync_api')
+    tr = json.loads((ROOT / 'locales' / f'{language}.json').read_text(encoding='utf-8'))
+    artifacts = ROOT / 'scratch' / 'session-browser-checks'
+    artifacts.mkdir(parents=True, exist_ok=True)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+        page = browser.new_page(viewport={'width': 1280, 'height': 900}, color_scheme=scheme)
+        page.add_init_script('localStorage.setItem("betterilias_language", ' + json.dumps(language) + ');'
+            'localStorage.setItem("betterilias_theme_mode", ' + json.dumps(scheme) + ');'
+            'localStorage.setItem("betterilias_session_id", "responsive-session");')
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        def respond(route):
+            path = urlparse(route.request.url).path
+            if path.endswith('/status'):
+                data = dict(authenticated=True, cookies_present=True, session_id='responsive-session')
+            elif path.endswith('/mobile-session'):
+                data = dict(handoff_token='responsive-one-use-code_0123456789', expires_in=60)
+            else:
+                data = dict(active_semester='HS2026', available_semesters=[], courses=[], grouped_by_category={})
+            route.fulfill(content_type='application/json', body=json.dumps(data))
+        page.route('**/api/**', respond)
+        page.goto(local_site)
+        page.get_by_role('button', name=tr['Design & Einstellungen'], exact=True).click()
+        page.get_by_role('button', name=tr['QR-Code anzeigen'], exact=True).click()
+        field = page.get_by_label(tr['BetterIlias-Adresse für das Handy'], exact=True)
+        field.fill('https://betterilias.test/')
+        panel = page.locator('dialog[open]')
+        for width, height in [(320, 740), (390, 844), (430, 900), (768, 1024), (1280, 900), (844, 390)]:
+            page.set_viewport_size(dict(width=width, height=height))
+            pw.expect(field).to_have_value('https://betterilias.test/')
+            pw.expect(page.get_by_text(tr['auth.handoff_hint'], exact=True)).to_be_visible()
+            field.scroll_into_view_if_needed()
+            page.wait_for_function('''() => {
+                const r = document.querySelector('dialog[open]').getBoundingClientRect();
+                return r.bottom <= innerHeight + 1 && r.right <= innerWidth + 1;
+            }''')
+            bounds = panel.bounding_box()
+            assert bounds and bounds['x'] >= 0 and bounds['y'] >= 0
+            assert bounds['x'] + bounds['width'] <= width + 1
+            assert bounds['y'] + bounds['height'] <= height + 1
+            assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+            page.screenshot(path=str(artifacts / f'{language}-{scheme}-{width}-{height}.png'))
+        # Removing manual login leaves extension instructions as the sole login UI.
+        page.get_by_text(tr['Browser-Erweiterung'], exact=True).click()
+        pw.expect(page.get_by_role('heading', name=tr['BetterIlias Companion'], exact=True)).to_be_visible()
+        assert page.locator('.app-overlay').filter(has=page.get_by_role('heading', name=tr['BetterIlias Companion'], exact=True)).locator('input').count() == 0
+        assert 'PHPSESSID' not in page.locator('body').inner_text()
+        assert errors == []
         browser.close()
 
 

@@ -159,7 +159,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
       ref={dropdownRef}
       aria-label={t("Einstellungen & Design")}
       onCancel={event => { event.preventDefault(); closePanel(); }}
-      className="settings-panel text-slate-900 dark:text-slate-100 z-50 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl backdrop-blur-md transition-all dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150"
+      className="settings-panel text-slate-900 dark:text-slate-100 z-50 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl backdrop-blur-md transition-opacity dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 settings-sheet-heading dark:border-slate-800">

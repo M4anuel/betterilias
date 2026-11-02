@@ -28,7 +28,7 @@ def test_health_check():
 
 def test_auth_status_endpoint():
     from unittest.mock import MagicMock
-    from backend.api.deps import get_session_manager
+    from backend.api.deps import get_optional_session_manager as get_session_manager
     from backend.auth.session import SessionManager
     from backend.main import app
 
@@ -44,17 +44,8 @@ def test_auth_status_endpoint():
         app.dependency_overrides.pop(get_session_manager, None)
 
 
-def test_manual_cookies_endpoint(tmp_path, monkeypatch):
-    from backend.config import settings
-    monkeypatch.setattr(settings, "session_cookie_file", str(tmp_path / "cookies.json"))
-
-    payload = {
-        "phpsessid": "mock_php_sess_12345",
-        "il_client_id": "ilias3_unibe"
-    }
-    response = client.post("/api/auth/cookies", json=payload)
-    assert response.status_code == 200
-    assert response.json()["success"] is True
+def test_removed_manual_cookies_endpoint():
+    assert client.post('/api/auth/cookies', json={'phpsessid': 'unused'}).status_code == 404
 
 
 def test_logout_endpoint(tmp_path):
@@ -76,28 +67,8 @@ def test_logout_endpoint(tmp_path):
         app.dependency_overrides.pop(get_session_manager, None)
 
 
-def test_login_browser_endpoint_success():
-    with patch(
-        "backend.api.routes.auth.run_browser_login",
-        new_callable=AsyncMock,
-        return_value=(True, {"PHPSESSID": "dummy_sess"}, "Login successful")
-    ):
-        response = client.post("/api/auth/login-browser")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert "PHPSESSID" in data["cookies_captured"]
-
-
-def test_login_browser_endpoint_failure():
-    with patch(
-        "backend.api.routes.auth.run_browser_login",
-        new_callable=AsyncMock,
-        return_value=(False, {}, "Authentication timed out")
-    ):
-        response = client.post("/api/auth/login-browser")
-        assert response.status_code == 400
-        assert "Authentication timed out" in response.json()["detail"]
+def test_removed_browser_login_endpoint():
+    assert client.post('/api/auth/login-browser').status_code == 404
 
 
 def test_dashboard_endpoint_authorized():
@@ -593,3 +564,14 @@ def test_pdf_info_endpoint():
         data = res.json()
         assert round(data["aspect_ratio"], 2) == 1.42
         assert data["pages"] == 1
+
+
+@pytest.fixture(autouse=True)
+def explicit_test_tenant(tmp_path, monkeypatch):
+    from backend.config import settings
+    from backend.auth.session import SessionManager
+    monkeypatch.setattr(settings, 'sessions_dir', str(tmp_path / 'sessions'))
+    SessionManager('api-test').save_cookies({'PHPSESSID': 'not-a-live-cookie'})
+    client.headers['X-Session-Id'] = 'api-test'
+    yield
+    client.headers.pop('X-Session-Id', None)

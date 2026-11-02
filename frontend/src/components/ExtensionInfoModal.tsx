@@ -1,7 +1,6 @@
 import { t, useLanguage } from '../lib/i18n';
 import React, { useState } from 'react';
-import { X, Puzzle, ExternalLink, Check, Copy, Key } from 'lucide-react';
-import { api } from '../lib/api';
+import { X, Puzzle, ExternalLink, Check, Copy } from 'lucide-react';
 
 interface ExtensionInfoModalProps {
   isOpen: boolean;
@@ -12,7 +11,6 @@ interface ExtensionInfoModalProps {
 export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
   isOpen,
   onClose,
-  onSuccessSync,
 }) => {
   useLanguage();
   const isFirefoxDetected = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent);
@@ -20,11 +18,6 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
     isFirefoxDetected ? 'firefox' : 'chrome'
   );
   const [copied, setCopied] = useState(false);
-  const [showManual, setShowManual] = useState(false);
-  const [phpsessid, setPhpsessid] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [manualError, setManualError] = useState<string | null>(null);
-
   if (!isOpen) return null;
 
   const chromeGithubUrl = 'https://github.com/M4anuel/betterilias/tree/main/extension';
@@ -35,27 +28,6 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
     navigator.clipboard.writeText(currentGithubUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phpsessid.trim()) return;
-
-    setIsSubmitting(true);
-    setManualError(null);
-    try {
-      const res = await api.setManualCookies(phpsessid.trim());
-      if (res.success) {
-        if (onSuccessSync) onSuccessSync();
-        onClose();
-      } else {
-        setManualError(t("Konnte Cookies nicht speichern."));
-      }
-    } catch (err: any) {
-      setManualError(err.message || t("Fehler beim Speichern der Cookies"));
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   return (
@@ -81,7 +53,7 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="min-h-0 overflow-y-auto p-6 space-y-4">
           <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
             {t("Da wir die Anmeldung direkt im Browser abwickeln (ohne Server-Passwortweitergabe), verbindet die kleine Browser-Erweiterung deine bestehende ILIAS-Sitzung sicher mit BetterIlias. Wähle deinen Browser:")}
           </p>
@@ -227,39 +199,6 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
             </div>
           </div>
 
-          {/* Collapsible Manual Cookie Input */}
-          <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => setShowManual(!showManual)}
-              className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 flex items-center gap-1.5 cursor-pointer"
-            >
-              <Key className="h-3.5 w-3.5" />
-              <span>{showManual ? t("Manuelle Eingabe verbergen") : t("Alternativ: PHPSESSID manuell eintragen")}</span>
-            </button>
-
-            {showManual && (
-              <form onSubmit={handleManualSubmit} className="mt-3 space-y-2">
-                <input
-                  type="text"
-                  value={phpsessid}
-                  onChange={(e) => setPhpsessid(e.target.value)}
-                  placeholder={t("PHPSESSID Cookie aus DevTools...")}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-800 placeholder-slate-400 focus:border-[#0AACA5] focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                />
-                {manualError && (
-                  <p className="text-[11px] text-red-600 dark:text-red-400">{manualError}</p>
-                )}
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !phpsessid.trim()}
-                  className="rounded-xl bg-[#0AACA5] px-4 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50 transition cursor-pointer"
-                >
-                  {isSubmitting ? t("Speichere...") : t("Cookie speichern")}
-                </button>
-              </form>
-            )}
-          </div>
         </div>
 
         {/* Footer */}
