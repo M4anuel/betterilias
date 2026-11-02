@@ -81,7 +81,8 @@ authentication remain separate manual checks.
 ## Repairing a changed ILIAS page
 
 1. Inspect `logs/failed_html_dump_*.html`, or use `/api/system/logs` and its
-   dump-detail/raw endpoints. Treat dumps as session/user data when reviewing or
+   dump-detail/raw endpoints with `APP_ENV=development` on a local backend.
+   Production returns 404 for these endpoints. Treat dumps as session/user data when reviewing or
    sharing them; keep cookies and tokens out of committed fixtures.
 2. Identify the affected parser, response model and native action. Compare the
    failing page with the corresponding fixture README and existing regressions.

@@ -119,22 +119,23 @@ The app sends the resulting session ID with API requests. Both browser extension
 support German/English and light/dark appearance. Firefox temporary installations
 must be loaded again after restarting Firefox.
 
-### Local interactive login helper
+### Extension-only login and deployment mode
 
-`python login.py` opens a browser **on the backend machine**, waits for your
-manual SWITCH login and saves the legacy default `session_cookies.json`.
-It does not refresh a tenant session already selected by the app. Use extension
-sync for a session ID obtained from an extension or shared with a phone.
+The local browser-login helper and manual cookie input have been removed. Use
+the companion to connect an authenticated ILIAS session. Anonymous requests never
+inherit another user's session, including in development.
 
-The API browser-login route can target the request's resolved tenant; manual
-cookie routes also exist. Their contracts are documented by the generated API
-schema. Session resolution/storage is explained in
-[Architecture](docs/ARCHITECTURE.md#sessions-and-login).
+`APP_ENV` defaults to `production`; `python start.py` explicitly starts a
+development backend. Set `APP_ENV=development` when running `python run.py`
+manually for local work. Maintenance dump endpoints and API docs are available
+only in development. Production needs same-origin HTTPS for frontend and `/api`.
+See [deployment security](docs/DEPLOYMENT_SECURITY.md) for storage mounts,
+shared-worker coordination, and the remaining multi-host limitations.
 
 ## Connect a phone
 
 On the desktop, open settings and choose **Handy verbinden → QR-Code anzeigen**.
-Scan the code with the phone's camera. Both devices use the same ILIAS session;
+Scan the code within 60 seconds; each code connects once. Both devices use the same ILIAS session;
 sync again on the desktop after expiry. Logging out ends that shared session.
 
 For local development, run `python run.py` and

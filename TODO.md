@@ -2,6 +2,27 @@
 
 Unchecked items are unfinished; completed work is listed separately below. Current behavior and limitations are also recorded in [`docs/ILIAS_SUPPORT_MATRIX.md`](docs/ILIAS_SUPPORT_MATRIX.md) and [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECIFICATION.md).
 
+## Deployment and onboarding
+
+- [x] Enforce strict HTTP session isolation, remove local/manual login, gate
+  maintenance endpoints by server runtime mode, replace long-lived URL session
+  credentials, and coordinate workers sharing one VPS data volume. See
+  [deployment security and limitations](docs/DEPLOYMENT_SECURITY.md).
+- [ ] Build a responsive bilingual landing/get-started page with extension
+  installation, ILIAS sign-in/sync instructions, a BetterIlias preview, and clear
+  expired-session/reconnect guidance.
+- [ ] Build an authenticated admin dashboard with separate administrator
+  authorization, health/worker/queue metrics, sanitized error reports and audit
+  records; keep raw student pages and credentials out of public diagnostics.
+- [ ] Add shared outbound request budgets, per-user fairness, GET coalescing,
+  429/Retry-After handling, and representative 10/25/50/100-active-user load tests.
+  Confirm aggregated traffic expectations with university ILIAS support.
+- [ ] Before multi-VPS scaling, migrate persistent data and coordination to
+  networked database/object storage and a coordinator such as Redis. Current
+  shared local filesystem locks support multiple containers on one VPS only.
+- [ ] Configure production extension hostname permissions, same-origin HTTPS
+  proxying, persistent volumes, backups, and deployment smoke checks.
+
 ## Teaching-assistant work distribution
 
 - [ ] Implement the reviewed [TA work distribution, downloads and feedback-return plan](docs/TA_WORK_DISTRIBUTION_PLAN.md):
