@@ -106,6 +106,10 @@ build validation, and English fallback for partial languages.
     crashing the app or server.
 - [x] Verify language selection, translation coverage, build failures for
   incomplete fully supported languages, and English fallback for partial ones.
+- [ ] Audit the whole app for scrapers and workflows where the user's ILIAS interface language could break BetterIlias:
+  - Inspect backend scrapers (`backend/scrapers/`) and service flows (`backend/services/`) for hardcoded or language-specific string matching on ILIAS UI elements (e.g. German vs. English button labels like "Herunterladen" / "Download", form submit buttons, table column headers, status badges, or navigation breadcrumbs).
+  - Use language-agnostic DOM selectors, input names, and URL command parameters (`cmd=...`, `cmdClass=...`, `baseClass=...`) where available, and support both German and English (and other common ILIAS languages) wherever text inspection is required.
+  - Verify key student and TA workflows against both German and English ILIAS fixtures and page dumps to prevent broken actions, missing download links, or false session expirations.
 
 ## ILIAS content and formatting
 
