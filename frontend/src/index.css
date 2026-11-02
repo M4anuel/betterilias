@@ -33,6 +33,11 @@
     color-scheme: dark;
   }
 
+  .dark select,
+  .dark select option {
+    color-scheme: dark;
+  }
+
   math {
     font-family: 'Cambria Math', 'Latin Modern Math', 'STIX Two Math', 'Times New Roman', serif;
     font-size: 1.05em;

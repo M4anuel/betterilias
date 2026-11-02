@@ -1534,7 +1534,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         </button>
       </div>
 
-      {/* TA Assignment Filter Dropdown */}
+      {/* TA Assignment Filter Dropdown & Export ZIP */}
       {assignedTAsList.length > 0 && (
         <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs shrink-0">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline whitespace-nowrap shrink-0">
@@ -1543,16 +1543,46 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           <select
             value={selectedTAFilter}
             onChange={(e) => setSelectedTAFilter(e.target.value)}
-            className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 py-1 px-2 rounded-lg cursor-pointer focus:outline-hidden whitespace-nowrap shrink-0"
+            className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg px-2 py-1 text-xs font-semibold shadow-2xs border border-transparent focus:border-indigo-500 focus:outline-hidden cursor-pointer whitespace-nowrap shrink-0 dark:[color-scheme:dark]"
+            aria-label={t("Tutor auswählen")}
           >
-            <option value="all">{t("Alle Tutoren")}</option>
-            <option value="unassigned">{t("Nicht zugewiesen")}</option>
+            <option value="all" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+              {t("Alle Tutoren")}
+            </option>
+            <option value="unassigned" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+              {t("Nicht zugewiesen")}
+            </option>
             {assignedTAsList.map((ta) => (
-              <option key={ta.id} value={ta.id}>
+              <option key={ta.id} value={ta.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
                 {ta.name}
               </option>
             ))}
           </select>
+
+          {/* Download ZIP button next to the dropdown for the respective TA (or default if 'all') */}
+          {(selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
+            <a
+              href={api.getTAExportZipUrl(
+                exerciseRefId,
+                selectedTaAssId || taSubmissionsData?.active_assignment_id || '',
+                selectedTAFilter !== 'all' ? selectedTAFilter : undefined
+              )}
+              download
+              className="flex items-center justify-center h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-700 transition cursor-pointer shrink-0 ml-1 mr-0.5"
+              title={
+                selectedTAFilter === 'all'
+                  ? t("Abgaben als ZIP-Paket exportieren")
+                  : t("Abgaben für ausgewählten Tutor als ZIP-Paket exportieren")
+              }
+              aria-label={
+                selectedTAFilter === 'all'
+                  ? t("Abgaben als ZIP-Paket exportieren")
+                  : t("Abgaben für ausgewählten Tutor als ZIP-Paket exportieren")
+              }
+            >
+              <Download className="h-3.5 w-3.5 shrink-0" />
+            </a>
+          )}
         </div>
       )}
     </div>
