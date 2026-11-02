@@ -173,6 +173,9 @@ class IliasClient(AuthoringMixin, ManagementMixin):
 
         # 3. HTML text & link markers
         text_lower = response.text.lower()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        if soup.select_one('.il-maincontrols-metabar a.il-user-avatar, #il_mbt_usr, span.il-avatar-initials, a.il-user-avatar'):
+            return
 
         # Explicit force_login command or login prompt target in HTML
         if (
@@ -186,13 +189,12 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             )
 
         # Check for HTML login form or startup section
-        if "<input" in response.text and 'name="username"' in response.text and 'name="password"' in response.text:
+        if soup.find('input', attrs={'name': 'username'}) and soup.find('input', attrs={'name': 'password'}):
             raise SessionExpiredError(t('Session expired: ILIAS login form encountered.'))
         if "ilstartupsection" in text_lower or "ilstartupframe" in text_lower:
             raise SessionExpiredError(t('Session expired: ILIAS startup screen encountered.'))
 
         # 4. Check for positive indicators of an authenticated ILIAS session FIRST
-        soup = BeautifulSoup(response.text, "html.parser")
         has_auth_indicator = bool(
             soup.select_one(".il-maincontrols-metabar a.il-user-avatar")
             or soup.select_one("#il_mbt_usr")
@@ -1512,12 +1514,9 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                         logger.warning(f"Failed fallback saveCommentForLearners: {sl_err}")
 
             # 6. Verify success
-            success, message = verify_grading_success(post_resp.text)
-            if not success:
-                # If HTTP was 200/302 and no explicit error message, consider it successful
-                if post_resp.status_code in [200, 302]:
-                    success = True
-                    message = t('Bewertung erfolgreich gespeichert.')
+            success, message = verify_grading_success(
+                post_resp.text, allow_unconfirmed=post_resp.status_code in (200, 302)
+            )
 
             return GradeSubmissionResponse(
                 success=success,

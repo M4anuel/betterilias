@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 
 from backend.config import settings
+from backend.scrapers.native_text import label_key
 from backend.schemas import CourseItem, SemesterItem, SemesterScreenResponse
 from backend.scrapers.dashboard import _extract_ref_id_from_url
 from backend.scrapers.dumper import safe_parser
@@ -72,7 +73,7 @@ def parse_semester_courses(html_content: str) -> SemesterScreenResponse:
     for elem in soup.find_all(["h2", "div"]):
         if elem.name == "h2":
             text = elem.get_text(strip=True)
-            if text and text not in ["Portal Point", "Terms of Service", "Tabs"]:
+            if text and label_key(text) not in {'portal point', 'terms of service', 'tabs', 'nutzungsvereinbarung', 'nutzungsbedingungen', 'reiter'}:
                 current_category = text
             continue
 
@@ -96,7 +97,7 @@ def parse_semester_courses(html_content: str) -> SemesterScreenResponse:
             for prop in elem.select(".il-multi-line-cap-3"):
                 pn = prop.select_one(".il-item-property-name")
                 pv = prop.select_one(".il-item-property-value")
-                if pn and pv and "contact" in pn.get_text().lower():
+                if pn and pv and label_key(pn.get_text()) in {'contact', 'kontakt'}:
                     contact = pv.get_text(strip=True)
 
             course_obj = CourseItem(

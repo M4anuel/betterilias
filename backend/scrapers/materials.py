@@ -11,6 +11,8 @@ from backend.config import settings
 from backend.schemas import BreadcrumbItem, CourseContentBlock, CourseMaterialsResponse, MaterialItem, CourseSessionItem
 from backend.scrapers.dashboard import _extract_ref_id_from_url
 from backend.scrapers.dumper import safe_parser
+from backend.scrapers.native_text import DATE_TOKEN, RELATIVE_DATE_TOKEN, PREVIOUS_SESSIONS, SESSION_MATERIALS, strip_page_prefix
+from backend.scrapers.logs import parse_log_item_element
 from backend.scrapers.membership import parse_membership, membership_form
 
 
@@ -298,7 +300,7 @@ def _parse_single_item(el, seen_ref_ids: set) -> Optional[MaterialItem]:
     if not title_link:
         for a in el.select("a[href*='ref_id'], a[href*='goto_'], a[href*='/go/'], button[data-action*='ref_id']"):
             txt = a.get_text(strip=True)
-            if txt and not any(k in txt.lower() for k in ["download", "info", "add to favourites", "notes", "set tags"]):
+            if txt and txt.casefold() not in {'download', 'herunterladen', 'info', 'add to favourites', 'zu favoriten hinzufügen', 'notes', 'notizen', 'set tags', 'tags setzen', 'aktionen'}:
                 title_link = a
                 break
 
@@ -318,13 +320,13 @@ def _parse_single_item(el, seen_ref_ids: set) -> Optional[MaterialItem]:
     if not title:
         img_alt = el.select_one("img[alt]")
         if img_alt and img_alt.get("alt"):
-            alt_txt = img_alt.get("alt", "").replace("Open ", "").strip()
+            alt_txt = re.sub(r"^(?:Open|Öffnen)\s*:?\s+", "", img_alt.get("alt", ""), flags=re.I).strip()
             if alt_txt:
                 title = alt_txt
     if not title:
         return None
 
-    if "previous sessions" in title.lower() or "previoussessions" in raw_url.lower():
+    if re.search(PREVIOUS_SESSIONS, title, re.I) or "previoussessions" in raw_url.lower():
         return None
 
     # Exclude news headlines that notify about added files/materials
@@ -351,7 +353,7 @@ def _parse_single_item(el, seen_ref_ids: set) -> Optional[MaterialItem]:
     icon_elem = el.select_one(".il-card-repository-head img, img.il-item-icon, img.il-icon, img[src*='icon_']")
     icon_src = icon_elem.get("src") if icon_elem else None
 
-    if el.find("img", alt="Session") or (icon_src and "icon_sess" in icon_src) or "/go/sess/" in raw_url:
+    if el.find("img", alt=re.compile(r"^(?:Session|Sitzung)$", re.I)) or (icon_src and "icon_sess" in icon_src) or "/go/sess/" in raw_url:
         item_type = "sess"
     elif "/go/fold/" in raw_url or (icon_src and "icon_fold" in icon_src):
         item_type = "fold"
@@ -607,7 +609,7 @@ def parse_course_blocks(
                     # Check if this drawer contains sessions
                     acc_sess_lis = [
                         li for li in cont_el.select("li.ilObjListRow, .ilContainerItemsContainer > li")
-                        if "sess" in li.get("id", "") or li.find("img", alt="Session") or li.select_one("img[src*='icon_sess']")
+                        if "sess" in li.get("id", "") or li.find("img", alt=re.compile(r"^(?:Session|Sitzung)$", re.I)) or li.select_one("img[src*='icon_sess']")
                     ]
                     if acc_sess_lis:
                         session_items: List[CourseSessionItem] = []
@@ -616,7 +618,7 @@ def parse_course_blocks(
                             if not title_a or not title_a.get_text(strip=True):
                                 continue
                             sess_title = title_a.get_text(strip=True)
-                            if not sess_title or "previous sessions" in sess_title.lower():
+                            if not sess_title or re.search(PREVIOUS_SESSIONS, sess_title, re.I):
                                 continue
                             raw_sess_id = sli.get("id", "")
                             sess_m = re.search(r"sess-(\d+)", raw_sess_id)
@@ -624,7 +626,7 @@ def parse_course_blocks(
                             if not sess_ref_id or sess_ref_id in block_seen_ref_ids:
                                 continue
                             block_seen_ref_ids.add(sess_ref_id)
-                            date_m = re.search(r"(\d{1,2}\.\s+[A-Za-z]+\s+\d{4})", sess_title)
+                            date_m = re.search(rf"({DATE_TOKEN}|{RELATIVE_DATE_TOKEN})", sess_title)
                             date_str = date_m.group(1).strip() if date_m else None
                             time_m = re.search(r"(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})", sess_title)
                             time_str = time_m.group(1).strip() if time_m else None
@@ -638,7 +640,7 @@ def parse_course_blocks(
 
                             materials_count = None
                             full_text = sli.get_text(" ", strip=True)
-                            mat_m = re.search(r"Session Materials:\s*(\d+)", full_text, re.I)
+                            mat_m = re.search(SESSION_MATERIALS, full_text, re.I)
                             if mat_m:
                                 materials_count = int(mat_m.group(1))
 
@@ -721,16 +723,16 @@ def parse_course_blocks(
         # 3. Sessions Block
         sess_lis = [
             li for li in child.select("li.ilObjListRow, .ilContainerItemsContainer > li")
-            if "sess" in li.get("id", "") or li.find("img", alt="Session") or li.select_one("img[src*='icon_sess']")
+            if "sess" in li.get("id", "") or li.find("img", alt=re.compile(r"^(?:Session|Sitzung)$", re.I)) or li.select_one("img[src*='icon_sess']")
         ]
-        if sess_lis and ("sess" in "".join(child.get("class", [])) or "session" in child.get_text(" ", strip=True).lower() or any("sess" in li.get("id", "") for li in sess_lis)):
+        if sess_lis and ("sess" in "".join(child.get("class", [])) or re.search(r'\b(?:sessions?|sitzungen?)\b', child.get_text(" ", strip=True), re.I) or any("sess" in li.get("id", "") for li in sess_lis)):
             session_items: List[CourseSessionItem] = []
             for sli in sess_lis:
                 title_a = sli.select_one("h3 a, h4 a, .il_ContainerItemTitle a, .il-item-title a") or sli.find("a")
                 if not title_a or not title_a.get_text(strip=True):
                     continue
                 sess_title = title_a.get_text(strip=True)
-                if not sess_title or "previous sessions" in sess_title.lower():
+                if not sess_title or re.search(PREVIOUS_SESSIONS, sess_title, re.I):
                     continue
 
                 raw_sess_id = sli.get("id", "")
@@ -740,7 +742,7 @@ def parse_course_blocks(
                     continue
                 block_seen_ref_ids.add(sess_ref_id)
 
-                date_m = re.search(r"(\d{1,2}\.\s+[A-Za-z]+\s+\d{4})", sess_title)
+                date_m = re.search(rf"({DATE_TOKEN}|{RELATIVE_DATE_TOKEN})", sess_title)
                 date_str = date_m.group(1).strip() if date_m else None
                 time_m = re.search(r"(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})", sess_title)
                 time_str = time_m.group(1).strip() if time_m else None
@@ -755,7 +757,7 @@ def parse_course_blocks(
 
                 materials_count = None
                 full_text = sli.get_text(" ", strip=True)
-                mat_m = re.search(r"Session Materials:\s*(\d+)", full_text, re.I)
+                mat_m = re.search(SESSION_MATERIALS, full_text, re.I)
                 if mat_m:
                     materials_count = int(mat_m.group(1))
 
@@ -975,7 +977,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
     )
     raw_title = title_elem.get_text(strip=True) if title_elem else t("Container {p0}", p0=container_ref_id)
     # Clean leading "View: Content: " or "Content: "
-    container_title = re.sub(r'^(View:\s*)?(Content:\s*)?', '', raw_title).strip()
+    container_title = strip_page_prefix(raw_title).strip()
 
     # Extract Breadcrumbs
     breadcrumbs = _extract_breadcrumbs(soup)
@@ -991,7 +993,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
     # Extract Course Sessions ("Sitzungen" / Drawers)
     session_lis = [
         li for li in soup.select("li.ilObjListRow, .ilContainerItemsContainer > li")
-        if "sess" in li.get("id", "") or li.find("img", alt="Session") or li.select_one("img[src*='icon_sess']")
+        if "sess" in li.get("id", "") or li.find("img", alt=re.compile(r"^(?:Session|Sitzung)$", re.I)) or li.select_one("img[src*='icon_sess']")
     ]
     for sli in session_lis:
         title_a = sli.select_one("h3 a, h4 a, .il_ContainerItemTitle a, .il-item-title a")
@@ -1003,7 +1005,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
         if not title_a:
             continue
         sess_title = title_a.get_text(strip=True)
-        if not sess_title or "previous sessions" in sess_title.lower():
+        if not sess_title or re.search(PREVIOUS_SESSIONS, sess_title, re.I):
             continue
 
         raw_sess_id = sli.get("id", "")
@@ -1014,7 +1016,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
         seen_ref_ids.add(sess_ref_id)
 
         # Date & time parsing
-        date_m = re.search(r"(\d{1,2}\.\s+[A-Za-z]+\s+\d{4})", sess_title)
+        date_m = re.search(rf"({DATE_TOKEN}|{RELATIVE_DATE_TOKEN})", sess_title)
         date_str = date_m.group(1).strip() if date_m else None
 
         time_m = re.search(r"(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})", sess_title)
@@ -1050,7 +1052,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
 
         materials_count = None
         full_text = sli.get_text(" ", strip=True)
-        mat_m = re.search(r"Session Materials:\s*(\d+)", full_text, re.I)
+        mat_m = re.search(SESSION_MATERIALS, full_text, re.I)
         if mat_m:
             materials_count = int(mat_m.group(1))
 
@@ -1252,43 +1254,9 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
     aside = soup.select_one("aside.il_right_col, #il_right_col")
     if aside:
         for el in aside.select(".il-item, .il-std-item, li"):
-            title_el = el.select_one(".il-item-title, h4, h5, a")
-            if not title_el:
-                continue
-            log_title = title_el.get_text(strip=True)
-            if not log_title or log_title in ["News", "Calendar", "Portal"]:
-                continue
-
-            full_text = el.get_text(" ", strip=True)
-            target = None
-            target_match = re.search(r"(File|Forum|Exercise|Course):\s*([^\|]+?)(?=\s*Date|\s*$)", full_text, re.I)
-            if target_match:
-                target = target_match.group(0).strip()
-
-            date_str = None
-            date_match = re.search(r"(Today|Yesterday|[0-9]{1,2}\.\s+[A-Za-z]+(?:\s+[0-9]{4})?),\s*[0-9]{2}:[0-9]{2}", full_text)
-            if date_match:
-                date_str = date_match.group(0).strip()
-
-            link_el = el.find("a", href=True)
-            log_url = urllib.parse.urljoin(settings.ilias_base_url, link_el.get("href")) if link_el else None
-
-            key = f"{log_title}_{target}_{date_str}"
-            if key in seen_log_keys:
-                continue
-            seen_log_keys.add(key)
-
-            log_type = "file" if "file" in full_text.lower() else "forum" if "forum" in full_text.lower() else "general"
-
-            logs.append(
-                CourseLogItem(
-                    title=log_title,
-                    target=target,
-                    date=date_str,
-                    url=log_url,
-                    log_type=log_type,
-                )
-            )
+            item = parse_log_item_element(el, seen_log_keys)
+            if item:
+                logs.append(item)
 
     blocks = parse_course_blocks(soup, container_ref_id, sessions=sessions, fallback_items=items)
     layout_hash = _calc_layout_hash(blocks)

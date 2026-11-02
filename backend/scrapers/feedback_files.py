@@ -90,6 +90,7 @@ def parse_feedback_files(html: str, base_url: str = settings.ilias_base_url) -> 
             size = (
                 col_map.get("size")
                 or col_map.get("grösse")
+                or col_map.get("größe")
                 or col_map.get("groesse")
                 or (cells[2].get_text(strip=True) if len(cells) > 2 else "")
             )

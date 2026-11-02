@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from backend.config import settings
 from backend.schemas import CourseLogItem, CourseLogsResponse
 from backend.scrapers.dumper import safe_parser
+from backend.scrapers.native_text import DATE_TOKEN, RELATIVE_DATE_TOKEN, label_key
 
 
 def parse_log_item_element(el, seen_keys: set) -> Optional[CourseLogItem]:
@@ -14,24 +15,24 @@ def parse_log_item_element(el, seen_keys: set) -> Optional[CourseLogItem]:
     if not title_el:
         return None
     log_title = title_el.get_text(strip=True)
-    if not log_title or log_title in ["News", "Calendar", "Portal", "Inbox"]:
+    if not log_title or label_key(log_title) in {'news', 'calendar', 'portal', 'inbox', 'neuigkeiten', 'kalender', 'posteingang'}:
         return None
 
     full_text = el.get_text(" ", strip=True)
-    if "Inbox" in full_text and "mails in your inbox" in full_text:
+    if ("Inbox" in full_text and "mails in your inbox" in full_text) or ('Posteingang' in full_text and 'Nachrichten in' in full_text):
         return None
 
     # Target extraction (File, Forum, Exercise, Course)
     target = None
-    target_match = re.search(r"(File|Forum|Exercise|Course):\s*([^\|]+?)(?=\s*Date|\s*$)", full_text, re.I)
+    target_match = re.search(r"(File|Datei|Forum|Exercise|Übung|Course|Kurs):\s*([^\|]+?)(?=\s+(?:Date|Datum)\s*:?|\s*$)", full_text, re.I)
     if target_match:
         target = target_match.group(0).strip()
 
     # Date extraction (Today, Yesterday, DD. MMM YYYY, HH:MM)
     date_str = None
     date_match = re.search(
-        r"(Today|Yesterday|[0-9]{1,2}\.\s+[A-Za-z]+(?:\s+[0-9]{4})?),\s*[0-9]{2}:[0-9]{2}",
-        full_text,
+        rf"({RELATIVE_DATE_TOKEN}|{DATE_TOKEN}|\d{{1,2}}\.\s*[^\W\d_]+\.?)(?:,\s*|\s+)\d{{1,2}}:\d{{2}}",
+        full_text, re.I,
     )
     if date_match:
         date_str = date_match.group(0).strip()
@@ -50,7 +51,7 @@ def parse_log_item_element(el, seen_keys: set) -> Optional[CourseLogItem]:
 
     log_type = (
         "file"
-        if "file" in full_text.lower()
+        if re.search(r'\b(?:files?|datei(?:en)?)\b', full_text, re.I)
         else "forum"
         if "forum" in full_text.lower()
         else "general"

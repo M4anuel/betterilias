@@ -188,6 +188,12 @@ class SessionManager:
                     return False, t('Sitzung abgelaufen oder Weiterleitung zum Login')
 
                 text_lower = response.text.lower()
+                soup = BeautifulSoup(response.text, "html.parser")
+                # Authenticated pages may contain login/help links or archived
+                # "Kein Zugriffsrecht" notices. Prefer the actual user control.
+                identity = soup.select_one('.il-maincontrols-metabar a.il-user-avatar, #il_mbt_usr, span.il-avatar-initials, a.il-user-avatar')
+                if identity:
+                    return True, identity.get_text(strip=True) or identity.get('title') or t('Angemeldet')
                 if (
                     "cmd=force_login" in text_lower
                     or "login.php?client_id=" in text_lower
@@ -196,8 +202,6 @@ class SessionManager:
                 ):
                     return False, t('Sitzung abgelaufen: Login-Aufforderung erkannt')
 
-                soup = BeautifulSoup(response.text, "html.parser")
-                
                 # 2. Check for login forms or startup screen
                 if soup.find("input", {"name": "username"}) and soup.find("input", {"name": "password"}):
                     return False, t('Sitzung abgelaufen: Login-Formular angezeigt')

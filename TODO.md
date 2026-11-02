@@ -212,6 +212,8 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 
 ## Completed
 
+- [x] Audit all backend Python modules for German ILIAS compatibility, fix confirmed parser/session issues and add focused German-layout regressions; record remaining capture needs in [the German backend audit](docs/GERMAN_BACKEND_AUDIT.md).
+
 - [x] Fetch complete assignment submissions independently of saved native ILIAS filters, page offsets and row limits; reset to default filters and 800 rows per network read without restoring the native view, and replace legacy partial caches.
 
 - [x] Keep submission-details Save/Close labels on one line with responsive action rows, and use Swiss ss spelling throughout application text and locale keys.
