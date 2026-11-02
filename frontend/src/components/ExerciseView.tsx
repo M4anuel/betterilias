@@ -200,6 +200,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     return cached;
   });
   const [isLoadingTaSubmissions, setIsLoadingTaSubmissions] = useState(false);
+  const [taSubmissionsError, setTaSubmissionsError] = useState<string | null>(null);
   const [taSearchQuery, setTaSearchQuery] = useState('');
   // Submission requirement filter (Radio: 'all' | 'submitted' | 'not_submitted')
   const [taSubmissionFilter, setTaSubmissionFilter] = useState<'all' | 'submitted' | 'not_submitted'>(() => {
@@ -593,6 +594,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   // 3. Load TA Submissions when in ta_grading tab (Cached + Race condition protection)
   const loadTaSubmissions = useCallback(
     (assId?: string, isInitialLoad = false, forceRefresh = false) => {
+      setTaSubmissionsError(null);
       const cacheKey = `${exerciseRefId}_${assId || 'default'}`;
       // 1. Instant serve from memory ref cache or localStorage cache (0ms)
       let cached: ExerciseSubmissionsResponse | null = submissionsCacheRef.current[cacheKey] || null;
@@ -731,6 +733,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         .catch((err) => {
           if (reqId === taRequestSeq.current) {
             console.error('Error loading submissions', err);
+            setTaSubmissionsError(err.message || t('Could not load all submissions from ILIAS. Please refresh and try again.'));
           }
         })
         .finally(() => {
@@ -2228,12 +2231,22 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           )}
 
           {/* Submissions List */}
+          {taSubmissionsError && (
+            <div role="alert" className="flex flex-col items-stretch gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+              <p className="min-w-0 flex-1">{taSubmissionsError}</p>
+              <button type="button" onClick={() => loadTaSubmissions(selectedTaAssId || undefined, false, true)}
+                className="min-h-11 shrink-0 self-start rounded-xl border border-red-300 px-3 py-2 font-semibold sm:self-auto dark:border-red-800">
+                {t('Erneut versuchen')}
+              </button>
+            </div>
+          )}
+
           {isLoadingTaSubmissions && !currentSubmissionsData ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
               <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
               <p className="text-xs font-semibold">{t("Lade Abgaben zur Bewertung...")}</p>
             </div>
-          ) : filteredTaSubmissions.length === 0 ? (
+          ) : taSubmissionsError && !currentSubmissionsData ? null : filteredTaSubmissions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center text-slate-400 dark:text-slate-500">
               <p className="text-xs font-semibold">{t("Keine Abgaben für diesen Filter gefunden.")}</p>
             </div>

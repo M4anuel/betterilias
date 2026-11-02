@@ -208,6 +208,8 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 
 ## Completed
 
+- [x] Fetch complete assignment submissions independently of saved native ILIAS filters, page offsets and row limits; reset to default filters and 800 rows per network read without restoring the native view, and replace legacy partial caches.
+
 - [x] Keep submission-details Save/Close labels on one line with responsive action rows, and use Swiss ss spelling throughout application text and locale keys.
 
 - [x] Enlarge the toolbar logo within its icon canvas and replace covering text badges with small corner status dots; retain full localized status in the tooltip and popup in both extensions.

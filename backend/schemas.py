@@ -387,6 +387,7 @@ class AssignmentItem(BaseModel):
     properties: Dict[str, str] = Field(default_factory=dict)
 
 class ExerciseSubmissionsResponse(BaseModel):
+    listing_complete: bool = False
     exercise: ExerciseInfo
     available_assignments: List[AssignmentItem] = Field(default_factory=list)
     active_assignment_id: Optional[str] = None

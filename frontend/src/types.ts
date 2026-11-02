@@ -316,6 +316,7 @@ export interface ExerciseInfo {
 }
 
 export interface ExerciseSubmissionsResponse {
+  listing_complete?: boolean;
   exercise: ExerciseInfo;
   available_assignments?: AssignmentItem[];
   active_assignment_id?: string;
