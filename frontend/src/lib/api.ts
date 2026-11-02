@@ -27,6 +27,9 @@ import {
   SaveTAAssignmentRequest,
   ApplyAllocationRequest,
   ApplyAllocationResponse,
+  FeedbackImportPreviewResponse,
+  FeedbackImportCommitRequest,
+  FeedbackImportCommitResponse,
   SemesterCalendarResponse,
   CourseScheduleRuleInput,
   CourseCalendarInfo,
@@ -508,6 +511,47 @@ export const api = {
     const sessionId = cache.getSessionId();
     if (sessionId) params.append('session_id', sessionId);
     return `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignments/${encodeURIComponent(assId)}/export-zip?${params.toString()}`;
+  },
+
+  async previewFeedbackImport(
+    exerciseId: string,
+    assId: string,
+    file: File | Blob
+  ): Promise<FeedbackImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await sessionFetch(
+      `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignments/${encodeURIComponent(assId)}/feedback-import/preview`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(apiError(err) || t('Vorschau für Feedback-Import fehlgeschlagen'));
+    }
+    return res.json();
+  },
+
+  async commitFeedbackImport(
+    exerciseId: string,
+    assId: string,
+    req: FeedbackImportCommitRequest
+  ): Promise<FeedbackImportCommitResponse> {
+    const res = await sessionFetch(
+      `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignments/${encodeURIComponent(assId)}/feedback-import/commit`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(apiError(err) || t('Feedback-Import fehlgeschlagen'));
+    }
+    return res.json();
   },
 
   async applyTAAllocation(

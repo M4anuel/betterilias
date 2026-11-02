@@ -625,6 +625,60 @@ class FeedbackFilesResponse(BaseModel):
     files: List[FeedbackFileItem] = Field(default_factory=list)
     upload_url: Optional[str] = None
 
+# ---------------------------------------------------------
+# Phase 3: Reviewed Feedback Import Schemas
+# ---------------------------------------------------------
+class FeedbackFileImportItem(BaseModel):
+    source_path: str
+    filename: str
+    size_bytes: int
+    is_conflict: bool = False
+    existing_file_id: Optional[str] = None
+    action: str = "upload" # "upload", "overwrite", "skip"
+
+class FeedbackUnitImportPreview(BaseModel):
+    unit_id: str
+    member_id: str
+    recipient_name: str
+    team_id: Optional[str] = None
+    assigned_ta_id: Optional[str] = None
+    assigned_ta_name: Optional[str] = None
+    files: List[FeedbackFileImportItem] = Field(default_factory=list)
+
+class FeedbackImportPreviewResponse(BaseModel):
+    staged_import_id: str
+    snapshot_token: str
+    exercise_ref_id: str
+    ass_id: str
+    units: List[FeedbackUnitImportPreview] = Field(default_factory=list)
+    unmatched_files: List[str] = Field(default_factory=list)
+    skipped_files: List[str] = Field(default_factory=list)
+    blockers: List[str] = Field(default_factory=list)
+    total_files: int = 0
+    total_size_bytes: int = 0
+    total_units: int = 0
+    has_conflicts: bool = False
+
+class FeedbackImportCommitRequest(BaseModel):
+    staged_import_id: str
+    snapshot_token: str
+    conflict_actions: Dict[str, str] = Field(default_factory=dict) # "{unit_id}:{filename}" -> "overwrite" | "skip" | "keep_both"
+
+class FeedbackImportCommitResultItem(BaseModel):
+    unit_id: str
+    filename: str
+    status: str # "success", "failed", "skipped"
+    message: Optional[str] = None
+
+class FeedbackImportCommitResponse(BaseModel):
+    success: bool
+    total_processed: int
+    uploaded_count: int
+    skipped_count: int
+    failed_count: int
+    results: List[FeedbackImportCommitResultItem] = Field(default_factory=list)
+    message: str
+
 class PdfInfoResponse(BaseModel):
     width: Optional[float] = None
     height: Optional[float] = None

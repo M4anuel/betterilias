@@ -24,6 +24,9 @@ from backend.schemas import (
     TAInstructionFileItem,
     AssignmentOrderUpdateRequest,
     SaveTAAssignmentRequest,
+    FeedbackImportPreviewResponse,
+    FeedbackImportCommitRequest,
+    FeedbackImportCommitResponse,
 )
 from backend.services.ilias_client import IliasClient, StudentUploadError, SessionExpiredError, AssignmentDeletionError
 from backend.services.ta_allocation import (
@@ -550,4 +553,51 @@ async def export_submissions_zip(
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Length": str(len(zip_bytes)),
         }
+    )
+
+
+@router.post("/{exercise_id}/assignments/{ass_id}/feedback-import/preview", response_model=FeedbackImportPreviewResponse)
+async def preview_feedback_import_endpoint(
+    exercise_id: str,
+    ass_id: str,
+    file: UploadFile = File(...),
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Phase 3: Preflight inspection of uploaded feedback ZIP archive.
+    Parses manifest/folder layout, detects filename conflicts against ILIAS,
+    stages files, and returns a verified preview snapshot.
+    """
+    from backend.services.feedback_import import preview_feedback_import
+    file_bytes = await file.read()
+    session_id = client.session_manager.session_id or "default"
+    return await preview_feedback_import(
+        exercise_ref_id=exercise_id,
+        ass_id=ass_id,
+        session_id=session_id,
+        file_bytes=file_bytes,
+        client=client,
+    )
+
+
+@router.post("/{exercise_id}/assignments/{ass_id}/feedback-import/commit", response_model=FeedbackImportCommitResponse)
+async def commit_feedback_import_endpoint(
+    exercise_id: str,
+    ass_id: str,
+    req: FeedbackImportCommitRequest,
+    client: IliasClient = Depends(get_ilias_client)
+):
+    """
+    Phase 3: Publishes staged feedback files to ILIAS after user confirmation.
+    Validates snapshot token, handles overwrite/skip/upload conflict choices,
+    and returns a summary of uploaded files.
+    """
+    from backend.services.feedback_import import commit_feedback_import
+    session_id = client.session_manager.session_id or "default"
+    return await commit_feedback_import(
+        exercise_ref_id=exercise_id,
+        ass_id=ass_id,
+        session_id=session_id,
+        request=req,
+        client=client,
     )

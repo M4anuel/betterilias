@@ -49,6 +49,7 @@ import { StudentAssignmentModal } from './StudentAssignmentModal';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { TAFilterSettingsModal } from './TAFilterSettingsModal';
 import { DistributeWorkModal } from './DistributeWorkModal';
+import { ReturnFeedbackModal } from './ReturnFeedbackModal';
 import { TAExportZipButton, SubmissionDownloadButton, FeedbackFileDownloadButton } from './DownloadButtons';
 import { NotificationToast, ChangeNotification } from './NotificationToast';
 import { GradingFeedbackBar, GradeSavedFeedback } from './GradingFeedbackBar';
@@ -249,6 +250,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   // Settings modal open state
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isDistributeModalOpen, setIsDistributeModalOpen] = useState(false);
+  const [isReturnFeedbackModalOpen, setIsReturnFeedbackModalOpen] = useState(false);
   const [selectedTAFilter, setSelectedTAFilter] = useState<string>('all');
 
   const handleSetSubmissionFilter = (val: 'all' | 'submitted' | 'not_submitted') => {
@@ -2155,6 +2157,20 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   />
                 )}
 
+                {/* Return Feedback Trigger */}
+                {(selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
+                  <button
+                    type="button"
+                    onClick={() => setIsReturnFeedbackModalOpen(true)}
+                    className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/70 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap"
+                    title={t("Feedback-Dateien für Übungseinheit hochladen")}
+                    aria-label={t("Feedback-Dateien für Übungseinheit hochladen")}
+                  >
+                    <Upload className="h-3.5 w-3.5 shrink-0" />
+                    <span className="desktop-only">{t("Feedback hochladen")}</span>
+                  </button>
+                )}
+
                 {/* Distribute Work Trigger */}
                 <button
                   type="button"
@@ -2830,6 +2846,24 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           }}
           onSave={handleSaveFromModal}
           onClose={() => setDetailModalSubmission(null)}
+        />
+      )}
+
+      {/* Return Feedback Modal */}
+      {isReturnFeedbackModalOpen && (selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
+        <ReturnFeedbackModal
+          exerciseRefId={exerciseRefId}
+          assId={selectedTaAssId || taSubmissionsData?.active_assignment_id || ''}
+          assignmentTitle={
+            overviewData?.assignments.find(
+              (a) => String(a.ass_id) === String(selectedTaAssId || taSubmissionsData?.active_assignment_id)
+            )?.title || t("Übung")
+          }
+          isOpen={isReturnFeedbackModalOpen}
+          onClose={() => setIsReturnFeedbackModalOpen(false)}
+          onSuccess={() => {
+            loadTaSubmissions(selectedTaAssId || undefined, false, true);
+          }}
         />
       )}
 

@@ -4,7 +4,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Teaching-assistant work distribution
 
-- [ ] Implement the reviewed [TA work distribution, downloads and feedback-return plan](docs/TA_WORK_DISTRIBUTION_PLAN.md), starting with native capability/identity probes. Planning and read-only source/fixture research are complete; the feature is not implemented.
+- [ ] Implement the reviewed [TA work distribution, downloads and feedback-return plan](docs/TA_WORK_DISTRIBUTION_PLAN.md):
+  - [x] Phase 0 & Phase 1: Shared allocations via [BI:<ta_id>|<ta_name>] markers and native saveStatusAll batch updates (backend/services/ta_allocation.py, TaWorkDistributionModal.tsx).
+  - [x] Phase 2: TA and bulk submission downloads with live progress, ZIP streaming, and betterilias-feedback.json round-trip manifest templates.
+  - [x] Phase 3: Reviewed feedback return with safe preflight ZIP/folder inspection, mapping preview, conflict detection/resolution, and authenticated publication (backend/services/feedback_import.py, ReturnFeedbackModal.tsx).
+  - [ ] Phase 4: Hardening, multi-tutor concurrency handling, and optional filename/CSV convenience adapters.
 
 ## Calendar and timetable
 

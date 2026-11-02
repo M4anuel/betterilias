@@ -511,6 +511,63 @@ export interface FeedbackFilesResponse {
   upload_url?: string;
 }
 
+export interface FeedbackFileImportItem {
+  source_path: string;
+  filename: string;
+  size_bytes: number;
+  is_conflict: boolean;
+  existing_file_id?: string;
+  action: 'upload' | 'overwrite' | 'skip';
+}
+
+export interface FeedbackUnitImportPreview {
+  unit_id: string;
+  member_id: string;
+  recipient_name: string;
+  team_id?: string;
+  assigned_ta_id?: string;
+  assigned_ta_name?: string;
+  files: FeedbackFileImportItem[];
+}
+
+export interface FeedbackImportPreviewResponse {
+  staged_import_id: string;
+  snapshot_token: string;
+  exercise_ref_id: string;
+  ass_id: string;
+  units: FeedbackUnitImportPreview[];
+  unmatched_files: string[];
+  skipped_files: string[];
+  blockers: string[];
+  total_files: number;
+  total_size_bytes: number;
+  total_units: number;
+  has_conflicts: boolean;
+}
+
+export interface FeedbackImportCommitRequest {
+  staged_import_id: string;
+  snapshot_token: string;
+  conflict_actions: Record<string, 'overwrite' | 'skip' | 'keep_both'>;
+}
+
+export interface FeedbackImportCommitResultItem {
+  unit_id: string;
+  filename: string;
+  status: 'success' | 'failed' | 'skipped';
+  message?: string;
+}
+
+export interface FeedbackImportCommitResponse {
+  success: boolean;
+  total_processed: number;
+  uploaded_count: number;
+  skipped_count: number;
+  failed_count: number;
+  results: FeedbackImportCommitResultItem[];
+  message: string;
+}
+
 export type CourseCalendarFeedStatus =
   | 'not_imported'
   | 'not_checked'
