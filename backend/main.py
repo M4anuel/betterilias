@@ -10,6 +10,7 @@ from backend.api.routes import auth, calendar, dashboard, exercises, materials, 
 from backend.config import settings
 from backend.scrapers.dumper import ScrapingParsingError
 from backend.services.ilias_client import SessionExpiredError
+from backend.services.submission_listing import SubmissionListingError
 from backend.i18n import LanguageMiddleware, t
 
 logging.basicConfig(
@@ -62,6 +63,11 @@ async def session_expired_handler(request: Request, exc: SessionExpiredError):
             "code": "SESSION_EXPIRED"
         }
     )
+
+
+@app.exception_handler(SubmissionListingError)
+async def submission_listing_error_handler(request: Request, exc: SubmissionListingError):
+    return JSONResponse(status_code=502, content={'detail': str(exc), 'code': 'SUBMISSIONS_INCOMPLETE'})
 
 
 @app.exception_handler(ScrapingParsingError)

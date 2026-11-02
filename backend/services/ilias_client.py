@@ -4,6 +4,7 @@ import logging
 import re
 import urllib.parse
 from contextlib import nullcontext
+from weakref import WeakValueDictionary
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from bs4 import BeautifulSoup
@@ -14,6 +15,8 @@ from backend.config import settings
 from backend.services.assignment_multipart import encode_assignment_form
 from backend.services.authoring import AuthoringMixin
 from backend.services.management import ManagementMixin
+from backend.services.submission_listing import collect_submissions, SubmissionListingError
+from backend.scrapers.submission_listing import parse_submission_listing
 from backend.scrapers.dumper import dump_failed_html
 from backend.schemas import RepositoryResponse
 from backend.scrapers.repository import parse_repository
@@ -104,6 +107,9 @@ class StudentUploadError(Exception):
 
 class IliasClient(AuthoringMixin, ManagementMixin):
     """High-level async client for interacting with Uni Bern ILIAS."""
+
+    # Native exc_mem filter/offset storage is shared across exercises in a session.
+    _submission_view_locks = WeakValueDictionary()
 
     # Class-level cache of course participants per exercise_ref_id for enriching team member names
     _course_user_cache: Dict[str, List[CourseUserCandidate]] = {}
@@ -610,9 +616,9 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             return parse_course_logs(resp.text, course_id=course_id)
 
     async def get_exercise_submissions(self, ref_id: str, ass_id: Optional[str] = None, include_ilias_order: bool = False) -> ExerciseSubmissionsResponse:
-        """Fetch and parse exercise participant submissions list (TA grading view)."""
+        """Fetch every participant, independently of the saved native table view."""
         self._ensure_authenticated()
-        extra = f"&ass_id={ass_id}&member_id=0&part_id=0&exc_mem_trows=800" if ass_id else "&exc_mem_trows=800"
+        extra = f"&ass_id={ass_id}&member_id=0&part_id=0" if ass_id else ""
         urls_to_try = [
             f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilExerciseManagementGUI&cmd=members&ref_id={ref_id}{extra}",
             f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilexercisemanagementgui&cmd=members&ref_id={ref_id}{extra}",
@@ -622,26 +628,20 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             f"{settings.ilias_base_url}/ilias.php?ref_id={ref_id}&cmd=viewMembers{extra}",
         ]
 
-        async with self.session_manager.get_http_client() as client:
-            last_resp = None
+        session_key = str(self.session_manager.session_id)
+        lock = self._submission_view_locks.setdefault(session_key, asyncio.Lock())
+        async with lock, self.session_manager.get_http_client() as client:
             for url in urls_to_try:
                 resp = await client.get(url)
                 self._check_response_for_session_loss(resp, url)
-                last_resp = resp
                 # If we hit the members submissions table
-                if "exc_mem" in resp.text:
-                    result = parse_exercise_submissions(resp.text, exercise_ref_id=ref_id)
+                if parse_submission_listing(resp.text, str(resp.url)).found:
+                    result = await collect_submissions(client, resp, ref_id, ass_id, self._check_response_for_session_loss)
                     if include_ilias_order:
                         await self._load_ilias_sort_names(client, result)
                     return result
 
-            if last_resp:
-                result = parse_exercise_submissions(last_resp.text, exercise_ref_id=ref_id)
-                if include_ilias_order:
-                    await self._load_ilias_sort_names(client, result)
-                return result
-
-            raise ValueError(t('Failed to fetch exercise with ref_id {p0}', p0=ref_id))
+            raise SubmissionListingError()
 
     async def _load_ilias_sort_names(self, client: httpx.AsyncClient, result: ExerciseSubmissionsResponse) -> None:
         """Use the native evaluation-file recipient, which can differ from the first team member."""

@@ -762,13 +762,17 @@ export const cache = {
     try {
       const key = `${EXERCISE_SUBMISSIONS_PREFIX}${refId}_${assId || 'default'}`;
       const raw = localStorage.getItem(key);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const parsed = JSON.parse(raw) as ExerciseSubmissionsResponse;
+        // Old caches may contain only the native filtered page, even in Saver mode.
+        if (parsed?.listing_complete === true) return parsed;
+      }
       if (assId) {
         // Also check default key in case it was loaded initially as the active assignment
         const defRaw = localStorage.getItem(`${EXERCISE_SUBMISSIONS_PREFIX}${refId}_default`);
         if (defRaw) {
           const parsed = JSON.parse(defRaw) as ExerciseSubmissionsResponse;
-          if (parsed && parsed.active_assignment_id === assId) {
+          if (parsed?.listing_complete === true && parsed.active_assignment_id === assId) {
             return parsed;
           }
         }

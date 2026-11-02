@@ -96,6 +96,22 @@ and 667 x 375 landscape in German/English and light/dark mode. It captures
 screenshots and checks text ranges to catch labels wrapping within buttons.
 These checks use headless Chrome emulation, not physical devices or live ILIAS.
 
+Submission-list retrieval clears native grade/submission/name/date filters for
+the read, enumerates the current native pages, and restores the original filters
+and page offset. It keeps the native row-count preference and rejects incomplete
+or repeated pages. A session-scoped lock prevents concurrent BetterIlias reads
+from mixing these temporary native views; direct ILIAS browser changes and other
+BetterIlias servers cannot share this lock. Restoration is attempted after errors,
+but an expired session or network failure can prevent it.
+Legacy submission caches without a completeness flag are ignored, including in
+Saver mode. A localised retry panel explains failed complete reads.
+`tests/test_submission_listing_browser.py` checks replacing a legacy graded-only
+cache with 50 submissions, keyboard retry, and client-side grading filters at
+320/390/430/768/1280 px and short landscape in German/dark and English/light mode.
+The native HTTP tests cover filter preservation, row limits, saved page offsets,
+empty lists, failed/repeated pages and concurrent reads. These are mocked tests;
+they do not establish live ILIAS or physical-device acceptance.
+
 ## Custom Confirmation & Navigation Dialog System
 
 Browser-native window.confirm and window.alert dialogs have been entirely replaced across student and TA workflows with a responsive custom dialog system (ConfirmModal.tsx and dialog.ts):
