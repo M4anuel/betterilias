@@ -15,8 +15,9 @@ NAV = 'exc_mem_table_nav'
 def members_page_url(url: str, navigation: str) -> str:
     parts = urlsplit(url)
     query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
-             if k not in ('cmd', 'fallbackCmd', NAV, NAV + '1', NAV + '2')]
-    return urlunsplit(parts._replace(query=urlencode(query + [('cmd', 'members'), (NAV, navigation)]), fragment=''))
+             if k not in ('cmd', 'fallbackCmd', 'exc_mem_trows', NAV, NAV + '1', NAV + '2')]
+    return urlunsplit(parts._replace(query=urlencode(query + [('cmd', 'members'), ('exc_mem_trows', '800'),
+                                                             (NAV, navigation)]), fragment=''))
 
 
 @dataclass
@@ -26,7 +27,6 @@ class SubmissionListingPage:
     security_fields: List[Tuple[str, str]] = field(default_factory=list)
     filters: List[Tuple[str, str]] = field(default_factory=list)
     reset: Optional[Tuple[str, str]] = None
-    apply: Optional[Tuple[str, str]] = None
     navigation: Optional[str] = None
     offset: int = 0
     total: Optional[int] = None
@@ -66,10 +66,9 @@ def parse_submission_listing(html: str, page_url: str) -> SubmissionListingPage:
         elif kind == 'hidden' and re.fullmatch(r'(?:.*csrf.*|.*token.*|nonce)', name, re.I):
             page.security_fields.append((name, control.get('value', '')))
 
-    for attr, command in [('reset', 'membersReset'), ('apply', 'membersApply')]:
-        button = scope.find(['input', 'button'], attrs={'name': f'cmd[{command}]'})
-        if button is not None:
-            setattr(page, attr, (button['name'], button.get('value', button.get_text(strip=True))))
+    button = scope.find(['input', 'button'], attrs={'name': 'cmd[membersReset]'})
+    if button is not None:
+        page.reset = (button['name'], button.get('value', button.get_text(strip=True)))
 
     current = scope.find('input', attrs={'name': NAV})
     navigation = current.get('value') if current else None

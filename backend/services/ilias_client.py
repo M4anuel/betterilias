@@ -618,11 +618,11 @@ class IliasClient(AuthoringMixin, ManagementMixin):
     async def get_exercise_submissions(self, ref_id: str, ass_id: Optional[str] = None, include_ilias_order: bool = False) -> ExerciseSubmissionsResponse:
         """Fetch every participant, independently of the saved native table view."""
         self._ensure_authenticated()
-        extra = f"&ass_id={ass_id}&member_id=0&part_id=0" if ass_id else ""
+        extra = (f"&ass_id={ass_id}&member_id=0&part_id=0" if ass_id else "") + "&exc_mem_trows=800"
         urls_to_try = [
-            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilExerciseManagementGUI&cmd=members&ref_id={ref_id}{extra}",
-            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilexercisemanagementgui&cmd=members&ref_id={ref_id}{extra}",
-            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdClass=ilexercisemanagementgui&cmd=members&ref_id={ref_id}{extra}",
+            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilExerciseManagementGUI&cmd=membersReset&ref_id={ref_id}{extra}",
+            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdNode=dc:o5:dd&cmdClass=ilexercisemanagementgui&cmd=membersReset&ref_id={ref_id}{extra}",
+            f"{settings.ilias_base_url}/ilias.php?baseClass=ilexercisehandlergui&cmdClass=ilexercisemanagementgui&cmd=membersReset&ref_id={ref_id}{extra}",
             f"{settings.ilias_base_url}/ilias.php?baseClass=ilExerciseHandlerGUI&ref_id={ref_id}&cmd=viewMembers{extra}",
             f"{settings.ilias_base_url}/ilias.php?cmdClass=ilobjexercisegui&cmd=viewMembers&ref_id={ref_id}{extra}",
             f"{settings.ilias_base_url}/ilias.php?ref_id={ref_id}&cmd=viewMembers{extra}",
@@ -635,8 +635,9 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                 resp = await client.get(url)
                 self._check_response_for_session_loss(resp, url)
                 # If we hit the members submissions table
-                if parse_submission_listing(resp.text, str(resp.url)).found:
-                    result = await collect_submissions(client, resp, ref_id, ass_id, self._check_response_for_session_loss)
+                page = parse_submission_listing(resp.text, str(resp.url))
+                if page.found:
+                    result = await collect_submissions(client, resp, ref_id, ass_id, self._check_response_for_session_loss, page)
                     if include_ilias_order:
                         await self._load_ilias_sort_names(client, result)
                     return result
