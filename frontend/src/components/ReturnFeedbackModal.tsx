@@ -68,6 +68,13 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
 
     (submissions || []).forEach((s) => {
       const isSub = s.submission_status === 'submitted' || s.submission_status === 'late' || Boolean(s.files && s.files.length > 0);
+      const hasFb = Boolean(
+        s.evaluation_by_file_url ||
+        s.feedback ||
+        s.evaluation_on ||
+        s.graded_on ||
+        (s.passed_status && s.passed_status !== 'not_graded')
+      );
       if (s.team_id) {
         const uId = `team:${s.team_id}`;
         if (!unitsMap.has(uId)) {
@@ -76,6 +83,7 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
             isTeam: true,
             teamId: s.team_id,
             hasSubmitted: isSub,
+            hasExistingFeedback: hasFb,
             memberNames: s.student_name ? [s.student_name] : [],
             primaryLabel: s.team_name || `Team ${s.team_id}`,
             secondaryLabel: s.student_name || '',
@@ -89,6 +97,9 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
           if (isSub) {
             existing.hasSubmitted = true;
           }
+          if (hasFb) {
+            existing.hasExistingFeedback = true;
+          }
         }
       } else {
         const uId = `user:${s.member_id}`;
@@ -97,6 +108,7 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
             unitId: uId,
             isTeam: false,
             hasSubmitted: isSub,
+            hasExistingFeedback: hasFb,
             memberNames: s.student_name ? [s.student_name] : [],
             primaryLabel: s.student_name || `User ${s.member_id}`,
             secondaryLabel: s.member_id ? `ID: ${s.member_id}` : undefined,
@@ -407,8 +419,9 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                           const mappedUnitId = manualMappings[filePath] || '';
                           const filename = filePath.split('/').pop() || '';
                           const conflictKey = `${mappedUnitId}:${filename}`;
+                          const selectedUnitOption = availableUnits.find((u) => u.unitId === mappedUnitId);
                           const existingFiles = mappedUnitId ? (previewData.existing_feedback_by_unit?.[mappedUnitId] || []) : [];
-                          const hasExistingFeedback = existingFiles.length > 0;
+                          const hasExistingFeedback = Boolean(selectedUnitOption?.hasExistingFeedback || existingFiles.length > 0);
                           const isNameConflict = existingFiles.includes(filename);
                           const action = conflictActions[conflictKey] || (isNameConflict ? 'overwrite' : 'keep_both');
 
@@ -431,13 +444,14 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                                       ...prev,
                                       [filePath]: unitId,
                                     }));
+                                    const targetUnit = availableUnits.find((u) => u.unitId === unitId);
                                     const exFiles = previewData?.existing_feedback_by_unit?.[unitId] || [];
                                     const fn = filePath.split('/').pop() || '';
                                     const key = `${unitId}:${fn}`;
                                     if (!conflictActions[key]) {
                                       setConflictActions((prev) => ({
                                         ...prev,
-                                        [key]: exFiles.includes(fn) ? 'overwrite' : 'keep_both',
+                                        [key]: (exFiles.includes(fn) || targetUnit?.hasExistingFeedback) ? 'overwrite' : 'keep_both',
                                       }));
                                     }
                                   }}

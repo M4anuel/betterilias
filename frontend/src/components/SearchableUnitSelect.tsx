@@ -7,6 +7,7 @@ export interface AssignmentUnitOption {
   isTeam: boolean;
   teamId?: string;
   hasSubmitted: boolean;
+  hasExistingFeedback?: boolean;
   memberNames: string[];
   primaryLabel: string;
   secondaryLabel?: string;
@@ -259,6 +260,11 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                                 {t("Eingereicht")}
                               </span>
+                              {unit.hasExistingFeedback && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100/80 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
+                                  {t("Feedback vorhanden")}
+                                </span>
+                              )}
                               {isSelected && <Check className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />}
                             </div>
                           </div>
@@ -307,6 +313,11 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                                 {t("Keine Abgabe eingereicht")}
                               </span>
+                              {unit.hasExistingFeedback && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100/80 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
+                                  {t("Feedback vorhanden")}
+                                </span>
+                              )}
                               {isSelected && <Check className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />}
                             </div>
                           </div>

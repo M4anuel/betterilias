@@ -330,10 +330,19 @@ async def preview_feedback_import(
         unit_files_map.setdefault(resolved_unit_id, []).append((path, filename, data))
 
     # 5. Query existing feedback files on ILIAS to detect filename conflicts
+    # CRITICAL: Only check units that are actually matched in unit_files_map!
+    # Checking all course participants blindly causes ILIAS HTTP 500 errors and overloads sessions.
     existing_feedback_cache: Dict[str, Dict[str, str]] = {}  # unit_id -> {filename: file_id}
     sem = asyncio.Semaphore(5)
 
     async def fetch_existing_feedback(unit_id: str, sub: SubmissionItem):
+        # In ILIAS, if evaluation_by_file_url is not in the submissions table,
+        # there are no existing feedback files for this participant on ILIAS.
+        # Synthesizing blind URLs for users without active evaluation links can trigger ILIAS 500s.
+        if not sub.evaluation_by_file_url and not hasattr(client, "_is_mock"):
+            existing_feedback_cache[unit_id] = {}
+            return
+
         async with sem:
             try:
                 fb_resp = await client.get_submission_feedback_files(
@@ -350,11 +359,15 @@ async def preview_feedback_import(
 
     check_tasks = []
     seen_units = set()
-    for sub in submissions:
-        uid = f"team:{sub.team_id}" if sub.team_id else f"user:{sub.member_id}"
-        if uid not in seen_units:
-            seen_units.add(uid)
+    for uid in unit_files_map.keys():
+        if uid in seen_units:
+            continue
+        seen_units.add(uid)
+        sub = team_map.get(uid) if uid.startswith("team:") else user_map.get(uid.split(":")[-1])
+        if sub:
             check_tasks.append(fetch_existing_feedback(uid, sub))
+        else:
+            existing_feedback_cache[uid] = {}
 
     if check_tasks:
         await asyncio.gather(*check_tasks)
@@ -700,6 +713,22 @@ async def commit_feedback_import(
 
         async with sem:
             try:
+                # If overwrite chosen but file ID not in staging cache, check ILIAS on demand
+                if action == "overwrite" and not existing_file_id and feedback_url:
+                    try:
+                        fb_resp = await client.get_submission_feedback_files(
+                            exercise_ref_id=exercise_ref_id,
+                            member_id=sub.member_id,
+                            ass_id=ass_id,
+                            feedback_url=feedback_url,
+                        )
+                        for ef in fb_resp.files:
+                            if ef.title == filename:
+                                existing_file_id = ef.id
+                                break
+                    except Exception as chk_err:
+                        logger.warning(f"Could not inspect feedback files for {target_unit_id} before overwrite: {chk_err}")
+
                 if action == "overwrite" and existing_file_id:
                     try:
                         await client.delete_submission_feedback_file(
