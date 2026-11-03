@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   X,
   Upload,
@@ -18,17 +18,20 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { formatBytes } from '../lib/downloadManager';
+import { SearchableUnitSelect, AssignmentUnitOption } from './SearchableUnitSelect';
 import { t } from '../lib/i18n';
 import {
   FeedbackImportPreviewResponse,
   FeedbackImportCommitResponse,
   FeedbackUnitImportPreview,
+  SubmissionItem,
 } from '../types';
 
 interface ReturnFeedbackModalProps {
   exerciseRefId: string;
   assId: string;
   assignmentTitle: string;
+  submissions?: SubmissionItem[];
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -40,6 +43,7 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
   exerciseRefId,
   assId,
   assignmentTitle,
+  submissions,
   isOpen,
   onClose,
   onSuccess,
@@ -49,10 +53,91 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<FeedbackImportPreviewResponse | null>(null);
   const [conflictActions, setConflictActions] = useState<Record<string, 'overwrite' | 'skip' | 'keep_both'>>({});
+  const [manualMappings, setManualMappings] = useState<Record<string, string>>({});
   const [commitResult, setCommitResult] = useState<FeedbackImportCommitResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
   const [showUnmatched, setShowUnmatched] = useState(false);
+
+  const isGroupExercise = useMemo(() => {
+    return (submissions || []).some((s) => Boolean(s.team_id));
+  }, [submissions]);
+
+  const availableUnits = useMemo<AssignmentUnitOption[]>(() => {
+    const unitsMap = new Map<string, AssignmentUnitOption>();
+
+    (submissions || []).forEach((s) => {
+      const isSub = s.submission_status === 'submitted' || s.submission_status === 'late' || Boolean(s.files && s.files.length > 0);
+      if (s.team_id) {
+        const uId = `team:${s.team_id}`;
+        if (!unitsMap.has(uId)) {
+          unitsMap.set(uId, {
+            unitId: uId,
+            isTeam: true,
+            teamId: s.team_id,
+            hasSubmitted: isSub,
+            memberNames: s.student_name ? [s.student_name] : [],
+            primaryLabel: s.team_name || `Team ${s.team_id}`,
+            secondaryLabel: s.student_name || '',
+          });
+        } else {
+          const existing = unitsMap.get(uId)!;
+          if (s.student_name && !existing.memberNames.includes(s.student_name)) {
+            existing.memberNames.push(s.student_name);
+            existing.secondaryLabel = existing.memberNames.join(', ');
+          }
+          if (isSub) {
+            existing.hasSubmitted = true;
+          }
+        }
+      } else {
+        const uId = `user:${s.member_id}`;
+        if (!unitsMap.has(uId)) {
+          unitsMap.set(uId, {
+            unitId: uId,
+            isTeam: false,
+            hasSubmitted: isSub,
+            memberNames: s.student_name ? [s.student_name] : [],
+            primaryLabel: s.student_name || `User ${s.member_id}`,
+            secondaryLabel: s.member_id ? `ID: ${s.member_id}` : undefined,
+          });
+        }
+      }
+    });
+
+    const list = Array.from(unitsMap.values());
+
+    // Priority sort:
+    // If group exercise:
+    // 1. Submitted groups (isTeam && hasSubmitted)
+    // 2. Submitted individuals (!isTeam && hasSubmitted)
+    // 3. Unsubmitted groups (isTeam && !hasSubmitted)
+    // 4. Unsubmitted individuals (!isTeam && !hasSubmitted)
+    // If individual exercise:
+    // 1. Submitted individuals (hasSubmitted)
+    // 2. Unsubmitted individuals (!hasSubmitted)
+    list.sort((a, b) => {
+      if (isGroupExercise) {
+        const scoreA = (a.isTeam ? 2 : 0) + (a.hasSubmitted ? 4 : 0);
+        const scoreB = (b.isTeam ? 2 : 0) + (b.hasSubmitted ? 4 : 0);
+        if (scoreA !== scoreB) {
+          return scoreB - scoreA;
+        }
+      } else {
+        if (a.hasSubmitted !== b.hasSubmitted) {
+          return a.hasSubmitted ? -1 : 1;
+        }
+      }
+      const numA = a.teamId ? parseInt(a.teamId, 10) : NaN;
+      const numB = b.teamId ? parseInt(b.teamId, 10) : NaN;
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numA - numB;
+      }
+      return a.primaryLabel.localeCompare(b.primaryLabel);
+    });
+
+    return list;
+  }, [submissions, isGroupExercise]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,6 +147,7 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
       setSelectedFile(null);
       setPreviewData(null);
       setConflictActions({});
+      setManualMappings({});
       setCommitResult(null);
       setErrorMessage(null);
       setShowSkipped(false);
@@ -115,6 +201,7 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
         staged_import_id: previewData.staged_import_id,
         snapshot_token: previewData.snapshot_token,
         conflict_actions: conflictActions,
+        manual_mappings: manualMappings,
       });
       setCommitResult(res);
       setStep('completed');
@@ -126,8 +213,9 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
   };
 
   const hasBlockers = (previewData?.blockers && previewData.blockers.length > 0) || false;
-  const totalUnits = previewData?.units.length || 0;
-  const totalFiles = previewData?.total_files || 0;
+  const manualMappedCount = Object.keys(manualMappings).filter((k) => manualMappings[k]).length;
+  const totalUnits = (previewData?.units.length || 0) + (manualMappedCount > 0 ? 1 : 0);
+  const totalFiles = (previewData?.total_files || 0) + manualMappedCount;
 
   return (
     <div
@@ -296,9 +384,9 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                 </div>
               </div>
 
-              {/* Unmatched Files Warning */}
+              {/* Unmatched Files Section */}
               {previewData.unmatched_files.length > 0 && (
-                <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 p-3.5 text-xs space-y-2">
+                <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 p-3.5 text-xs space-y-2.5">
                   <div
                     onClick={() => setShowUnmatched(!showUnmatched)}
                     className="flex items-center justify-between cursor-pointer font-bold text-amber-800 dark:text-amber-300"
@@ -310,11 +398,100 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                     {showUnmatched ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </div>
                   {showUnmatched && (
-                    <ul className="space-y-1 text-slate-600 dark:text-slate-400 text-[11px] list-disc list-inside max-h-32 overflow-y-auto pt-1">
-                      {previewData.unmatched_files.map((f, idx) => (
-                        <li key={idx} className="truncate">{f}</li>
-                      ))}
-                    </ul>
+                    <div className="space-y-2 pt-1">
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                        {t("Sie können nicht zugeordnete Dateien hier manuell einem Teilnehmer oder Team zuweisen:")}
+                      </p>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {previewData.unmatched_files.map((filePath, idx) => {
+                          const mappedUnitId = manualMappings[filePath] || '';
+                          const filename = filePath.split('/').pop() || '';
+                          const conflictKey = `${mappedUnitId}:${filename}`;
+                          const existingFiles = mappedUnitId ? (previewData.existing_feedback_by_unit?.[mappedUnitId] || []) : [];
+                          const hasExistingFeedback = existingFiles.length > 0;
+                          const isNameConflict = existingFiles.includes(filename);
+                          const action = conflictActions[conflictKey] || (isNameConflict ? 'overwrite' : 'keep_both');
+
+                          return (
+                            <div
+                              key={idx}
+                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-amber-200/60 dark:border-amber-900/40 text-[11px]"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileText className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                <span className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={filePath}>
+                                  {filename}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                <SearchableUnitSelect
+                                  selectedUnitId={mappedUnitId}
+                                  onSelect={(unitId) => {
+                                    setManualMappings((prev) => ({
+                                      ...prev,
+                                      [filePath]: unitId,
+                                    }));
+                                    const exFiles = previewData?.existing_feedback_by_unit?.[unitId] || [];
+                                    const fn = filePath.split('/').pop() || '';
+                                    const key = `${unitId}:${fn}`;
+                                    if (!conflictActions[key]) {
+                                      setConflictActions((prev) => ({
+                                        ...prev,
+                                        [key]: exFiles.includes(fn) ? 'overwrite' : 'keep_both',
+                                      }));
+                                    }
+                                  }}
+                                  onClear={() => {
+                                    setManualMappings((prev) => {
+                                      const copy = { ...prev };
+                                      delete copy[filePath];
+                                      return copy;
+                                    });
+                                  }}
+                                  units={availableUnits}
+                                  isGroupExercise={isGroupExercise}
+                                />
+
+                                {mappedUnitId && (
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {hasExistingFeedback ? (
+                                      <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-2 py-1 rounded-xl">
+                                        <span
+                                          className="text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                                          title={existingFiles.join(', ')}
+                                        >
+                                          {isNameConflict ? t("Datei existiert bereits") : t("Feedback vorhanden")}
+                                        </span>
+                                        <select
+                                          value={action}
+                                          onChange={(e) => {
+                                            const val = e.target.value as 'overwrite' | 'skip' | 'keep_both';
+                                            setConflictActions((prev) => ({
+                                              ...prev,
+                                              [conflictKey]: val,
+                                            }));
+                                          }}
+                                          className="rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 text-[10px] font-semibold text-slate-700 dark:text-slate-200 px-1.5 py-0.5 cursor-pointer"
+                                        >
+                                          <option value="overwrite">{t("Ersetzen")}</option>
+                                          <option value="keep_both">{t("Zusätzlich hochladen")}</option>
+                                          <option value="skip">{t("Überspringen")}</option>
+                                        </select>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 px-2 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        <span>{t("Neu")}</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}

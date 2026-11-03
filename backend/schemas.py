@@ -653,11 +653,13 @@ class FeedbackImportPreviewResponse(BaseModel):
     total_size_bytes: int = 0
     total_units: int = 0
     has_conflicts: bool = False
+    existing_feedback_by_unit: Dict[str, List[str]] = Field(default_factory=dict)
 
 class FeedbackImportCommitRequest(BaseModel):
     staged_import_id: str = Field(pattern=r'^[a-zA-Z0-9_-]{1,128}$')
     snapshot_token: str
     conflict_actions: Dict[str, str] = Field(default_factory=dict) # "{unit_id}:{filename}" -> "overwrite" | "skip" | "keep_both"
+    manual_mappings: Dict[str, str] = Field(default_factory=dict) # "{source_path}" -> "{target_unit_id}"
 
 class FeedbackImportCommitResultItem(BaseModel):
     unit_id: str

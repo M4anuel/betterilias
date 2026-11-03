@@ -543,12 +543,14 @@ export interface FeedbackImportPreviewResponse {
   total_size_bytes: number;
   total_units: number;
   has_conflicts: boolean;
+  existing_feedback_by_unit?: Record<string, string[]>;
 }
 
 export interface FeedbackImportCommitRequest {
   staged_import_id: string;
   snapshot_token: string;
   conflict_actions: Record<string, 'overwrite' | 'skip' | 'keep_both'>;
+  manual_mappings?: Record<string, string>;
 }
 
 export interface FeedbackImportCommitResultItem {

@@ -263,6 +263,7 @@ async def preview_feedback_import(
 
     blockers: List[str] = list(errors)
     unmatched_files: List[str] = []
+    unmatched_files_data: List[Tuple[str, str, bytes]] = []
 
     # 3. Check for BetterIlias manifest / metadata files
     manifest_data: Optional[Dict[str, Any]] = None
@@ -310,6 +311,7 @@ async def preview_feedback_import(
 
         if not unit_id:
             unmatched_files.append(path)
+            unmatched_files_data.append((path, filename, data))
             continue
 
         # Check if unit actually belongs to this assignment
@@ -321,6 +323,7 @@ async def preview_feedback_import(
 
         if not target_sub:
             unmatched_files.append(f"{path} (ID {raw_id} not found in this assignment)")
+            unmatched_files_data.append((path, filename, data))
             continue
 
         resolved_unit_id = f"team:{target_sub.team_id}" if target_sub.team_id else f"user:{target_sub.member_id}"
@@ -346,9 +349,11 @@ async def preview_feedback_import(
                 existing_feedback_cache[unit_id] = {}
 
     check_tasks = []
-    for uid in unit_files_map.keys():
-        sub = team_map.get(uid) if uid.startswith("team:") else user_map.get(uid.split(":")[-1])
-        if sub:
+    seen_units = set()
+    for sub in submissions:
+        uid = f"team:{sub.team_id}" if sub.team_id else f"user:{sub.member_id}"
+        if uid not in seen_units:
+            seen_units.add(uid)
             check_tasks.append(fetch_existing_feedback(uid, sub))
 
     if check_tasks:
@@ -416,10 +421,32 @@ async def preview_feedback_import(
             )
         )
 
+    # Stage unmatched files as well so manual mapping resolution can reference them
+    unmatched_folder = stage_dir / "_unmatched"
+    unmatched_files_meta: Dict[str, Dict[str, Any]] = {}
+    if unmatched_files_data:
+        unmatched_folder.mkdir(parents=True, exist_ok=True)
+        for u_path, u_filename, u_data in unmatched_files_data:
+            safe_id = hashlib.sha256(u_path.encode("utf-8")).hexdigest()[:12]
+            stored_filename = f"{safe_id}_{u_filename}"
+            (unmatched_folder / stored_filename).write_bytes(u_data)
+            unmatched_files_meta[u_path] = {
+                "source_path": u_path,
+                "filename": u_filename,
+                "stored_filename": stored_filename,
+                "size_bytes": len(u_data),
+            }
+
     # Compute snapshot token
     fingerprint_items.sort()
     token_str = f"{exercise_ref_id}:{ass_id}:" + json.dumps(fingerprint_items)
     snapshot_token = hashlib.sha256(token_str.encode("utf-8")).hexdigest()
+
+    existing_feedback_by_unit = {
+        uid: list(files_dict.keys())
+        for uid, files_dict in existing_feedback_cache.items()
+        if files_dict
+    }
 
     # Save metadata manifest in staging dir for commit verification
     staged_manifest = {
@@ -429,6 +456,8 @@ async def preview_feedback_import(
         "ass_id": ass_id,
         "created_at": time.time(),
         "units": [u.model_dump() for u in preview_units],
+        "unmatched_files_meta": unmatched_files_meta,
+        "existing_feedback_cache": existing_feedback_cache,
     }
     (stage_dir / "meta.json").write_text(json.dumps(staged_manifest), encoding="utf-8")
 
@@ -445,6 +474,7 @@ async def preview_feedback_import(
         total_size_bytes=total_size,
         total_units=len(preview_units),
         has_conflicts=has_conflicts,
+        existing_feedback_by_unit=existing_feedback_by_unit,
     )
 
 
@@ -591,15 +621,144 @@ async def commit_feedback_import(
     if upload_tasks:
         await asyncio.gather(*upload_tasks)
 
+    # Process any manual mappings for previously unmatched files
+    manual_mappings = request.manual_mappings or {}
+    unmatched_meta = meta.get("unmatched_files_meta", {})
+    unmatched_folder = stage_dir / "_unmatched"
+
+    async def upload_manual_item(source_path: str, target_unit_id: str):
+        nonlocal uploaded_count, skipped_count, failed_count
+        file_info = unmatched_meta.get(source_path)
+        if not file_info:
+            failed_count += 1
+            results.append(
+                FeedbackImportCommitResultItem(
+                    unit_id=target_unit_id,
+                    filename=source_path.split("/")[-1],
+                    status="failed",
+                    message=t("Unmatched file not found in staging metadata."),
+                )
+            )
+            return
+
+        filename = file_info["filename"]
+        stored_file = unmatched_folder / file_info["stored_filename"]
+        if not stored_file.exists():
+            failed_count += 1
+            results.append(
+                FeedbackImportCommitResultItem(
+                    unit_id=target_unit_id,
+                    filename=filename,
+                    status="failed",
+                    message=t("Staged file not found on disk."),
+                )
+            )
+            return
+
+        sub = None
+        if target_unit_id.startswith("team:"):
+            sub = team_sub_map.get(target_unit_id[5:])
+        else:
+            raw_uid = target_unit_id.split(":")[-1]
+            sub = sub_map.get(raw_uid)
+
+        if not sub:
+            failed_count += 1
+            results.append(
+                FeedbackImportCommitResultItem(
+                    unit_id=target_unit_id,
+                    filename=filename,
+                    status="failed",
+                    message=t("Recipient not found in assignment."),
+                )
+            )
+            return
+
+        # Check conflict action for this manually mapped file
+        conflict_key = f"{target_unit_id}:{filename}"
+        action = request.conflict_actions.get(conflict_key, "overwrite")
+
+        if action == "skip":
+            skipped_count += 1
+            results.append(
+                FeedbackImportCommitResultItem(
+                    unit_id=target_unit_id,
+                    filename=filename,
+                    status="skipped",
+                    message=t("Skipped by user choice."),
+                )
+            )
+            return
+
+        file_bytes = stored_file.read_bytes()
+        feedback_url = sub.evaluation_by_file_url
+
+        # Check existing file deletion if action is overwrite
+        existing_cache = meta.get("existing_feedback_cache", {})
+        unit_existing = existing_cache.get(target_unit_id, {})
+        existing_file_id = unit_existing.get(filename)
+
+        async with sem:
+            try:
+                if action == "overwrite" and existing_file_id:
+                    try:
+                        await client.delete_submission_feedback_file(
+                            exercise_ref_id=exercise_ref_id,
+                            member_id=sub.member_id,
+                            file_id=existing_file_id,
+                            ass_id=ass_id,
+                            feedback_url=feedback_url,
+                        )
+                    except Exception as del_err:
+                        logger.warning(f"Could not delete existing feedback file {existing_file_id} for {target_unit_id}: {del_err}")
+
+                # Upload feedback file to ILIAS
+                await client.upload_submission_feedback_file(
+                    exercise_ref_id=exercise_ref_id,
+                    member_id=sub.member_id,
+                    filename=filename,
+                    file_bytes=file_bytes,
+                    ass_id=ass_id,
+                    feedback_url=feedback_url,
+                )
+                uploaded_count += 1
+                results.append(
+                    FeedbackImportCommitResultItem(
+                        unit_id=target_unit_id,
+                        filename=filename,
+                        status="success",
+                        message=t("Uploaded successfully via manual mapping."),
+                    )
+                )
+            except Exception as e:
+                failed_count += 1
+                results.append(
+                    FeedbackImportCommitResultItem(
+                        unit_id=target_unit_id,
+                        filename=filename,
+                        status="failed",
+                        message=str(e),
+                    )
+                )
+
+    manual_tasks = []
+    for s_path, t_uid in manual_mappings.items():
+        if t_uid:
+            manual_tasks.append(upload_manual_item(s_path, t_uid))
+
+    if manual_tasks:
+        await asyncio.gather(*manual_tasks)
+
     # Clean up staging directory
     try:
         shutil.rmtree(stage_dir, ignore_errors=True)
     except Exception as e:
         logger.warning(f"Failed to remove staging directory {stage_dir}: {e}")
 
+    total_ops = len(upload_tasks) + len(manual_tasks)
     return FeedbackImportCommitResponse(
-        success=failed_count == 0,
-        total_processed=len(upload_tasks),
+        success=failed_count == 0 and (uploaded_count > 0 or skipped_count > 0),
+        total_processed=total_ops,
         uploaded_count=uploaded_count,
         skipped_count=skipped_count,
         failed_count=failed_count,

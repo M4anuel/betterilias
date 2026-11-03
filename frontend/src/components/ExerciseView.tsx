@@ -2859,6 +2859,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               (a) => String(a.ass_id) === String(selectedTaAssId || taSubmissionsData?.active_assignment_id)
             )?.title || t("Übung")
           }
+          submissions={taSubmissionsData?.submissions || []}
           isOpen={isReturnFeedbackModalOpen}
           onClose={() => setIsReturnFeedbackModalOpen(false)}
           onSuccess={() => {

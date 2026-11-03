@@ -219,3 +219,70 @@ async def test_re_zip_empty_and_feedback_json_manifest_ignored():
     assert any("submissions" in s for s in preview.skipped_files)
 
 
+
+
+@pytest.mark.asyncio
+async def test_manual_mapping_unmatched_file_upload():
+    mock_client = AsyncMock(spec=IliasClient)
+    mock_client.get_exercise_submissions.return_value = ExerciseSubmissionsResponse(
+        exercise=ExerciseInfo(ref_id="999", title="Test"),
+        submissions=[
+            SubmissionItem(member_id="101", student_name="Alice", submission_status="submitted"),
+            SubmissionItem(member_id="102", student_name="Bob", team_id="55", team_name="Team 55", submission_status="submitted"),
+        ],
+    )
+    mock_client.get_submission_feedback_files.return_value = FeedbackFilesResponse(
+        member_id="101",
+        files=[],
+    )
+    mock_client.upload_submission_feedback_file.return_value = (True, "OK", "new_f1")
+
+    # ZIP with flat unmatched file
+    zip_content = {
+        "RandomName_review.pdf": b"manual review content",
+    }
+    zip_bytes = create_test_zip(zip_content)
+    session_id = "test_manual_sess"
+
+    preview = await preview_feedback_import(
+        exercise_ref_id="999",
+        ass_id="42",
+        session_id=session_id,
+        file_bytes=zip_bytes,
+        client=mock_client,
+    )
+
+    assert len(preview.unmatched_files) == 1
+    assert preview.unmatched_files[0] == "RandomName_review.pdf"
+    assert preview.total_files == 0
+
+    # Commit with manual mapping assigning RandomName_review.pdf to Team 55
+    commit_req = FeedbackImportCommitRequest(
+        staged_import_id=preview.staged_import_id,
+        snapshot_token=preview.snapshot_token,
+        conflict_actions={},
+        manual_mappings={"RandomName_review.pdf": "team:55"},
+    )
+
+    commit_res = await commit_feedback_import(
+        exercise_ref_id="999",
+        ass_id="42",
+        session_id=session_id,
+        request=commit_req,
+        client=mock_client,
+    )
+
+    assert commit_res.success is True
+    assert commit_res.uploaded_count == 1
+    assert commit_res.failed_count == 0
+    assert commit_res.results[0].unit_id == "team:55"
+    assert commit_res.results[0].filename == "RandomName_review.pdf"
+
+    mock_client.upload_submission_feedback_file.assert_called_once_with(
+        exercise_ref_id="999",
+        member_id="102",
+        filename="RandomName_review.pdf",
+        file_bytes=b"manual review content",
+        ass_id="42",
+        feedback_url=None,
+    )
