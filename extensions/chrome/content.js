@@ -36,7 +36,8 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     try {
       document.dispatchEvent(
         new CustomEvent('BETTERILIAS_SESSION_SYNCED', {
-          detail: { sessionId }
+          // Firefox page scripts cannot read objects owned by the Xray sandbox.
+          detail: typeof cloneInto === 'function' ? cloneInto({ sessionId }, window) : { sessionId }
         })
       );
     } catch (_) {}
@@ -50,6 +51,25 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     } catch (_) {}
   }
 
+  // Register live updates before awaiting startup checks or background requests.
+  browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message && message.type === 'BETTERILIAS_SESSION_SYNCED' && message.sessionId) {
+      try {
+        applySessionToPage(message.sessionId);
+        sendResponse({ success: true });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    }
+    return false;
+  });
+
+  browserAPI.storage.onChanged?.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes.sessionId?.newValue) {
+      applySessionToPage(changes.sessionId.newValue);
+    }
+  });
+
   try {
     // 1. Sync session from extension storage to web app localStorage if available
     const data = await browserAPI.storage.local.get(['sessionId']);
@@ -62,25 +82,11 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
   // 2. Ask background service worker to check and auto-sync immediately if logged in
   try {
-    browserAPI.runtime.sendMessage({ type: 'CHECK_AND_AUTO_SYNC' }, (response) => {
-      if (response && response.sessionId) {
-        applySessionToPage(response.sessionId);
-      }
-    });
-  } catch (_) {}
-
-  // 3. Listen for runtime messages from the extension popup or background worker
-  browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message && message.type === 'BETTERILIAS_SESSION_SYNCED' && message.sessionId) {
-      try {
-        applySessionToPage(message.sessionId);
-        sendResponse({ success: true });
-      } catch (err) {
-        sendResponse({ success: false, error: err.message });
-      }
+    const response = await browserAPI.runtime.sendMessage({ type: 'CHECK_AND_AUTO_SYNC' });
+    if (response && response.sessionId) {
+      applySessionToPage(response.sessionId);
     }
-    return true;
-  });
+  } catch (_) {}
 
   // 4. Inform web app that the companion extension is installed
   try {

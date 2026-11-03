@@ -12,13 +12,21 @@ patterns. The content scripts check the page's actual origin against the standar
 development endpoints and saved frontend/backend settings before sharing a session.
 Keep this origin check when changing manifest permissions.
 
-For native Firefox regressions, install `marionette_driver` in your test
+For native Firefox regressions, build the frontend and install `marionette_driver` in your test
 environment and run `python -m pytest tests/test_firefox_extension_browser.py -v`
 with `BETTERILIAS_FIREFOX_TESTS=1`. Set `BETTERILIAS_FIREFOX_BINARY` if Firefox is
 not installed in its standard location. These tests use fresh headless Firefox
 profiles, synthetic cookies and local test servers; they do not use a real ILIAS
 account. They exercise the packaged popup document with real extension APIs,
 including the 20-second network timeout, retry and content-script handoff.
+The built React app is also checked in an already-open tab after another sync:
+its course requests must carry the new `X-Session-Id`, the course must appear and
+the inactive-session banner must disappear. The custom DOM event is tested
+independently of postMessage to cover Firefox's page/extension object boundary.
+Firefox event detail objects must be cloned into the page with `cloneInto`;
+writing localStorage alone does not notify an already-mounted React app. Both
+companions listen for extension-storage session changes as well as tab messages,
+and register these listeners before waiting for a background sync response.
 
 Browser-internal addresses such as `chrome://extensions`, `edge://extensions`
 and `about:debugging#/runtime/this-firefox` must be pasted into the address bar.

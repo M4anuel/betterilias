@@ -13,6 +13,7 @@ import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Event, Thread
+from urllib.parse import urlsplit, unquote
 
 import pytest
 
@@ -30,6 +31,11 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
     tr = json.loads((ROOT / 'locales' / f'{language}.json').read_text(encoding='utf-8'))
     mode = ['valid']
     requests = []
+    session_id = ['isolated-firefox-session']
+    course_credentials = []
+    build = ROOT / 'frontend/dist'
+    if not (build / 'index.html').is_file():
+        pytest.skip('Build the frontend before running the native Firefox app check')
     release = Event()
 
     class Handler(BaseHTTPRequestHandler):
@@ -40,7 +46,7 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
             if current == 'stalled':
                 release.wait(30)
             status = 401 if current == 'expired' else 503 if current == 'unavailable' else 200
-            body = json.dumps(dict(success=True, authenticated=True, session_id='isolated-firefox-session', user_name='Test User') if status == 200 else {}).encode()
+            body = json.dumps(dict(success=True, authenticated=True, session_id=session_id[0], user_name='Test User') if status == 200 else {}).encode()
             try:
                 self.send_response(status)
                 self.send_header('Content-Type', 'application/json')
@@ -51,9 +57,40 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
                 pass  # The popup correctly aborts a stalled request.
 
         def do_GET(self):
-            body = b'<!doctype html><title>Isolated BetterIlias handoff</title>'
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html')
+            path = urlsplit(self.path).path
+            status, content_type = 200, 'application/json'
+            authenticated = self.headers.get('X-Session-Id') == session_id[0]
+            if path == '/bridge-test.js':
+                # Exercise the custom DOM event independently of postMessage,
+                # whose source differs across Firefox versions/privilege contexts.
+                content_type = 'text/javascript'
+                body = (f"localStorage.setItem('betterilias_language', {json.dumps(language)});"
+                    f"localStorage.setItem('betterilias_theme_mode', {json.dumps('dark' if language == 'de' else 'light')});"
+                    "window.addEventListener('message', event => { if (event.data?.type === 'BETTERILIAS_SESSION_SYNCED') event.stopImmediatePropagation(); });").encode()
+            elif path == '/api/auth/status':
+                body = json.dumps(dict(authenticated=authenticated, cookies_present=authenticated)).encode()
+            elif path == '/api/dashboard/semesters':
+                course_credentials.append(self.headers.get('X-Session-Id'))
+                status = 200 if authenticated else 401
+                body = json.dumps(dict(active_semester='HS2026', available_semesters=['HS2026'],
+                    courses=[dict(ref_id='42', title='Firefox live sync course', url='https://ilias.unibe.ch/goto.php?target=crs_42', item_type='crs', semester='HS2026')],
+                    grouped_by_category={}) if authenticated else dict(detail='Unauthenticated')).encode()
+            elif path.startswith('/api/'):
+                body = b'{}'
+            else:
+                asset = (build / unquote(path).lstrip('/')).resolve()
+                if not asset.is_relative_to(build.resolve()):
+                    self.send_error(404)
+                    return
+                if not asset.is_file():
+                    asset = build / 'index.html'
+                body = asset.read_bytes()
+                content_type = {'.js':'text/javascript', '.css':'text/css', '.svg':'image/svg+xml'}.get(asset.suffix, 'text/html')
+                if asset.name == 'index.html':
+                    body = body.replace(b'<head>', b'<head><script src="/bridge-test.js"></script>')
+            self.send_response(status)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(len(body)))
             self.end_headers()
             self.wfile.write(body)
 
@@ -103,7 +140,7 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
                 with client.using_context('chrome'):
                     client.execute_script('gBrowser.selectedBrowser.loadURI(Services.io.newURI(arguments[0]), {triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()});', script_args=[url])
                 if not url.endswith('/harness.html'):
-                    wait_for('return location.href === ' + json.dumps(url) + ' && document.readyState === "complete";')
+                    wait_for('return location.href.split(/[?#]/)[0] === ' + json.dumps(url) + ' && document.readyState === "complete";')
 
             def wait_for(script, timeout=10):
                 deadline = time.monotonic() + timeout
@@ -145,8 +182,22 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
             # Actual content script, Firefox Xray boundaries and native storage.
             navigate(server_url + '/')
             wait_for('return localStorage.getItem("betterilias_session_id") === "isolated-firefox-session";')
+            wait_for('return document.body.innerText.includes("Firefox live sync course");')
+            app_handle = client.current_window_handle
+            popup_handle = client.open(type='tab', focus=True)['handle']
+            client.switch_to_window(popup_handle)
+            session_id[0] = 'rotated-firefox-session'
+            navigate(f'moz-extension://{uuid}/popup.html')
+            expect_status('Synchronisiert')
+            client.switch_to_window(app_handle)
+            wait_for('return localStorage.getItem("betterilias_session_id") === "rotated-firefox-session";')
+            wait_for('return localStorage.getItem("betterilias_cache_owner") === "rotated-firefox-session";')
+            wait_for('return document.body.innerText.includes("Firefox live sync course");')
+            assert 'rotated-firefox-session' in course_credentials
+            assert tr['Sitzung nicht aktiv:'] not in client.execute_script('return document.body.innerText;')
+            assert client.execute_script('return document.documentElement.lang;') == language
+            (tmp_path / 'live-sync-app.png').write_bytes(client.screenshot(format='binary'))
             navigate(f'http://127.0.0.1:{unrelated_server.server_port}/')
-            wait_for('return document.title === "Isolated BetterIlias handoff";')
             time.sleep(.5)
             assert client.execute_script('return localStorage.getItem("betterilias_session_id");') is None
         finally:

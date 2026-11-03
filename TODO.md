@@ -4,6 +4,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Make Firefox live-tab session events readable across its extension/page
+  boundary and propagate extension-storage changes; verify real React course
+  requests carry the replacement credential after sync.
+
 - [x] Fix Firefox local host match patterns and verify native popup sync,
   expired sessions, backend errors, request timeout/retry and scoped page handoff.
 
