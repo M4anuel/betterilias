@@ -5,6 +5,7 @@ Firefox binary (or BETTERILIAS_FIREFOX_BINARY); never opens a user's profile.
 """
 import json
 import os
+import secrets
 import shutil
 import socket
 import subprocess
@@ -23,7 +24,8 @@ pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_FIREFOX_TESTS') != '
 
 
 @pytest.mark.parametrize('language', ['de', 'en'])
-def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language, monkeypatch):
+@pytest.mark.parametrize('bridge_available', [True, False], ids=['content-script', 'no-content-script'])
+def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language, bridge_available, monkeypatch):
     Marionette = pytest.importorskip('marionette_driver.marionette').Marionette
     Addons = pytest.importorskip('marionette_driver.addons').Addons
     from fastapi import Response
@@ -38,6 +40,8 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
     requests = []
     session_id = ['isolated-firefox-session']
     course_credentials = []
+    handoffs = {}
+    claimed_handoffs = []
     build = ROOT / 'frontend/dist'
     if not (build / 'index.html').is_file():
         pytest.skip('Build the frontend before running the native Firefox app check')
@@ -45,8 +49,36 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
-            payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            payload = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
             requests.append(payload)
+            path = urlsplit(self.path).path
+            if path in ('/api/auth/mobile-session', '/api/auth/claim'):
+                claimed = None
+                if path.endswith('/mobile-session') and self.headers.get('X-Session-Id') == session_id[0]:
+                    token = secrets.token_urlsafe(32)
+                    handoffs[token] = (session_id[0], time.monotonic() + 60)
+                    status, data = 200, dict(handoff_token=token, expires_in=60)
+                elif path.endswith('/claim'):
+                    entry = handoffs.pop(payload.get('token'), None)
+                    if entry and entry[1] > time.monotonic() and entry[0] == session_id[0]:
+                        claimed = entry[0]
+                        claimed_handoffs.append(payload['token'])
+                        status, data = 200, dict(session_id=claimed)
+                    else:
+                        status, data = 401, dict(detail='Invalid handoff')
+                else:
+                    status, data = 401, dict(detail='Explicit session header required')
+                body = json.dumps(data).encode()
+                self.send_response(status)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                if claimed:
+                    cookie_response = Response()
+                    browser_cookie(cookie_response, claimed)
+                    self.send_header('Set-Cookie', cookie_response.headers['set-cookie'])
+                self.end_headers()
+                self.wfile.write(body)
+                return
             current = mode[0]
             if current == 'stalled':
                 # Stay stalled until the test releases us; a slow test host must
@@ -142,9 +174,15 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
     with zipfile.ZipFile(package, 'w') as archive:
         for path in (ROOT / 'extensions/firefox').rglob('*'):
             if path.is_file():
-                archive.write(path, path.relative_to(ROOT / 'extensions/firefox'))
-        # Keep the production manifest/permissions intact. Only seed isolated
-        # extension settings and a synthetic cookie before opening its popup.
+                if path.name == 'manifest.json' and not bridge_available:
+                    manifest = json.loads(path.read_text(encoding='utf-8'))
+                    manifest['content_scripts'] = []
+                    archive.writestr('manifest.json', json.dumps(manifest))
+                else:
+                    archive.write(path, path.relative_to(ROOT / 'extensions/firefox'))
+        # Keep production host permissions. The missing-bridge variant omits
+        # content scripts to model an existing tab without an injected receiver.
+        # Seed only isolated settings and a synthetic ILIAS cookie.
         archive.writestr('harness.html', '<!doctype html><script src="harness.js"></script>')
         archive.writestr('harness.js', '''(async () => {
           await browser.storage.local.set({language: %s, autoSyncEnabled: false, serverUrl: %s, frontendUrl: %s});
@@ -207,6 +245,17 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
             expect_status('Synchronisiert')
             # Actual content script, Firefox Xray boundaries and native storage.
             navigate(server_url + '/')
+            if not bridge_available:
+                wait_for('return document.body.innerText.includes(' + json.dumps(tr['Sitzung nicht aktiv:']) + ');')
+                assert None in course_credentials
+                app_handle = client.current_window_handle
+                popup_handle = client.open(type='tab', focus=True)['handle']
+                client.switch_to_window(popup_handle)
+                navigate(f'moz-extension://{uuid}/popup.html')
+                expect_status('Synchronisiert')
+                retry()
+                expect_status('Synchronisiert')
+                client.switch_to_window(app_handle)
             wait_for('return localStorage.getItem("betterilias_session_id") === "isolated-firefox-session";')
             wait_for('return document.body.innerText.includes("Firefox live sync course");')
             app_handle = client.current_window_handle
@@ -215,6 +264,9 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
             session_id[0] = 'rotated-firefox-session'
             navigate(f'moz-extension://{uuid}/popup.html')
             expect_status('Synchronisiert')
+            if not bridge_available:
+                retry()
+                expect_status('Synchronisiert')
             client.switch_to_window(app_handle)
             wait_for('return localStorage.getItem("betterilias_session_id") === "rotated-firefox-session";')
             wait_for('return localStorage.getItem("betterilias_cache_owner") === "rotated-firefox-session";')
@@ -222,6 +274,11 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
             assert 'rotated-firefox-session' in course_credentials
             assert tr['Sitzung nicht aktiv:'] not in client.execute_script('return document.body.innerText;')
             assert client.execute_script('return document.documentElement.lang;') == language
+            if not bridge_available:
+                assert len(claimed_handoffs) == 2
+                assert len(set(claimed_handoffs)) == 2
+                assert not handoffs
+                assert '#connect=' not in client.get_url()
             # Use the actual backend cookie helper: Firefox must retain the
             # HttpOnly /api cookie and send it on native GETs without a header.
             cookie_check = client.execute_async_script('''

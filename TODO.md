@@ -4,9 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
-- [ ] Diagnose the remaining Firefox profile with a synced companion but no
-  BetterIlias cookie; compare app request credentials with response headers.
-  Native clean-profile cookie acceptance is covered on localhost and 127.0.0.1.
+- [x] Recover manual companion sync when an open app tab has no content-script
+  receiver or session header, using separate one-use connection codes per tab.
+  Verify header authentication and cookie acceptance with and without the bridge.
 
 - [x] Make Firefox live-tab session events readable across its extension/page
   boundary and propagate extension-storage changes; verify real React course

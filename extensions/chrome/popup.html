@@ -192,6 +192,7 @@
     .badge-neutral { background: var(--btn-sec-bg); color: var(--text-muted); border: 1px solid var(--border-color); }
     [hidden] { display: none !important; }
     #login-btn { min-height: 48px; text-decoration: none; font-size: 14px; }
+    #sync-btn, #open-app-btn { min-height: 44px; }
 
     .info-sub {
       font-size: 11px;
@@ -331,7 +332,7 @@
     </div>
   </div>
 
-  <div id="feedback-box" class="feedback"></div>
+  <div id="feedback-box" class="feedback" aria-live="polite"></div>
 
   <a id="login-btn" class="btn btn-primary" href="https://ilias.unibe.ch/" target="_blank" rel="noopener noreferrer" hidden data-i18n="Bei ILIAS anmelden"></a>
 

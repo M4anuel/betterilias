@@ -13,6 +13,77 @@ pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
+@pytest.mark.parametrize('language,scheme', [('de', 'dark'), ('en', 'light')])
+def test_popup_recovers_tabs_without_content_scripts(local_site, directory, language, scheme):
+    pw = pytest.importorskip('playwright.sync_api')
+    tr = json.loads((ROOT / 'locales' / f'{language}.json').read_text(encoding='utf-8'))
+    artifacts = ROOT / 'scratch' / 'extension-handoff-checks'
+    artifacts.mkdir(parents=True, exist_ok=True)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=dict(width=320, height=740), color_scheme=scheme)
+        page.add_init_script('''
+          window.updatedTabs = [];
+          window.reloadedTabs = [];
+          window.chrome = {
+            storage: {local: {get: async () => ({language: %s}), set: async () => {}}},
+            cookies: {getAll: async () => [{name:'PHPSESSID',value:'synthetic-cookie'}]},
+            tabs: {
+              query: async () => [
+                {id:1,url:'http://localhost:5173/?semester=HS2026&course=42'},
+                {id:2,url:'http://localhost:5173/?semester=FS2026'},
+                {id:3,url:'http://localhost:51730/'}
+              ],
+              sendMessage: async () => {throw Error('No receiver');},
+              update: async (id, options) => updatedTabs.push({id, url:options.url}),
+              reload: async id => reloadedTabs.push(id)
+            }
+          };
+        ''' % json.dumps(language))
+        if directory.endswith('firefox'):
+            page.add_init_script('window.browser = window.chrome;')
+        issued = []
+        fail = [False]
+        page.route('**/api/auth/sync', lambda route: route.fulfill(content_type='application/json', body=json.dumps(
+            dict(success=True, authenticated=True, session_id='private-session-key', user_name='Test User'))))
+        def issue(route):
+            assert route.request.headers['x-session-id'] == 'private-session-key'
+            if fail[0]:
+                route.fulfill(status=503, content_type='application/json', body='{}')
+                return
+            token = f'single-use-test-code-{len(issued):032d}'
+            issued.append(token)
+            route.fulfill(content_type='application/json', body=json.dumps(dict(handoff_token=token, expires_in=60)))
+        page.route('**/api/auth/mobile-session', issue)
+        page.goto(f'{local_site}/{directory}/popup.html')
+        pw.expect(page.locator('#feedback-box')).to_have_text(tr['extension.page_connection_needed'])
+        assert not issued  # Opening a popup must not navigate app tabs automatically.
+        page.locator('#sync-btn').click()
+        page.wait_for_function('updatedTabs.length === 2')
+        updates = page.evaluate('updatedTabs')
+        assert [update['id'] for update in updates] == [1, 2]
+        assert page.evaluate('reloadedTabs') == [1, 2]
+        assert len(set(issued)) == 2
+        assert 'semester=HS2026&course=42' in updates[0]['url']
+        assert 'semester=FS2026' in updates[1]['url']
+        for update, token in zip(updates, issued):
+            assert f'#connect={token}' in update['url']
+            assert 'private-session-key' not in update['url']
+        fail[0] = True
+        page.locator('#sync-btn').click()
+        pw.expect(page.locator('#feedback-box')).to_have_text(tr['extension.page_connection_failed'])
+        pw.expect(page.locator('#ilias-status-badge')).to_have_text(tr['Synchronisiert'])
+        assert len(page.evaluate('updatedTabs')) == 2
+        for width, height in [(320, 740), (390, 844), (430, 900), (768, 1024), (1280, 900), (844, 390)]:
+            page.set_viewport_size(dict(width=width, height=height))
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            assert page.locator('#sync-btn').bounding_box()['height'] >= 44
+            assert page.locator('#open-app-btn').bounding_box()['height'] >= 44
+            page.screenshot(path=str(artifacts / f'{directory.split("/")[-1]}-{language}-{scheme}-{width}.png'))
+        browser.close()
+
+
 @pytest.fixture
 def local_site():
     class Handler(SimpleHTTPRequestHandler):

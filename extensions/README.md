@@ -31,6 +31,15 @@ The native tests also use the backend's cookie helper on `localhost` and
 `127.0.0.1`: Firefox must store the HttpOnly session cookie and send it on a
 header-free native API GET, while keeping it unavailable to `document.cookie`.
 
+If Firefox shows a synced ILIAS session but the app sends no `X-Session-Id`,
+the app has not received its credential. Manual sync first tries tab messaging;
+when no content-script receiver answers, it reconnects that tab with the existing
+60-second single-use handoff flow. Each tab gets a separate code, its course and
+semester URL parameters are preserved, and no long-lived credential enters a URL.
+Automatic popup checks explain a missing connection without navigating tabs.
+The native regression also omits content scripts deliberately, then checks that
+manual sync restores header/cookie authentication in the already-open React app.
+
 Browser-internal addresses such as `chrome://extensions`, `edge://extensions`
 and `about:debugging#/runtime/this-firefox` must be pasted into the address bar.
 Browsers restrict navigation to these pages from websites; the BetterIlias setup

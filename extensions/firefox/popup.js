@@ -18,6 +18,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (error) { console.warn('Could not load settings:', error); }
   const serverUrl = () => (byId('server-url').value || 'http://localhost:8000').replace(/\/+$/, '');
   const frontendUrl = () => (byId('frontend-url').value || 'http://localhost:5173').replace(/\/+$/, '');
+  async function appConnectionUrl(sessionId, appUrl = frontendUrl()) {
+    const target = new URL(appUrl);
+    const { response, data } = await BetterIliasRequest(`${serverUrl()}/api/auth/mobile-session`, {
+      method: 'POST', headers: { 'X-Session-Id': sessionId },
+    }, t('Sitzung konnte auf ILIAS nicht verifiziert werden.'));
+    if (!response.ok || !data.handoff_token) throw new Error(t('extension.page_connection_failed'));
+    target.hash = new URLSearchParams({ connect: data.handoff_token }).toString();
+    return target.href;
+  }
   function showFeedback(message, type = 'success') {
     feedback.textContent = message;
     feedback.className = `feedback visible ${type}`;
@@ -120,9 +129,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       sessionUser = user; setSessionState('valid');
       if (manual) showFeedback(t('Erfolgreich synchronisiert als "{user}"!', { user }));
       for (const tab of await browserAPI.tabs.query({})) {
-        if (tab.url && tab.url.startsWith(frontendUrl()) && tab.id) {
-          try { await browserAPI.tabs.sendMessage(tab.id, { type: 'BETTERILIAS_SESSION_SYNCED', sessionId: data.session_id }); }
-          catch (_) { /* Tab may have closed. */ }
+        if (!tab.url || !tab.id) continue;
+        let appTab = false;
+        try { appTab = new URL(tab.url).origin === new URL(frontendUrl()).origin; } catch (_) {}
+        if (!appTab) continue;
+        try {
+          const reply = await browserAPI.tabs.sendMessage(tab.id, { type: 'BETTERILIAS_SESSION_SYNCED', sessionId: data.session_id });
+          if (reply?.success) continue;
+        } catch (_) { /* Reloaded extensions may have no content script in an existing tab. */ }
+        if (manual) {
+          try {
+            // Recover without a content script: claim a separate, one-use code
+            // in each app tab, setting its own same-origin HttpOnly cookie.
+            await browserAPI.tabs.update(tab.id, { url: await appConnectionUrl(data.session_id, tab.url) });
+            // A fragment-only navigation does not rerun the app bootstrap.
+            await browserAPI.tabs.reload(tab.id);
+          } catch (_) { showFeedback(t('extension.page_connection_failed'), 'error'); }
+        } else {
+          showFeedback(t('extension.page_connection_needed'), 'error');
         }
       }
     } catch (error) {
@@ -134,18 +158,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   sync.addEventListener('click', () => verifySession(true));
   byId('open-app-btn').addEventListener('click', async () => {
-    const stored = await browserAPI.storage.local.get(['sessionId']), target = new URL(frontendUrl());
-    if (stored.sessionId) {
-      try {
-        const response = await fetch(`${serverUrl()}/api/auth/mobile-session`, {
-          method: 'POST', headers: { 'X-Session-Id': stored.sessionId },
-        });
-        const data = await response.json();
-        if (!response.ok || !data.handoff_token) throw new Error();
-        target.hash = new URLSearchParams({ connect: data.handoff_token }).toString();
-      } catch (_) { showFeedback(t('Sitzung konnte auf ILIAS nicht verifiziert werden.'), 'error'); return; }
-    }
-    browserAPI.tabs.create({ url: target.href });
+    try {
+      const stored = await browserAPI.storage.local.get(['sessionId']);
+      const url = stored.sessionId ? await appConnectionUrl(stored.sessionId) : new URL(frontendUrl()).href;
+      await browserAPI.tabs.create({ url });
+    } catch (_) { showFeedback(t('extension.page_connection_failed'), 'error'); }
   });
   byId('save-settings-btn').addEventListener('click', async () => {
     try {
