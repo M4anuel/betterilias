@@ -43,7 +43,7 @@ export function useEscapeNavigation(onBack: () => Promise<boolean>, onOverview: 
         // Run after all event listeners; custom controls may consume Escape later.
         if (disposed || !bubbled.has(event) || event.defaultPrevented || escapeBelongsToControl(event)) { lastEscape = -Infinity; return; }
         const overview = timestamp - lastEscape <= ESCAPE_OVERVIEW_INTERVAL_MS;
-        lastEscape = overview ? -Infinity : timestamp;
+        lastEscape = timestamp;
         pending = pending.then(async previousAllowed => {
           if (disposed || (overview && !previousAllowed)) return false;
           const allowed = await (overview ? callbacks.current.onOverview() : callbacks.current.onBack());

@@ -100,6 +100,10 @@ def test_escape_back_double_escape_and_overlay_priority(local_site, language, wi
         pw.expect(page).to_have_url(re.compile(r'folder=51'))
         page.keyboard.press('Escape')
         pw.expect(page).to_have_url(re.compile(r'\?semester='))
+        overview_after_double_escape = page.url
+        page.keyboard.press('Escape')
+        page.wait_for_timeout(100)
+        assert page.url == overview_after_double_escape
         # A fresh overview entry cannot Escape back to another document/site.
         page.goto(local_site + '/?semester=HS2026&entry=standalone')
         pw.expect(page.get_by_role('heading', name=tr('Vorlesungsübersicht'), exact=True)).to_be_visible()
