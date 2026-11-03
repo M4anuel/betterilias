@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, X, Check, Users, User, ChevronDown } from 'lucide-react';
 import { t } from '../lib/i18n';
 
@@ -7,6 +8,7 @@ export interface AssignmentUnitOption {
   isTeam: boolean;
   teamId?: string;
   hasSubmitted: boolean;
+  hasExistingFeedback?: boolean;
   memberNames: string[];
   primaryLabel: string;
   secondaryLabel?: string;
@@ -29,12 +31,71 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const [popoverCoords, setPopoverCoords] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
   const selectedUnit = useMemo(() => {
     return units.find((u) => u.unitId === selectedUnitId);
   }, [units, selectedUnitId]);
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const popoverWidth = Math.min(320, window.innerWidth - 24);
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const estimatedHeight = 280;
+
+    let top: number;
+    if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
+      // Open upwards above trigger
+      top = Math.max(12, rect.top - estimatedHeight - 6);
+    } else {
+      // Open downwards below trigger
+      top = Math.min(window.innerHeight - estimatedHeight - 12, rect.bottom + 6);
+    }
+
+    // On desktop, right-align popover with the trigger; on mobile, align to trigger left
+    let left = rect.right - popoverWidth;
+    if (left < 12 || window.innerWidth < 640) {
+      left = Math.max(12, rect.left);
+    }
+    if (left + popoverWidth > window.innerWidth - 12) {
+      left = window.innerWidth - popoverWidth - 12;
+    }
+
+    setPopoverCoords({ top, left, width: popoverWidth });
+  }, []);
+
+  // Update position on open, scroll, or resize
+  useEffect(() => {
+    if (!isOpen) {
+      setPopoverCoords(null);
+      return;
+    }
+
+    updatePosition();
+
+    const handleScrollResize = () => {
+      updatePosition();
+    };
+
+    window.addEventListener('resize', handleScrollResize);
+    window.addEventListener('scroll', handleScrollResize, true);
+
+    return () => {
+      window.removeEventListener('resize', handleScrollResize);
+      window.removeEventListener('scroll', handleScrollResize, true);
+    };
+  }, [isOpen, updatePosition]);
 
   // Focus search input when opened
   useEffect(() => {
@@ -49,10 +110,17 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
 
   // Close on outside click or Escape
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleOutsideClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
+      const target = e.target as Node;
+      if (triggerRef.current && triggerRef.current.contains(target)) {
+        return;
       }
+      if (popoverRef.current && popoverRef.current.contains(target)) {
+        return;
+      }
+      setIsOpen(false);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -61,10 +129,9 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleOutsideClick);
-      document.addEventListener('keydown', handleKeyDown);
-    }
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('keydown', handleKeyDown);
@@ -117,69 +184,79 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full sm:w-auto">
-      {/* Trigger Button or Mapped Badge */}
-      {!isOpen && (
-        <div className="flex items-center gap-1.5 w-full sm:w-auto">
-          {selectedUnit ? (
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-800 dark:text-teal-200 text-xs font-semibold shadow-2xs max-w-full truncate">
-              {selectedUnit.isTeam ? (
-                <Users className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
-              ) : (
-                <User className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
-              )}
-              <span
-                onClick={() => setIsOpen(true)}
-                className="cursor-pointer hover:underline truncate max-w-[200px]"
-                title={`${selectedUnit.primaryLabel}${selectedUnit.secondaryLabel ? ` (${selectedUnit.secondaryLabel})` : ''}`}
-              >
-                {selectedUnit.primaryLabel}
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsOpen(true)}
-                className="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-200 p-0.5 rounded cursor-pointer"
-                title={t("Zuweisung ändern")}
-              >
-                <ChevronDown className="h-3 w-3" />
-              </button>
-              {onClear && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClear();
-                  }}
-                  className="text-teal-500 hover:text-teal-700 dark:hover:text-teal-300 p-0.5 rounded cursor-pointer ml-0.5"
-                  title={t("Zuweisung aufheben")}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          ) : (
+    <div ref={triggerRef} className="relative w-full sm:w-auto">
+      {/* Trigger Button or Mapped Badge (Always visible as anchor) */}
+      <div className="flex items-center gap-1.5 w-full sm:w-auto">
+        {selectedUnit ? (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-800 dark:text-teal-200 text-xs font-semibold shadow-2xs max-w-full">
+            {selectedUnit.isTeam ? (
+              <Users className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+            ) : (
+              <User className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+            )}
             <button
               type="button"
-              onClick={() => setIsOpen(true)}
-              className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 transition shadow-2xs cursor-pointer w-full sm:w-auto min-h-[36px]"
+              onClick={() => setIsOpen(!isOpen)}
+              className="cursor-pointer hover:underline truncate max-w-[140px] sm:max-w-[200px] text-left"
+              title={`${selectedUnit.primaryLabel}${selectedUnit.secondaryLabel ? ` (${selectedUnit.secondaryLabel})` : ''}`}
             >
-              <span className="flex items-center gap-1.5 truncate">
-                {isGroupExercise ? (
-                  <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                ) : (
-                  <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                )}
-                <span className="truncate">{t("Empfänger auswählen...")}</span>
-              </span>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              {selectedUnit.primaryLabel}
             </button>
-          )}
-        </div>
-      )}
+            <button
+              type="button"
+              onClick={() => setIsOpen(!isOpen)}
+              className="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-200 p-0.5 rounded cursor-pointer"
+              title={t("Zuweisung ändern")}
+              aria-expanded={isOpen}
+            >
+              <ChevronDown className={`h-3 w-3 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {onClear && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClear();
+                }}
+                className="text-teal-500 hover:text-teal-700 dark:hover:text-teal-300 p-0.5 rounded cursor-pointer ml-0.5"
+                title={t("Zuweisung aufheben")}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            aria-expanded={isOpen}
+            className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 transition shadow-2xs cursor-pointer w-full sm:w-auto min-h-[36px]"
+          >
+            <span className="flex items-center gap-1.5 truncate">
+              {isGroupExercise ? (
+                <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              ) : (
+                <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              )}
+              <span className="truncate">{t("Empfänger auswählen...")}</span>
+            </span>
+            <ChevronDown className={`h-3.5 w-3.5 text-slate-400 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+      </div>
 
-      {/* Searchable Dropdown Card */}
-      {isOpen && (
-        <div className="w-full sm:w-80 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-2.5 space-y-2 text-xs z-50">
+      {/* Floating Popover rendered outside dialog via Portal to never trigger modal scrollbars */}
+      {isOpen && popoverCoords && createPortal(
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'fixed',
+            top: `${popoverCoords.top}px`,
+            left: `${popoverCoords.left}px`,
+            width: `${popoverCoords.width}px`,
+          }}
+          className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl p-2.5 space-y-2 text-xs z-[100] animate-in fade-in zoom-in-95 duration-150"
+        >
           {/* Search Header */}
           <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
             <div className="relative flex-1">
@@ -259,6 +336,11 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                                 {t("Eingereicht")}
                               </span>
+                              {unit.hasExistingFeedback && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100/80 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
+                                  {t("Feedback vorhanden")}
+                                </span>
+                              )}
                               {isSelected && <Check className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />}
                             </div>
                           </div>
@@ -307,6 +389,11 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                                 {t("Keine Abgabe eingereicht")}
                               </span>
+                              {unit.hasExistingFeedback && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100/80 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
+                                  {t("Feedback vorhanden")}
+                                </span>
+                              )}
                               {isSelected && <Check className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />}
                             </div>
                           </div>
@@ -318,7 +405,8 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
               </>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

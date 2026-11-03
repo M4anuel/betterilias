@@ -96,6 +96,7 @@ async def test_preview_and_commit_feedback_import():
             team_id="55",
             team_name="Team 55",
             submission_status="submitted",
+            evaluation_by_file_url="https://ilias.unibe.ch/ilias.php?baseClass=ilexercisehandlergui&cmdClass=ilResourceCollectionGUI&ref_id=999&ass_id=42&member_id=101",
         ),
         SubmissionItem(
             member_id="102",
@@ -174,7 +175,7 @@ async def test_preview_and_commit_feedback_import():
         member_id="101",
         file_id="existing_f1",
         ass_id="42",
-        feedback_url=None,
+        feedback_url="https://ilias.unibe.ch/ilias.php?baseClass=ilexercisehandlergui&cmdClass=ilResourceCollectionGUI&ref_id=999&ass_id=42&member_id=101",
     )
 
     # Verify upload was called for both
@@ -285,4 +286,72 @@ async def test_manual_mapping_unmatched_file_upload():
         file_bytes=b"manual review content",
         ass_id="42",
         feedback_url=None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_manual_mapping_overwrite_deletes_existing_file():
+    mock_client = AsyncMock(spec=IliasClient)
+    mock_client.get_exercise_submissions.return_value = ExerciseSubmissionsResponse(
+        exercise=ExerciseInfo(ref_id="999", title="Test"),
+        submissions=[
+            SubmissionItem(
+                member_id="102",
+                student_name="Bob",
+                team_id="55",
+                team_name="Team 55",
+                submission_status="submitted",
+                evaluation_by_file_url="https://ilias.unibe.ch/feedback-102",
+            ),
+        ],
+    )
+    # ILIAS returns existing file on-demand for team 55
+    mock_client.get_submission_feedback_files.return_value = FeedbackFilesResponse(
+        member_id="102",
+        files=[FeedbackFileItem(id="old_fid_99", title="RandomName_review.pdf")],
+    )
+
+    zip_bytes = create_test_zip({"RandomName_review.pdf": b"new content"})
+    session_id = "test_manual_overwrite_sess"
+
+    preview = await preview_feedback_import(
+        exercise_ref_id="999",
+        ass_id="42",
+        session_id=session_id,
+        file_bytes=zip_bytes,
+        client=mock_client,
+    )
+
+    commit_req = FeedbackImportCommitRequest(
+        staged_import_id=preview.staged_import_id,
+        snapshot_token=preview.snapshot_token,
+        conflict_actions={"team:55:RandomName_review.pdf": "overwrite"},
+        manual_mappings={"RandomName_review.pdf": "team:55"},
+    )
+
+    commit_res = await commit_feedback_import(
+        exercise_ref_id="999",
+        ass_id="42",
+        session_id=session_id,
+        request=commit_req,
+        client=mock_client,
+    )
+
+    assert commit_res.success is True
+    assert commit_res.uploaded_count == 1
+    # Verify existing file was deleted prior to upload
+    mock_client.delete_submission_feedback_file.assert_called_once_with(
+        exercise_ref_id="999",
+        member_id="102",
+        file_id="old_fid_99",
+        ass_id="42",
+        feedback_url="https://ilias.unibe.ch/feedback-102",
+    )
+    mock_client.upload_submission_feedback_file.assert_called_once_with(
+        exercise_ref_id="999",
+        member_id="102",
+        filename="RandomName_review.pdf",
+        file_bytes=b"new content",
+        ass_id="42",
+        feedback_url="https://ilias.unibe.ch/feedback-102",
     )
