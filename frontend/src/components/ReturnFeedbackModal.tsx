@@ -414,7 +414,7 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                       <p className="text-[11px] text-amber-700 dark:text-amber-400">
                         {t("Sie können nicht zugeordnete Dateien hier manuell einem Teilnehmer oder Team zuweisen:")}
                       </p>
-                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      <div className="space-y-2">
                         {previewData.unmatched_files.map((filePath, idx) => {
                           const mappedUnitId = manualMappings[filePath] || '';
                           const filename = filePath.split('/').pop() || '';

@@ -118,69 +118,70 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full sm:w-auto">
-      {/* Trigger Button or Mapped Badge */}
-      {!isOpen && (
-        <div className="flex items-center gap-1.5 w-full sm:w-auto">
-          {selectedUnit ? (
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-800 dark:text-teal-200 text-xs font-semibold shadow-2xs max-w-full truncate">
-              {selectedUnit.isTeam ? (
-                <Users className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
-              ) : (
-                <User className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
-              )}
-              <span
-                onClick={() => setIsOpen(true)}
-                className="cursor-pointer hover:underline truncate max-w-[200px]"
-                title={`${selectedUnit.primaryLabel}${selectedUnit.secondaryLabel ? ` (${selectedUnit.secondaryLabel})` : ''}`}
-              >
-                {selectedUnit.primaryLabel}
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsOpen(true)}
-                className="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-200 p-0.5 rounded cursor-pointer"
-                title={t("Zuweisung ändern")}
-              >
-                <ChevronDown className="h-3 w-3" />
-              </button>
-              {onClear && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClear();
-                  }}
-                  className="text-teal-500 hover:text-teal-700 dark:hover:text-teal-300 p-0.5 rounded cursor-pointer ml-0.5"
-                  title={t("Zuweisung aufheben")}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          ) : (
+    <div ref={containerRef} className={`relative w-full sm:w-auto ${isOpen ? 'z-30' : ''}`}>
+      {/* Trigger Button or Mapped Badge (Always visible as anchor) */}
+      <div className="flex items-center gap-1.5 w-full sm:w-auto">
+        {selectedUnit ? (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-800 dark:text-teal-200 text-xs font-semibold shadow-2xs max-w-full">
+            {selectedUnit.isTeam ? (
+              <Users className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+            ) : (
+              <User className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+            )}
             <button
               type="button"
-              onClick={() => setIsOpen(true)}
-              className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 transition shadow-2xs cursor-pointer w-full sm:w-auto min-h-[36px]"
+              onClick={() => setIsOpen(!isOpen)}
+              className="cursor-pointer hover:underline truncate max-w-[140px] sm:max-w-[200px] text-left"
+              title={`${selectedUnit.primaryLabel}${selectedUnit.secondaryLabel ? ` (${selectedUnit.secondaryLabel})` : ''}`}
             >
-              <span className="flex items-center gap-1.5 truncate">
-                {isGroupExercise ? (
-                  <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                ) : (
-                  <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                )}
-                <span className="truncate">{t("Empfänger auswählen...")}</span>
-              </span>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              {selectedUnit.primaryLabel}
             </button>
-          )}
-        </div>
-      )}
+            <button
+              type="button"
+              onClick={() => setIsOpen(!isOpen)}
+              className="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-200 p-0.5 rounded cursor-pointer"
+              title={t("Zuweisung ändern")}
+              aria-expanded={isOpen}
+            >
+              <ChevronDown className={`h-3 w-3 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {onClear && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClear();
+                }}
+                className="text-teal-500 hover:text-teal-700 dark:hover:text-teal-300 p-0.5 rounded cursor-pointer ml-0.5"
+                title={t("Zuweisung aufheben")}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            aria-expanded={isOpen}
+            className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 transition shadow-2xs cursor-pointer w-full sm:w-auto min-h-[36px]"
+          >
+            <span className="flex items-center gap-1.5 truncate">
+              {isGroupExercise ? (
+                <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              ) : (
+                <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              )}
+              <span className="truncate">{t("Empfänger auswählen...")}</span>
+            </span>
+            <ChevronDown className={`h-3.5 w-3.5 text-slate-400 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+      </div>
 
-      {/* Searchable Dropdown Card */}
+      {/* Floating Searchable Dropdown Popover */}
       {isOpen && (
-        <div className="w-full sm:w-80 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-2.5 space-y-2 text-xs z-50">
+        <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-72 sm:w-80 max-w-[calc(100vw-3rem)] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl p-2.5 space-y-2 text-xs z-50 animate-in fade-in zoom-in-95 duration-150">
           {/* Search Header */}
           <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
             <div className="relative flex-1">
