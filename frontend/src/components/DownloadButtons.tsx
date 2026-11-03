@@ -199,7 +199,7 @@ export const MaterialDownloadButton: React.FC<MaterialDownloadButtonProps> = ({
   const inProgress = isPreparing || isDownloading;
 
   const defaultClasses =
-    'relative overflow-hidden flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold hover:opacity-90 transition shadow-2xs cursor-pointer disabled:cursor-wait';
+    'relative overflow-hidden min-h-11 min-w-11 md:min-h-0 md:min-w-0 flex items-center justify-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold hover:opacity-90 transition shadow-2xs cursor-pointer disabled:cursor-wait';
 
   return (
     <button
@@ -224,7 +224,7 @@ export const MaterialDownloadButton: React.FC<MaterialDownloadButtonProps> = ({
         ) : (
           <Download className="h-3 w-3 shrink-0" />
         )}
-        <span>
+        <span className="desktop-only">
           {isCompleted
             ? t("Fertig")
             : inProgress

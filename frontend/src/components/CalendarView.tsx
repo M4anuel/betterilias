@@ -2334,7 +2334,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
                     {/* Expandable Sync & Last-Checked Info Popover */}
                     {isInfoOpen && (
-                      <div className="rounded-lg border border-slate-200/80 bg-white p-2.5 text-[11px] text-slate-600 shadow-2xs dark:border-slate-700/80 dark:bg-slate-900 dark:text-slate-300 space-y-1">
+                      <div data-escape-scope className="rounded-lg border border-slate-200/80 bg-white p-2.5 text-[11px] text-slate-600 shadow-2xs dark:border-slate-700/80 dark:bg-slate-900 dark:text-slate-300 space-y-1">
                         <div className="flex items-center justify-between gap-2 flex-wrap font-semibold text-slate-800 dark:text-slate-100">
                           <span className="inline-flex items-center gap-1">
                             {isSyncedFromIlias ? (

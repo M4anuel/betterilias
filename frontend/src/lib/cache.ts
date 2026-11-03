@@ -420,9 +420,16 @@ export const cache = {
   },
 
   // --- Sidebar Custom Order & Sections ---
-  getSidebarOrder(): SidebarOrderItem[] | null {
+  getSidebarOrder(semester: string): SidebarOrderItem[] | null {
     try {
-      const raw = localStorage.getItem(SIDEBAR_ORDER_KEY);
+      const key = `${SIDEBAR_ORDER_KEY}_${semester}`;
+      // Claim the old global layout once; never copy its dividers into every semester.
+      const legacy = localStorage.getItem(SIDEBAR_ORDER_KEY);
+      if (legacy !== null) {
+        if (localStorage.getItem(key) === null) localStorage.setItem(key, legacy);
+        localStorage.removeItem(SIDEBAR_ORDER_KEY);
+      }
+      const raw = localStorage.getItem(key);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -434,21 +441,21 @@ export const cache = {
     }
   },
 
-  setSidebarOrder(order: SidebarOrderItem[] | null) {
+  setSidebarOrder(semester: string, order: SidebarOrderItem[] | null) {
     try {
       if (order && order.length > 0) {
-        localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(order));
+        localStorage.setItem(`${SIDEBAR_ORDER_KEY}_${semester}`, JSON.stringify(order));
       } else {
-        localStorage.removeItem(SIDEBAR_ORDER_KEY);
+        localStorage.removeItem(`${SIDEBAR_ORDER_KEY}_${semester}`);
       }
     } catch (e) {
       console.error('Failed to save sidebar order', e);
     }
   },
 
-  clearSidebarOrder() {
+  clearSidebarOrder(semester: string) {
     try {
-      localStorage.removeItem(SIDEBAR_ORDER_KEY);
+      localStorage.removeItem(`${SIDEBAR_ORDER_KEY}_${semester}`);
     } catch (e) {
       console.error('Failed to clear sidebar order', e);
     }

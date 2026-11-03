@@ -17,6 +17,7 @@ import { cache } from '../lib/cache';
 import { CourseIcon, AVAILABLE_COURSE_ICONS } from './CourseIcon';
 
 interface NicknameModalProps {
+  semester: string;
   courses: CourseItem[];
   isOpen: boolean;
   onClose: () => void;
@@ -24,6 +25,7 @@ interface NicknameModalProps {
 }
 
 export const NicknameModal: React.FC<NicknameModalProps> = ({
+  semester,
   courses,
   isOpen,
   onClose,
@@ -39,18 +41,20 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const backdropMouseDownRef = useRef(false);
   const initialized = useRef(false);
+  const initializedSemester = useRef(semester);
 
   // Sync state whenever modal opens
   useEffect(() => {
     if (!isOpen) { initialized.current = false; return; }
-    if (!initialized.current) {
+    if (!initialized.current || initializedSemester.current !== semester) {
+      initializedSemester.current = semester;
       initialized.current = true;
       setNicknames(cache.getNicknames());
       setIcons(cache.getCourseIcons());
       setActivePickerRefId(null);
       setDraggedIndex(null);
 
-      const existingOrder = cache.getSidebarOrder();
+      const existingOrder = cache.getSidebarOrder(semester);
       if (existingOrder && existingOrder.length > 0) {
         setHasCustomOrder(true);
         // Ensure all current courses exist in orderItems
@@ -77,7 +81,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
         return added.length ? [...previous, ...added] : previous;
       });
     }
-  }, [isOpen, courses]);
+  }, [isOpen, courses, semester]);
 
   // Close on Escape key
   useEffect(() => {
@@ -103,9 +107,9 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
 
     // Save or clear custom sidebar ordering
     if (hasCustomOrder) {
-      cache.setSidebarOrder(orderItems);
+      cache.setSidebarOrder(semester, orderItems);
     } else {
-      cache.clearSidebarOrder();
+      cache.clearSidebarOrder(semester);
     }
 
     onNicknamesUpdated();
@@ -507,19 +511,19 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-3.5">
+        <div className="flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 sm:px-6 py-3.5">
           <button
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition cursor-pointer"
+            className="min-h-11 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition cursor-pointer"
           >
             {t("Abbrechen")}
           </button>
           <button
             onClick={handleSave}
             style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
-            className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition cursor-pointer"
+            className="min-h-11 min-w-0 flex items-center justify-center gap-1.5 rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition cursor-pointer"
           >
-            <Check className="h-4 w-4" />
+            <Check className="h-4 w-4 shrink-0" />
             <span>{t("Änderungen speichern")}</span>
           </button>
         </div>

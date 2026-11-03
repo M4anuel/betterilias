@@ -1,5 +1,28 @@
 # Mobile UI refinement
 
+## Semester layouts and Escape navigation
+
+Sidebar dividers and their course positions are stored per semester. The old
+global layout migrates once into the selected semester; editing/resetting another
+semester leaves it intact. Nicknames and icons remain shared. Editor drafts still
+survive refreshes and viewport changes within their semester.
+
+Escape goes back through BetterIlias history. Two consecutive eligible presses
+within 700 ms return to the current semester overview. Dialogs, menus, native
+controls, editable fields, IME input, fullscreen and pointer lock take priority;
+their Escape presses do not start a double-press sequence. Held keys and modified
+Escape presses do not navigate. Navigation waits for existing confirmation guards
+and never steps past the app's first history entry. Custom dismissible widgets
+should mark their visible content with `data-escape-scope` or consume the keyboard
+event with `preventDefault()`/`stopPropagation()`.
+
+`tests/test_escape_and_semester_sidebar_browser.py` exercises actual editing,
+reset/migration, folder history, timing, modal and native menu priority, editable
+controls, fullscreen-state protection, and pending-operation confirmation. Checks
+use Chromium emulation at 320/390/430/768/1280 px and short landscape sizes in
+German/English and dark/light modes. Native fullscreen is simulated for the
+shortcut-suppression check; real iOS/Android and live ILIAS remain manual checks.
+
 ## Implementation prompt
 
 Refine the mobile UI around compact layouts, consistent controls and stable

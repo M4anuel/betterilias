@@ -135,7 +135,7 @@ def test_compact_settings_semesters_materials_and_exercises(local_site, language
         nested = page.locator('[data-mobile-folder]').filter(has_text='Nested folder')
         pw.expect(nested).to_be_visible()
         assert nested.bounding_box()['height'] <= 68
-        download = page.get_by_role('link', name=tr('Download'), exact=True)
+        download = page.get_by_role('button', name=tr('Download'), exact=True)
         pw.expect(download).to_be_visible()
         assert download.bounding_box()['width'] <= 48
         pw.expect(page.get_by_text('1.2 MB', exact=True)).to_be_hidden()
@@ -161,7 +161,15 @@ def test_compact_settings_semesters_materials_and_exercises(local_site, language
         views.select_option('submissions')
         pw.expect(page.get_by_text('Student, Test', exact=True)).to_be_visible()
         toolbar = page.locator('.grading-toolbar')
-        assert toolbar.bounding_box()['height'] <= 140
+        # Bulk feedback/allocation actions now have a separate row below search.
+        # Keep that row compact and aligned rather than applying the old two-row cap.
+        assert toolbar.bounding_box()['height'] <= 188
+        action_titles = [tr('Abgaben als ZIP-Paket exportieren'),
+                         tr('Feedback-Dateien für Übungseinheit hochladen'),
+                         tr('Arbeit auf Tutoren verteilen'),
+                         tr('Filter-, Sortier- & Kursansicht-Einstellungen öffnen')]
+        action_tops = [toolbar.get_by_role('button', name=title, exact=True).bounding_box()['y'] for title in action_titles]
+        assert max(action_tops) - min(action_tops) <= 1
         page.get_by_title(tr('Filter-, Sortier- & Kursansicht-Einstellungen öffnen'), exact=True).click()
         grading = page.get_by_role('dialog', name=tr('Filter- & Anzeige-Einstellungen'))
         pw.expect(grading.get_by_role('heading', name=tr('mobile.submission_filters'))).to_be_visible()
