@@ -27,6 +27,9 @@ Firefox event detail objects must be cloned into the page with `cloneInto`;
 writing localStorage alone does not notify an already-mounted React app. Both
 companions listen for extension-storage session changes as well as tab messages,
 and register these listeners before waiting for a background sync response.
+The native tests also use the backend's cookie helper on `localhost` and
+`127.0.0.1`: Firefox must store the HttpOnly session cookie and send it on a
+header-free native API GET, while keeping it unavailable to `document.cookie`.
 
 Browser-internal addresses such as `chrome://extensions`, `edge://extensions`
 and `about:debugging#/runtime/this-firefox` must be pasted into the address bar.

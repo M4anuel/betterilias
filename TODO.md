@@ -4,6 +4,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [ ] Diagnose the remaining Firefox profile with a synced companion but no
+  BetterIlias cookie; compare app request credentials with response headers.
+  Native clean-profile cookie acceptance is covered on localhost and 127.0.0.1.
+
 - [x] Make Firefox live-tab session events readable across its extension/page
   boundary and propagate extension-storage changes; verify real React course
   requests carry the replacement credential after sync.

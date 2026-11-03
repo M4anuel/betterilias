@@ -11,6 +11,7 @@ import subprocess
 import time
 import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.cookies import SimpleCookie
 from pathlib import Path
 from threading import Event, Thread
 from urllib.parse import urlsplit, unquote
@@ -22,9 +23,13 @@ pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_FIREFOX_TESTS') != '
 
 
 @pytest.mark.parametrize('language', ['de', 'en'])
-def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language):
+def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language, monkeypatch):
     Marionette = pytest.importorskip('marionette_driver.marionette').Marionette
     Addons = pytest.importorskip('marionette_driver.addons').Addons
+    from fastapi import Response
+    from backend.api.deps import browser_cookie
+    from backend.config import settings
+    monkeypatch.setattr(settings, 'app_env', 'development')
     binary = os.environ.get('BETTERILIAS_FIREFOX_BINARY') or shutil.which('firefox') or 'C:/Program Files/Mozilla Firefox/firefox.exe'
     if not Path(binary).is_file():
         pytest.skip('Firefox binary unavailable')
@@ -44,7 +49,9 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
             requests.append(payload)
             current = mode[0]
             if current == 'stalled':
-                release.wait(30)
+                # Stay stalled until the test releases us; a slow test host must
+                # not turn this into a successful response before Firefox's timer.
+                release.wait()
             status = 401 if current == 'expired' else 503 if current == 'unavailable' else 200
             body = json.dumps(dict(success=True, authenticated=True, session_id=session_id[0], user_name='Test User') if status == 200 else {}).encode()
             try:
@@ -57,9 +64,18 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
                 pass  # The popup correctly aborts a stalled request.
 
         def do_GET(self):
+            if self.server is unrelated_server:
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html')
+                self.end_headers()
+                self.wfile.write(b'<!doctype html><title>Unrelated local site</title>')
+                return
             path = urlsplit(self.path).path
             status, content_type = 200, 'application/json'
-            authenticated = self.headers.get('X-Session-Id') == session_id[0]
+            cookies = SimpleCookie(self.headers.get('Cookie', ''))
+            cookie = cookies.get('betterilias_session')
+            credential = self.headers.get('X-Session-Id') or (cookie.value if cookie else None)
+            authenticated = credential == session_id[0]
             if path == '/bridge-test.js':
                 # Exercise the custom DOM event independently of postMessage,
                 # whose source differs across Firefox versions/privilege contexts.
@@ -68,7 +84,12 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
                     f"localStorage.setItem('betterilias_theme_mode', {json.dumps('dark' if language == 'de' else 'light')});"
                     "window.addEventListener('message', event => { if (event.data?.type === 'BETTERILIAS_SESSION_SYNCED') event.stopImmediatePropagation(); });").encode()
             elif path == '/api/auth/status':
-                body = json.dumps(dict(authenticated=authenticated, cookies_present=authenticated)).encode()
+                body = json.dumps(dict(authenticated=authenticated, cookies_present=authenticated,
+                    session_id=session_id[0] if authenticated else None)).encode()
+            elif path == '/api/native-cookie-check':
+                cookie_authenticated = bool(cookie and cookie.value == session_id[0])
+                status = 200 if cookie_authenticated else 401
+                body = json.dumps(dict(authenticated=cookie_authenticated)).encode()
             elif path == '/api/dashboard/semesters':
                 course_credentials.append(self.headers.get('X-Session-Id'))
                 status = 200 if authenticated else 401
@@ -91,6 +112,10 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
             self.send_response(status)
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(len(body)))
+            if authenticated and path.startswith('/api/'):
+                cookie_response = Response()
+                browser_cookie(cookie_response, session_id[0])
+                self.send_header('Set-Cookie', cookie_response.headers['set-cookie'])
             self.end_headers()
             self.wfile.write(body)
 
@@ -101,7 +126,8 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
     Thread(target=server.serve_forever, daemon=True).start()
     unrelated_server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
     Thread(target=unrelated_server.serve_forever, daemon=True).start()
-    server_url = f'http://127.0.0.1:{server.server_port}'
+    frontend_host = 'localhost' if language == 'de' else '127.0.0.1'
+    server_url = f'http://{frontend_host}:{server.server_port}'
     uuid = 'ce8cd159-6dc0-4239-9d56-78280234a412'
     profile = tmp_path / 'profile'
     profile.mkdir()
@@ -196,6 +222,15 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
             assert 'rotated-firefox-session' in course_credentials
             assert tr['Sitzung nicht aktiv:'] not in client.execute_script('return document.body.innerText;')
             assert client.execute_script('return document.documentElement.lang;') == language
+            # Use the actual backend cookie helper: Firefox must retain the
+            # HttpOnly /api cookie and send it on native GETs without a header.
+            cookie_check = client.execute_async_script('''
+                const done = arguments[arguments.length - 1];
+                fetch('/api/native-cookie-check', {credentials:'same-origin'})
+                    .then(response => response.json()).then(done);
+            ''')
+            assert cookie_check['authenticated'] is True
+            assert client.execute_script('return document.cookie.includes("betterilias_session=");') is False
             (tmp_path / 'live-sync-app.png').write_bytes(client.screenshot(format='binary'))
             navigate(f'http://127.0.0.1:{unrelated_server.server_port}/')
             time.sleep(.5)
