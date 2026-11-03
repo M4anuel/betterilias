@@ -1624,5 +1624,11 @@
   "Staged file not found on disk.": "Staged file not found on disk.",
   "Recipient not found in assignment.": "Recipient not found in assignment.",
   "Uploaded successfully via manual mapping.": "Uploaded successfully via manual mapping.",
-  "Upload failed.": "Upload failed."
+  "Upload failed.": "Upload failed.",
+  "Empfänger oder Team suchen...": "Search recipient or team...",
+  "Keine passenden Teilnehmer oder Gruppen gefunden.": "No matching participants or groups found.",
+  "Eingereichte Gruppen": "Submitted groups",
+  "Eingereichte Abgaben": "Submitted work",
+  "Weitere Teilnehmer & Gruppen": "Other participants & groups",
+  "Zuweisung ändern": "Change assignment"
 }

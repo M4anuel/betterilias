@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { formatBytes } from '../lib/downloadManager';
+import { SearchableUnitSelect, AssignmentUnitOption } from './SearchableUnitSelect';
 import { t } from '../lib/i18n';
 import {
   FeedbackImportPreviewResponse,
@@ -58,34 +59,85 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
   const [showSkipped, setShowSkipped] = useState(false);
   const [showUnmatched, setShowUnmatched] = useState(false);
 
-  interface AssignmentUnitOption {
-    unitId: string;
-    label: string;
-  }
+  const isGroupExercise = useMemo(() => {
+    return (submissions || []).some((s) => Boolean(s.team_id));
+  }, [submissions]);
 
   const availableUnits = useMemo<AssignmentUnitOption[]>(() => {
     const unitsMap = new Map<string, AssignmentUnitOption>();
+
     (submissions || []).forEach((s) => {
+      const isSub = s.submission_status === 'submitted' || s.submission_status === 'late' || Boolean(s.files && s.files.length > 0);
       if (s.team_id) {
         const uId = `team:${s.team_id}`;
         if (!unitsMap.has(uId)) {
           unitsMap.set(uId, {
             unitId: uId,
-            label: s.team_name ? `${s.team_name} (${s.student_name})` : `Team ${s.team_id}`,
+            isTeam: true,
+            teamId: s.team_id,
+            hasSubmitted: isSub,
+            memberNames: s.student_name ? [s.student_name] : [],
+            primaryLabel: s.team_name || `Team ${s.team_id}`,
+            secondaryLabel: s.student_name || '',
           });
+        } else {
+          const existing = unitsMap.get(uId)!;
+          if (s.student_name && !existing.memberNames.includes(s.student_name)) {
+            existing.memberNames.push(s.student_name);
+            existing.secondaryLabel = existing.memberNames.join(', ');
+          }
+          if (isSub) {
+            existing.hasSubmitted = true;
+          }
         }
       } else {
         const uId = `user:${s.member_id}`;
         if (!unitsMap.has(uId)) {
           unitsMap.set(uId, {
             unitId: uId,
-            label: s.student_name ? `${s.student_name} (${s.member_id})` : `User ${s.member_id}`,
+            isTeam: false,
+            hasSubmitted: isSub,
+            memberNames: s.student_name ? [s.student_name] : [],
+            primaryLabel: s.student_name || `User ${s.member_id}`,
+            secondaryLabel: s.member_id ? `ID: ${s.member_id}` : undefined,
           });
         }
       }
     });
-    return Array.from(unitsMap.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [submissions]);
+
+    const list = Array.from(unitsMap.values());
+
+    // Priority sort:
+    // If group exercise:
+    // 1. Submitted groups (isTeam && hasSubmitted)
+    // 2. Submitted individuals (!isTeam && hasSubmitted)
+    // 3. Unsubmitted groups (isTeam && !hasSubmitted)
+    // 4. Unsubmitted individuals (!isTeam && !hasSubmitted)
+    // If individual exercise:
+    // 1. Submitted individuals (hasSubmitted)
+    // 2. Unsubmitted individuals (!hasSubmitted)
+    list.sort((a, b) => {
+      if (isGroupExercise) {
+        const scoreA = (a.isTeam ? 2 : 0) + (a.hasSubmitted ? 4 : 0);
+        const scoreB = (b.isTeam ? 2 : 0) + (b.hasSubmitted ? 4 : 0);
+        if (scoreA !== scoreB) {
+          return scoreB - scoreA;
+        }
+      } else {
+        if (a.hasSubmitted !== b.hasSubmitted) {
+          return a.hasSubmitted ? -1 : 1;
+        }
+      }
+      const numA = a.teamId ? parseInt(a.teamId, 10) : NaN;
+      const numB = b.teamId ? parseInt(b.teamId, 10) : NaN;
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numA - numB;
+      }
+      return a.primaryLabel.localeCompare(b.primaryLabel);
+    });
+
+    return list;
+  }, [submissions, isGroupExercise]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -353,11 +405,10 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                       <div className="space-y-1.5 max-h-48 overflow-y-auto">
                         {previewData.unmatched_files.map((filePath, idx) => {
                           const mappedUnitId = manualMappings[filePath] || '';
-                          const mappedOption = availableUnits.find((u: AssignmentUnitOption) => u.unitId === mappedUnitId);
                           return (
                             <div
                               key={idx}
-                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-amber-200/60 dark:border-amber-900/40 text-[11px]"
+                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-amber-200/60 dark:border-amber-900/40 text-[11px]"
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <FileText className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -365,41 +416,25 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                                   {filePath.split('/').pop()}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <select
-                                  value={mappedUnitId}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
+                              <div className="shrink-0">
+                                <SearchableUnitSelect
+                                  selectedUnitId={mappedUnitId}
+                                  onSelect={(unitId) => {
                                     setManualMappings((prev) => ({
                                       ...prev,
-                                      [filePath]: val,
+                                      [filePath]: unitId,
                                     }));
                                   }}
-                                  className="text-[11px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-slate-700 dark:text-slate-200 cursor-pointer max-w-[200px] truncate"
-                                >
-                                  <option value="">-- {t("Empfänger auswählen...")} --</option>
-                                  {availableUnits.map((u: AssignmentUnitOption) => (
-                                    <option key={u.unitId} value={u.unitId}>
-                                      {u.label}
-                                    </option>
-                                  ))}
-                                </select>
-                                {mappedUnitId && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setManualMappings((prev) => {
-                                        const copy = { ...prev };
-                                        delete copy[filePath];
-                                        return copy;
-                                      });
-                                    }}
-                                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md cursor-pointer"
-                                    title={t("Zuweisung aufheben")}
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
+                                  onClear={() => {
+                                    setManualMappings((prev) => {
+                                      const copy = { ...prev };
+                                      delete copy[filePath];
+                                      return copy;
+                                    });
+                                  }}
+                                  units={availableUnits}
+                                  isGroupExercise={isGroupExercise}
+                                />
                               </div>
                             </div>
                           );

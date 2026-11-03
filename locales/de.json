@@ -1624,5 +1624,11 @@
   "Staged file not found on disk.": "Bereitgestellte Datei nicht auf der Festplatte gefunden.",
   "Recipient not found in assignment.": "Empfänger in dieser Übung nicht gefunden.",
   "Uploaded successfully via manual mapping.": "Erfolgreich über manuelle Zuweisung hochgeladen.",
-  "Upload failed.": "Hochladen fehlgeschlagen."
+  "Upload failed.": "Hochladen fehlgeschlagen.",
+  "Empfänger oder Team suchen...": "Empfänger oder Team suchen...",
+  "Keine passenden Teilnehmer oder Gruppen gefunden.": "Keine passenden Teilnehmer oder Gruppen gefunden.",
+  "Eingereichte Gruppen": "Eingereichte Gruppen",
+  "Eingereichte Abgaben": "Eingereichte Abgaben",
+  "Weitere Teilnehmer & Gruppen": "Weitere Teilnehmer & Gruppen",
+  "Zuweisung ändern": "Zuweisung ändern"
 }
