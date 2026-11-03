@@ -543,6 +543,7 @@ export interface FeedbackImportPreviewResponse {
   total_size_bytes: number;
   total_units: number;
   has_conflicts: boolean;
+  existing_feedback_by_unit?: Record<string, string[]>;
 }
 
 export interface FeedbackImportCommitRequest {

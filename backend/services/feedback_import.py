@@ -349,9 +349,11 @@ async def preview_feedback_import(
                 existing_feedback_cache[unit_id] = {}
 
     check_tasks = []
-    for uid in unit_files_map.keys():
-        sub = team_map.get(uid) if uid.startswith("team:") else user_map.get(uid.split(":")[-1])
-        if sub:
+    seen_units = set()
+    for sub in submissions:
+        uid = f"team:{sub.team_id}" if sub.team_id else f"user:{sub.member_id}"
+        if uid not in seen_units:
+            seen_units.add(uid)
             check_tasks.append(fetch_existing_feedback(uid, sub))
 
     if check_tasks:
@@ -440,6 +442,12 @@ async def preview_feedback_import(
     token_str = f"{exercise_ref_id}:{ass_id}:" + json.dumps(fingerprint_items)
     snapshot_token = hashlib.sha256(token_str.encode("utf-8")).hexdigest()
 
+    existing_feedback_by_unit = {
+        uid: list(files_dict.keys())
+        for uid, files_dict in existing_feedback_cache.items()
+        if files_dict
+    }
+
     # Save metadata manifest in staging dir for commit verification
     staged_manifest = {
         "import_id": import_id,
@@ -449,6 +457,7 @@ async def preview_feedback_import(
         "created_at": time.time(),
         "units": [u.model_dump() for u in preview_units],
         "unmatched_files_meta": unmatched_files_meta,
+        "existing_feedback_cache": existing_feedback_cache,
     }
     (stage_dir / "meta.json").write_text(json.dumps(staged_manifest), encoding="utf-8")
 
@@ -465,6 +474,7 @@ async def preview_feedback_import(
         total_size_bytes=total_size,
         total_units=len(preview_units),
         has_conflicts=has_conflicts,
+        existing_feedback_by_unit=existing_feedback_by_unit,
     )
 
 
@@ -664,37 +674,62 @@ async def commit_feedback_import(
             )
             return
 
+        # Check conflict action for this manually mapped file
+        conflict_key = f"{target_unit_id}:{filename}"
+        action = request.conflict_actions.get(conflict_key, "overwrite")
+
+        if action == "skip":
+            skipped_count += 1
+            results.append(
+                FeedbackImportCommitResultItem(
+                    unit_id=target_unit_id,
+                    filename=filename,
+                    status="skipped",
+                    message=t("Skipped by user choice."),
+                )
+            )
+            return
+
         file_bytes = stored_file.read_bytes()
+        feedback_url = sub.evaluation_by_file_url
+
+        # Check existing file deletion if action is overwrite
+        existing_cache = meta.get("existing_feedback_cache", {})
+        unit_existing = existing_cache.get(target_unit_id, {})
+        existing_file_id = unit_existing.get(filename)
+
         async with sem:
             try:
-                ok, up_msg, fid = await client.upload_submission_feedback_file(
+                if action == "overwrite" and existing_file_id:
+                    try:
+                        await client.delete_submission_feedback_file(
+                            exercise_ref_id=exercise_ref_id,
+                            member_id=sub.member_id,
+                            file_id=existing_file_id,
+                            ass_id=ass_id,
+                            feedback_url=feedback_url,
+                        )
+                    except Exception as del_err:
+                        logger.warning(f"Could not delete existing feedback file {existing_file_id} for {target_unit_id}: {del_err}")
+
+                # Upload feedback file to ILIAS
+                await client.upload_submission_feedback_file(
                     exercise_ref_id=exercise_ref_id,
                     member_id=sub.member_id,
                     filename=filename,
                     file_bytes=file_bytes,
                     ass_id=ass_id,
-                    feedback_url=sub.evaluation_by_file_url,
+                    feedback_url=feedback_url,
                 )
-                if ok:
-                    uploaded_count += 1
-                    results.append(
-                        FeedbackImportCommitResultItem(
-                            unit_id=target_unit_id,
-                            filename=filename,
-                            status="success",
-                            message=t("Uploaded successfully via manual mapping."),
-                        )
+                uploaded_count += 1
+                results.append(
+                    FeedbackImportCommitResultItem(
+                        unit_id=target_unit_id,
+                        filename=filename,
+                        status="success",
+                        message=t("Uploaded successfully via manual mapping."),
                     )
-                else:
-                    failed_count += 1
-                    results.append(
-                        FeedbackImportCommitResultItem(
-                            unit_id=target_unit_id,
-                            filename=filename,
-                            status="failed",
-                            message=up_msg or t("Upload failed."),
-                        )
-                    )
+                )
             except Exception as e:
                 failed_count += 1
                 results.append(

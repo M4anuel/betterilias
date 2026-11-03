@@ -1630,5 +1630,8 @@
   "Eingereichte Gruppen": "Submitted groups",
   "Eingereichte Abgaben": "Submitted work",
   "Weitere Teilnehmer & Gruppen": "Other participants & groups",
-  "Zuweisung ändern": "Change assignment"
+  "Zuweisung ändern": "Change assignment",
+  "Datei existiert bereits": "File already exists",
+  "Feedback vorhanden": "Feedback exists",
+  "Zusätzlich hochladen": "Upload additionally"
 }

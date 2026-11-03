@@ -405,18 +405,25 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                       <div className="space-y-1.5 max-h-48 overflow-y-auto">
                         {previewData.unmatched_files.map((filePath, idx) => {
                           const mappedUnitId = manualMappings[filePath] || '';
+                          const filename = filePath.split('/').pop() || '';
+                          const conflictKey = `${mappedUnitId}:${filename}`;
+                          const existingFiles = mappedUnitId ? (previewData.existing_feedback_by_unit?.[mappedUnitId] || []) : [];
+                          const hasExistingFeedback = existingFiles.length > 0;
+                          const isNameConflict = existingFiles.includes(filename);
+                          const action = conflictActions[conflictKey] || (isNameConflict ? 'overwrite' : 'keep_both');
+
                           return (
                             <div
                               key={idx}
-                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-amber-200/60 dark:border-amber-900/40 text-[11px]"
+                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-amber-200/60 dark:border-amber-900/40 text-[11px]"
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <FileText className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                                 <span className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={filePath}>
-                                  {filePath.split('/').pop()}
+                                  {filename}
                                 </span>
                               </div>
-                              <div className="shrink-0">
+                              <div className="flex flex-wrap items-center gap-2 shrink-0">
                                 <SearchableUnitSelect
                                   selectedUnitId={mappedUnitId}
                                   onSelect={(unitId) => {
@@ -424,6 +431,15 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                                       ...prev,
                                       [filePath]: unitId,
                                     }));
+                                    const exFiles = previewData?.existing_feedback_by_unit?.[unitId] || [];
+                                    const fn = filePath.split('/').pop() || '';
+                                    const key = `${unitId}:${fn}`;
+                                    if (!conflictActions[key]) {
+                                      setConflictActions((prev) => ({
+                                        ...prev,
+                                        [key]: exFiles.includes(fn) ? 'overwrite' : 'keep_both',
+                                      }));
+                                    }
                                   }}
                                   onClear={() => {
                                     setManualMappings((prev) => {
@@ -435,6 +451,41 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
                                   units={availableUnits}
                                   isGroupExercise={isGroupExercise}
                                 />
+
+                                {mappedUnitId && (
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {hasExistingFeedback ? (
+                                      <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-2 py-1 rounded-xl">
+                                        <span
+                                          className="text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                                          title={existingFiles.join(', ')}
+                                        >
+                                          {isNameConflict ? t("Datei existiert bereits") : t("Feedback vorhanden")}
+                                        </span>
+                                        <select
+                                          value={action}
+                                          onChange={(e) => {
+                                            const val = e.target.value as 'overwrite' | 'skip' | 'keep_both';
+                                            setConflictActions((prev) => ({
+                                              ...prev,
+                                              [conflictKey]: val,
+                                            }));
+                                          }}
+                                          className="rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 text-[10px] font-semibold text-slate-700 dark:text-slate-200 px-1.5 py-0.5 cursor-pointer"
+                                        >
+                                          <option value="overwrite">{t("Ersetzen")}</option>
+                                          <option value="keep_both">{t("Zusätzlich hochladen")}</option>
+                                          <option value="skip">{t("Überspringen")}</option>
+                                        </select>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 px-2 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        <span>{t("Neu")}</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
