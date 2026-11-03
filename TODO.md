@@ -70,6 +70,10 @@ no lecture dates.
 
 ## Mobile usability
 
+- [x] Scope custom sidebar dividers/order to each semester, and add guarded
+  Escape navigation (back once; twice within 700 ms for the semester overview)
+  while preserving dialog/menu/editor/fullscreen dismissal and navigation guards.
+
 - [x] Restore two-row sidebar editor cards on tablet/desktop; enlarge the phone
   assignment selector and balance submission header metadata and actions.
 

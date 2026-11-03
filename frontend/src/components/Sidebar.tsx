@@ -7,6 +7,7 @@ import { CourseIcon } from './CourseIcon';
 
 interface SidebarProps {
   isMobile?: boolean;
+  semester: string;
   courses: CourseItem[];
   selectedCourseId: string | null;
   onSelectCourse: (refId: string) => void;
@@ -25,6 +26,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isMobile,
+  semester,
   courses,
   selectedCourseId,
   onSelectCourse,
@@ -44,9 +46,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Check if a custom user ordering exists
   const customOrder = useMemo(() => {
-    return cache.getSidebarOrder();
+    return cache.getSidebarOrder(semester);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nicknamesVersion, courses]);
+  }, [nicknamesVersion, courses, semester]);
 
   // Group by subject when in default mode (no custom ordering)
   const groupedBySubject = useMemo(() => {

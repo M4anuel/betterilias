@@ -27,6 +27,8 @@ import { cache, MATERIALS_CACHE_PREFIX } from './lib/cache';
 import { useMobileViewport } from './lib/useMobileViewport';
 import { theme } from './lib/theme';
 import { navigationGuard } from './lib/navigationGuard';
+import { appHistoryDepth, pushAppHistory, replaceAppHistory } from './lib/appHistory';
+import { useEscapeNavigation } from './lib/useEscapeNavigation';
 
 export interface NavigationState {
   semester: string;
@@ -102,6 +104,7 @@ export function parseStateFromUrl(defaultSemester: string): NavigationState {
 
 export const App: React.FC = () => {
   const language = useLanguage();
+  const approvedHistoryNavigation = useRef(false);
   const isMobile = useMobileViewport();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const mobileNavigation = useRef<HTMLDialogElement>(null);
@@ -469,7 +472,7 @@ export const App: React.FC = () => {
         exerciseTab: null,
         isCalendarOpen,
       };
-      window.history.pushState(nextState, '', stateToUrl(nextState));
+      pushAppHistory(nextState, '', stateToUrl(nextState));
     },
     [myCourses, repositoryId, isCalendarOpen, selectedSemester, selectedCourseId, activeExerciseRefId, loadSemesters]
   );
@@ -502,7 +505,7 @@ export const App: React.FC = () => {
         exerciseId: null,
         exerciseTab: null,
       };
-      window.history.pushState(nextState, '', stateToUrl(nextState));
+      pushAppHistory(nextState, '', stateToUrl(nextState));
     },
     [selectedCourseId, currentContainerId, activeExerciseRefId, selectedSemester, loadCourseMaterials]
   );
@@ -527,7 +530,7 @@ export const App: React.FC = () => {
         exerciseId: null,
         exerciseTab: null,
       };
-      window.history.pushState(nextState, '', stateToUrl(nextState));
+      pushAppHistory(nextState, '', stateToUrl(nextState));
     },
     [selectedCourseId, currentContainerId, activeExerciseRefId, selectedSemester, loadCourseMaterials]
   );
@@ -551,15 +554,15 @@ export const App: React.FC = () => {
         exerciseId: null,
         exerciseTab: null,
       };
-      window.history.pushState(nextState, '', stateToUrl(nextState));
+      pushAppHistory(nextState, '', stateToUrl(nextState));
     },
     [currentContainerId, activeExerciseRefId, selectedSemester, loadCourseMaterials]
   );
 
   // --- Return to Semester Overview ---
   const handleNavigateHome = useCallback(async () => {
-    if (!await navigationGuard.confirmNavigation()) return;
-    if (!myCourses && !repositoryId && !isCalendarOpen && selectedCourseId === null && !activeExerciseRefId) return;
+    if (!await navigationGuard.confirmNavigation()) return false;
+    if (!myCourses && !repositoryId && !isCalendarOpen && selectedCourseId === null && !activeExerciseRefId) return true;
     setMyCourses(false);
     setRepositoryId(null);
     setIsCalendarOpen(false);
@@ -580,8 +583,27 @@ export const App: React.FC = () => {
       exerciseId: null,
       exerciseTab: null,
     };
-    window.history.pushState(nextState, '', stateToUrl(nextState));
+    pushAppHistory(nextState, '', stateToUrl(nextState));
+    return true;
   }, [myCourses, repositoryId, isCalendarOpen, selectedCourseId, activeExerciseRefId, selectedSemester]);
+
+  const handleEscapeBack = useCallback(async (): Promise<boolean> => {
+    if ((appHistoryDepth() ?? 0) === 0) return handleNavigateHome();
+    if (!await navigationGuard.confirmNavigation()) return false;
+    // The popstate handler must not ask a second time for a pending upload.
+    approvedHistoryNavigation.current = true;
+    return new Promise(resolve => {
+      const finish = () => { window.clearTimeout(timeout); resolve(true); };
+      const timeout = window.setTimeout(() => {
+        window.removeEventListener('popstate', finish);
+        approvedHistoryNavigation.current = false;
+        resolve(false);
+      }, 1500);
+      window.addEventListener('popstate', finish, { once: true });
+      window.history.back();
+    });
+  }, [handleNavigateHome]);
+  useEscapeNavigation(handleEscapeBack, handleNavigateHome);
 
   const handleNavigateCalendar = useCallback(async () => {
     if (!await navigationGuard.confirmNavigation()) return;
@@ -605,7 +627,7 @@ export const App: React.FC = () => {
       exerciseTab: null,
       isCalendarOpen: true,
     };
-    window.history.pushState(nextState, '', stateToUrl(nextState));
+    pushAppHistory(nextState, '', stateToUrl(nextState));
   }, [isCalendarOpen, myCourses, repositoryId, selectedCourseId, selectedSemester]);
 
   const handleNavigateRepository = useCallback(async (refId: string) => {
@@ -628,7 +650,7 @@ export const App: React.FC = () => {
       exerciseTab: null,
       repositoryId: refId,
     };
-    window.history.pushState(nextState, '', stateToUrl(nextState));
+    pushAppHistory(nextState, '', stateToUrl(nextState));
   }, [repositoryId, selectedSemester, materialsData]);
 
   const handleNavigateMyCourses = useCallback(async () => {
@@ -646,7 +668,7 @@ export const App: React.FC = () => {
     setLoadMaterialsError(null);
     const state: NavigationState = { semester: selectedSemester, courseId: null,
       containerId: null, exerciseId: null, myCourses: true };
-    window.history.pushState(state, '', stateToUrl(state));
+    pushAppHistory(state, '', stateToUrl(state));
   }, [myCourses, selectedSemester]);
 
   // --- Exercise View Handler ---
@@ -671,7 +693,7 @@ export const App: React.FC = () => {
         exerciseId: exerciseRefId,
         exerciseTab: tab,
       };
-      window.history.pushState(nextState, '', stateToUrl(nextState));
+      pushAppHistory(nextState, '', stateToUrl(nextState));
     },
     [activeExerciseRefId, activeExerciseTab, selectedSemester, selectedCourseId, currentContainerId]
   );
@@ -688,7 +710,7 @@ export const App: React.FC = () => {
         exerciseId: activeExerciseRefId,
         exerciseTab: tab === 'assignments' ? null : tab,
       };
-      window.history.pushState(nextState, '', stateToUrl(nextState));
+      pushAppHistory(nextState, '', stateToUrl(nextState));
     },
     [activeExerciseTab, selectedSemester, selectedCourseId, currentContainerId, activeExerciseRefId]
   );
@@ -700,6 +722,7 @@ export const App: React.FC = () => {
     const currentState: NavigationState = {
       repositoryId,
       myCourses,
+      isCalendarOpen,
       semester: selectedSemester,
       courseId: selectedCourseId,
       containerId: currentContainerId,
@@ -707,10 +730,9 @@ export const App: React.FC = () => {
       exerciseTab: activeExerciseTab,
     };
 
-    if (!window.history.state) {
-      if (selectedCourseId) {
-        // If cold-loaded directly into a course (via last opened course or URL),
-        // prime the base history entry with Semester Overview so Mouse 4 / Back navigates to it!
+    if (appHistoryDepth() === null) {
+      if (selectedCourseId || repositoryId || myCourses || isCalendarOpen) {
+        // Give deep links an in-app overview entry so Back/Escape never leave the app.
         const baseState: NavigationState = {
           semester: selectedSemester,
           courseId: null,
@@ -718,10 +740,10 @@ export const App: React.FC = () => {
           exerciseId: null,
           exerciseTab: null,
         };
-        window.history.replaceState(baseState, '', stateToUrl(baseState));
-        window.history.pushState(currentState, '', stateToUrl(currentState));
+        replaceAppHistory(baseState, '', stateToUrl(baseState));
+        pushAppHistory(currentState, '', stateToUrl(currentState));
       } else {
-        window.history.replaceState(currentState, '', stateToUrl(currentState));
+        replaceAppHistory(currentState, '', stateToUrl(currentState));
       }
     }
 
@@ -789,9 +811,11 @@ export const App: React.FC = () => {
   // --- History Navigation & PopState Effect ---
   useEffect(() => {
     const handlePopState = async (event: PopStateEvent) => {
-      if (!await navigationGuard.confirmNavigation()) {
+      const approved = approvedHistoryNavigation.current;
+      approvedHistoryNavigation.current = false;
+      if (!approved && !await navigationGuard.confirmNavigation()) {
         const current = currentNavStateRef.current;
-        window.history.pushState(current, '', stateToUrl(current));
+        pushAppHistory(current, '', stateToUrl(current));
         return;
       }
       const state: NavigationState =
@@ -928,6 +952,7 @@ export const App: React.FC = () => {
   const effectiveMaterialsData = isMatchingContainer ? materialsData : null;
 
   const sidebar = <Sidebar
+    semester={selectedSemester}
     courses={allCourses}
     selectedCourseId={selectedCourseId}
     onSelectCourse={refId => { handleSelectCourse(refId); setMobileNavigationOpen(false); }}
@@ -1080,6 +1105,7 @@ export const App: React.FC = () => {
 
       {/* Nickname & Icon Editor Modal */}
       <NicknameModal
+        semester={selectedSemester}
         courses={allCourses}
         isOpen={isNicknameModalOpen}
         onClose={() => setIsNicknameModalOpen(false)}

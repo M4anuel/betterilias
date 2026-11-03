@@ -20,7 +20,7 @@ export function MobilePageHeader({ title, onBack, onRefresh, refreshing, trailin
     {trailing}
     <details ref={menu} className="relative shrink-0" onKeyDown={event => { if (event.key === 'Escape') { menu.current?.removeAttribute('open'); menu.current?.querySelector('summary')?.focus(); } }}>
       <summary aria-label={t('mobile.actions')} className="icon-button cursor-pointer list-none rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"><MoreVertical size={18} /></summary>
-      <div className="absolute right-0 top-full z-30 w-60 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900 [&_button]:w-full [&_button]:text-left"
+      <div data-escape-scope className="absolute right-0 top-full z-30 w-60 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900 [&_button]:w-full [&_button]:text-left"
         onClick={event => { if ((event.target as HTMLElement).closest('button')) menu.current?.removeAttribute('open'); }}>
         <button type="button" onClick={onRefresh} disabled={refreshing} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"><RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />{t('Neu von ILIAS abrufen')}</button>
         {children}
