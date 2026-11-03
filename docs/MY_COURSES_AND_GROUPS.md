@@ -29,7 +29,8 @@ with mocked API responses, and run the repository's required checks.
 - Data: `GET /api/dashboard/memberships` fetches `ilmembershipoverviewgui` with
   the existing authenticated, tenant-specific client and session checks.
 - Favourites and sorting use `betterilias_my_courses_<session_id>` in localStorage
-  (`local` for the existing single-user fallback). They do not change ILIAS's
+  (`local` is only a browser-preference bucket before pairing, not an HTTP
+  authentication fallback). They do not change ILIAS's
   favourites or memberships. Active search and filters apply to both sections.
 - Semester metadata is extracted from explicit HS/FS year codes in item titles.
   Entries without such a code are available under “Without semester”.

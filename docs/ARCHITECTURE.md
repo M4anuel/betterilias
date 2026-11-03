@@ -78,6 +78,14 @@ historical semesters used in fixtures.
 
 - [App](../frontend/src/App.tsx) coordinates course/container/exercise navigation
   and history state. URLs preserve selected courses, folders and exercise tabs.
+- [App history](../frontend/src/lib/appHistory.ts) marks the app's history boundary.
+  [Escape navigation](../frontend/src/lib/useEscapeNavigation.ts) goes back once,
+  or to the semester overview for consecutive presses within 700 ms. Consumed
+  events, dialogs, menus, editable controls and fullscreen take priority.
+- Sidebar layouts use `ilias_sidebar_order_<semester>`; the old global layout
+  migrates once into the selected semester. Nicknames/icons remain shared across
+  semesters. Fixed row/header/divider geometry keeps the icon rail stationary
+  during its width transition, with consistent inherited primary colours.
 - Cached data can render while a background request revalidates it. This avoids
   unnecessary blank screens; it is not a zero-latency guarantee.
 - Request sequence IDs, active-container checks and keyed CourseView instances
@@ -86,6 +94,9 @@ historical semesters used in fixtures.
   and exercise data, timestamps and personal display preferences in localStorage.
   ILIAS Saver can skip background revalidation within a user-selected TTL;
   manual refresh and management updates fetch fresh data.
+- [SyncIndicator](../frontend/src/components/SyncIndicator.tsx) gives each visible
+  page one sync animation. Nested session/feedback and TA editor/list loads report
+  to the parent; placeholders and refresh actions do not duplicate the animation.
 - Empty-scrape guards preserve existing populated caches. Verified deletion
   explicitly invalidates affected entries and refills an emptied parent so
   those guards do not resurrect removed items.
@@ -117,6 +128,14 @@ Exercise writes use separate assignment/submission/feedback adapters. Native
 file handlers, command names and multipart field conventions vary between
 workflows; course uploads and exercise attachments are not interchangeable.
 
+TA allocations add compact per-row markers to native tutor notes and use native
+multi-row saves while preserving marks/status fields. ZIP downloads include a
+feedback manifest. Feedback imports stage inspected files per tenant, preview
+recipient mappings/conflicts, and publish only after review. Allocation markers
+are shared through ILIAS; defaults and player/UI preferences remain local. See
+the [TA workflow](TA_WORK_DISTRIBUTION_PLAN.md) for current scope and the retained
+research gates, including native bulk-protocol and live-validation limits.
+
 ## Localisation and visual identity
 
 Shared German/English catalogues serve the app, backend and both extensions.
@@ -135,7 +154,8 @@ rules are in AGENTS.md; the old project's Uni Bern crest description is obsolete
 | `start.py`, `start.bat`, `run.py` | Local launchers; development mode is explicit |
 | `backend/config.py`, `.env.example` | Settings and local configuration defaults |
 | `backend/main.py`, `backend/api/` | App, middleware, session dependencies and REST routes |
-| `backend/auth/` | Session storage and Playwright login |
+| `backend/auth/` | Tenant session storage and native session verification; extension-only login |
+| `backend/coordination.py` | Shared-local-volume locks and single-use handoff transactions for one VPS |
 | `backend/scrapers/` | Native HTML/form parsing and failed-page dumps |
 | `backend/services/` | Authenticated native workflows, write verification and download streaming |
 | `backend/schemas.py` | Typed backend request/response models |

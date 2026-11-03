@@ -57,7 +57,8 @@ creation types are separate from ILIAS's allowed types. The authoring scraper an
 service are isolated in `backend/scrapers/authoring.py` and
 `backend/services/authoring.py` for future exercise creation and management.
 Regression fixtures under `tests/fixtures/authoring` are sanitized excerpts of
-the source page saves. Navigation guards are being implemented separately.
+the source page saves. Shared navigation guards protect unsaved edits and pending
+writes, including Escape navigation; see `frontend/src/lib/navigationGuard.ts`.
 
 The sections below describe the target design; the status and corrections above
 take precedence where they differ from the initial proposal.

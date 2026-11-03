@@ -75,7 +75,11 @@ python start.py --help  # or verify python start.py syntax
 * Sessions are isolated and keyed by `session_id`.
 * The frontend stores `session_id` in `localStorage` under `betterilias_session_id` and forwards it to the backend via the `X-Session-Id` header (or cookie `betterilias_session`).
 * The backend saves sessions to `.sessions/<session_id>.json`.
-* Single-tenant local fallback: The backend also populates `session_cookies.json` / picks up the most recently synced session if no `X-Session-Id` is provided, preventing unauthenticated 401s during local development.
+* **Strict isolation in every runtime mode:** Never populate or select a default/latest-user HTTP session when a request has no valid credential. Missing, malformed or revoked credentials must not fall back to another tenant. The internal legacy `SessionManager` default exists for isolated tooling/tests, not HTTP authentication.
+* Login is through the Chrome/Firefox companions; verify incoming ILIAS cookies before replacing saved credentials. Local headed-browser login and manual cookie entry are removed.
+* Native GET downloads/previews use an HttpOnly `betterilias_session` cookie (Secure in production); mutations require an explicit header/bearer credential. Never add long-lived session IDs to URLs. Phone/extension navigation uses single-use, 60-second handoff codes.
+* `APP_ENV` defaults to production. Maintenance dump endpoints and generated API documentation are development-only. The local launcher explicitly selects development mode.
+* Native view state, grading/allocation/import writes and persisted calendar changes use shared coordination. Current filesystem locks/SQLite handoffs support replicas sharing one local VPS data volume, not independent VPSs/NFS. See [`docs/DEPLOYMENT_SECURITY.md`](docs/DEPLOYMENT_SECURITY.md).
 
 ### 3.3 Safe Scraper Protocol & False-Positive Session Loss
 * Wrap all DOM parsing functions with `@safe_parser` from `backend.scrapers.dumper` so unhandled HTML changes dump to `logs/failed_html_dump_*.html` rather than crashing silently.

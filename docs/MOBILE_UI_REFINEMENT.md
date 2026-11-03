@@ -1,5 +1,28 @@
 # Mobile UI refinement
 
+## Stable sidebar collapse and foregrounds
+
+All navigation/course rows share a 44 px height, the same icon wrapper and an
+inherited foreground colour. Raw SVG-only buttons otherwise match a global
+centering rule after their labels disappear, which moved three icons while the
+wrapped course/overview icons stayed put. The shared wrappers remove that split.
+
+Only sidebar width animates. Its header/footer and subject/custom-divider slots
+keep their height during collapse; labels truncate on one line rather than
+wrapping. The header title cannot shrink its row, and the customization action
+stays keyboard-accessible in the compact rail. Reduced motion disables the width
+transition. Phone/tablet drawers retain their full available width.
+
+Primary inactive labels and icons use the same inherited slate foreground
+(`slate-700` light, `slate-200` dark); the selected row uses the accent colour.
+Section headings, course-code subtitles and secondary actions remain muted.
+The design deliberately does not make every piece of sidebar text pure white.
+
+`tests/test_sidebar_collapse_browser.py` samples icon coordinates throughout
+repeated collapse/expand animations, compares primary computed colours and checks
+fixed header/row heights. It covers default/custom sections, German/English,
+light/dark and short desktop windows, plus phone/tablet drawer geometry.
+
 ## One page sync indicator
 
 Use `SyncIndicator` once in the visible page header for ILIAS fetches. Initial

@@ -48,3 +48,14 @@ Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzun
 
 - **Dark Mode Support**: Erkennt automatisch die Systemeinstellungen deines Betriebssystems (`prefers-color-scheme`).
 - **Sicher & Datenschutzfreundlich**: Liest ausschliesslich Cookies für `ilias.unibe.ch`. Keine Passwörter werden abgefangen oder gespeichert.
+
+
+## Deployment and connection links
+
+Login uses this companion; the backend no longer offers local Playwright login
+or manual cookie entry. Opening BetterIlias uses a single-use connection code
+valid for 60 seconds, rather than putting the session ID in the address bar.
+The manifest currently permits the listed localhost origins; add the intended
+production hostname before publishing a production extension. Use development
+mode for a local HTTP backend, and same-origin HTTPS for the deployed app/API.
+See [deployment security](../docs/DEPLOYMENT_SECURITY.md) for exact requirements.

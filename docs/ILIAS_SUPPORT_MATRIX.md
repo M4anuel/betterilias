@@ -49,7 +49,7 @@ fallbacks and does not recognize all 30 types explicitly.
 | `wiki` | Wiki | Catalogue only. | No page/history reader, wiki-link resolver or editor. |
 | `xpdl` | Etherpad text editor | Catalogue only. | No dedicated collaborative editor integration. |
 | `grp` | Group / Gruppe | Explicit recognition and generic container browsing in the repository explorer; recognized as a container for management inspection. Course-material detection is less comprehensive. | No dedicated group workspace, group-membership management or group creation/deletion workflow. |
-| `exc` | Exercise / Übung | Native exercise overview, assignment details, formatted instructions, instruction-file downloads, student submission uploads/deletion and supported team controls. TA views support grading, feedback files and assignment management. | Create/edit/delete **assignments within an existing exercise**, reorder assignments, manage instruction attachments and grading. Creating/deleting the repository exercise container is not implemented. Assignment type is fixed after creation; forms expose supported native fields rather than every possible ILIAS assessment feature. |
+| `exc` | Exercise / Übung | Native exercise overview, assignment details, formatted instructions, instruction-file downloads, student submission uploads/deletion and supported team controls. TA views support grading, allocation through batch tutor-note markers, assignment/TA submission ZIPs, allocation CSV, reviewed folder/ZIP feedback return with manual recipient mapping, and assignment management. | Create/edit/delete **assignments within an existing exercise**, reorder assignments, manage instruction attachments and grading. Creating/deleting the repository exercise container is not implemented. Assignment type is fixed after creation; forms expose supported native fields rather than every possible ILIAS assessment feature. TA default persistence and lossless note-budget handling remain follow-ups; see the TA workflow. |
 | `tst` | Test | Recognized/link: opens the ILIAS test environment. | No native test runner, question editor, scoring runtime or test creation. |
 | `qpl` | Question pool for tests | Catalogue only. | No instructor question-pool browser/editor. |
 | `prtt` | Portfolio template | Catalogue only. | No template preview or portfolio-authoring workflow. |
@@ -127,6 +127,20 @@ clipboard or page-element history/style editor.
 | Move/copy/link to another container | Not implemented as native BetterIlias management actions. Dragging management rows changes order only. |
 | Evacuate folder contents before deletion | Planned; currently the reviewed operation is cascading deletion, with acknowledgement. |
 | Trash/restore | No native trash browser/restore workflow. Recoverability depends on ILIAS settings; the UI does not promise restoration. |
+
+## Shared interface behavior
+
+- Course/group memberships have content-generated semester filters, reversible
+  sorting and browser-local favourites. Sidebar dividers/order are per semester;
+  stable rows and wrapped icons keep the compact rail from shifting.
+- Escape navigates back inside the app; consecutive presses within 700 ms return
+  to the semester overview. Dialogs, menus, editable controls and fullscreen own
+  their Escape events. Unsaved/pending navigation guards remain active.
+- Each visible page has one ILIAS sync animation, including cached revalidation
+  and nested session/feedback loads. Placeholders and refresh actions stay static.
+- The player stores layout/stream/quality, volume/mute, speed and caption
+  preferences per session, with episode resume positions stored separately.
+  Recording lists have compact title/date and direction toggles.
 
 ## Evidence and maintenance
 

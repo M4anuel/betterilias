@@ -10,15 +10,15 @@ workflow without replacing those rules.
 | Question | Update/read |
 | --- | --- |
 | How do I install and use the app? | [README](../README.md) |
-| What still needs implementation or verification? | [TODO](../TODO.md) — unfinished actions only |
+| What still needs implementation or verification? | [TODO](../TODO.md) — backlog and completed milestones |
 | What does a specific ILIAS object/element actually do here? | [Support inventory](ILIAS_SUPPORT_MATRIX.md) |
 | How does the existing implementation fit together? | [Architecture](ARCHITECTURE.md) |
 | Why/how should a planned feature be built? | Its scoped plan, linked from TODO |
-| What are the exact current REST routes and schemas? | The running backend's `/docs`, `/redoc` and `/openapi.json` |
+| What are the exact current REST routes and schemas? | A development backend's `/docs`, `/redoc` and `/openapi.json`; production disables them |
 | What changed previously? | Git history; the support inventory describes the current result |
 
 When completing a task, update its current behavior in the inventory/README as
-appropriate, then remove the finished backlog entry. Keep acceptance criteria and
+appropriate, then mark its backlog entry complete. Keep acceptance criteria and
 protocol findings in feature plans rather than repeating them in TODO. Do not
 present speculative routes, sample measurements or historical milestones as
 implemented behavior.
@@ -70,6 +70,19 @@ Some tests require optional local/private HTML dumps and skip when absent.
 Committed fixtures and mock-native/browser tests do not establish live support
 for every ILIAS installation. If the default temporary directory is unavailable,
 pytest accepts a fresh writable `--basetemp` directory.
+
+Focused UI regressions for recent changes:
+
+```powershell
+$env:BETTERILIAS_BROWSER_TESTS = '1'
+python -m pytest tests/test_sidebar_collapse_browser.py tests/test_escape_and_semester_sidebar_browser.py tests/test_page_sync_browser.py -q
+```
+
+The sidebar test samples icon coordinates throughout collapse/expand transitions
+and checks inherited colours, rather than only checking final screenshots. Page
+sync tests hold responses open for initial/cached/nested loads and failure cleanup.
+Screenshots and geometry checks use Chromium emulation; they do not establish
+physical iOS/Android or live ILIAS acceptance.
 
 `tests/test_extension_popup_browser.py` loads the Chrome package in an isolated
 Chromium profile and opens its actual toolbar popup. It checks intrinsic width,

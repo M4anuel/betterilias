@@ -25,11 +25,13 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Teaching-assistant work distribution
 
-- [x] Implement the reviewed [TA work distribution, downloads and feedback-return plan](docs/TA_WORK_DISTRIBUTION_PLAN.md):
+- [ ] Finish the reviewed [TA work distribution, downloads and feedback-return plan](docs/TA_WORK_DISTRIBUTION_PLAN.md); core phases are implemented, with remaining plan differences below:
   - [x] Phase 0 & Phase 1: Shared allocations via [BI:<ta_id>|<ta_name>] markers and native saveStatusAll batch updates (backend/services/ta_allocation.py, DistributeWorkModal.tsx).
   - [x] Phase 2: TA and bulk submission downloads with live progress, ZIP streaming, and betterilias-feedback.json round-trip manifest templates.
   - [x] Phase 3: Reviewed feedback return with safe preflight ZIP/folder inspection, mapping preview, conflict detection/resolution, and authenticated publication (backend/services/feedback_import.py, ReturnFeedbackModal.tsx).
   - [x] Phase 4: Hardening (200-char note budget guard, fingerprint concurrency verification, zero-work TA quotas), unmatched-files manual mapping resolver, and allocation CSV export.
+  - [ ] Persist assistant count/names/priority per session and lecture; the current dialog starts with two assistant slots.
+  - [ ] Refuse or explicitly preview/confirm tutor-note truncation when allocation markers exceed the available 200-character budget; current formatting can shorten existing note text.
 
 ## Calendar and timetable
 
@@ -69,6 +71,9 @@ no lecture dates.
   hosting supports them.
 
 ## Mobile usability
+
+- [x] Keep sidebar icons/rows stationary throughout collapse, prevent header
+  wrapping, unify primary icon/label colours and keep compact-rail editing accessible.
 
 - [x] Keep one visible ILIAS sync animation per page during initial loads and
   cached refreshes; consolidate nested session/feedback requests and retain

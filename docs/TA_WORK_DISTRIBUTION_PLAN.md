@@ -1,9 +1,41 @@
-# TA work distribution, downloads and feedback return — implementation plan
+# TA work distribution, downloads and feedback return — implementation and retained plan
 
-**Status:** planning only. No feature implementation or live ILIAS writes were performed.
-**Research date:** 30 October 2026. **Repository baseline:** `822c6d6`, including the recent native submission-download parsing/proxy fix.
+**Current status:** the core allocation, ZIP-download and reviewed feedback-return
+workflows are implemented. The original research/design below is retained;
+its proposed envelopes, native bulk protocols and release gates must not be read
+as a checklist of shipped behavior. Live ILIAS acceptance remains separate.
 
-## 1. Improved implementation prompt
+**Original research date:** 30 October 2026. **Research baseline:** `822c6d6`.
+
+## Current implementation and remaining differences
+
+- `DistributeWorkModal` groups teams into correction units, supports native order,
+  team number, submission time and seeded random allocation, and distributes
+  remainders by an editable assistant priority. Names and counts are editable;
+  the current dialog starts with two TAs. Lecture/session-scoped persistence of
+  these defaults is still pending.
+- Per-member tutor notes carry compact `[BI:<ta_id>|<ta_name>]` markers. Native
+  `saveStatusAll` batches preserve unrelated grade/status fields and support
+  fingerprint conflict checks and read-back verification. The 200-character note
+  budget is enforced, but current formatting may shorten existing note text;
+  refusing or explicitly reviewing that truncation remains a follow-up.
+- Assignment/TA ZIP bundles include a `betterilias-feedback.json` manifest and
+  recipient feedback folders. This is a BetterIlias bundle workflow, not a claim
+  that every native selected-download/background-job protocol is implemented.
+- Folder/ZIP feedback is staged per session, inspected, mapped to verified units
+  and previewed before publication. Unmatched files have manual recipient mapping
+  with a searchable selection and submitted-unit prioritization. Conflict actions
+  include skip, replace and keep both; publication reuses native feedback-file
+  handlers with per-file outcomes. Allocation CSV export is also available.
+- Shared-local-volume locks coordinate BetterIlias grading/allocation/import
+  writers on one VPS. They do not lock tutors' native browser edits or establish
+  multi-VPS coordination. See [deployment security](DEPLOYMENT_SECURITY.md).
+
+Current code: `DistributeWorkModal.tsx`, `ReturnFeedbackModal.tsx`,
+`SearchableUnitSelect.tsx`, `backend/services/{ta_allocation,exercise_bulk,feedback_import}.py`
+and the exercise routes/client. Future work and acceptance remain in [TODO](../TODO.md).
+
+## 1. Original implementation prompt
 
 > Design, but do not implement, an assignment-level work-distribution system for teaching assistants in BetterIlias. Inspect the existing application, saved ILIAS pages and upstream ILIAS source first. Clearly distinguish verified native capabilities, version-dependent behavior and unresolved questions.
 >
@@ -244,7 +276,7 @@ Use bounded workers, temporary disk storage, configured upload/archive limits an
 - Localise labels, tooltips, accessible names and generated errors with the existing shared catalogues; preserve TA labels and lecturer/student content.
 - Test 320/390/430/768/1280 px and short landscape, including long German labels, long TA names, keyboard focus restoration and real selection/reorder/save interactions. Distinguish emulation from physical iOS/Android and live ILIAS acceptance.
 
-## 12. Phased delivery and release gates
+## 12. Original phased delivery and release gates
 
 ### Phase 0 — capability/identity probes, before implementation assumptions are frozen
 
@@ -287,7 +319,7 @@ Exercise simultaneous tutors, permission/session changes, timeout/restart recove
 - UI: user can name/reorder assistants, reverse a sort, inspect quotas, save a plan, choose a TA download, preview a folder/ZIP mapping and recover a partial operation at the required viewport widths with touch and keyboard.
 - Future implementation checks: full backend suite, frontend build, locale validation and launcher syntax; add focused browser regressions and sanitized real-dump fixtures for every native adapter. Mocked tests alone do not establish live ILIAS compatibility.
 
-## 14. Decisions to confirm before coding
+## 14. Original decisions to confirm before coding
 
 | Question | Recommended starting decision |
 | --- | --- |
@@ -301,4 +333,5 @@ Exercise simultaneous tutors, permission/session changes, timeout/restart recove
 | What if notes cannot fit or team fields cannot be preserved? | Block affected publication and resolve it; no silent text loss or unsafe grade-reset workaround. |
 | Are filename-only matching and arbitrary archive formats required initially? | No; start with manifest, explicit-ID folders and native individual ZIPs, then add reviewed convenience adapters. |
 
-These are plan assumptions and research gates, not claims that the feature has been implemented.
+These tables retain the original plan assumptions and research gates. Use the
+current-implementation section above and the support inventory for shipped scope.
