@@ -116,6 +116,11 @@ The management plan contains the detailed safeguards and native evidence.
 Exercise writes use separate assignment/submission/feedback adapters. Native
 file handlers, command names and multipart field conventions vary between
 workflows; course uploads and exercise attachments are not interchangeable.
+Teaching assistant work distribution is managed via `ta_allocation.py` (storing
+assignments in compact tutor-note markers and batch-updating via native `saveStatusAll`),
+bulk submission ZIP streaming via `exercise_bulk.py`, and mass feedback return
+via `feedback_import.py` (with safe preflight inspection, conflict resolution, and
+per-collection publication).
 
 ## Localisation and visual identity
 

@@ -1,7 +1,34 @@
 # TA work distribution, downloads and feedback return — implementation plan
 
-**Status:** planning only. No feature implementation or live ILIAS writes were performed.
-**Research date:** 30 October 2026. **Repository baseline:** `822c6d6`, including the recent native submission-download parsing/proxy fix.
+**Status:** Fully implemented (Phases 0–4 completed and verified).
+**Repository baseline:** `8cc3066`, with shared note allocations, tailored multi-ZIP downloads, safe mass feedback return, searchable recipient combobox, and portal-rendered popovers.
+
+## 0. Implementation status & delivered capabilities
+
+All core phases defined in this specification have been implemented, verified, and integrated:
+
+- **Phase 0 & 1 — Shared allocations:**
+  - Normalized submission units (`team:<id>` or `user:<id>`) with verified native identities.
+  - Deterministic allocation (sorted native ILIAS order, team numbers, submission times, student names) and randomized allocation with equal quota division (`floor(M/N)`) and prioritized remainder assignment.
+  - Shared persistence via compact `[BI:<ta_id>|<ta_name>]` markers in ILIAS tutor-internal notes, respecting the native 200-character boundary while preserving human comments.
+  - Atomic multi-row native `saveStatusAll` batch updates preserving marks, passed statuses, and existing notes.
+  - Interactive allocation workspace (`DistributeWorkModal.tsx`), live preview, quota inspection, and allocation CSV export.
+- **Phase 2 — Tailored submission downloads:**
+  - Filtered ZIP generation for the whole assignment, unassigned work, or specific assistants.
+  - Live download progress tracking with byte counters and animated status bars (`DownloadProgressBar.tsx`).
+  - Standardized folder hierarchy (`feedback/team-<id>/` or `feedback/user-<id>/`) bundled with a `betterilias-feedback.json` round-trip manifest template.
+- **Phase 3 — Safe mass feedback return:**
+  - Secure staging under authenticated session directories (`.staging/<session_id>/<import_id>/`).
+  - Preflight zip inspection rejecting symlinks, path traversals, expansion bombs, and system metadata (`__MACOSX`, `.DS_Store`, `Thumbs.db`).
+  - Automatic recipient mapping with conflict detection against existing ILIAS feedback files.
+  - Optimized preflight querying: targeted only to units actually matched in the ZIP, eliminating runaway queries and ILIAS HTTP 500 errors.
+- **Phase 4 — Execution & conflict resolution:**
+  - Conflict actions per file: `Ersetzen` (overwrite), `Zusätzlich hochladen` (keep both), and `Überspringen` (skip).
+  - Manual recipient mapping for unmatched files with a searchable combobox (`SearchableUnitSelect.tsx`), priority-sorting submitted teams/students, and badge indicators for existing feedback.
+  - Popover portal rendering directly into `document.body` (`createPortal`), floating above the modal frame without triggering dialog scrollbars.
+  - On-demand inspection and deletion prior to overwrite uploads.
+  - Full automated regression test coverage (`tests/test_ta_allocation.py`, `tests/test_feedback_import.py`).
+
 
 ## 1. Improved implementation prompt
 

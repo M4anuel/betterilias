@@ -15,6 +15,7 @@ student and teaching-assistant workflows.
 | Tests, localisation, configuration and scraper repair | [Development guide](docs/DEVELOPMENT.md) |
 | Unified management design and future authoring adapters | [Management plan](docs/UNIFIED_MANAGEMENT_PLAN.md) |
 | Planned synchronized camera/slides playback | [Podcast player plan](docs/PODCAST_PLAYER_PLAN.md) |
+| TA work distribution, submission downloads and feedback return | [TA work distribution plan](docs/TA_WORK_DISTRIBUTION_PLAN.md) |
 | Contribution, branching and publishing rules | [AGENTS.md](AGENTS.md) |
 
 The support inventory describes implemented behavior. TODO contains open work;
@@ -31,6 +32,14 @@ from the running backend's [Swagger UI](http://127.0.0.1:8000/docs),
 - Upload/delete student assignment submissions and use supported assignment-team
   controls. TAs can grade submissions, manage feedback/instruction attachments,
   and create/edit/reorder/delete assignments inside an existing exercise.
+- Distribute grading work across teaching assistants with equal quotas and prioritized
+  remainders, saved directly in ILIAS tutor notes for multi-client synchronization.
+- Download tailored submission ZIPs (all, unassigned, or per-assistant) with live progress
+  feedback and round-trip manifest templates.
+- Review and upload student feedback files in bulk from ZIP archives with preflight
+  inspection, conflict resolution (overwrite, keep both, skip), and searchable recipient mapping.
+- Combine all semester courses into an integrated calendar and weekly timetable with
+  course colors, custom recurring rules, and .ics export/subscription feeds.
 - Enter **Manage this page** to create folders, upload course files, review and
   delete files/folders, and save native shared ordering. Creation controls stay
   out of normal browsing; management follows folder navigation within a course.
