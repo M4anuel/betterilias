@@ -32,6 +32,7 @@ const fieldIds: Record<AssignmentField, string> = {
 const invalidFieldStyle = 'aria-invalid:border-rose-500 dark:aria-invalid:border-rose-400 aria-invalid:ring-2 aria-invalid:ring-rose-500/30';
 
 interface TAExerciseEditorViewProps {
+  onSyncingChange?: (syncing: boolean) => void;
   exerciseRefId: string;
   assId: string | null;
   initialTypeId?: number;
@@ -40,6 +41,7 @@ interface TAExerciseEditorViewProps {
 }
 
 export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
+  onSyncingChange,
   exerciseRefId,
   assId,
   initialTypeId = 1,
@@ -52,6 +54,11 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRevalidating, setIsRevalidating] = useState(false);
+  const [isLoadingTypes, setIsLoadingTypes] = useState(false);
+  useEffect(() => {
+    onSyncingChange?.(isLoading || isRevalidating || isLoadingTypes);
+    return () => onSyncingChange?.(false);
+  }, [isLoading, isRevalidating, isLoadingTypes, onSyncingChange]);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -139,13 +146,15 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   useEffect(() => {
     if (assId) return;
     let active = true;
+    setIsLoadingTypes(true);
     api.getTAAssignments(exerciseRefId).then((data) => {
       if (active && data.available_types && Object.keys(data.available_types).length) {
         setAvailableTypes(data.available_types);
         setTypeId((selected) => Object.hasOwn(data.available_types!, String(selected)) ? selected : Number(Object.keys(data.available_types!)[0]));
       }
-    }).catch((err) => { if (active) setError(err?.message || t('Fehler beim Laden der Übungsliste')); });
-    return () => { active = false; };
+    }).catch((err) => { if (active) setError(err?.message || t('Fehler beim Laden der Übungsliste')); })
+      .finally(() => { if (active) setIsLoadingTypes(false); });
+    return () => { active = false; setIsLoadingTypes(false); };
   }, [exerciseRefId, assId]);
 
   // Load existing assignment details
@@ -547,7 +556,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
 
       {isLoading ? (
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-16 text-center border border-slate-200 dark:border-slate-800">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-indigo-500" />
+          {!onSyncingChange && <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-indigo-500" />}
           <p className="text-sm font-medium text-slate-500">{t("Übungsdetails werden geladen...")}</p>
         </div>
       ) : (

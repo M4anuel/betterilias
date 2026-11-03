@@ -30,6 +30,7 @@ export interface AssignmentFeedback {
 }
 
 interface TAExerciseManagementViewProps {
+  onSyncingChange?: (syncing: boolean) => void;
   exerciseRefId: string;
   exerciseTitle?: string;
   onBack: () => void;
@@ -39,6 +40,7 @@ interface TAExerciseManagementViewProps {
 }
 
 export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> = ({
+  onSyncingChange,
   exerciseRefId,
   exerciseTitle,
   onBack,
@@ -50,6 +52,11 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
   const [assignments, setAssignments] = useState<TAAssignmentListItem[]>([]);
   const [initialOrders, setInitialOrders] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isRevalidating, setIsRevalidating] = useState(false);
+  useEffect(() => {
+    onSyncingChange?.(isLoading || isRevalidating);
+    return () => onSyncingChange?.(false);
+  }, [isLoading, isRevalidating, onSyncingChange]);
   const [error, setError] = useState<string | null>(null);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
@@ -87,6 +94,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
       return;
     }
 
+    setIsRevalidating(true);
     try {
       const data = await api.getTAAssignments(exerciseRefId);
       cache.setCachedTAAssignments(exerciseRefId, data);
@@ -100,6 +108,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
     } catch (err: any) {
       if (!cached) setError(err?.message || t("Fehler beim Laden der Übungsliste"));
     } finally {
+      setIsRevalidating(false);
       setIsLoading(false);
     }
   }, [exerciseRefId]);
@@ -328,7 +337,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
         {isLoading ? (
           <div className="p-12 text-center text-slate-500 dark:text-slate-400">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-indigo-500" />
+            {!onSyncingChange && <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-indigo-500" />}
             <p className="text-sm font-medium">{t("Übungen werden geladen...")}</p>
           </div>
         ) : filteredAssignments.length === 0 ? (

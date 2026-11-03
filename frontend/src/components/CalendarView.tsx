@@ -1,3 +1,4 @@
+import { SyncIndicator } from './SyncIndicator';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Calendar as CalendarIcon,
@@ -1211,7 +1212,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" style={{ color: 'var(--accent, #0AACA5)' }} />
           <span>{t('calendar.title')}</span>
           {(isLoading || isSyncing) && (
-            <RefreshCw className="h-4 w-4 animate-spin text-slate-400 shrink-0" />
+            <SyncIndicator />
           )}
         </h1>
 
@@ -1234,7 +1235,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               }}
               className="min-h-10 sm:min-h-7 whitespace-nowrap inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 transition cursor-pointer"
             >
-              <RefreshCw className={`h-3.5 w-3.5 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+              <RefreshCw className="h-3.5 w-3.5 shrink-0" />
               <span>{t('calendar.recheck.button')}</span>
             </button>
           </div>
@@ -1264,7 +1265,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         >
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <RefreshCw className="h-4 w-4 shrink-0 animate-spin text-[#0AACA5]" />
               <span className="font-bold truncate">
                 {t('calendar.sync_progress', {
                   current: syncProgress.current,
