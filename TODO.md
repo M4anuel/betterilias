@@ -4,6 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Fix Firefox local host match patterns and verify native popup sync,
+  expired sessions, backend errors, request timeout/retry and scoped page handoff.
+
 - [x] Group browser companions under `extensions/chrome/` and `extensions/firefox/`;
   update setup links and provide copy controls for restricted browser-internal addresses.
 - [ ] Port and validate the companion in Safari on macOS/iOS, including cookie

@@ -1,5 +1,5 @@
 // background.js - BetterIlias Companion Background Service Worker / Script
-if (typeof importScripts === 'function') importScripts('i18n.js', 'toolbar.js');
+if (typeof importScripts === 'function') importScripts('i18n.js', 'toolbar.js', 'request.js');
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 let syncDebounceTimeout = null;
@@ -140,9 +140,8 @@ async function checkAndAutoSync(force = false) {
     const source = typeof browser !== 'undefined' ? 'firefox_extension' : 'chrome_extension';
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'BetterIlias Extension';
 
-    const response = await fetch(`${settings.serverUrl}/api/auth/sync`, {
+    const { response, data } = await BetterIliasRequest(`${settings.serverUrl}/api/auth/sync`, {
       method: 'POST',
-      signal: AbortSignal.timeout(20000),
       headers: {
         'Content-Type': 'application/json',
         'Accept-Language': settings.language,
@@ -153,9 +152,7 @@ async function checkAndAutoSync(force = false) {
         source,
         user_agent: userAgent,
       }),
-    });
-
-    const data = await response.json().catch(() => ({}));
+    }, 'Session verification timed out.');
     if (response.ok && data.success && data.authenticated && data.session_id) {
       await browserAPI.storage.local.set({
         sessionId: data.session_id,

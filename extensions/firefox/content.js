@@ -2,6 +2,22 @@
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 (async function () {
+  // Firefox match patterns cannot restrict ports. Check the actual origin before
+  // exposing any BetterIlias credential to a page on a local development server.
+  let settings;
+  try {
+    settings = await browserAPI.storage.local.get(['serverUrl', 'frontendUrl']);
+  } catch (_) { return; }
+  const allowedOrigins = new Set([
+    'http://localhost:5173', 'http://127.0.0.1:5173',
+    'http://localhost:8000', 'http://127.0.0.1:8000',
+  ]);
+  for (const value of [settings.serverUrl, settings.frontendUrl]) {
+    if (!value) continue;
+    try { allowedOrigins.add(new URL(value).origin); } catch (_) {}
+  }
+  if (!allowedOrigins.has(window.location.origin)) return;
+
   function applySessionToPage(sessionId) {
     if (!sessionId) return;
 

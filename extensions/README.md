@@ -7,6 +7,19 @@ The browser-specific folders contain complete extension packages. Locale bundles
 are generated from the shared `locales/` catalogues by
 `node scripts/sync-extension-locales.mjs` from the repository root.
 
+Local match patterns omit ports because Firefox does not support port-specific
+patterns. The content scripts check the page's actual origin against the standard
+development endpoints and saved frontend/backend settings before sharing a session.
+Keep this origin check when changing manifest permissions.
+
+For native Firefox regressions, install `marionette_driver` in your test
+environment and run `python -m pytest tests/test_firefox_extension_browser.py -v`
+with `BETTERILIAS_FIREFOX_TESTS=1`. Set `BETTERILIAS_FIREFOX_BINARY` if Firefox is
+not installed in its standard location. These tests use fresh headless Firefox
+profiles, synthetic cookies and local test servers; they do not use a real ILIAS
+account. They exercise the packaged popup document with real extension APIs,
+including the 20-second network timeout, retry and content-script handoff.
+
 Browser-internal addresses such as `chrome://extensions`, `edge://extensions`
 and `about:debugging#/runtime/this-firefox` must be pasted into the address bar.
 Browsers restrict navigation to these pages from websites; the BetterIlias setup

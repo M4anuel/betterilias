@@ -91,18 +91,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       const stored = await browserAPI.storage.local.get(['sessionId']);
-      let response;
+      let response, data;
       try {
-        response = await fetch(`${serverUrl()}/api/auth/sync`, {
+        ({ response, data } = await BetterIliasRequest(`${serverUrl()}/api/auth/sync`, {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': getLanguage() },
-          signal: AbortSignal.timeout(20000),
           body: JSON.stringify({ cookies, session_id: stored.sessionId || null,
             source: typeof browser !== 'undefined' ? 'firefox_extension' : 'chrome_extension', user_agent: navigator.userAgent }),
-        });
+        }, t('Session verification unavailable. Check your connection and the backend, then retry.')));
       } catch (error) {
         throw new Error(t('Verbindung zum Backend fehlgeschlagen ({error}). Läuft das Backend auf {url}?', { error: error.message, url: serverUrl() }));
       }
-      const data = await response.json().catch(() => ({}));
       if (response.status === 401 || response.status === 403 || (response.ok && data.authenticated === false)) {
         setSessionState('invalid');
         await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
