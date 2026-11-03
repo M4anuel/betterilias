@@ -1,5 +1,6 @@
+import { SyncIndicator } from './SyncIndicator';
 import { t, useLanguage, generatedTitle } from '../lib/i18n';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Folder,
   FileText,
@@ -278,6 +279,11 @@ export const CourseView: React.FC<CourseViewProps> = ({
     Record<string, { total: number; files: number; folders: number; isMapped: boolean; isEmpty: boolean }>
   >({});
   const [isScanningTree, setIsScanningTree] = useState(false);
+  const [sessionSyncs, setSessionSyncs] = useState<Record<string, boolean>>({});
+  const onSessionSync = useCallback((key: string, busy: boolean) => {
+    setSessionSyncs(previous => previous[key] === busy ? previous : { ...previous, [key]: busy });
+  }, []);
+  const isPageSyncing = isRevalidating || isScanningTree || Object.values(sessionSyncs).some(Boolean);
   const [searchCategoryFilter, setSearchCategoryFilter] = useState<'all' | 'file' | 'fold' | 'mcst' | 'exc'>('all');
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
@@ -824,10 +830,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
     return (
       <div className="flex h-96 items-center justify-center p-8">
         <div className="flex flex-col items-center gap-3 text-slate-400 dark:text-slate-500">
-          <div
-            className="h-7 w-7 animate-spin rounded-full border-2 border-t-transparent"
-            style={{ borderColor: 'var(--accent, #0AACA5)', borderTopColor: 'transparent' }}
-          />
+          <SyncIndicator large />
           <p className="text-xs font-semibold">{t("Lade Vorlesungsinhalte...")}</p>
         </div>
       </div>
@@ -1371,10 +1374,6 @@ export const CourseView: React.FC<CourseViewProps> = ({
                   </span>
                 )
               ) : null
-            ) : isScanningTree ? (
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                <RefreshCw className="h-2.5 w-2.5 animate-spin text-slate-400" />
-              </span>
             ) : null}
             <span className="text-[11px] font-semibold text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition shrink-0">
               {t("Öffnen →")}
@@ -1643,7 +1642,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             )}
 
             {block.sessions && block.sessions.length > 0 && (
-              <SessionDrawer sessions={block.sessions} courseRefId={courseRefId} />
+              <SessionDrawer sessions={block.sessions} courseRefId={courseRefId} syncKey={block.id} onSyncingChange={onSessionSync} />
             )}
           </div>
         )}
@@ -1724,7 +1723,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             </span>
           </h3>
         </div>
-        <SessionDrawer sessions={sessList} courseRefId={courseRefId} />
+        <SessionDrawer sessions={sessList} courseRefId={courseRefId} syncKey={block.id} onSyncingChange={onSessionSync} />
       </div>
     );
   };
@@ -1768,12 +1767,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 {items.length}
               </span>
             </h3>
-            {isScanningTree && (
-              <div className="flex items-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md font-medium">
-                <RefreshCw className="h-3 w-3 animate-spin" />
-                <span>{t("Analysiere Unterordner...")}</span>
-              </div>
-            )}
+
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -1796,12 +1790,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                 {items.length}
               </span>
             </h3>
-            {isScanningTree && (
-              <div className="flex items-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md font-medium">
-                <RefreshCw className="h-3 w-3 animate-spin" />
-                <span>{t("Analysiere Unterordner...")}</span>
-              </div>
-            )}
+
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -1851,7 +1840,6 @@ export const CourseView: React.FC<CourseViewProps> = ({
                       )
                     ) : isScanningTree ? (
                       <span className="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500">
-                        <RefreshCw className="h-2.5 w-2.5 animate-spin" />
                         <span>{t("Prüfe...")}</span>
                       </span>
                     ) : (
@@ -1983,7 +1971,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
           const current = crumbs.findIndex(crumb => crumb.ref_id === materialsData?.container_ref_id);
           const parent = current > 0 ? crumbs[current - 1]?.ref_id : courseRefId;
           onNavigateFolder(parent || courseRefId);
-        }} onRefresh={onManualRefresh} refreshing={isRevalidating}>
+        }} onRefresh={onManualRefresh} refreshing={isPageSyncing}>
         {materialsData?.authoring && (materialsData.authoring.can_create || materialsData.authoring.can_manage || materialsData.authoring.can_edit_page) &&
           <button type="button" className="rounded-lg px-3 py-2 text-sm" aria-pressed={isManaging} onClick={async () => { if (await navigationGuard.confirmNavigation()) setIsManaging(!isManaging); }}>{t(isManaging ? 'management.done' : 'management.enter')}</button>}
         <button type="button" className="rounded-lg px-3 py-2 text-sm" onClick={() => setIsOrderModalOpen(true)}>{t('Reihenfolge')}</button>
@@ -2013,10 +2001,9 @@ export const CourseView: React.FC<CourseViewProps> = ({
             >
               {t(isManaging ? 'management.done' : 'management.enter')}
             </button>}
-          {isRevalidating ? (
+          {isPageSyncing ? (
             <div className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:text-blue-300">
-              <RefreshCw className="h-3 w-3 animate-spin" />
-              <span>{t("Synchronisiere...")}</span>
+              <SyncIndicator label />
             </div>
           ) : (
             <div className="flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
@@ -2117,12 +2104,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                     <span>
                       {t("Durchsucht: Aktueller Ordner +")} {Object.keys(subfolderMaterials).length} {t("Unterordner")}
                     </span>
-                    {isScanningTree && (
-                      <span className="flex items-center gap-1 text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 px-2.5 py-0.5 rounded-md font-medium text-[11px]">
-                        <RefreshCw className="h-3 w-3 animate-spin" />
-                        <span>{t("Analysiere Ordnerstruktur...")}</span>
-                      </span>
-                    )}
+
                   </div>
                 </div>
 
@@ -2251,10 +2233,6 @@ export const CourseView: React.FC<CourseViewProps> = ({
               if (!materialsData || (isRevalidating && orderedBlocksToRender.length === 0)) {
                 return (
                   <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center animate-in fade-in duration-150">
-                    <div
-                      className="h-8 w-8 animate-spin rounded-full border-3 border-t-transparent mb-3"
-                      style={{ borderColor: 'var(--accent, #0AACA5)', borderTopColor: 'transparent' }}
-                    />
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{t("Lade Vorlesungsinhalte...")}</p>
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{t("Materialien werden von ILIAS abgerufen")}</p>
                   </div>

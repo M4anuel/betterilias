@@ -1,3 +1,4 @@
+import { SyncIndicator } from './SyncIndicator';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useMemo } from 'react';
 import {
@@ -153,7 +154,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
               <GraduationCap className="h-6 w-6" style={{ color: 'var(--accent, #0AACA5)' }} />
               <span>{t("Vorlesungsübersicht")}</span>
               {isLoading && (
-                <RefreshCw className="h-4 w-4 animate-spin text-slate-400 ml-2" />
+                <SyncIndicator />
               )}
             </h1>
 
@@ -243,7 +244,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                   title={t("Übersicht aktualisieren")}
                   aria-label={t("Übersicht aktualisieren")}
                 >
-                  <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className="h-4 w-4" />
                 </button>
               )}
             </div>
@@ -296,10 +297,6 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
         {isLoading && !semesterData && (
           <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
             <div className="flex flex-col items-center gap-3 text-slate-400 dark:text-slate-500">
-              <div
-                className="h-6 w-6 animate-spin rounded-full border-2 border-t-transparent"
-                style={{ borderColor: 'var(--accent, #0AACA5)', borderTopColor: 'transparent' }}
-              />
               <span className="text-xs font-medium">{t("Lade Semester-Angebote für")} {currentSemesterMeta.short}...</span>
             </div>
           </div>

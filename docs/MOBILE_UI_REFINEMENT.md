@@ -1,5 +1,27 @@
 # Mobile UI refinement
 
+## One page sync indicator
+
+Use `SyncIndicator` once in the visible page header for ILIAS fetches. Initial
+content placeholders, refresh actions, folder rows, progress summaries and cached
+content must not add another loading animation for that fetch. The mobile page
+header owns the phone indicator; the desktop status badge owns the desktop one.
+Course session drawers and TA management/editor children report their activity to
+the parent. Automatic feedback-file batches share the grading indicator too.
+Standalone session drawers retain one indicator for the whole drawer.
+
+The audit covers semester, course/folder, assignments, information, grading,
+assignment management/editor, calendar, memberships and repository pages. The
+information tab fetches on tab/context changes, rather than restarting when its
+response updates state. Upload/save/download progress remains tied to its own
+operation.
+
+`tests/test_page_sync_browser.py` holds actual frontend API calls open to check
+initial loads, cached revalidation, nested requests, failure cleanup and reduced
+motion. Screenshots cover German/English, light/dark, phones, tablet, desktop and
+short landscape using Chromium emulation. Live ILIAS and physical-device checks
+are separate.
+
 ## Semester layouts and Escape navigation
 
 Sidebar dividers and their course positions are stored per semester. The old

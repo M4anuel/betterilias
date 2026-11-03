@@ -1,3 +1,4 @@
+import { SyncIndicator } from './SyncIndicator';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -9,7 +10,6 @@ import {
   Download,
   FolderOpen,
   Filter,
-  RefreshCw,
 } from 'lucide-react';
 import { CourseSessionItem, MaterialItem } from '../types';
 import { api } from '../lib/api';
@@ -17,16 +17,23 @@ import { MaterialDownloadButton } from './DownloadButtons';
 import { downloadManager } from '../lib/downloadManager';
 
 interface SessionDrawerProps {
+  onSyncingChange?: (key: string, busy: boolean) => void;
+  syncKey?: string;
   sessions: CourseSessionItem[];
   courseRefId?: string;
 }
 
-export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRefId }) => {
+export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRefId, syncKey = 'sessions', onSyncingChange }) => {
   useLanguage();
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const [filterMode, setFilterMode] = useState<'all' | 'with_materials' | 'upcoming'>('all');
   const [loadedMaterials, setLoadedMaterials] = useState<Record<string, MaterialItem[]>>({});
   const [loadingSessions, setLoadingSessions] = useState<Record<string, boolean>>({});
+  const isSyncing = Object.values(loadingSessions).some(Boolean);
+  useEffect(() => {
+    onSyncingChange?.(syncKey, isSyncing);
+    return () => onSyncingChange?.(syncKey, false);
+  }, [isSyncing, syncKey, onSyncingChange]);
 
   const prefetchingRef = useRef<Set<string>>(new Set());
 
@@ -149,7 +156,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 px-5 py-3.5">
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 shrink-0">
-            <Calendar className="h-4 w-4" />
+            {!onSyncingChange && isSyncing ? <SyncIndicator /> : <Calendar className="h-4 w-4" />}
           </div>
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
@@ -261,7 +268,6 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                 <div className="flex items-center gap-2 shrink-0">
                   {isLoading ? (
                     <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-                      <RefreshCw className="h-3 w-3 animate-spin text-emerald-600 dark:text-emerald-400" />
                       <span>{t("Lade...")}</span>
                     </div>
                   ) : sessionHasMats ? (
@@ -289,7 +295,6 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
                 <div className="bg-slate-50/70 dark:bg-slate-800/70 p-3.5 pl-12 border-t border-slate-100 dark:border-slate-800 space-y-2 animate-in fade-in duration-150">
                   {isLoading ? (
                     <div className="flex items-center gap-2 py-2 text-xs text-slate-500 dark:text-slate-400">
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
                       <span>{t("Lade Sitzungsunterlagen...")}</span>
                     </div>
                   ) : mats.length > 0 ? (

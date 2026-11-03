@@ -70,6 +70,10 @@ no lecture dates.
 
 ## Mobile usability
 
+- [x] Keep one visible ILIAS sync animation per page during initial loads and
+  cached refreshes; consolidate nested session/feedback requests and retain
+  static placeholders, error cleanup and reduced-motion support.
+
 - [x] Scope custom sidebar dividers/order to each semester, and add guarded
   Escape navigation (back once; twice within 700 ms for the semester overview)
   while preserving dialog/menu/editor/fullscreen dismissal and navigation guards.

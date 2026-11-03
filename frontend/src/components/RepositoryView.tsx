@@ -45,8 +45,8 @@ export const RepositoryView: React.FC<Props> = ({ refId, onNavigate, onOpenCours
       </React.Fragment>)}
     </nav>
     <div className="flex items-center justify-between gap-4">
-      <h1 className="text-2xl font-bold">{title || <span aria-label={t("Titel wird geladen")} className="block h-8 w-48 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />}</h1>
-      <button type="button" onClick={() => setRevision((v) => v + 1)} disabled={isRefreshing} aria-label={t("Magazin aktualisieren")} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800"><RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} /></button>
+      <h1 className="text-2xl font-bold">{title || <span aria-label={t("Titel wird geladen")} className="block h-8 w-48 rounded bg-slate-200 dark:bg-slate-800" />}</h1>
+      <button type="button" onClick={() => setRevision((v) => v + 1)} disabled={isRefreshing} aria-label={t("Magazin aktualisieren")} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800"><RefreshCw className={`h-4 w-4 ${isRefreshing ? 'motion-safe:animate-spin' : ''}`} /></button>
     </div>
     {error && <div role="alert" className="text-red-600">{error} <button type="button" onClick={() => setRevision((v) => v + 1)} className="underline">{t("Erneut versuchen")}</button></div>}
     {!data ? !error && <p role="status">{t("Inhalte werden geladen…")}</p>

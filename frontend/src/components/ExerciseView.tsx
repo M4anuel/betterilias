@@ -1,3 +1,4 @@
+import { SyncIndicator } from './SyncIndicator';
 import { t, useLanguage, assignmentStatusText } from '../lib/i18n';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
@@ -201,6 +202,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     }
     return cached;
   });
+  const [isLoadingTaManagement, setIsLoadingTaManagement] = useState(false);
   const [isLoadingTaSubmissions, setIsLoadingTaSubmissions] = useState(false);
   const [taSubmissionsError, setTaSubmissionsError] = useState<string | null>(null);
   const [taSearchQuery, setTaSearchQuery] = useState('');
@@ -574,25 +576,24 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   // 2. Load Info tab when switched
   useEffect(() => {
     if (activeTab === 'info') {
+      let active = true;
       const cached = cache.getCachedExerciseInfo(exerciseRefId);
-      if (cached && !infoData) {
-        setInfoData(cached);
-      }
-      if (!cached && !infoData) {
-        setIsLoadingInfo(true);
-      }
+      if (cached) setInfoData(cached);
+      setIsLoadingInfo(true);
       api
         .getExerciseInfo(exerciseRefId)
         .then((data) => {
+          if (!active) return;
           setInfoData(data);
           cache.setCachedExerciseInfo(exerciseRefId, data);
           setIsLoadingInfo(false);
         })
         .catch(() => {
-          setIsLoadingInfo(false);
+          if (active) setIsLoadingInfo(false);
         });
+      return () => { active = false; setIsLoadingInfo(false); };
     }
-  }, [activeTab, exerciseRefId, infoData]);
+  }, [activeTab, exerciseRefId]);
 
   // 3. Load TA Submissions when in ta_grading tab (Cached + Race condition protection)
   const loadTaSubmissions = useCallback(
@@ -875,6 +876,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       needed.forEach((s) => fetchedFeedbackMembersRef.current.add(s.member_id));
 
       let isCancelled = false;
+      const unfinished = new Set(needed.map(submission => submission.member_id));
       const fetchBatch = async () => {
         const queue = [...needed];
         const workers = Array.from({ length: Math.min(3, queue.length) }, async () => {
@@ -905,6 +907,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               }
             } finally {
               if (!isCancelled) {
+                unfinished.delete(sub.member_id);
                 setLoadingFeedbackFilesFor((prev) => ({ ...prev, [k]: false }));
               }
             }
@@ -916,6 +919,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       fetchBatch();
       return () => {
         isCancelled = true;
+        unfinished.forEach(memberId => fetchedFeedbackMembersRef.current.delete(memberId));
+        setLoadingFeedbackFilesFor({});
       };
     }
   }, [activeTab, evalModeInOverview, taSubmissionsData?.submissions, exerciseRefId, selectedTaAssId]);
@@ -1580,6 +1585,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   );
 
   const ongoingCount = (overviewData?.assignments || []).filter((a) => a.is_ongoing).length;
+  const isPageSyncing = isLoadingOverview || isRevalidatingOverview
+    || (activeTab === 'info' && isLoadingInfo)
+    || (activeTab === 'ta_grading' && (isLoadingTaSubmissions || (evalModeInOverview === 'file' && Object.values(loadingFeedbackFilesFor).some(Boolean))))
+    || (taManagementMode !== 'none' && isLoadingTaManagement);
   const mobileView: ExerciseTab = taManagementMode === 'editor' ? 'manage-edit' : taManagementMode === 'list' ? 'manage' : activeTab === 'ta_grading' ? 'submissions' : activeTab;
 
 
@@ -1587,7 +1596,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
       <MobilePageHeader title={overviewData?.title || t("Übungsübersicht")}
-        onBack={onBack} onRefresh={handleRefresh} refreshing={isLoadingOverview || isRevalidatingOverview}
+        onBack={onBack} onRefresh={handleRefresh} refreshing={isPageSyncing}
         trailing={<span className="exercise-view-control relative shrink-0 max-w-[46%]">
           <select aria-label={t('mobile.exercise_view')} value={mobileView}
           className="exercise-view-select absolute inset-0 w-full min-w-0 appearance-none rounded-xl border border-slate-200 bg-white pl-2 pr-6 text-base font-semibold dark:border-slate-700 dark:bg-slate-900"
@@ -1623,10 +1632,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
         {/* Sync / Refresh status */}
         <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-          {isLoadingOverview || isRevalidatingOverview ? (
+          {isPageSyncing ? (
             <div className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:text-blue-300">
-              <RefreshCw className="h-3 w-3 animate-spin" />
-              <span>{t("Synchronisiere...")}</span>
+              <SyncIndicator label />
             </div>
           ) : (
             <div className="flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
@@ -1643,11 +1651,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             title={t("Neu von ILIAS abrufen")}
           >
             <RefreshCw
-              className={`h-3.5 w-3.5 ${
-                isLoadingOverview || isRevalidatingOverview || (activeTab === 'ta_grading' && isLoadingTaSubmissions)
-                  ? 'animate-spin text-indigo-600 dark:text-indigo-400'
-                  : ''
-              }`}
+              className="h-3.5 w-3.5"
             />
           </button>
         </div>
@@ -1722,6 +1726,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           ======================================================== */}
       {activeTab === 'assignments' && taManagementMode === 'list' && (
         <TAExerciseManagementView
+          onSyncingChange={setIsLoadingTaManagement}
           exerciseRefId={exerciseRefId}
           exerciseTitle={overviewData?.title}
           feedback={assignmentFeedback}
@@ -1742,6 +1747,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
       {activeTab === 'assignments' && taManagementMode === 'editor' && (
         <TAExerciseEditorView
+          onSyncingChange={setIsLoadingTaManagement}
           exerciseRefId={exerciseRefId}
           assId={editingTaAssId}
           initialTypeId={editingTaTypeId}
@@ -1843,7 +1849,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           {/* Assignments Grid */}
           {isLoadingOverview && !overviewData ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
-              <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
               <p className="text-xs font-semibold">{t("Lade Übungsblätter...")}</p>
             </div>
           ) : overviewError ? (
@@ -1986,7 +1991,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         <div className="space-y-6 max-w-4xl mx-auto">
           {isLoadingInfo && !infoData ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
-              <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
               <p className="text-xs font-semibold">{t("Lade Kriterien & Informationen...")}</p>
             </div>
           ) : infoData && infoData.sections.length > 0 ? (
@@ -2055,12 +2059,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
             {/* Submissions Stats Pill & Background Sync Badge */}
             <div className="desktop-only flex items-center gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 flex-wrap">
-              {isLoadingTaSubmissions && currentSubmissionsData && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-semibold animate-pulse">
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
-                  <span>{t("Wird synchronisiert...")}</span>
-                </div>
-              )}
               {currentSubmissionsData?.exercise && (
                 <>
                   <div className="px-3.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-center">
@@ -2237,7 +2235,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
           {isLoadingTaSubmissions && !currentSubmissionsData ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
-              <RefreshCw className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
               <p className="text-xs font-semibold">{t("Lade Abgaben zur Bewertung...")}</p>
             </div>
           ) : taSubmissionsError && !currentSubmissionsData ? null : filteredTaSubmissions.length === 0 ? (
@@ -2570,7 +2567,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                           {/* Uploaded Feedback Files List */}
                           {loadingFeedbackFilesFor[subAssKey] && !rowFeedbackFiles[subAssKey] ? (
                             <div className="p-2.5 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80">
-                              <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
                               <span>{t("Lade Korrekturdateien aus ILIAS...")}</span>
                             </div>
                           ) : rowFeedbackFiles[subAssKey] && rowFeedbackFiles[subAssKey].length > 0 ? (
@@ -2788,7 +2784,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             </>
                           ) : isLoadingTaSubmissions ? (
                             <>
-                              <RefreshCw className="h-3.5 w-3.5 animate-spin text-slate-300 dark:text-slate-500" />
                               <span>{t("Lädt...")}</span>
                             </>
                           ) : isSaved ? (
