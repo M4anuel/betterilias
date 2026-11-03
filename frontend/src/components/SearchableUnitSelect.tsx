@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, X, Check, Users, User, ChevronDown } from 'lucide-react';
 import { t } from '../lib/i18n';
 
@@ -30,12 +31,71 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const [popoverCoords, setPopoverCoords] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
   const selectedUnit = useMemo(() => {
     return units.find((u) => u.unitId === selectedUnitId);
   }, [units, selectedUnitId]);
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const popoverWidth = Math.min(320, window.innerWidth - 24);
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const estimatedHeight = 280;
+
+    let top: number;
+    if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
+      // Open upwards above trigger
+      top = Math.max(12, rect.top - estimatedHeight - 6);
+    } else {
+      // Open downwards below trigger
+      top = Math.min(window.innerHeight - estimatedHeight - 12, rect.bottom + 6);
+    }
+
+    // On desktop, right-align popover with the trigger; on mobile, align to trigger left
+    let left = rect.right - popoverWidth;
+    if (left < 12 || window.innerWidth < 640) {
+      left = Math.max(12, rect.left);
+    }
+    if (left + popoverWidth > window.innerWidth - 12) {
+      left = window.innerWidth - popoverWidth - 12;
+    }
+
+    setPopoverCoords({ top, left, width: popoverWidth });
+  }, []);
+
+  // Update position on open, scroll, or resize
+  useEffect(() => {
+    if (!isOpen) {
+      setPopoverCoords(null);
+      return;
+    }
+
+    updatePosition();
+
+    const handleScrollResize = () => {
+      updatePosition();
+    };
+
+    window.addEventListener('resize', handleScrollResize);
+    window.addEventListener('scroll', handleScrollResize, true);
+
+    return () => {
+      window.removeEventListener('resize', handleScrollResize);
+      window.removeEventListener('scroll', handleScrollResize, true);
+    };
+  }, [isOpen, updatePosition]);
 
   // Focus search input when opened
   useEffect(() => {
@@ -50,10 +110,17 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
 
   // Close on outside click or Escape
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleOutsideClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
+      const target = e.target as Node;
+      if (triggerRef.current && triggerRef.current.contains(target)) {
+        return;
       }
+      if (popoverRef.current && popoverRef.current.contains(target)) {
+        return;
+      }
+      setIsOpen(false);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -62,10 +129,9 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleOutsideClick);
-      document.addEventListener('keydown', handleKeyDown);
-    }
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('keydown', handleKeyDown);
@@ -118,7 +184,7 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
   };
 
   return (
-    <div ref={containerRef} className={`relative w-full sm:w-auto ${isOpen ? 'z-30' : ''}`}>
+    <div ref={triggerRef} className="relative w-full sm:w-auto">
       {/* Trigger Button or Mapped Badge (Always visible as anchor) */}
       <div className="flex items-center gap-1.5 w-full sm:w-auto">
         {selectedUnit ? (
@@ -179,9 +245,18 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
         )}
       </div>
 
-      {/* Floating Searchable Dropdown Popover */}
-      {isOpen && (
-        <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-72 sm:w-80 max-w-[calc(100vw-3rem)] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl p-2.5 space-y-2 text-xs z-50 animate-in fade-in zoom-in-95 duration-150">
+      {/* Floating Popover rendered outside dialog via Portal to never trigger modal scrollbars */}
+      {isOpen && popoverCoords && createPortal(
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'fixed',
+            top: `${popoverCoords.top}px`,
+            left: `${popoverCoords.left}px`,
+            width: `${popoverCoords.width}px`,
+          }}
+          className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl p-2.5 space-y-2 text-xs z-[100] animate-in fade-in zoom-in-95 duration-150"
+        >
           {/* Search Header */}
           <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
             <div className="relative flex-1">
@@ -330,7 +405,8 @@ export const SearchableUnitSelect: React.FC<SearchableUnitSelectProps> = ({
               </>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
