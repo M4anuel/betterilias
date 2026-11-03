@@ -65,271 +65,86 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return map;
   }, [courses, language, customOrder]);
 
+  // Every row keeps its geometry and inherits one foreground colour. Wrapping
+  // icons also avoids the global SVG-only button centering rule during collapse.
+  const rowClass = (selected: boolean) => `group flex h-11 min-h-11 w-full min-w-0 items-center gap-3 overflow-hidden rounded-xl px-4 py-2 text-left text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)] cursor-pointer ${
+    selected ? '' : 'text-slate-700 hover:bg-slate-100/80 hover:text-[var(--accent)] dark:text-slate-200 dark:hover:bg-slate-800/80'
+  }`;
+  const selectedStyle = { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' };
+  const icon = (content: React.ReactNode) => <span className="sidebar-icon flex h-4 w-4 shrink-0 items-center justify-center">{content}</span>;
+  const renderNavigation = (title: string, Icon: typeof LayoutGrid, selected: boolean, onClick: () => void) => (
+    <button key={title} type="button" onClick={onClick} title={title} aria-label={title}
+      aria-current={selected ? 'page' : undefined} className={rowClass(selected)} style={selected ? selectedStyle : undefined}>
+      {icon(<Icon className="h-4 w-4" />)}
+      {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap leading-tight">{title}</span>}
+    </button>
+  );
   const renderCourseButton = (course: CourseItem) => {
     const displayName = cache.getDisplayName(course.ref_id, course.title);
-    const iconName = cache.getCourseIcon(course.ref_id, course);
     const isSelected = selectedCourseId === course.ref_id;
-
-    return (
-      <button
-        key={course.ref_id}
-        onClick={() => onSelectCourse(course.ref_id)}
-        className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition cursor-pointer ${
-          isSelected
-            ? 'font-semibold'
-            : 'text-slate-700 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white'
-        }`}
-        style={
-          isSelected
-            ? { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }
-            : undefined
-        }
-        aria-label={displayName}
-        aria-current={isSelected ? "page" : undefined}
-        title={course.title}
-      >
-        <div
-          className={`flex h-4 w-4 shrink-0 items-center justify-center transition ${
-            isSelected
-              ? ''
-              : 'text-slate-400 group-hover:text-[var(--accent)] dark:text-slate-400 dark:group-hover:text-[var(--accent)]'
-          }`}
-          style={isSelected ? { color: 'var(--accent)' } : undefined}
-        >
-          <CourseIcon iconName={iconName} className="h-4 w-4" />
-        </div>
-
-        {!isCollapsed && (
-          <div className="flex-1 truncate">
-            <div
-              className={`truncate text-xs font-semibold leading-tight transition ${
-                isSelected ? '' : 'group-hover:text-[var(--accent)]'
-              }`}
-            >
-              {displayName}
-            </div>
-            {displayName !== course.title && (
-              <div
-                className={`truncate text-[10px] leading-tight ${
-                  isSelected ? 'opacity-75' : 'text-slate-400 dark:text-slate-500'
-                }`}
-                style={isSelected ? { color: 'var(--accent)' } : undefined}
-              >
-                {course.title.split(':')[0]}
-              </div>
-            )}
-          </div>
-        )}
-      </button>
-    );
+    return <button key={course.ref_id} type="button" onClick={() => onSelectCourse(course.ref_id)}
+      className={rowClass(isSelected)} style={isSelected ? selectedStyle : undefined}
+      aria-label={displayName} aria-current={isSelected ? 'page' : undefined} title={course.title}>
+      {icon(<CourseIcon iconName={cache.getCourseIcon(course.ref_id, course)} className="h-4 w-4" />)}
+      {!isCollapsed && <span className="min-w-0 flex-1 overflow-hidden text-left">
+        <span className="block truncate whitespace-nowrap text-xs font-semibold leading-tight">{displayName}</span>
+        {displayName !== course.title && <span className={`block truncate whitespace-nowrap text-[10px] leading-tight ${isSelected ? 'opacity-75' : 'text-slate-400 dark:text-slate-400'}`}>
+          {course.title.split(':')[0]}
+        </span>}
+      </span>}
+    </button>;
   };
-
-  return (
-    <aside
-      className={`relative flex h-full min-h-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 transition-all duration-200 ease-in-out shrink-0 select-none ${
-        isCollapsed ? 'w-16' : 'w-64'
-      }`}
-    >
-      {/* Top header row */}
-      <div className="flex h-14 items-center justify-between border-b border-slate-100 px-3 dark:border-slate-800">
-        {!isCollapsed && (
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            {t("Meine Vorlesungen")}
-          </span>
-        )}
-        <div className="flex items-center ml-auto">
-          <button
-            onClick={onToggleCollapse}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer"
-            aria-label={isMobile ? t("Schliessen") : isCollapsed ? t("Seitenleiste ausklappen") : t("Seitenleiste einklappen")}
-            title={isCollapsed ? t("Seitenleiste ausklappen") : t("Seitenleiste einklappen")}
-          >
-            {isMobile ? <X className="h-5 w-5" /> : isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Main navigation items */}
-      <nav aria-label={t("Meine Vorlesungen")} className="min-h-0 flex-1 overflow-y-auto p-2 space-y-1">
-        {/* Semester / Overview Button */}
-        {(() => {
-          const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isMyCoursesSelected && !isCalendarSelected;
-          return (
-            <button
-              onClick={onSelectSemesterOverview}
-              className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition cursor-pointer ${
-                isSemesterSelected
-                  ? 'font-semibold'
-                  : 'text-slate-700 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white'
-              }`}
-              style={
-                isSemesterSelected
-                  ? { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }
-                  : undefined
-              }
-              title={t("Semester-Übersicht")}
-            >
-              <div
-                className={`flex h-4 w-4 shrink-0 items-center justify-center transition ${
-                  isSemesterSelected
-                    ? ''
-                    : 'text-slate-400 group-hover:text-[var(--accent)] dark:text-slate-400 dark:group-hover:text-[var(--accent)]'
-                }`}
-                style={isSemesterSelected ? { color: 'var(--accent)' } : undefined}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </div>
-              {!isCollapsed && (
-                <span
-                  className={`truncate text-xs leading-tight font-semibold transition ${
-                    isSemesterSelected ? '' : 'group-hover:text-[var(--accent)]'
-                  }`}
-                >
-                  {t("Semester-Übersicht")}
-                </span>
-              )}
-            </button>
-          );
-        })()}
-
-        {onSelectCalendar && (
-          <button
-            type="button"
-            onClick={onSelectCalendar}
-            title={t("calendar.sidebar_nav")}
-            aria-current={isCalendarSelected ? 'page' : undefined}
-            style={isCalendarSelected ? { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' } : undefined}
-            className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition cursor-pointer ${
-              isCalendarSelected
-                ? 'font-semibold'
-                : 'text-slate-700 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white'
-            }`}
-          >
-            <Calendar
-              className={`h-4 w-4 shrink-0 transition ${
-                isCalendarSelected
-                  ? ''
-                  : 'text-slate-400 group-hover:text-[var(--accent)] dark:text-slate-400 dark:group-hover:text-[var(--accent)]'
-              }`}
-              style={isCalendarSelected ? { color: 'var(--accent)' } : undefined}
-            />
-            {!isCollapsed && <span>{t("calendar.sidebar_nav")}</span>}
-          </button>
-        )}
-
-        <button type="button" onClick={onSelectMyCourses} title={t('my_courses.title')}
-          aria-label={t('my_courses.title')} aria-current={isMyCoursesSelected ? 'page' : undefined}
-          style={isMyCoursesSelected ? { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' } : undefined}
-          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-          <Users className="h-4 w-4 shrink-0" />
-          {!isCollapsed && <span>{t('my_courses.title')}</span>}
-        </button>
-        <button
-          type="button"
-          onClick={onSelectRepository}
-          title={t("Magazin")}
-          aria-current={isRepositorySelected ? 'page' : undefined}
-          style={isRepositorySelected ? { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' } : undefined}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-        >
-          <Library className="h-4 w-4 shrink-0" />
-          {!isCollapsed && <span>{t("Magazin")}</span>}
-        </button>
-
-        <div className="pt-2 pb-1">
-          <div className="h-px bg-slate-100 dark:bg-slate-800" />
-        </div>
-
-        {/* Courses List - Custom Ordering vs Default Subject Sectioning */}
-        {customOrder?.some(item => item.type === 'section') ? (
-          /* Custom Ordering Mode: default subject sections disappear, custom order and custom section dividers take over */
-          <div className="space-y-1">
-            {(() => {
-              const renderedCourseIds = new Set<string>();
-              const elements: React.ReactNode[] = [];
-
-              for (const item of customOrder) {
-                if (item.type === 'section') {
-                  elements.push(
-                    isCollapsed ? (
-                      <div
-                        key={item.id}
-                        className="my-2 flex items-center justify-center"
-                        title={item.title || t("Abschnittsname")}
-                      >
-                        <div className="h-0.5 w-6 rounded-full bg-[var(--accent)] opacity-60" />
-                      </div>
-                    ) : (
-                      <div key={item.id} className="pt-3 pb-1 px-3">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] truncate max-w-[190px]"
-                            title={item.title}
-                          >
-                            {item.title || t("Abschnittsname")}
-                          </span>
-                          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                        </div>
-                      </div>
-                    )
-                  );
-                } else {
-                  const course = courses.find((c) => c.ref_id === item.id);
-                  if (course) {
-                    renderedCourseIds.add(course.ref_id);
-                    elements.push(renderCourseButton(course));
-                  }
-                }
-              }
-
-              // Append any unplaced courses safely at the bottom
-              const unplacedCourses = courses.filter((c) => !renderedCourseIds.has(c.ref_id));
-              for (const course of unplacedCourses) {
-                elements.push(renderCourseButton(course));
-              }
-
-              return elements;
-            })()}
-          </div>
-        ) : (
-          /* Default Mode: Sectioned into subjects (matching Semester Overview) */
-          <div className="space-y-2">
-            {Array.from(groupedBySubject.entries()).map(([subject, subjectCourses], groupIndex) => (
-              <div key={subject} className="space-y-1">
-                {isCollapsed ? (
-                  groupIndex > 0 && <div className="my-1.5 h-px bg-slate-100 dark:bg-slate-800" />
-                ) : (
-                  <div className="pt-2.5 pb-0.5 px-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate max-w-[190px]"
-                        title={subject}
-                      >
-                        {subject}
-                      </span>
-                      <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
-                    </div>
-                  </div>
-                )}
-                {subjectCourses.map((course) => renderCourseButton(course))}
-              </div>
-            ))}
-          </div>
-        )}
-      </nav>
-
-      {/* Bottom Footer in Sidebar: Vorlesungen anpassen */}
-      {!isCollapsed && (
-        <div className="border-t border-slate-100 p-3 text-center dark:border-slate-800">
-          <button
-            onClick={onOpenNicknameModal}
-            className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer"
-          >
-            <Edit3 className="h-3 w-3 text-slate-400" />
-            <span>{t("Vorlesungen anpassen")}</span>
-          </button>
-        </div>
-      )}
-    </aside>
+  const renderDivider = (key: string, title: string, custom: boolean) => (
+    <div key={key} title={title} className={`flex shrink-0 items-center overflow-hidden px-4 ${custom ? 'h-8' : 'h-7'}`}>
+      {isCollapsed ? <span className={`h-px w-6 shrink-0 rounded-full ${custom ? 'bg-[var(--accent)] opacity-60' : 'bg-slate-200 dark:bg-slate-700'}`} />
+        : <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className={`min-w-0 truncate whitespace-nowrap text-[10px] font-bold uppercase tracking-wider ${custom ? 'text-[var(--accent)]' : 'text-slate-400 dark:text-slate-400'}`}>{title}</span>
+          <span className="h-px min-w-2 flex-1 bg-slate-200 dark:bg-slate-800" />
+        </span>}
+    </div>
   );
+  const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isMyCoursesSelected && !isCalendarSelected;
+  const customSections = customOrder?.some(item => item.type === 'section');
+  const placed = new Set<string>();
+
+  return <aside data-sidebar-collapsed={isCollapsed} className={`relative flex h-full min-h-0 shrink-0 select-none flex-col overflow-hidden border-r border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 transition-[width] duration-200 ease-in-out motion-reduce:transition-none ${isCollapsed ? 'w-16' : 'w-64'}`}>
+    <div className="flex h-14 shrink-0 items-center justify-between gap-2 overflow-hidden border-b border-slate-100 px-3 dark:border-slate-800">
+      {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">{t('Meine Vorlesungen')}</span>}
+      <button type="button" onClick={onToggleCollapse}
+        className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        aria-label={isMobile ? t('Schliessen') : isCollapsed ? t('Seitenleiste ausklappen') : t('Seitenleiste einklappen')}
+        title={isMobile ? t('Schliessen') : isCollapsed ? t('Seitenleiste ausklappen') : t('Seitenleiste einklappen')}>
+        {isMobile ? <X className="h-5 w-5" /> : isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      </button>
+    </div>
+    <nav aria-label={t('Meine Vorlesungen')} className="min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto p-2">
+      {renderNavigation(t('Semester-Übersicht'), LayoutGrid, isSemesterSelected, onSelectSemesterOverview)}
+      {onSelectCalendar && renderNavigation(t('calendar.sidebar_nav'), Calendar, isCalendarSelected, onSelectCalendar)}
+      {renderNavigation(t('my_courses.title'), Users, isMyCoursesSelected, onSelectMyCourses)}
+      {renderNavigation(t('Magazin'), Library, isRepositorySelected, onSelectRepository)}
+      <div className="pt-2 pb-1"><div className="h-px bg-slate-100 dark:bg-slate-800" /></div>
+      {customSections ? <div className="space-y-1">
+        {customOrder?.map(item => {
+          if (item.type === 'section') return renderDivider(item.id, item.title || t('Abschnittsname'), true);
+          const course = courses.find(candidate => candidate.ref_id === item.id);
+          if (!course || placed.has(course.ref_id)) return null;
+          placed.add(course.ref_id);
+          return renderCourseButton(course);
+        })}
+        {courses.filter(course => !placed.has(course.ref_id)).map(renderCourseButton)}
+      </div> : <div className="space-y-2">
+        {Array.from(groupedBySubject.entries()).map(([subject, subjectCourses]) => <div key={subject} className="space-y-1">
+          {renderDivider(subject, subject, false)}
+          {subjectCourses.map(renderCourseButton)}
+        </div>)}
+      </div>}
+    </nav>
+    <div className="flex h-16 shrink-0 items-center justify-center border-t border-slate-100 px-2 dark:border-slate-800">
+      <button type="button" onClick={onOpenNicknameModal} aria-label={t('Vorlesungen anpassen')} title={t('Vorlesungen anpassen')}
+        className="flex h-11 w-full min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">
+        {icon(<Edit3 className="h-4 w-4" />)}
+        {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap">{t('Vorlesungen anpassen')}</span>}
+      </button>
+    </div>
+  </aside>;
 };
