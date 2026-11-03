@@ -127,12 +127,13 @@ The management plan contains the detailed safeguards and native evidence.
 Exercise writes use separate assignment/submission/feedback adapters. Native
 file handlers, command names and multipart field conventions vary between
 workflows; course uploads and exercise attachments are not interchangeable.
-
-TA allocations add compact per-row markers to native tutor notes and use native
-multi-row saves while preserving marks/status fields. ZIP downloads include a
-feedback manifest. Feedback imports stage inspected files per tenant, preview
-recipient mappings/conflicts, and publish only after review. Allocation markers
-are shared through ILIAS; defaults and player/UI preferences remain local. See
+TA allocations (`ta_allocation.py`) add compact per-row markers to native tutor
+notes and use native `saveStatusAll` batches while preserving marks/status fields.
+ZIP downloads (`exercise_bulk.py`) include live progress and a feedback manifest.
+Feedback imports (`feedback_import.py`) stage inspected files per tenant, preview
+recipient mappings/conflicts, and publish through native handlers only after
+review. Allocation markers are shared through ILIAS; persisted TA dialog defaults
+are still pending, while player/UI preferences remain local. See
 the [TA workflow](TA_WORK_DISTRIBUTION_PLAN.md) for current scope and the retained
 research gates, including native bulk-protocol and live-validation limits.
 

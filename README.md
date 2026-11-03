@@ -36,9 +36,12 @@ from the running backend's [Swagger UI](http://127.0.0.1:8000/docs),
   controls. TAs can grade submissions, manage feedback/instruction attachments,
   and create/edit/reorder/delete assignments inside an existing exercise.
 - Divide correction work between named TAs, save per-submission allocation markers
-  through native batch tutor notes, and download assignment/TA ZIP bundles with
-  feedback templates. Preview folder/ZIP feedback, resolve unmatched recipients
+  through native batch tutor notes, and download assignment, unassigned or per-TA
+  ZIP bundles with live download progress and feedback templates. Preview
+  folder/ZIP feedback, resolve unmatched recipients
   and file conflicts, then publish through native feedback handlers.
+- Combine semester courses in a calendar and weekly timetable, with course colours,
+  custom recurring rules, and .ics export/private subscription feeds.
 - Enter **Manage this page** to create folders, upload course files, review and
   delete files/folders, and save native shared ordering. Creation controls stay
   out of normal browsing; management follows folder navigation within a course.

@@ -19,14 +19,21 @@ as a checklist of shipped behavior. Live ILIAS acceptance remains separate.
   fingerprint conflict checks and read-back verification. The 200-character note
   budget is enforced, but current formatting may shorten existing note text;
   refusing or explicitly reviewing that truncation remains a follow-up.
-- Assignment/TA ZIP bundles include a `betterilias-feedback.json` manifest and
-  recipient feedback folders. This is a BetterIlias bundle workflow, not a claim
+- Assignment/unassigned/TA ZIP bundles have live byte-progress feedback and include
+  a `betterilias-feedback.json` manifest and `feedback/team-<id>/` or
+  `feedback/user-<id>/` recipient folders. This is a BetterIlias bundle workflow, not a claim
   that every native selected-download/background-job protocol is implemented.
-- Folder/ZIP feedback is staged per session, inspected, mapped to verified units
-  and previewed before publication. Unmatched files have manual recipient mapping
-  with a searchable selection and submitted-unit prioritization. Conflict actions
-  include skip, replace and keep both; publication reuses native feedback-file
-  handlers with per-file outcomes. Allocation CSV export is also available.
+- Folder/ZIP feedback is staged under `.staged_imports/<session_id>/<import_id>/`,
+  inspected, mapped to verified units and previewed before publication. Inspection
+  rejects unsafe paths, symlinks and oversized/over-expanded archives, and ignores
+  system metadata. Preflight queries matched recipients; additional lookups can
+  be deferred until manual mapping/overwrite.
+- Unmatched files have manual recipient mapping with a searchable selection and
+  submitted-unit prioritization. Its popover is portaled into `document.body` to
+  avoid clipping/scrolling the dialog. Conflict actions include skip, replace and
+  keep both; replace resolves current file IDs on demand before native deletion
+  and upload. Publication uses native feedback-file handlers with per-file
+  outcomes. Allocation CSV export is also available.
 - Shared-local-volume locks coordinate BetterIlias grading/allocation/import
   writers on one VPS. They do not lock tutors' native browser edits or establish
   multi-VPS coordination. See [deployment security](DEPLOYMENT_SECURITY.md).
