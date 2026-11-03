@@ -673,7 +673,7 @@ main { overflow-wrap: anywhere; }
   overscroll-behavior: contain;
 }
 .app-overlay > div > .flex-1 { min-height: 0; }
-dialog:not(.mobile-navigation) {
+dialog:not(.mobile-navigation):not(.app-overlay) {
   position: fixed;
   top: calc(var(--visible-top, 0px) + var(--visible-height, 100dvh) / 2);
   bottom: auto;

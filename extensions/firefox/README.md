@@ -7,8 +7,8 @@ Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzun
 ## 🚀 Installation in Mozilla Firefox
 
 1. **Repository herunterladen oder klonen**:
-   - Lade den Ordner `extension-firefox/` von GitHub herunter:
-     [https://github.com/M4anuel/betterilias/tree/main/extension-firefox](https://github.com/M4anuel/betterilias/tree/main/extension-firefox)
+   - Lade den Ordner `extensions/firefox/` von GitHub herunter:
+     [https://github.com/M4anuel/betterilias/tree/main/extensions/firefox](https://github.com/M4anuel/betterilias/tree/main/extensions/firefox)
    - Oder klone das gesamte Repository:
      ```bash
      git clone https://github.com/M4anuel/betterilias.git
@@ -23,7 +23,7 @@ Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzun
 
 3. **Temporäres Add-on laden**:
    - Klicke auf die Schaltfläche **„Temporäres Add-on laden...“** (Load Temporary Add-on...).
-   - Navigiere in den Ordner `extension-firefox` und wähle die Datei `manifest.json` aus.
+   - Navigiere in den Ordner `extensions/firefox` und wähle die Datei `manifest.json` aus.
 
 4. **Fertig!**
    - Das BetterIlias-Icon erscheint in deiner Firefox-Symbolleiste (kann über das Puzzle-Symbol dauerhaft an die Symbolleiste geheftet werden).

@@ -69,7 +69,7 @@ python start.py --help  # or verify python start.py syntax
 ### 3.1 Tech Stack
 * **Backend:** FastAPI + Uvicorn (Python 3.13+/3.14+), `httpx` (async HTTP client), BeautifulSoup 4 + `lxml`, Pydantic v2.
 * **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Lucide React.
-* **Browser Extensions:** Manifest V3 for Google Chrome (`extension/`) and Mozilla Firefox (`extension-firefox/`).
+* **Browser Extensions:** Manifest V3 for Google Chrome (`extensions/chrome/`) and Mozilla Firefox (`extensions/firefox/`).
 
 ### 3.2 Multi-Tenant Session Architecture
 * Sessions are isolated and keyed by `session_id`.
@@ -114,7 +114,7 @@ Consult [`docs/MOBILE_UI_REFINEMENT.md`](docs/MOBILE_UI_REFINEMENT.md) for exist
 
 ### 3.7 Browser Extension Parity
 * If changes are made to the session sync endpoint (`POST /api/auth/sync`), cookie handling, or extension popup UX:
-  * Update **both** the Chrome extension (`extension/`) and the Firefox extension (`extension-firefox/`).
+  * Update **both** the Chrome extension (`extensions/chrome/`) and the Firefox extension (`extensions/firefox/`).
   * In Firefox, remember that content scripts run in an Xray sandbox: write to `window.wrappedJSObject.localStorage` and dispatch custom DOM events (`BETTERILIAS_SESSION_SYNCED`) so the page React app detects the session.
 
 ---

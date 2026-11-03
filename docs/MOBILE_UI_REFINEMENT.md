@@ -182,6 +182,22 @@ The native HTTP tests check request counts, filter resets, 800-row pages,
 empty lists, failed/repeated pages and concurrent reads. These are mocked tests;
 they do not establish live ILIAS or physical-device acceptance.
 
+## Extension installation guidance
+
+The companion installation dialog uses a native modal with explicit focus
+restoration, a visible close button and a scrolling content area. Restricted
+browser-internal setup addresses have 44 px copy controls, localised success
+feedback and a manual-copy fallback if clipboard access fails. Browser packages
+and installation paths now live under `extensions/chrome/` and `extensions/firefox/`.
+
+`test_extension_setup_addresses_copy_and_fit_viewports` checks both browser choices,
+copied addresses, clipboard rejection, Escape/focus restoration and GitHub targets
+at 320/390/430/768/1280 px and 844 x 390 in German/English and light/dark mode.
+Screenshots were inspected for wrapping, alignment and reachable close controls.
+These are Chromium emulation checks with mocked API/clipboard responses, not
+physical iOS Safari/Android Chrome or live ILIAS validation. Safari companion
+compatibility remains a separate, unfinished task.
+
 ## Custom Confirmation & Navigation Dialog System
 
 Browser-native window.confirm and window.alert dialogs have been entirely replaced across student and TA workflows with a responsive custom dialog system (ConfirmModal.tsx and dialog.ts):

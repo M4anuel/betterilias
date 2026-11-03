@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.parametrize('directory', ['extension', 'extension-firefox'])
+@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
 def test_background_verification_controls_toolbar_status(directory):
     node = shutil.which('node')
     if not node:

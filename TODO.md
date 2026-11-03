@@ -4,6 +4,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Group browser companions under `extensions/chrome/` and `extensions/firefox/`;
+  update setup links and provide copy controls for restricted browser-internal addresses.
+- [ ] Port and validate the companion in Safari on macOS/iOS, including cookie
+  permissions, session sync, background refresh and Apple distribution.
+
 - [x] Enforce strict HTTP session isolation, remove local/manual login, gate
   maintenance endpoints by server runtime mode, replace long-lived URL session
   credentials, and coordinate workers sharing one VPS data volume. See

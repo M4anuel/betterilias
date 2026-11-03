@@ -32,7 +32,7 @@ const keys = new Set();
 for (const file of files(path.join(root, 'frontend/src')).filter(f => /\.tsx?$/.test(f))) {
   for (const key of jsKeys(file)) keys.add(key);
 }
-for (const dir of ['extension', 'extension-firefox']) {
+for (const dir of ['extensions/chrome', 'extensions/firefox']) {
   for (const key of jsKeys(path.join(root, dir, 'popup.js'))) keys.add(key);
   const html = fs.readFileSync(path.join(root, dir, 'popup.html'), 'utf8');
   for (const match of html.matchAll(/data-i18n="([^"]+)"/g)) keys.add(match[1]);

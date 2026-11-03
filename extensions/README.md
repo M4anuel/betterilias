@@ -1,0 +1,31 @@
+# BetterIlias browser companions
+
+- [Chrome, Edge and Brave](chrome/README.md): load `extensions/chrome/`.
+- [Firefox](firefox/README.md): load `extensions/firefox/manifest.json`.
+
+The browser-specific folders contain complete extension packages. Locale bundles
+are generated from the shared `locales/` catalogues by
+`node scripts/sync-extension-locales.mjs` from the repository root.
+
+Browser-internal addresses such as `chrome://extensions`, `edge://extensions`
+and `about:debugging#/runtime/this-firefox` must be pasted into the address bar.
+Browsers restrict navigation to these pages from websites; the BetterIlias setup
+dialog provides copy buttons rather than links that cannot open them.
+See [Chrome's installation instructions](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked)
+and [Firefox's privileged URL restrictions](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs/create).
+
+## Safari feasibility
+
+Safari supports WebExtensions on Mac, iPhone and iPad, so the existing JavaScript,
+popup and translations are a useful starting point. There is no supported Safari
+package in this repository yet. A port needs to verify the manifest/background
+configuration, cookies and host permissions, session sync and content-script
+handoff, background refresh, toolbar rendering, and popup behavior on Apple devices.
+On iPhone/iPad, `localhost` refers to that device; connecting to a hosted BetterIlias
+instance needs its HTTPS hostname in the extension permissions and settings.
+
+Apple documents [Xcode conversion and App Store distribution](https://developer.apple.com/safari/extensions/).
+Its [WWDC26 WebExtensions update](https://webkit.org/blog/17974/web-technology-sessions-at-wwdc26/)
+also describes packaging and submitting through App Store Connect from a browser
+without requiring a Mac or Xcode. Packaging alone does not establish runtime
+compatibility: validate the actual sign-in/sync workflow in Safari before release.

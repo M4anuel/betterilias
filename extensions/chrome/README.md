@@ -3,15 +3,15 @@
 Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzung (via SWITCH edu-ID) mit nur einem Klick sicher an BetterIlias zu übermitteln.
 
 > [!NOTE]
-> Nutzt du Mozilla Firefox? Die dedizierte Firefox-Erweiterung findest du im Ordner [`extension-firefox/`](../extension-firefox).
+> Nutzt du Mozilla Firefox? Die dedizierte Firefox-Erweiterung findest du im Ordner [`extensions/firefox/`](../firefox).
 
 ---
 
 ## 🚀 Installation in Chrome / Edge / Brave
 
 1. **Repository herunterladen oder klonen**:
-   - Lade den Ordner `extension/` von GitHub herunter:
-     [https://github.com/M4anuel/betterilias/tree/main/extension](https://github.com/M4anuel/betterilias/tree/main/extension)
+   - Lade den Ordner `extensions/chrome/` von GitHub herunter:
+     [https://github.com/M4anuel/betterilias/tree/main/extensions/chrome](https://github.com/M4anuel/betterilias/tree/main/extensions/chrome)
    - Oder klone das Repository:
      ```bash
      git clone https://github.com/M4anuel/betterilias.git
@@ -26,7 +26,7 @@ Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzun
 
 4. **Erweiterung laden**:
    - Klicke oben links auf die Schaltfläche **"Entpackte Erweiterung laden"** (Load unpacked).
-   - Wähle den heruntergeladenen Ordner `extension` aus.
+   - Wähle den heruntergeladenen Ordner `extensions/chrome` aus.
 
 5. **Fertig!**
    - Das BetterIlias-Icon erscheint in deiner Browser-Leiste (eventuell unter dem Puzzle-Symbol anheften).

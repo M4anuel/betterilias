@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def local_site():
     class Handler(SimpleHTTPRequestHandler):
         def translate_path(self, path):
-            if path.startswith(('/extension/', '/extension-firefox/')):
+            if path.startswith(('/extensions/chrome/', '/extensions/firefox/')):
                 return str(ROOT / path.lstrip('/'))
             return super().translate_path(path)
 
@@ -74,7 +74,7 @@ def test_language_switch_is_live_persisted_and_sent_to_backend(local_site):
         browser.close()
 
 
-@pytest.mark.parametrize('directory', ['extension', 'extension-firefox'])
+@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
 def test_extension_language_selection_and_safe_sync_feedback(local_site, directory):
     playwright = pytest.importorskip('playwright.sync_api')
     with playwright.sync_playwright() as p:
@@ -176,7 +176,7 @@ def test_connection_panel_resizes_without_losing_address(local_site, language, s
         browser.close()
 
 
-@pytest.mark.parametrize('directory', ['extension', 'extension-firefox'])
+@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
 @pytest.mark.parametrize('language,scheme', [('de','dark'), ('de','light'), ('en','dark'), ('en','light')])
 def test_extension_checking_invalid_recovery_and_unavailable(local_site, directory, language, scheme):
     pw=pytest.importorskip('playwright.sync_api')
@@ -197,7 +197,7 @@ def test_extension_checking_invalid_recovery_and_unavailable(local_site, directo
             }},
             tabs:{query:async()=>[],sendMessage:async()=>{},create:()=>{}}
           };
-        ''' + f"localStorage.setItem('mock-extension',JSON.stringify({{language:'{language}',autoSyncEnabled:false}}));" + ("globalThis.browser=chrome;" if directory=='extension-firefox' else ''))
+        ''' + f"localStorage.setItem('mock-extension',JSON.stringify({{language:'{language}',autoSyncEnabled:false}}));" + ("globalThis.browser=chrome;" if directory=='extensions/firefox' else ''))
         held=[]
         mode=['held']
         def respond(route):
@@ -244,4 +244,59 @@ def test_extension_checking_invalid_recovery_and_unavailable(local_site, directo
         pw.expect(badge).to_have_class('status-badge badge-danger')
         pw.expect(login).to_be_visible()
         pw.expect(page.locator('#sync-btn')).to_be_disabled()
+        browser.close()
+
+
+@pytest.mark.parametrize('language,scheme', [('de', 'dark'), ('de', 'light'), ('en', 'dark'), ('en', 'light')])
+def test_extension_setup_addresses_copy_and_fit_viewports(local_site, language, scheme):
+    pw = pytest.importorskip('playwright.sync_api')
+    tr = json.loads((ROOT / 'locales' / f'{language}.json').read_text(encoding='utf-8'))
+    artifacts = ROOT / 'scratch' / 'extension-setup-checks'
+    artifacts.mkdir(parents=True, exist_ok=True)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+        page = browser.new_page(viewport={'width': 1280, 'height': 900}, color_scheme=scheme)
+        page.add_init_script('localStorage.setItem("betterilias_language", ' + json.dumps(language) + ');'
+            'localStorage.setItem("betterilias_theme_mode", ' + json.dumps(scheme) + ');'
+            'Object.defineProperty(navigator, "clipboard", {value: {writeText: async text => {'
+            'if (window.rejectCopy) throw Error("denied"); window.copiedAddress = text;}}});')
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        def respond(route):
+            if urlparse(route.request.url).path.endswith('/auth/status'):
+                route.fulfill(content_type='application/json', body='{"authenticated":false,"cookies_present":false}')
+            else:
+                route.fulfill(status=401, content_type='application/json', body='{"detail":"Unauthenticated"}')
+        page.route('**/api/**', respond)
+        page.goto(local_site)
+        trigger = page.get_by_role('button', name=tr['Browser-Erweiterung'], exact=True)
+        trigger.click()
+        panel = page.get_by_role('dialog', name=tr['BetterIlias Companion'])
+        for width, height in [(320, 740), (390, 844), (430, 900), (768, 1024), (1280, 900), (844, 390)]:
+            page.set_viewport_size(dict(width=width, height=height))
+            for browser_name, addresses in [('Chrome / Edge / Brave', ['chrome://extensions', 'edge://extensions']),
+                                             ('Mozilla Firefox', ['about:debugging#/runtime/this-firefox'])]:
+                panel.get_by_role('button', name=tr[browser_name], exact=True).click()
+                for address in addresses:
+                    label = tr['extension.setup.copy_address'].replace('{address}', address)
+                    control = panel.get_by_role('button', name=label, exact=True)
+                    control.click()
+                    assert page.evaluate('window.copiedAddress') == address
+                    pw.expect(panel.get_by_role('status')).to_have_text(tr['Kopiert!'])
+                    bounds = control.bounding_box()
+                    assert bounds and bounds['height'] >= 44 and bounds['x'] >= 0
+                    assert bounds['x'] + bounds['width'] <= width
+                expected = 'firefox' if browser_name == 'Mozilla Firefox' else 'chrome'
+                assert panel.locator(f'a[href="https://github.com/M4anuel/betterilias/tree/main/extensions/{expected}"]').count() == 2
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                close = panel.get_by_role('button', name=tr['Schliessen'], exact=True).first
+                pw.expect(close).to_be_in_viewport()
+                page.screenshot(path=str(artifacts / f'{language}-{scheme}-{width}-{height}-{expected}.png'))
+        page.evaluate('window.rejectCopy = true')
+        panel.get_by_role('button', name=tr['extension.setup.copy_address'].replace('{address}', 'about:debugging#/runtime/this-firefox'), exact=True).click()
+        pw.expect(panel.get_by_role('status')).to_have_text(tr['extension.setup.copy_failed'])
+        page.keyboard.press('Escape')
+        pw.expect(panel).to_have_count(0)
+        pw.expect(trigger).to_be_focused()
+        assert errors == []
         browser.close()

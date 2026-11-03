@@ -5,7 +5,7 @@ import { translate, resolveLanguage } from '../locales/runtime.mjs';
 import { languages, catalogues, jsKeys } from './check-locales.mjs';
 if (process.exitCode) process.exit(process.exitCode);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-for (const directory of ['extension', 'extension-firefox']) {
+for (const directory of ['extensions/chrome', 'extensions/firefox']) {
   const popup = path.join(root, directory, 'popup.js');
   const keys = new Set(jsKeys(popup));
   for (const match of fs.readFileSync(path.join(root, directory, 'popup.html'), 'utf8').matchAll(/data-i18n="([^"]+)"/g)) keys.add(match[1]);

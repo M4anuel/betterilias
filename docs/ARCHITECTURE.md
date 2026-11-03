@@ -164,7 +164,7 @@ rules are in AGENTS.md; the old project's Uni Bern crest description is obsolete
 | `frontend/src/lib/` | API client, caches, navigation guards, catalogue and localisation helpers |
 | `frontend/src/types.ts`, `frontend/src/index.css` | Frontend contracts and shared styling |
 | `locales/`, `scripts/` | Shared translations, validation and extension-package generation |
-| `extension/`, `extension-firefox/` | Browser-specific companion extensions |
+| `extensions/chrome/`, `extensions/firefox/` | Browser-specific companion extensions |
 | `tests/`, `tests/fixtures/` | Portable regressions, optional browser/local-dump checks and evidence notes |
 | `docs/` | Support inventory, architecture, development guidance and scoped feature plans |
 

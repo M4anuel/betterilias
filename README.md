@@ -134,8 +134,8 @@ for configuration and verification details.
 ### Browser extension
 
 1. Install the companion extension using the instructions for
-   [Chrome/Edge/Brave](extension/README.md) or
-   [Firefox](extension-firefox/README.md).
+   [Chrome/Edge/Brave](extensions/chrome/README.md) or
+   [Firefox](extensions/firefox/README.md).
 2. Log into [Uni Bern ILIAS](https://ilias.unibe.ch) normally, including SWITCH
    edu-ID/2FA when required.
 3. With BetterIlias running, open the extension and choose **Sync session with

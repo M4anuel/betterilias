@@ -17,10 +17,10 @@ def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, sc
     pw=pytest.importorskip('playwright.sync_api')
     # Firefox uses the exact same markup/styles; native Firefox toolbar sizing
     # still needs manual verification. Chromium cannot load its Gecko manifest.
-    assert (ROOT/'extension/popup.html').read_bytes()==(ROOT/'extension-firefox/popup.html').read_bytes()
+    assert (ROOT/'extensions/chrome/popup.html').read_bytes()==(ROOT/'extensions/firefox/popup.html').read_bytes()
     with pw.sync_playwright() as p:
         context=p.chromium.launch_persistent_context(str(tmp_path/'profile'),channel='chromium',headless=True,
-            color_scheme=scheme,args=[f'--disable-extensions-except={ROOT/"extension"}',f'--load-extension={ROOT/"extension"}'])
+            color_scheme=scheme,args=[f'--disable-extensions-except={ROOT/"extensions/chrome"}',f'--load-extension={ROOT/"extensions/chrome"}'])
         try:
             worker=context.service_workers[0] if context.service_workers else context.wait_for_event('serviceworker')
             icon=worker.evaluate('''async()=>{

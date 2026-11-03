@@ -52,7 +52,7 @@ test('the actual build validator rejects incomplete full languages and accepts p
   }
 });
 test('both packaged extension runtimes select languages and match shared catalogues', () => {
-  for (const directory of ['extension', 'extension-firefox']) {
+  for (const directory of ['extensions/chrome', 'extensions/firefox']) {
     const context = vm.createContext({ navigator: { language: 'de-CH' } });
     vm.runInContext(fs.readFileSync(path.join(root, directory, 'i18n.js'), 'utf8'), context);
     const runtime = context.BetterIliasI18n;
@@ -62,5 +62,5 @@ test('both packaged extension runtimes select languages and match shared catalog
     assert.equal(runtime.t('Sitzung mit BetterIlias synchronisieren'), en['Sitzung mit BetterIlias synchronisieren']);
     runtime.setLanguage('unknown'); assert.equal(runtime.getLanguage(), 'en');
   }
-  assert.equal(fs.readFileSync(path.join(root, 'extension/i18n.js'), 'utf8'), fs.readFileSync(path.join(root, 'extension-firefox/i18n.js'), 'utf8'));
+  assert.equal(fs.readFileSync(path.join(root, 'extensions/chrome/i18n.js'), 'utf8'), fs.readFileSync(path.join(root, 'extensions/firefox/i18n.js'), 'utf8'));
 });
