@@ -127,6 +127,8 @@ allowance or proof of 100-user production capacity. Writes are not replayed and
 still serve a separate purpose from the outbound budget. Additional backends
 behind the same egress IP do not increase an upstream per-IP allowance. Video
 media commonly streams directly from Opencast; not all bytes pass through this
-VPS. Public hosting also requires an audit/restriction of URL fetch targets and
-redirects, including the general download/PDF routes; traffic volume control
-does not provide SSRF or cross-origin cookie-forwarding protection.
+VPS. Exact outbound origins, per-connection public-address pinning, external
+credential/cookie isolation and resource-proxy restrictions are implemented in
+the separate [outbound target policy](OUTBOUND_TARGET_SECURITY.md). Validate the
+installation's actual media origins and authenticated download/expiry flows in
+staging before rollout; traffic volume control alone is not target authorization.
