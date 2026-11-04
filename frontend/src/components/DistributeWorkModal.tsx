@@ -1,13 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { X, Users, ArrowUp, ArrowDown, CheckCircle, AlertTriangle, Loader2, Download } from 'lucide-react';
 import { t } from '../lib/i18n';
 import { SubmissionItem, TAInfo, ApplyAllocationRequest } from '../types';
 import { api } from '../lib/api';
+import { cache } from '../lib/cache';
+import { allocationDefaultsKey, loadAllocationDefaults, saveAllocationDefaults, allocationNotice, validAssistant, MAX_ASSISTANTS } from '../lib/taAllocation';
 
 interface DistributeWorkModalProps {
   isOpen: boolean;
   onClose: () => void;
   exerciseRefId: string;
+  courseRefId?: string;
   assId: string;
   submissions: SubmissionItem[];
   fingerprint?: string;
@@ -25,24 +28,47 @@ interface CanonicalUnit {
   members: SubmissionItem[];
 }
 
-export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
-  isOpen,
+export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = (props) => {
+  if (!props.isOpen) return null;
+  const scope = allocationDefaultsKey(cache.getSessionId(), props.courseRefId, props.exerciseRefId);
+  return <DistributeWorkEditor key={`${scope || 'temporary'}:${props.assId}`} {...props} scope={scope} />;
+};
+
+const DistributeWorkEditor: React.FC<DistributeWorkModalProps & { scope: string | null }> = ({
   onClose,
+  courseRefId,
+  scope,
   exerciseRefId,
   assId,
   submissions,
   fingerprint,
   onDistributionComplete,
 }) => {
-  const [assistants, setAssistants] = useState<TAInfo[]>([
-    { id: 'ta1', name: 'TA 1' },
-    { id: 'ta2', name: 'TA 2' },
-  ]);
-  const [priorityOrder, setPriorityOrder] = useState<string[]>(['ta1', 'ta2']);
+  const [preferences, setPreferences] = useState(() => loadAllocationDefaults(scope, number => t('allocation.default_ta', { number })));
+  const { assistants, priorityOrder } = preferences;
+  const [defaultsStored, setDefaultsStored] = useState(true);
   const [sortMethod, setSortMethod] = useState<'native' | 'team' | 'time' | 'random'>('native');
   const [randomSeed, setRandomSeed] = useState<number>(() => Date.now());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    const previous = document.activeElement;
+    const dialog = dialogRef.current!;
+    dialog.showModal();
+    closeRef.current?.focus({ preventScroll: true });
+    return () => {
+      mounted.current = false;
+      dialog.close();
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, []);
+  useEffect(() => {
+    if (scope) setDefaultsStored(saveAllocationDefaults(scope, preferences));
+  }, [scope, preferences]);
 
   // Group submissions by unit_id to treat teams as single indivisible units
   const canonicalUnits = useMemo(() => {
@@ -83,37 +109,27 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
     const temp = newOrder[idx];
     newOrder[idx] = newOrder[targetIdx];
     newOrder[targetIdx] = temp;
-    setPriorityOrder(newOrder);
+    setPreferences(prev => ({ ...prev, priorityOrder: newOrder }));
   };
 
   // Add assistant using monotonically unique IDs
   const addAssistant = () => {
-    let nextNum = 1;
-    const existingNums = assistants
-      .map((a) => {
-        const m = a.id.match(/^ta(\d+)$/);
-        return m ? parseInt(m[1], 10) : 0;
-      })
-      .filter((n) => !isNaN(n));
-
-    if (existingNums.length > 0) {
-      nextNum = Math.max(...existingNums) + 1;
-    }
-
-    const newId = `ta${nextNum}`;
-    const newTA: TAInfo = { id: newId, name: `TA ${nextNum}` };
-    setAssistants((prev) => [...prev, newTA]);
-    setPriorityOrder((prev) => [...prev, newId]);
+    if (assistants.length >= MAX_ASSISTANTS) return;
+    setPreferences(prev => {
+      const newId = `ta${prev.nextId}`;
+      return { ...prev, nextId: prev.nextId + 1,
+        assistants: [...prev.assistants, { id: newId, name: t('allocation.default_ta', { number: prev.nextId }) }],
+        priorityOrder: [...prev.priorityOrder, newId] };
+    });
   };
 
   const removeAssistant = (id: string) => {
     if (assistants.length <= 1) return;
-    setAssistants((prev) => prev.filter((a) => a.id !== id));
-    setPriorityOrder((prev) => prev.filter((pid) => pid !== id));
+    setPreferences(prev => ({ ...prev, assistants: prev.assistants.filter(a => a.id !== id), priorityOrder: prev.priorityOrder.filter(pid => pid !== id) }));
   };
 
   const updateAssistantName = (id: string, name: string) => {
-    setAssistants((prev) => prev.map((a) => (a.id === id ? { ...a, name } : a)));
+    setPreferences(prev => ({ ...prev, assistants: prev.assistants.map(a => a.id === id ? { ...a, name } : a) }));
   };
 
 
@@ -122,7 +138,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
   const distributionPlan = useMemo(() => {
     const M = canonicalUnits.length;
     const N = assistants.length;
-    if (N === 0) return { quotas: {}, assignedUnits: [], memberUpdates: [] };
+    if (N === 0) return { quotas: {}, assignedUnits: [], memberUpdates: [], conflicts: [] };
 
     // Sort units based on chosen method
     const sorted = [...canonicalUnits];
@@ -166,6 +182,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
     }> = [];
 
     const memberUpdates: Array<{ member_id: string; notice: string }> = [];
+    const conflicts: Array<{ memberId: string; name: string; length: number }> = [];
 
     let currentItemIdx = 0;
     for (const ta of orderedTAs) {
@@ -182,21 +199,11 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
 
           // Propagate notice marker to all members of this unit with 200-character budget guard
           unit.members.forEach((m) => {
-            let cleanNotice = (m.notice || '').replace(/\[BI:[^\]]+\]/g, '').trim();
-            const marker = `[BI:${ta.id}|${ta.name}]`;
-            let newNotice = cleanNotice ? `${cleanNotice} ${marker}` : marker;
-            if (newNotice.length > 200) {
-              const maxClean = 200 - marker.length - 4; // allow space + '...'
-              if (maxClean > 0) {
-                cleanNotice = cleanNotice.slice(0, maxClean).trimEnd() + '...';
-                newNotice = `${cleanNotice} ${marker}`;
-              } else {
-                newNotice = marker;
-              }
-            }
+            const result = allocationNotice(m.notice || '', ta);
+            if (result.exceedsLimit) conflicts.push({ memberId: m.member_id, name: m.student_name, length: result.length });
             memberUpdates.push({
               member_id: m.member_id,
-              notice: newNotice,
+              notice: result.notice,
             });
           });
 
@@ -205,8 +212,11 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
       }
     }
 
-    return { quotas, assignedUnits, memberUpdates };
+    return { quotas, assignedUnits, memberUpdates, conflicts };
   }, [canonicalUnits, assistants, priorityOrder, sortMethod, randomSeed]);
+  const invalidNames = assistants.some(ta => !validAssistant(ta));
+  const hasFingerprint = Boolean(fingerprint && /^[a-f0-9]{16}$/.test(fingerprint));
+  const canApply = canonicalUnits.length > 0 && !invalidNames && !distributionPlan.conflicts.length && hasFingerprint;
 
   const exportAllocationCsv = () => {
     const headers = ['Unit ID', 'Typ', 'Name/Team', 'Zugewiesener TA', 'Abgabestatus', 'Abgabezeitpunkt'];
@@ -234,6 +244,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
   };
 
   const handleApply = async () => {
+    if (!canApply || isSubmitting) return;
     setIsSubmitting(true);
     setError(null);
     try {
@@ -245,6 +256,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
       };
 
       const res = await api.applyTAAllocation(exerciseRefId, assId, payload);
+      if (!mounted.current) return;
       if (res.success) {
         onDistributionComplete();
         onClose();
@@ -252,25 +264,26 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
         setError(res.message || t("Fehler beim Speichern der Verteilung"));
       }
     } catch (err: any) {
-      setError(err?.message || t("Netzwerkfehler beim Anwenden der Verteilung"));
+      if (mounted.current) setError(err?.message || t("Netzwerkfehler beim Anwenden der Verteilung"));
     } finally {
-      setIsSubmitting(false);
+      if (mounted.current) setIsSubmitting(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
-      <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden transition-all">
+    <dialog ref={dialogRef} aria-labelledby="allocation-title" aria-busy={isSubmitting}
+      onCancel={event => { event.preventDefault(); if (!isSubmitting) onClose(); }}
+      onClick={event => { if (event.target === event.currentTarget && !isSubmitting) onClose(); }}
+      className="m-auto w-[calc(100%-1.5rem)] max-w-2xl p-0 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-xs">
+      <div className="relative w-full max-h-[calc(var(--visible-height,100dvh)-2rem)] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 px-5 py-4">
-          <div className="flex items-center gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
               <Users className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              <h2 id="allocation-title" className="text-base font-bold text-slate-900 dark:text-slate-100">
                 {t("Arbeit verteilen")}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -280,15 +293,27 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
           </div>
           <button
             type="button"
+            ref={closeRef}
+            aria-label={t('Schliessen')}
+            disabled={isSubmitting}
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+          <fieldset disabled={isSubmitting} className="min-w-0 space-y-5 border-0 p-0 m-0">
+          <p className="text-xs text-slate-500 dark:text-slate-400">{courseRefId ? t('allocation.defaults_course') : t('allocation.defaults_exercise')}</p>
+          {!defaultsStored && <p role="status" className="text-xs text-amber-700 dark:text-amber-300">{t('allocation.storage_unavailable')}</p>}
+          {!hasFingerprint && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">{t('allocation.refresh_required')}</p>}
+          {invalidNames && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{t('allocation.invalid_name')}</p>}
+          {distributionPlan.conflicts.length > 0 && <div role="alert" className="rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 p-3 text-xs text-rose-700 dark:text-rose-300">
+            <p>{t('allocation.notice_conflicts', { count: distributionPlan.conflicts.length })}</p>
+            <ul className="mt-2 space-y-1">{distributionPlan.conflicts.map(item => <li key={item.memberId} className="[overflow-wrap:anywhere]">{item.name}: {item.length}/200</li>)}</ul>
+          </div>}
           {error && (
             <div className="flex items-center gap-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 p-3 text-xs text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40">
               <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -298,14 +323,15 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
 
           {/* Section: TA Roster & Priority */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 {t("Tutoren & Priorität (Restverteilung)")}
               </label>
               <button
                 type="button"
                 onClick={addAssistant}
-                className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                disabled={assistants.length >= MAX_ASSISTANTS}
+                className="min-h-11 px-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer disabled:opacity-40"
               >
                 + {t("Tutor hinzufügen")}
               </button>
@@ -320,30 +346,34 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
                 return (
                   <div
                     key={taId}
-                    className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 p-2.5 text-xs"
+                    className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 p-2.5 text-xs"
                   >
+                    <div className="flex min-w-0 items-center gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-200 dark:bg-slate-700 font-bold text-slate-700 dark:text-slate-200 text-[11px]">
                       {idx + 1}
                     </span>
 
                     <input
                       type="text"
+                      aria-label={t('allocation.assistant_name', { number: idx + 1 })}
+                      maxLength={100}
                       value={ta.name}
                       onChange={(e) => updateAssistantName(taId, e.target.value)}
-                      className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 font-medium text-slate-800 dark:text-slate-200"
+                      className="min-w-0 min-h-11 flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-base sm:text-xs font-medium text-slate-800 dark:text-slate-200"
                     />
-
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
                     <span className="shrink-0 rounded-md bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 font-bold text-indigo-700 dark:text-indigo-300">
                       {quota} {t("Abgaben")}
                     </span>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center">
                       <button
                         type="button"
                         disabled={idx === 0}
                         onClick={() => movePriority(idx, 'up')}
                         aria-label={t("Nach oben verschieben")}
-                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 cursor-pointer"
+                        className="flex h-11 w-11 items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 cursor-pointer"
                       >
                         <ArrowUp className="h-3.5 w-3.5" />
                       </button>
@@ -352,21 +382,22 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
                         disabled={idx === priorityOrder.length - 1}
                         onClick={() => movePriority(idx, 'down')}
                         aria-label={t("Nach unten verschieben")}
-                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 cursor-pointer"
+                        className="flex h-11 w-11 items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 cursor-pointer"
                       >
                         <ArrowDown className="h-3.5 w-3.5" />
                       </button>
-                    </div>
-
                     {assistants.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeAssistant(taId)}
-                        className="p-1 text-slate-400 hover:text-rose-500 cursor-pointer"
+                        aria-label={t('allocation.remove_assistant', { name: ta.name })}
+                        className="flex h-11 w-11 items-center justify-center text-slate-400 hover:text-rose-500 cursor-pointer"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
                     )}
+                    </div>
+                    </div>
                   </div>
                 );
               })}
@@ -383,7 +414,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setRandomSeed(Date.now())}
-                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                  className="min-h-11 px-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
                 >
                   {t("Neu mischen")}
                 </button>
@@ -402,7 +433,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
                   key={m.id}
                   type="button"
                   onClick={() => setSortMethod(m.id)}
-                  className={`px-3 py-2 rounded-xl text-xs font-semibold border transition text-center cursor-pointer ${
+                  className={`min-h-11 px-3 py-2 rounded-xl text-xs font-semibold border transition text-center cursor-pointer ${
                     sortMethod === m.id
                       ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-500 dark:text-indigo-300'
                       : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -420,7 +451,7 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
               {t("Vorschau der Zuweisung")}
             </label>
             <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-              <table className="w-full text-left text-xs">
+              <table className="w-full table-fixed text-left text-xs [overflow-wrap:anywhere]">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800 sticky top-0">
                   <tr>
                     <th className="py-2 px-3">{t("Student / Team")}</th>
@@ -444,33 +475,34 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
               </table>
             </div>
           </div>
+          </fieldset>
         </div>
 
         {/* Footer Actions */}
-        <div className="border-t border-slate-100 dark:border-slate-800 px-5 py-3.5 bg-slate-50 dark:bg-slate-900 flex items-center justify-between gap-3">
+        <div className="shrink-0 border-t border-slate-100 dark:border-slate-800 px-4 sm:px-5 py-3.5 bg-slate-50 dark:bg-slate-900 grid grid-cols-2 sm:flex sm:items-center sm:justify-between gap-2">
           <button
             type="button"
             onClick={exportAllocationCsv}
-            disabled={distributionPlan.assignedUnits.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={isSubmitting || distributionPlan.assignedUnits.length === 0}
+            className="flex min-h-11 items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="h-3.5 w-3.5 text-slate-500" />
             <span>{t("CSV exportieren")}</span>
           </button>
-          <div className="flex items-center gap-3">
+          <div className="contents sm:flex sm:items-center sm:gap-2">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 cursor-pointer"
+            className="min-h-11 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
           >
             {t("Abbrechen")}
           </button>
           <button
             type="button"
             onClick={handleApply}
-            disabled={isSubmitting || canonicalUnits.length === 0}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 cursor-pointer shadow-xs"
+            disabled={isSubmitting || !canApply}
+            className="col-span-2 flex min-h-11 items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 cursor-pointer shadow-xs"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             <span>{t("Verteilung in ILIAS speichern")}</span>
@@ -478,6 +510,6 @@ export const DistributeWorkModal: React.FC<DistributeWorkModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 };

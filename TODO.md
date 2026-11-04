@@ -55,8 +55,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   - [x] Phase 2: TA and bulk submission downloads with live progress, ZIP streaming, and betterilias-feedback.json round-trip manifest templates.
   - [x] Phase 3: Reviewed feedback return with safe preflight ZIP/folder inspection, mapping preview, conflict detection/resolution, and authenticated publication (backend/services/feedback_import.py, ReturnFeedbackModal.tsx).
   - [x] Phase 4: Hardening (200-char note budget guard, fingerprint concurrency verification, zero-work TA quotas), unmatched-files manual mapping resolver with searchable recipient combobox and portal popover, on-demand overwrite file deletion, and allocation CSV export.
-  - [ ] Persist assistant count/names/priority per session and lecture; the current dialog starts with two assistant slots.
-  - [ ] Refuse or explicitly preview/confirm tutor-note truncation when allocation markers exceed the available 200-character budget; current formatting can shorten existing note text.
+  - [x] Persist assistant count/names/priority per session and lecture, with an
+    exercise-scoped fallback and stable slot IDs on this device.
+  - [x] Refuse allocations exceeding the 200-character tutor-note budget in the
+    preview and server; preserve human note text and recheck fresh native state.
 
 ## Calendar and timetable
 

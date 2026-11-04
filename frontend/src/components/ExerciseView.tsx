@@ -2866,6 +2866,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       {/* Distribute Work Modal */}
       {(selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
         <DistributeWorkModal
+          courseRefId={courseRefId}
           isOpen={isDistributeModalOpen}
           onClose={() => setIsDistributeModalOpen(false)}
           exerciseRefId={exerciseRefId}
