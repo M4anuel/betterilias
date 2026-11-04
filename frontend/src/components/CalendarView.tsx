@@ -391,14 +391,50 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const syncRunIdRef = useRef<number>(0);
   const syncAbortRef = useRef<AbortController | null>(null);
+  const syncPollTimerRef = useRef<any>(null);
   const hasInitialLoadedRef = useRef<boolean>(false);
+
+  const stopSyncPolling = useCallback(() => {
+    if (syncPollTimerRef.current) {
+      clearInterval(syncPollTimerRef.current);
+      syncPollTimerRef.current = null;
+    }
+  }, []);
+
+  const startSyncPolling = useCallback(() => {
+    stopSyncPolling();
+    syncPollTimerRef.current = setInterval(async () => {
+      try {
+        const cal = await api.getCalendar();
+        if (cal) {
+          setCalendarData(cal);
+          cache.setCachedCalendar('ALL', cal);
+          setCacheTimestamp(Date.now());
+          if (cal.sync_progress && cal.sync_progress.is_syncing) {
+            setIsSyncing(true);
+            setSyncProgress({
+              current: cal.sync_progress.current,
+              total: cal.sync_progress.total,
+              title: cal.sync_progress.current_course_title || '',
+            });
+          } else {
+            setIsSyncing(false);
+            setSyncProgress(null);
+            stopSyncPolling();
+          }
+        }
+      } catch {
+        // Silently ignore background polling errors
+      }
+    }, 1500);
+  }, [stopSyncPolling]);
 
   useEffect(() => {
     return () => {
       syncRunIdRef.current += 1;
-      syncAbortRef.current?.abort();
+      stopSyncPolling();
     };
-  }, []);
+  }, [stopSyncPolling]);
 
   // Progressive newest-to-oldest course sync that re-renders the calendar after each course
   const runProgressiveSync = useCallback(
@@ -421,34 +457,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         return a.title.localeCompare(b.title);
       });
 
+      setSyncProgress({
+        current: 1,
+        total: sortedQueue.length,
+        title: sortedQueue[0].title,
+      });
+      startSyncPolling();
+
       try {
-        for (let i = 0; i < sortedQueue.length; i++) {
-          if (syncRunIdRef.current !== runId || abortController.signal.aborted) break;
-          const item = sortedQueue[i];
-          setSyncProgress({
-            current: i + 1,
-            total: sortedQueue.length,
+        const synced = await api.syncCalendar({
+          courses: sortedQueue.map((item) => ({
+            ref_id: item.ref_id,
             title: item.title,
-          });
-          const synced = await api.syncCalendar({
-            courses: [
-              {
-                ref_id: item.ref_id,
-                title: item.title,
-                semester: item.semester || undefined,
-                item_type: item.item_type || 'crs',
-              },
-            ],
-            force_refresh: forceRefresh,
-            signal: abortController.signal,
-          });
-          if (syncRunIdRef.current !== runId || abortController.signal.aborted) break;
+            semester: item.semester || undefined,
+            item_type: item.item_type || 'crs',
+          })),
+          force_refresh: forceRefresh,
+          signal: abortController.signal,
+        });
+        if (syncRunIdRef.current === runId) {
           setCalendarData(synced);
           cache.setCachedCalendar('ALL', synced);
           setCacheTimestamp(Date.now());
-        }
-        if (syncRunIdRef.current === runId && !abortController.signal.aborted && forceRefresh) {
-          setStatusBanner(t('calendar.sync_completed'));
+          if (forceRefresh) {
+            setStatusBanner(t('calendar.sync_completed'));
+          }
         }
       } catch (err: any) {
         if (abortController.signal.aborted || err?.name === 'AbortError') {
@@ -459,12 +492,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         }
       } finally {
         if (syncRunIdRef.current === runId) {
+          stopSyncPolling();
           setSyncProgress(null);
           setIsSyncing(false);
         }
       }
     },
-    []
+    [startSyncPolling, stopSyncPolling]
   );
 
   // Load global calendar once on mount (independent of selectedSemester)
@@ -497,6 +531,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           setReferenceDate(semStart);
           setSelectedMonthDateStr(effectiveCal.semester_start_date);
         }
+      }
+
+      // If a sync is already actively running on the backend, connect to it and poll progress!
+      if (effectiveCal.sync_progress?.is_syncing) {
+        setIsSyncing(true);
+        setSyncProgress({
+          current: effectiveCal.sync_progress.current,
+          total: effectiveCal.sync_progress.total,
+          title: effectiveCal.sync_progress.current_course_title || '',
+        });
+        startSyncPolling();
+        return;
       }
 
       const rawMemberships: CourseItem[] = Array.isArray(membershipsRes)
@@ -563,7 +609,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [coursesList, selectedSemester, currentSemesterId, runProgressiveSync]);
+  }, [coursesList, selectedSemester, currentSemesterId, runProgressiveSync, startSyncPolling]);
 
   useEffect(() => {
     if (!hasInitialLoadedRef.current) {

@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
@@ -56,6 +57,11 @@ async def discover_calendar_courses(
     """
     tenant_key = _resolve_tenant_key(request, client)
     base_url = _resolve_base_url(request)
+    if calendar_service.is_sync_active(tenant_key):
+        return calendar_service.build_semester_response(
+            tenant_key=tenant_key,
+            base_url=base_url,
+        )
     return await calendar_service.discover_courses_from_agenda_and_memberships(
         tenant_key=tenant_key,
         client=client,
@@ -71,14 +77,32 @@ async def sync_semester_calendar(
 ):
     tenant_key = _resolve_tenant_key(request, client)
     base_url = _resolve_base_url(request)
-    return await calendar_service.sync_semester_calendar(
-        tenant_key=tenant_key,
-        client=client,
-        semester=payload.semester,
-        courses=payload.courses,
-        force_refresh=payload.force_refresh,
-        base_url=base_url,
+    if calendar_service.is_sync_active(tenant_key):
+        return calendar_service.build_semester_response(
+            tenant_key=tenant_key,
+            semester=payload.semester,
+            base_url=base_url,
+        )
+
+    task = asyncio.create_task(
+        calendar_service.sync_semester_calendar(
+            tenant_key=tenant_key,
+            client=client,
+            semester=payload.semester,
+            courses=payload.courses,
+            force_refresh=payload.force_refresh,
+            base_url=base_url,
+        )
     )
+    calendar_service.register_sync_task(tenant_key, task)
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        return calendar_service.build_semester_response(
+            tenant_key=tenant_key,
+            semester=payload.semester,
+            base_url=base_url,
+        )
 
 
 @router.post("/rules", response_model=SemesterCalendarResponse)

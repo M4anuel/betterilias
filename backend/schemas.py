@@ -772,6 +772,15 @@ class CourseCalendarInfo(BaseModel):
     last_imported_at: Optional[datetime] = None
 
 
+class CalendarSyncProgress(BaseModel):
+    is_syncing: bool = False
+    current: int = 0
+    total: int = 0
+    current_course_title: Optional[str] = None
+    last_error: Optional[str] = None
+    updated_at: Optional[float] = None
+
+
 class SemesterCalendarResponse(BaseModel):
     semester: str
     semester_start_date: str
@@ -786,6 +795,7 @@ class SemesterCalendarResponse(BaseModel):
     webcal_url: Optional[str] = None
     is_local_host: bool = True
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    sync_progress: Optional[CalendarSyncProgress] = None
 
 
 class CalendarCourseImportRequest(BaseModel):

@@ -1,3 +1,4 @@
+import time
 from datetime import date, datetime, timezone
 from pathlib import Path
 import pytest
@@ -597,6 +598,69 @@ async def test_agenda_discovery_and_opportunistic_course_materials_ingest(tmp_pa
     )
     assert ingested_again is False
 
+
+
+
+@pytest.mark.anyio
+async def test_calendar_sync_progress_and_nonblocking_read(tmp_path, monkeypatch):
+    """
+    Verify:
+    1. Sync progress is persisted and returned in SemesterCalendarResponse.
+    2. Reads via build_semester_response and GET /api/calendar do not contend on locks
+       or throw 503 CoordinationBusy when a background fetch is ongoing.
+    3. Stale sync tasks (>120s) fall back gracefully with is_syncing=False.
+    """
+    test_service = CalendarService(storage_dir=tmp_path / '.calendar')
+    monkeypatch.setattr('backend.api.routes.calendar.calendar_service', test_service)
+    tenant = 'test-progress-tenant'
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    client = TestClient(app)
+    from backend.auth.session import SessionManager
+    from backend.config import settings
+    monkeypatch.setattr(settings, 'sessions_dir', str(tmp_path / 'sessions'))
+    headers = {'X-Session-Id': tenant}
+    SessionManager(tenant).save_cookies({'PHPSESSID': 'fake'})
+
+    # 1. Initially no progress
+    assert test_service.is_sync_active(tenant) is False
+    init_res = test_service.build_semester_response(tenant)
+    assert init_res.sync_progress is None or init_res.sync_progress.is_syncing is False
+
+    # 2. Save active sync progress
+    state = test_service._load_tenant_state(tenant)
+    state['sync_progress'] = {
+        'is_syncing': True,
+        'current': 3,
+        'total': 8,
+        'current_course_title': 'Lineare Algebra',
+        'updated_at': time.time(),
+    }
+    test_service._save_tenant_state(tenant, state)
+
+    # 3. Read via build_semester_response (should reflect active progress)
+    progress_res = test_service.build_semester_response(tenant)
+    assert progress_res.sync_progress is not None
+    assert progress_res.sync_progress.is_syncing is True
+    assert progress_res.sync_progress.current == 3
+    assert progress_res.sync_progress.total == 8
+    assert progress_res.sync_progress.current_course_title == 'Lineare Algebra'
+
+    # 4. Read via API endpoint GET /api/calendar
+    api_res = client.get('/api/calendar', headers=headers)
+    assert api_res.status_code == 200
+    api_data = api_res.json()
+    assert 'sync_progress' in api_data
+    assert api_data['sync_progress']['is_syncing'] is True
+    assert api_data['sync_progress']['current'] == 3
+
+    # 5. Simulate stale sync progress (>120s old)
+    stale_time = time.time() - 150
+    state['sync_progress']['updated_at'] = stale_time
+    test_service._save_tenant_state(tenant, state)
+    stale_res = test_service.build_semester_response(tenant)
+    assert stale_res.sync_progress is not None
+    assert stale_res.sync_progress.is_syncing is False
 
 from tests.test_localisation_browser import local_site, ROOT
 
