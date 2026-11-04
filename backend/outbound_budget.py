@@ -18,12 +18,13 @@ import weakref
 
 from backend.config import settings
 from backend.coordination import SharedLock
+from backend.i18n import t
 
 logger = logging.getLogger('ilias.outbound')
 
 class OutboundUnavailable(Exception):
     def __init__(self, retry_after=1, *, write_uncertain=False):
-        super().__init__('Outbound ILIAS traffic temporarily unavailable')
+        super().__init__(t('outbound.busy'))
         self.retry_after = max(1, math.ceil(retry_after))
         self.write_uncertain = write_uncertain
 

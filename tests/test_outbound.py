@@ -469,3 +469,30 @@ async def _recover_after_crash(directory):
     budget = OutboundBudget(directory, BudgetPolicy(concurrency=1, per_session=1, rate=1000, queue_timeout=8))
     permit = await budget.acquire('survivor')
     await permit.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('language', ['de', 'en'])
+async def test_background_calendar_busy_keeps_events_and_localizes_progress(tmp_path, monkeypatch, language):
+    from backend.i18n import current_language, translate
+    from backend.schemas import CourseItem
+    from backend.services.calendar_service import CalendarService
+    from backend.services.ilias_client import IliasClient
+    monkeypatch.setattr(settings, 'coordination_dir', str(tmp_path / 'coordination'))
+    service = CalendarService(tmp_path / 'calendar')
+    previous = {'42': [{'id': 'previous-event', 'title': 'Lecturer content'}]}
+    state = service._load_tenant_state('alice')
+    state['imported_events'] = previous
+    service._save_tenant_state('alice', state)
+    token = current_language.set(language)
+    try:
+        monkeypatch.setattr(service, '_import_single_course', AsyncMock(side_effect=OutboundUnavailable()))
+        with pytest.raises(OutboundUnavailable):
+            await service.sync_semester_calendar('alice', IliasClient(), courses=[
+                CourseItem(ref_id='42', title='Course', url='', item_type='crs')], force_refresh=True)
+    finally:
+        current_language.reset(token)
+    saved = service._load_tenant_state('alice')
+    assert saved['imported_events'] == previous
+    assert saved['sync_progress']['is_syncing'] is False
+    assert saved['sync_progress']['last_error'] == translate('outbound.busy', language)
