@@ -771,8 +771,10 @@ dialog.settings-panel {
   max-height: calc(var(--visible-height, 100dvh) - 5rem);
 }
 .sidebar-course-title { min-width: 0; overflow-wrap: break-word; }
+.grading-toolbar { overflow-wrap: normal; }
+.grading-toolbar, .grading-toolbar * { word-break: keep-all; }
 .single-row-filters > button { flex-shrink: 0; white-space: nowrap; }
-.grading-toolbar button, .grading-toolbar select { white-space: nowrap; flex-shrink: 0; }
+.grading-toolbar button, .grading-toolbar select, .grading-toolbar span { white-space: nowrap; flex-shrink: 0; }
 .grading-settings-body button { white-space: nowrap; }
 @media (max-width: 767px) {
   .desktop-only { display: none; }

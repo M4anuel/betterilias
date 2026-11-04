@@ -664,6 +664,15 @@ export interface CourseCalendarInfo {
   last_imported_at?: string | null;
 }
 
+export interface CalendarSyncProgress {
+  is_syncing: boolean;
+  current: number;
+  total: number;
+  current_course_title?: string | null;
+  last_error?: string | null;
+  updated_at?: number | null;
+}
+
 export interface SemesterCalendarResponse {
   semester: string;
   semester_start_date: string;
@@ -678,6 +687,7 @@ export interface SemesterCalendarResponse {
   webcal_url?: string | null;
   is_local_host?: boolean;
   fetched_at: string;
+  sync_progress?: CalendarSyncProgress | null;
 }
 
 export interface CalendarSubscriptionResponse {

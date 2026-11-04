@@ -1443,7 +1443,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   }, [taSubmissionsData?.submissions]);
 
   const advancedGradingFilters = (
-    <div className="flex items-center gap-2.5 flex-wrap">
+    <div className="flex items-center gap-2.5 flex-wrap shrink-0">
       {/* Submission Radio Group */}
       <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs shrink-0">
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline whitespace-nowrap shrink-0">
@@ -2083,11 +2083,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           </div>
 
           {/* TA Grading Menu Bar (Left/Center: Quick-Filters + Advanced Filters, Right: Search, Sorting indicator, Action buttons) */}
-          <div className="grading-toolbar flex flex-col xl:flex-row xl:items-start justify-between gap-3.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <div className="grading-toolbar flex flex-col 2xl:flex-row 2xl:items-start justify-between gap-3.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             {/* Left/Middle: All Filters (Quick-Filters + Advanced Filters) */}
-            <div className="flex flex-wrap items-center gap-2.5 min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2.5 min-w-0">
               {/* Quick-Filters collection */}
-              <div className="single-row-filters flex items-center gap-1.5 flex-wrap">
+              <div className="single-row-filters flex items-center gap-1.5 flex-wrap shrink-0">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 hidden sm:inline whitespace-nowrap shrink-0">
                   {t("Schnellfilter:")}
                 </span>
@@ -2119,11 +2119,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               </div>
 
               {/* Advanced Filters: Submission Radio toggle + Grade Multi-select + Tutor */}
-              <div className="desktop-only">{advancedGradingFilters}</div>
+              <div className="desktop-only flex items-center gap-2.5 flex-wrap shrink-0">{advancedGradingFilters}</div>
             </div>
 
             {/* Right: Search, Sorting Indicator & Action Buttons (reorganized on top of / below each other) */}
-            <div className="grading-search flex flex-col gap-2 shrink-0 self-stretch sm:self-auto">
+            <div className="grading-search flex flex-col sm:flex-row 2xl:flex-col items-stretch sm:items-center 2xl:items-end justify-between 2xl:justify-start gap-2.5 shrink-0">
               <div className="flex flex-col gap-0.5">
                 <div className="relative w-full sm:w-56">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
