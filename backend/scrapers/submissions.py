@@ -142,12 +142,16 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
 
     # Extract dynamic script click actions (e.g. $('#btn_id').on('click', function() { window.location = '...'; }))
     script_action_map: Dict[str, str] = {}
-    for m in re.finditer(
-        r"\$\(['\"]#([^'\"]+)['\"]\)\.on\(['\"]click['\"].*?window\.location\s*=\s*['\"]([^'\"]+)['\"]",
-        html_content,
-        re.DOTALL,
-    ):
-        script_action_map[m.group(1)] = m.group(2)
+    # Only accept the native direct-navigation callback. Searching arbitrarily
+    # forward from a click binding can cross a feedback/modal callback and steal
+    # the next participant's download URL, falsely marking this row submitted.
+    for script in soup.find_all('script'):
+        for m in re.finditer(
+            r"\$\(['\"]#([^'\"]+)['\"]\)\.on\(\s*['\"]click['\"]\s*,\s*"
+            r"function\s*\([^)]*\)\s*\{\s*window\.location\s*=\s*['\"]([^'\"]+)['\"]",
+            script.string or '',
+        ):
+            script_action_map[m.group(1)] = m.group(2)
 
     # 4. Locate Submissions Table
     table = (
