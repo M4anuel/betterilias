@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from typing import List, Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -45,6 +46,15 @@ class Settings(BaseSettings):
     
     # HTTP Client Configuration
     http_timeout_seconds: float = 30.0
+    # Shared across all workers using COORDINATION_DIR, including file streams.
+    outbound_max_concurrency: int = Field(default=6, ge=1, le=64)
+    outbound_per_session_concurrency: int = Field(default=2, ge=1, le=64)
+    outbound_requests_per_second: float = Field(default=5.0, gt=0, le=1000)
+    outbound_queue_limit: int = Field(default=512, ge=1, le=10000)
+    outbound_per_session_queue_limit: int = Field(default=32, ge=1, le=1000)
+    outbound_queue_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
+    outbound_read_retries: int = Field(default=2, ge=0, le=3)
+    outbound_coalesce_max_bytes: int = Field(default=2_097_152, ge=0, le=8_388_608)
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "

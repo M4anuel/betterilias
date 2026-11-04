@@ -1638,5 +1638,7 @@
   "extension.page_connection_failed": "Deine ILIAS-Sitzung ist synchronisiert, aber der BetterIlias-Tab konnte nicht verbunden werden. Prüfe die Frontend-Adresse und versuche es erneut mit BetterIlias öffnen.",
   "extension.setup.copy_address": "Adresse kopieren: {address}",
   "extension.setup.internal_pages": "Browser-interne Seiten lassen sich aus Webseiten nicht direkt öffnen. Tippe auf die Adresse, um sie zu kopieren, und füge sie in die Adressleiste ein.",
-  "extension.setup.copy_failed": "Kopieren nicht möglich. Markiere die angezeigte Adresse und kopiere sie manuell in die Adressleiste."
+  "extension.setup.copy_failed": "Kopieren nicht möglich. Markiere die angezeigte Adresse und kopiere sie manuell in die Adressleiste.",
+  "outbound.busy": "ILIAS-Anfragen sind vorübergehend ausgelastet oder begrenzt. Bitte warte einen Moment und versuche es erneut.",
+  "outbound.write_uncertain": "ILIAS ist vorübergehend nicht verfügbar. Der Vorgang wurde nicht automatisch wiederholt. Falls du Änderungen gespeichert hast, prüfe das Ergebnis in ILIAS, bevor du es erneut versuchst."
 }

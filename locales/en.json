@@ -1638,5 +1638,7 @@
   "extension.page_connection_failed": "Your ILIAS session is synced, but the BetterIlias tab could not be connected. Check the frontend address and try Open BetterIlias again.",
   "extension.setup.copy_address": "Copy address: {address}",
   "extension.setup.internal_pages": "Browser internal pages cannot be opened directly from websites. Tap an address to copy it, then paste it into the address bar.",
-  "extension.setup.copy_failed": "Copying failed. Select the displayed address and copy it manually into the address bar."
+  "extension.setup.copy_failed": "Copying failed. Select the displayed address and copy it manually into the address bar.",
+  "outbound.busy": "ILIAS requests are temporarily busy or rate limited. Please wait a moment and try again.",
+  "outbound.write_uncertain": "ILIAS is temporarily unavailable. The operation was not retried automatically. If you were saving changes, check the result in ILIAS before trying again."
 }

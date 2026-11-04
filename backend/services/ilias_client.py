@@ -1,3 +1,4 @@
+from backend.outbound_budget import OutboundUnavailable
 from backend.coordination import SharedLock, coordinated
 import asyncio
 from backend.i18n import t
@@ -340,6 +341,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                         course_title=parsed.title,
                         client=self,
                     )
+                except OutboundUnavailable:
+                    raise
                 except Exception as cal_err:
                     logger.debug(f"Opportunistic calendar ingest skipped for {ref_id}: {cal_err}")
             # Some unjoined courses expose Join only in their parent category.
@@ -542,6 +545,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                     parsed = parse_course_materials(resp.text, container_ref_id=session_ref_id)
                     if parsed.items:
                         return parsed.items
+                except OutboundUnavailable:
+                    raise
                 except Exception:
                     continue
 
@@ -586,6 +591,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                             if ep.id not in seen_ids:
                                 all_episodes.append(ep)
                                 seen_ids.add(ep.id)
+                    except OutboundUnavailable:
+                        raise
                     except Exception as e:
                         logger.warning(f"Error fetching podcast page {page_url}: {e}")
 
@@ -736,6 +743,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                             detail.team_members = [m.login for m in team_screen.members]
                 except SessionExpiredError:
                     raise
+                except OutboundUnavailable:
+                    raise
                 except Exception as te:
                     logger.debug(f"Could not fetch team management screen for {ref_id}/{ass_id}: {te}")
 
@@ -771,6 +780,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                         if last_sub:
                             detail.last_submission = last_sub
             except SessionExpiredError:
+                raise
+            except OutboundUnavailable:
                 raise
             except Exception as e:
                 logger.debug(f"Could not fetch student submission screen: {e}")
@@ -999,6 +1010,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                     create_url = pres_detail.create_team_url
             except SessionExpiredError:
                 raise
+            except OutboundUnavailable:
+                raise
             except Exception as e:
                 logger.debug(f"Using fallback createTeam URL: {e}")
 
@@ -1046,6 +1059,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                         )
                         if expanded_screen.candidates:
                             course_screen = expanded_screen
+                except OutboundUnavailable:
+                    raise
                 except Exception as e:
                     logger.warning(f"Failed to expand course user list to 800 rows: {e}")
 
@@ -1303,6 +1318,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                                 lu_resp.text, base_url=settings.ilias_base_url
                             )
                             self_uid = lu_screen.current_user_id
+                    except OutboundUnavailable:
+                        raise
                     except Exception as e:
                         logger.debug(f"Could not resolve self_uid from listUsers: {e}")
 
@@ -1490,6 +1507,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                         fb_post_resp = await client.post(modal_action, data=modal_payload)
                         if fb_post_resp.status_code in [200, 302] and "alert-danger" not in fb_post_resp.text:
                             feedback_saved = True
+                except OutboundUnavailable:
+                    raise
                 except Exception as fb_err:
                     logger.warning(f"Failed submitting feedback modal form: {fb_err}")
 
@@ -1510,6 +1529,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                         if grade_data.rtoken:
                             save_data["rtoken"] = grade_data.rtoken
                         await client.post(save_url, data=save_data)
+                    except OutboundUnavailable:
+                        raise
                     except Exception as sl_err:
                         logger.warning(f"Failed fallback saveCommentForLearners: {sl_err}")
 
@@ -1542,7 +1563,11 @@ class IliasClient(AuthoringMixin, ManagementMixin):
         full_url = urllib.parse.urljoin(settings.ilias_base_url, clean_url)
 
         req = client.build_request("GET", full_url)
-        resp = await client.send(req, stream=True)
+        try:
+            resp = await client.send(req, stream=True)
+        except BaseException:
+            await client.aclose()
+            raise
 
         if resp.status_code >= 400:
             await resp.aclose()
@@ -1876,6 +1901,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                     files = await self.get_ta_instruction_files(ref_id, ass_id, http_client=client)
                     detail.instruction_files = files
                 except SessionExpiredError:
+                    raise
+                except OutboundUnavailable:
                     raise
                 except Exception as fe:
                     logger.debug(f"Could not load instruction files for {ass_id}: {fe}")

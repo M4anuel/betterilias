@@ -1,3 +1,4 @@
+from backend.outbound_budget import OutboundUnavailable
 from backend.coordination import coordinated, atomic_json
 from datetime import date, datetime, timezone
 import json
@@ -402,6 +403,8 @@ class CalendarService:
                             client._check_response_for_session_loss(exp_resp, expanded_url)
                             exp_disc = parse_course_calendar_discovery(exp_resp.text, course.ref_id, course.title)
                             discoveries.append(exp_disc)
+                        except OutboundUnavailable:
+                            raise
                         except Exception as exp_err:
                             logger.debug(f"Expanded session fetch skipped for {course.ref_id}: {exp_err}")
 
@@ -415,10 +418,14 @@ class CalendarService:
                                 ics_resp = await http.get(ical_feed_url)
                                 if ics_resp.status_code == 200 and "BEGIN:VCALENDAR" in ics_resp.text:
                                     ics_events = parse_ics_feed(ics_resp.text, course.ref_id, course.title)
+                        except OutboundUnavailable:
+                            raise
                         except Exception as ics_err:
                             logger.debug(f"iCal modal/feed fetch failed for {course.ref_id}: {ics_err}")
             except SessionExpiredError:
                 session_expired = True
+            except OutboundUnavailable:
+                raise
             except (httpx.HTTPError, Exception) as e:
                 logger.warning(f"Failed live calendar fetch for course {course.ref_id}: {e}")
                 request_failed = True
@@ -560,12 +567,16 @@ class CalendarService:
                     client._check_response_for_session_loss(resp, agenda_url)
                     parsed_agenda = parse_ilias_agenda_page(resp.text)
                     agenda_categories = parsed_agenda.categories
+            except OutboundUnavailable:
+                raise
             except Exception as e:
                 logger.warning(f"Failed live Agenda discovery fetch: {e}")
 
             try:
                 dash_resp = await client.get_my_courses()
                 membership_courses = dash_resp.courses
+            except OutboundUnavailable:
+                raise
             except Exception as e:
                 logger.debug(f"Secondary memberships discovery skipped: {e}")
 
@@ -722,6 +733,8 @@ class CalendarService:
                         ics_resp = await http.get(ical_feed_url)
                         if ics_resp.status_code == 200 and "BEGIN:VCALENDAR" in ics_resp.text:
                             ics_events = parse_ics_feed(ics_resp.text, course_ref_id, effective_title)
+            except OutboundUnavailable:
+                raise
             except Exception as ics_err:
                 logger.debug(f"Opportunistic iCal modal fetch skipped for {course_ref_id}: {ics_err}")
 
@@ -810,6 +823,8 @@ class CalendarService:
                 else:
                     dash_resp = await client.get_my_courses()
                     target_courses = dash_resp.courses
+            except OutboundUnavailable:
+                raise
             except Exception as e:
                 logger.warning(f"Could not fetch courses for calendar sync ({semester}): {e}")
 

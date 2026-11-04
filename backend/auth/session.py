@@ -13,6 +13,8 @@ from bs4 import BeautifulSoup
 
 from backend.config import settings
 from backend.coordination import coordinated, atomic_json
+from backend.outbound_http import BudgetTransport
+from backend.outbound_budget import OutboundUnavailable
 
 logger = logging.getLogger("ilias.auth")
 
@@ -162,6 +164,7 @@ class SessionManager:
             if isinstance(k, str) and not any(c in k for c in ('{', '}', '|', '[', ']', '(', ')', '<', '>', '@', ',', ';', ':', '\\', '"', '/', '?', '='))
         }
         return httpx.AsyncClient(
+            transport=BudgetTransport('native:' + raw_cookies.get('PHPSESSID', self.session_id)),
             base_url=settings.ilias_base_url,
             cookies=cookies,
             headers=headers,
@@ -261,6 +264,11 @@ class SessionManager:
 
                 return False, t('ILIAS Dashboard-Struktur konnte nicht verifiziert werden.')
 
+            except OutboundUnavailable:
+                # Queue pressure/rate limiting is not proof of authentication.
+                # In particular, do not accept new cookies through the legacy
+                # network-latency fallback below.
+                raise
             except Exception as e:
                 err_msg = str(e).strip()
                 if isinstance(e, httpx.TimeoutException) or not err_msg:

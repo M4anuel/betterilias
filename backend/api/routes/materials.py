@@ -1,3 +1,4 @@
+from backend.outbound_budget import OutboundUnavailable
 from backend.i18n import t
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status, File, Form, UploadFile
 import re, logging
@@ -213,6 +214,8 @@ async def download_material_file(
             status_code=status_code,
             headers=headers
         )
+    except OutboundUnavailable:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -262,6 +265,8 @@ async def get_pdf_info(
                         aspect_ratio=round(w / h, 4),
                         pages=pages
                     )
+    except OutboundUnavailable:
+        raise
     except Exception as e:
         logger.warning(f"Failed to inspect PDF dimensions for {url}: {e}")
 
