@@ -84,14 +84,12 @@ def test_build_bulk_note_payload_encoded_bytes():
     assert "cmd%5BsaveStatusAll%5D=Save+All" in body_str
 
 
-def test_format_ta_marker_200_char_budget_truncation():
+def test_format_ta_marker_refuses_to_truncate_human_notes():
     # Long existing note that would exceed 200 chars with marker
     long_note = "A" * 195
-    formatted = format_ta_marker(long_note, "ta1", "VeryLongAssistantName")
-    assert len(formatted) <= MAX_NOTICE_LENGTH
-    assert "[BI:ta1|VeryLongAssistantName]" in formatted
-    assert formatted.endswith("[BI:ta1|VeryLongAssistantName]")
-    assert "..." in formatted
+    with pytest.raises(ValueError, match='200'):
+        format_ta_marker(long_note, 'ta1', 'VeryLongAssistantName')
+    assert long_note == 'A' * 195
 
 def test_distribute_units_more_tas_than_units():
     # 2 units, 5 TAs

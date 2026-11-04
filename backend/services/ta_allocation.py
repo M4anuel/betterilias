@@ -3,6 +3,7 @@ import json
 import re
 from typing import Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
+from backend.i18n import t
 
 # Marker protocol prefix
 MARKER_PREFIX = "[BI:"
@@ -45,7 +46,7 @@ class AllocationPreviewResponse(BaseModel):
 class ApplyAllocationRequest(BaseModel):
     exercise_ref_id: str
     ass_id: str
-    fingerprint: str
+    fingerprint: str = Field(pattern=r'^[a-f0-9]{16}$')
     items: List[Dict[str, str]] = Field(default_factory=list)  # list of {"member_id": "...", "notice": "..."}
 
 class ApplyAllocationResponse(BaseModel):
@@ -60,45 +61,49 @@ def parse_ta_marker(notice: Optional[str]) -> Tuple[Optional[str], Optional[str]
     Parses notice text for [BI:slot_id|name|ver] marker.
     Returns (ta_id, ta_name, clean_human_notice).
     """
-    if not notice:
-        return None, None, ""
-
-    # Match [BI:<slot_id>|<name>|...] or [BI:<slot_id>|<name>]
-    match = re.search(r"\[BI:([^\|\]]+)\|([^\|\]]+)(?:\|[^\]]*)?\]", notice)
-    if not match:
-        return None, None, notice.strip()
-
-    ta_id = match.group(1).strip()
-    ta_name = match.group(2).strip()
-
-    # Clean the notice by removing the marker and stripping
-    clean_notice = (notice[:match.start()] + notice[match.end():]).strip()
-    return ta_id, ta_name, clean_notice
+    return allocation_notice_parts(notice or '')
 
 def format_ta_marker(clean_notice: str, ta_id: str, ta_name: str) -> str:
     """
     Appends compact [BI:ta_id|ta_name] to the clean notice.
-    Guarantees that total length does not exceed MAX_NOTICE_LENGTH (200 chars),
-    gracefully truncating clean_notice with an ellipsis if required.
+    Refuses to discard human notes or silently alter assistant names.
     """
-    # Sanitize ta_id and ta_name to avoid delimiter issues
-    clean_id = re.sub(r"[\|\]\[]", "", ta_id).strip()
-    clean_name = re.sub(r"[\|\]\[]", "", ta_name).strip()
+    clean_id, clean_name = ta_id.strip(), ta_name.strip()
+    if (not re.fullmatch(r'[a-zA-Z0-9_-]{1,64}', clean_id) or not clean_name
+            or re.search(r'[|\[\]\r\n]', clean_name)):
+        raise ValueError(t('allocation.invalid_name'))
     marker = f"{MARKER_PREFIX}{clean_id}|{clean_name}{MARKER_SUFFIX}"
 
-    if not clean_notice:
-        return marker
+    result = f'{clean_notice} {marker}' if clean_notice else marker
+    if len(result) > MAX_NOTICE_LENGTH:
+        raise ValueError(t('allocation.notice_limit', limit=MAX_NOTICE_LENGTH))
+    return result
 
-    max_clean_len = MAX_NOTICE_LENGTH - len(marker) - 1
-    if len(clean_notice) > max_clean_len:
-        if max_clean_len > 3:
-            clean_notice = clean_notice[: max_clean_len - 3].rstrip() + "..."
-        else:
-            clean_notice = ""
 
-    if clean_notice:
-        return f"{clean_notice} {marker}"
-    return marker
+def allocation_notice_parts(notice: str) -> Tuple[Optional[str], Optional[str], str]:
+    """Remove only a recognized terminal marker and its one separator space.
+
+    Human whitespace, marker-looking text in the middle and lecturer content
+    remain byte-for-byte intact. Optional legacy version fields are recognized.
+    """
+    match = re.search(r'\[BI:([a-zA-Z0-9_-]{1,64})\|([^|\[\]\r\n]+)(?:\|[^\[\]\r\n]*)?\]\Z', notice)
+    if not match:
+        return None, None, notice
+    human = notice[:match.start()]
+    if human.endswith(' '):
+        human = human[:-1]
+    return match[1], match[2], human
+
+
+def validate_allocation_notice(previous: str, proposed: str) -> None:
+    """An allocation may replace its suffix, never edit/truncate the human note."""
+    ta_id, ta_name, human = allocation_notice_parts(proposed)
+    if ta_id is None or ta_name is None:
+        raise ValueError(t('allocation.invalid_name'))
+    if human != allocation_notice_parts(previous)[2]:
+        raise ValueError(t('allocation.note_changed'))
+    if proposed != format_ta_marker(human, ta_id, ta_name):
+        raise ValueError(t('allocation.invalid_name'))
 
 def compute_distribution_fingerprint(unit_ids: List[str], current_notices: List[str]) -> str:
     """

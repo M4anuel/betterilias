@@ -1759,6 +1759,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
         exercise_ref_id: str,
         ass_id: str,
         target_updates: List[Tuple[str, str, str, Optional[str]]],
+        expected_fingerprint: Optional[str] = None,
     ) -> Tuple[int, List[str]]:
         """
         Submits batch note updates via cmd[saveStatusAll] while echoing existing status/mark.
@@ -1767,6 +1768,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
         Returns (updated_count, list_of_errors).
         """
         from backend.services.exercise_bulk import build_bulk_note_payload
+        from backend.services.ta_allocation import compute_distribution_fingerprint, validate_allocation_notice
         self._ensure_authenticated()
 
         exercise_url = (
@@ -1779,6 +1781,23 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             resp = await client.get(exercise_url)
             self._check_response_for_session_loss(resp, exercise_url)
 
+            latest = parse_exercise_submissions(resp.text, exercise_ref_id=exercise_ref_id)
+            fingerprint = compute_distribution_fingerprint(
+                [sub.member_id for sub in latest.submissions], [sub.notice or '' for sub in latest.submissions])
+            if expected_fingerprint and fingerprint != expected_fingerprint:
+                return 0, [t('allocation.note_changed')]
+            current = {sub.member_id: sub for sub in latest.submissions}
+            refreshed_updates = []
+            for member_id, notice, _, _ in target_updates:
+                sub = current.get(str(member_id))
+                if sub is None:
+                    return 0, [t('allocation.invalid_members')]
+                try:
+                    validate_allocation_notice(sub.notice or '', notice)
+                except ValueError as exc:
+                    return 0, [str(exc)]
+                refreshed_updates.append((member_id, notice, sub.passed_status, sub.mark))
+            target_updates = refreshed_updates
             action_url, encoded_body = build_bulk_note_payload(resp.text, target_updates)
 
             # 2. Submit batch POST with form-urlencoded content bytes
@@ -1804,11 +1823,11 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                 m_str = str(member_id)
                 sub = verified_map.get(m_str)
                 if not sub:
-                    errors.append(f"Member {m_str} missing in read-back verification.")
+                    errors.append(t('allocation.member_missing', member=m_str))
                     continue
                 # Check that marker is present in the actual saved notice
-                if expected_notice and expected_notice not in (sub.notice or ""):
-                    errors.append(f"Notice for member {m_str} was not persisted correctly in ILIAS.")
+                if expected_notice != (sub.notice or ""):
+                    errors.append(t('allocation.not_persisted', member=m_str))
                 else:
                     verified_count += 1
 
