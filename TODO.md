@@ -30,9 +30,14 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 - [ ] Build an authenticated admin dashboard with separate administrator
   authorization, health/worker/queue metrics, sanitized error reports and audit
   records; keep raw student pages and credentials out of public diagnostics.
-- [ ] Add shared outbound request budgets, per-user fairness, GET coalescing,
-  429/Retry-After handling, and representative 10/25/50/100-active-user load tests.
-  Confirm aggregated traffic expectations with university ILIAS support.
+- [x] Add shared outbound request budgets, native-session fairness, allowlisted
+  in-worker GET coalescing, 429/Retry-After handling and offline multi-process
+  10/25/50/100-user load scenarios. See [traffic controls, measurements and
+  limitations](docs/OUTBOUND_TRAFFIC.md).
+- [ ] Confirm aggregated traffic expectations with university ILIAS support and
+  validate configured limits/latency on the intended VPS before broad rollout.
+- [ ] Audit and restrict user-controlled download/PDF targets and redirect chains
+  against SSRF and cross-origin cookie forwarding before public hosting.
 - [ ] Before multi-VPS scaling, migrate persistent data and coordination to
   networked database/object storage and a coordinator such as Redis. Current
   shared local filesystem locks support multiple containers on one VPS only.
