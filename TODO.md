@@ -41,6 +41,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Teaching-assistant work distribution
 
+- [x] Prevent submission action parsing from borrowing a later participant's
+  download URL across feedback/modal handlers; reproduce incorrect submitted
+  counts and downloads with German/English ILIAS and app language combinations.
+
 - [ ] Finish the reviewed [TA work distribution, downloads and feedback-return plan](docs/TA_WORK_DISTRIBUTION_PLAN.md); core phases are implemented, with remaining plan differences below:
   - [x] Phase 0 & Phase 1: Shared allocations via [BI:<ta_id>|<ta_name>] markers and native saveStatusAll batch updates (backend/services/ta_allocation.py, DistributeWorkModal.tsx).
   - [x] Phase 2: TA and bulk submission downloads with live progress, ZIP streaming, and betterilias-feedback.json round-trip manifest templates.
