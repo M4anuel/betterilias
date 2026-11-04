@@ -550,15 +550,10 @@ def test_video_stream_info_endpoint():
 
 def test_pdf_info_endpoint():
     mock_pdf_bytes = b"%PDF-1.4\n1 0 obj\n<< /Type /Pages /Count 1 >>\nendobj\n2 0 obj\n<< /Type /Page /MediaBox [ 0 0 842 595 ] >>\nendobj\n%%EOF"
-    mock_resp = MagicMock()
-    mock_resp.content = mock_pdf_bytes
-    mock_resp.status_code = 200
-
-    mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=mock_resp)
-
     with patch("backend.auth.session.SessionManager.get_http_client") as mock_cm:
-        mock_cm.return_value.__aenter__.return_value = mock_client
+        import httpx
+        mock_cm.side_effect = lambda: httpx.AsyncClient(transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, content=mock_pdf_bytes)))
         res = client.get("/api/pdf/info?url=https%3A%2F%2Filias.unibe.ch%2Ftest.pdf")
         assert res.status_code == 200
         data = res.json()

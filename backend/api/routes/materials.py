@@ -1,4 +1,5 @@
 from backend.outbound_budget import OutboundUnavailable
+from backend.outbound_targets import OutboundTargetRejected, TargetPolicy, RESOURCE_READ
 from backend.i18n import t
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status, File, Form, UploadFile
 import re, logging
@@ -214,7 +215,7 @@ async def download_material_file(
             status_code=status_code,
             headers=headers
         )
-    except OutboundUnavailable:
+    except (OutboundUnavailable, OutboundTargetRejected):
         raise
     except Exception as e:
         raise HTTPException(
@@ -231,17 +232,25 @@ async def get_pdf_info(
     Fetch PDF metadata (MediaBox, Rotate, Count) to determine exact aspect ratio
     and page count so embedded course PDFs fit any aspect ratio without letterboxing.
     """
-    full_url = url.split("#")[0]
-    if not full_url.startswith("http"):
-        full_url = f"https://ilias.unibe.ch/{full_url.lstrip('/')}"
+    full_url = TargetPolicy().resource_url(url)
 
     try:
         async with client.session_manager.get_http_client() as http:
-            resp = await http.get(full_url, headers={"Range": "bytes=0-32767"}, follow_redirects=True)
-            content = resp.content
+            async def prefix(headers=None):
+                chunks, size = [], 0
+                async with http.stream('GET', full_url, headers=headers, follow_redirects=True,
+                                       extensions={RESOURCE_READ: True}) as resp:
+                    resp.raise_for_status()
+                    async for chunk in resp.aiter_bytes(chunk_size=32768):
+                        part = chunk[:262144 - size]
+                        chunks.append(part)
+                        size += len(part)
+                        if size >= 262144:
+                            break
+                return b''.join(chunks)
+            content = await prefix({"Range": "bytes=0-32767"})
             if b"/MediaBox" not in content and len(content) < 131072:
-                resp = await http.get(full_url, follow_redirects=True)
-                content = resp.content[:262144]
+                content = await prefix()
 
             mb = re.search(rb'/MediaBox\s*\[\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*\]', content)
             if not mb:
@@ -265,7 +274,7 @@ async def get_pdf_info(
                         aspect_ratio=round(w / h, 4),
                         pages=pages
                     )
-    except OutboundUnavailable:
+    except (OutboundUnavailable, OutboundTargetRejected):
         raise
     except Exception as e:
         logger.warning(f"Failed to inspect PDF dimensions for {url}: {e}")

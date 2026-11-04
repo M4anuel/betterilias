@@ -15,6 +15,7 @@ from backend.config import settings
 from backend.coordination import coordinated, atomic_json
 from backend.outbound_http import BudgetTransport
 from backend.outbound_budget import OutboundUnavailable
+from backend.outbound_targets import OutboundTargetRejected
 
 logger = logging.getLogger("ilias.auth")
 
@@ -163,10 +164,13 @@ class SessionManager:
             k: v for k, v in raw_cookies.items()
             if isinstance(k, str) and not any(c in k for c in ('{', '}', '|', '[', ']', '(', ')', '<', '>', '@', ',', ';', ':', '\\', '"', '/', '?', '='))
         }
+        scoped_cookies = httpx.Cookies()
+        for name, value in cookies.items():
+            scoped_cookies.set(name, value, domain=httpx.URL(settings.ilias_base_url).host, path='/')
         return httpx.AsyncClient(
             transport=BudgetTransport('native:' + raw_cookies.get('PHPSESSID', self.session_id)),
             base_url=settings.ilias_base_url,
-            cookies=cookies,
+            cookies=scoped_cookies,
             headers=headers,
             timeout=settings.http_timeout_seconds,
             follow_redirects=True,
@@ -264,21 +268,16 @@ class SessionManager:
 
                 return False, t('ILIAS Dashboard-Struktur konnte nicht verifiziert werden.')
 
-            except OutboundUnavailable:
-                # Queue pressure/rate limiting is not proof of authentication.
-                # In particular, do not accept new cookies through the legacy
-                # network-latency fallback below.
+            except (OutboundUnavailable, OutboundTargetRejected, httpx.NetworkError, httpx.TimeoutException):
+                # Neither network failures nor cookie names prove authentication.
+                # Preserve existing credentials and surface a retryable error;
+                # incoming cookies still need a positive authenticated response.
                 raise
             except Exception as e:
                 err_msg = str(e).strip()
                 if isinstance(e, httpx.TimeoutException) or not err_msg:
                     err_msg = t('Zeitüberschreitung bei der Verbindung zu ilias.unibe.ch. Der Server antwortet verzögert.')
                 logger.error(f"Error verifying ILIAS session: {err_msg}")
-                cookies = self.load_cookies()
-                has_shib = any(k.startswith('_shibsession_') for k in cookies)
-                if cookies.get('PHPSESSID') and has_shib:
-                    logger.info("Session contains active SWITCH edu-ID cookies despite network latency. Accepting session.")
-                    return True, t("Angemeldet")
                 return False, t('Verifizierung fehlgeschlagen: {p0}', p0=err_msg)
 
 
