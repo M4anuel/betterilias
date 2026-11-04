@@ -45,9 +45,9 @@ def test_busy_submissions_keep_session_and_retry(local_site, width, height, lang
         alert.scroll_into_view_if_needed()
         retry = alert.get_by_role('button', name=tr('Erneut versuchen'), exact=True)
         pw.expect(retry).to_be_in_viewport()
+        page.screenshot(path=str(artifacts / f'busy-{width}-{language}.png'))
         assert_no_overflow(page)
         assert False not in page.evaluate('authEvents')
-        page.screenshot(path=str(artifacts / f'busy-{width}-{language}.png'))
         failing[0] = False
         retry.focus()
         page.keyboard.press('Enter')
