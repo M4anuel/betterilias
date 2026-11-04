@@ -1656,5 +1656,6 @@
   "allocation.assistant_name": "Name von Tutor {number}",
   "allocation.remove_assistant": "Tutor {name} entfernen",
   "allocation.member_missing": "Teilnehmer {member} fehlte beim Prüfen der gespeicherten Verteilung. Lade die Abgaben neu.",
-  "allocation.not_persisted": "Die Zuweisungsnotiz für Teilnehmer {member} konnte in ILIAS nicht bestätigt werden. Lade die Abgaben vor einem erneuten Versuch neu."
+  "allocation.not_persisted": "Die Zuweisungsnotiz für Teilnehmer {member} konnte in ILIAS nicht bestätigt werden. Lade die Abgaben vor einem erneuten Versuch neu.",
+  "outbound.target_blocked": "Dieser Link kann nicht sicher über BetterIlias abgerufen werden. Öffne ihn direkt in ILIAS oder verbinde deine ILIAS-Sitzung erneut."
 }

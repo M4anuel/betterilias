@@ -159,10 +159,11 @@ Before a broad rollout, agree an aggregate traffic budget with university ILIAS
 support and validate it on the intended VPS. Add production domain/extension
 permissions, same-origin HTTPS, persistent data mounts, tested backup/restore,
 deployment smoke checks and separate administrator authentication/monitoring.
-Also audit every user-controlled fetch target and redirect for SSRF and cookie
-forwarding: the general material download/PDF routes accept URLs, while some
-newer membership/player flows already perform origin checks. Traffic budgets
-bound request volume; they do not authorize arbitrary egress targets.
+The separate [outbound target policy](OUTBOUND_TARGET_SECURITY.md) now restricts
+fetch origins/redirects, public TCP destinations and external credential forwarding.
+It also constrains the material download/PDF proxies and bounds PDF probes.
+Validate the exact media origins and native links used by the deployment in
+staging. Traffic budgets bound volume; the target policy authorizes destinations.
 
 For the missing course-management write adapters, capture sanitized native forms
 and confirmation/results for exercise-container creation, weblink/item-group

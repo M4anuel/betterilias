@@ -36,8 +36,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   limitations](docs/OUTBOUND_TRAFFIC.md).
 - [ ] Confirm aggregated traffic expectations with university ILIAS support and
   validate configured limits/latency on the intended VPS before broad rollout.
-- [ ] Audit and restrict user-controlled download/PDF targets and redirect chains
-  against SSRF and cross-origin cookie forwarding before public hosting.
+- [x] Restrict server-side targets and redirect hops to configured origins, pin
+  public DNS answers at connection time, strip external credentials/cookies,
+  constrain resource-proxy commands and bound PDF probes. See
+  [target security and deployment limitations](docs/OUTBOUND_TARGET_SECURITY.md).
 - [ ] Before multi-VPS scaling, migrate persistent data and coordination to
   networked database/object storage and a coordinator such as Redis. Current
   shared local filesystem locks support multiple containers on one VPS only.

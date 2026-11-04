@@ -17,6 +17,7 @@ import httpx
 
 from backend.config import settings
 from backend.outbound_budget import OutboundBudget, OutboundUnavailable
+from backend.outbound_network import EgressTransport
 
 
 def safe_read(request):
@@ -120,7 +121,7 @@ _flights = weakref.WeakKeyDictionary()
 class BudgetTransport(httpx.AsyncBaseTransport):
     def __init__(self, identity, *, inner=None, budget=None, retries=None, max_bytes=None):
         self.identity = identity
-        self.inner = inner or httpx.AsyncHTTPTransport(retries=0)
+        self.inner = inner or EgressTransport()
         self.budget = budget or OutboundBudget()
         self.retries = settings.outbound_read_retries if retries is None else retries
         self.max_bytes = settings.outbound_coalesce_max_bytes if max_bytes is None else max_bytes
@@ -175,6 +176,8 @@ class BudgetTransport(httpx.AsyncBaseTransport):
                              if key in ('http_version', 'reason_phrase')})
 
     async def handle_async_request(self, request):
+        if hasattr(self.inner, 'prepare_request'):
+            self.inner.prepare_request(request)
         readonly = safe_read(request)
         if not readonly or not self.max_bytes:
             return await self._send(request, readonly)

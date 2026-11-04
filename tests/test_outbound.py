@@ -352,7 +352,8 @@ async def test_actual_session_clients_use_budget_for_redirect_hops(tmp_path, mon
         if len(calls) == 1:
             return httpx.Response(302, headers={'Location': READ})
         return httpx.Response(200, text='ok', headers={'Content-Type': 'text/html'})
-    monkeypatch.setattr(httpx, 'AsyncHTTPTransport', lambda **kwargs: httpx.MockTransport(respond))
+    from backend.outbound_network import EgressTransport
+    monkeypatch.setattr('backend.outbound_http.EgressTransport', lambda: EgressTransport(inner=httpx.MockTransport(respond)))
     manager = SessionManager('alice')
     monkeypatch.setattr(manager, 'load_cookies', lambda: {'PHPSESSID': 'private-session'})
     monkeypatch.setattr(manager, 'load_metadata', lambda: {})
