@@ -1443,7 +1443,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   }, [taSubmissionsData?.submissions]);
 
   const advancedGradingFilters = (
-    <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+    <div className="flex min-w-0 max-w-full items-center gap-2.5 flex-wrap">
       {/* Submission Radio Group */}
       <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs shrink-0">
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline whitespace-nowrap shrink-0">
@@ -1703,7 +1703,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             <span>{t("Informationen")}</span>
           </button>
 
-          {/* Tutor Abgaben & Noten Tab: ONLY shown if tutor access is detected! */}
+          {/* Tutor Abgaben & NotenTab: ONLY shown if tutor access is detected! */}
           {overviewData?.has_ta_access && (
             <button
               type="button"
@@ -1715,7 +1715,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               }`}
             >
               <Award className="h-3.5 w-3.5" />
-              <span>{t("Abgaben & Noten (Tutor)")}</span>
+              <span>{t("Abgaben & Noten")}</span>
             </button>
           )}
         </div>
@@ -2119,7 +2119,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               </div>
 
               {/* Advanced Filters: Submission Radio toggle + Grade Multi-select + Tutor */}
-              <div className="desktop-only flex items-center gap-2.5 flex-wrap shrink-0">{advancedGradingFilters}</div>
+              <div className="desktop-only flex min-w-0 max-w-full items-center gap-2.5 flex-wrap">{advancedGradingFilters}</div>
             </div>
 
             {/* Right: Search, Sorting Indicator & Action Buttons (reorganized on top of / below each other) */}
@@ -2866,6 +2866,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       {/* Distribute Work Modal */}
       {(selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
         <DistributeWorkModal
+          courseRefId={courseRefId}
           isOpen={isDistributeModalOpen}
           onClose={() => setIsDistributeModalOpen(false)}
           exerciseRefId={exerciseRefId}

@@ -2,6 +2,13 @@
 
 Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzung (via SWITCH edu-ID) in Mozilla Firefox mit nur einem Klick sicher an BetterIlias zu übermitteln.
 
+Das Backend ersetzt gespeicherte Zugangsdaten erst nach einer erfolgreichen
+Prüfung bei ILIAS. Netzwerkfehler, Zeitüberschreitungen oder begrenzte Anfragen
+sind kein Nachweis einer abgelaufenen Sitzung: Die Erweiterung behält die
+gespeicherte Verbindungskennung und erlaubt einen erneuten Versuch. Vorhandene
+Cookies allein gelten nicht als erfolgreiche Anmeldung. Der Backend-Transport
+sendet ILIAS-Cookies ausschliesslich an die konfigurierte ILIAS-Instanz.
+
 ---
 
 ## 🚀 Installation in Mozilla Firefox

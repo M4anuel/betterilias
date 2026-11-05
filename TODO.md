@@ -30,9 +30,16 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 - [ ] Build an authenticated admin dashboard with separate administrator
   authorization, health/worker/queue metrics, sanitized error reports and audit
   records; keep raw student pages and credentials out of public diagnostics.
-- [ ] Add shared outbound request budgets, per-user fairness, GET coalescing,
-  429/Retry-After handling, and representative 10/25/50/100-active-user load tests.
-  Confirm aggregated traffic expectations with university ILIAS support.
+- [x] Add shared outbound request budgets, native-session fairness, allowlisted
+  in-worker GET coalescing, 429/Retry-After handling and offline multi-process
+  10/25/50/100-user load scenarios. See [traffic controls, measurements and
+  limitations](docs/OUTBOUND_TRAFFIC.md).
+- [ ] Confirm aggregated traffic expectations with university ILIAS support and
+  validate configured limits/latency on the intended VPS before broad rollout.
+- [x] Restrict server-side targets and redirect hops to configured origins, pin
+  public DNS answers at connection time, strip external credentials/cookies,
+  constrain resource-proxy commands and bound PDF probes. See
+  [target security and deployment limitations](docs/OUTBOUND_TARGET_SECURITY.md).
 - [ ] Before multi-VPS scaling, migrate persistent data and coordination to
   networked database/object storage and a coordinator such as Redis. Current
   shared local filesystem locks support multiple containers on one VPS only.
@@ -50,8 +57,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   - [x] Phase 2: TA and bulk submission downloads with live progress, ZIP streaming, and betterilias-feedback.json round-trip manifest templates.
   - [x] Phase 3: Reviewed feedback return with safe preflight ZIP/folder inspection, mapping preview, conflict detection/resolution, and authenticated publication (backend/services/feedback_import.py, ReturnFeedbackModal.tsx).
   - [x] Phase 4: Hardening (200-char note budget guard, fingerprint concurrency verification, zero-work TA quotas), unmatched-files manual mapping resolver with searchable recipient combobox and portal popover, on-demand overwrite file deletion, and allocation CSV export.
-  - [ ] Persist assistant count/names/priority per session and lecture; the current dialog starts with two assistant slots.
-  - [ ] Refuse or explicitly preview/confirm tutor-note truncation when allocation markers exceed the available 200-character budget; current formatting can shorten existing note text.
+  - [x] Persist assistant count/names/priority per session and lecture, with an
+    exercise-scoped fallback and stable slot IDs on this device.
+  - [x] Refuse allocations exceeding the 200-character tutor-note budget in the
+    preview and server; preserve human note text and recheck fresh native state.
 
 ## Calendar and timetable
 

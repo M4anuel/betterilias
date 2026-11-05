@@ -13,6 +13,8 @@ from backend.services.ilias_client import SessionExpiredError
 from backend.services.submission_listing import SubmissionListingError
 from backend.i18n import LanguageMiddleware, t
 from backend.coordination import CoordinationBusy
+from backend.outbound_budget import OutboundUnavailable
+from backend.outbound_targets import OutboundTargetRejected
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,6 +31,20 @@ app = FastAPI(
     openapi_url='/openapi.json' if settings.app_env == 'development' else None,
 )
 app.add_middleware(LanguageMiddleware)
+
+
+@app.exception_handler(OutboundTargetRejected)
+async def outbound_target_rejected_handler(request: Request, exc: OutboundTargetRejected):
+    return JSONResponse(status_code=400, content={'detail': t('outbound.target_blocked'), 'code': 'OUTBOUND_TARGET_BLOCKED'},
+                        headers={'Cache-Control': 'no-store'})
+
+
+@app.exception_handler(OutboundUnavailable)
+async def outbound_unavailable_handler(request: Request, exc: OutboundUnavailable):
+    return JSONResponse(status_code=503,
+        content={'detail': t('outbound.write_uncertain') if exc.write_uncertain or request.method not in ('GET', 'HEAD', 'OPTIONS') else t('outbound.busy'),
+                 'code': 'ILIAS_BUSY'},
+        headers={'Retry-After': str(exc.retry_after), 'Cache-Control': 'no-store'})
 
 
 @app.exception_handler(CoordinationBusy)

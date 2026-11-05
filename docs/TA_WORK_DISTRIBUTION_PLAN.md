@@ -12,13 +12,17 @@ as a checklist of shipped behavior. Live ILIAS acceptance remains separate.
 - `DistributeWorkModal` groups teams into correction units, supports native order,
   team number, submission time and seeded random allocation, and distributes
   remainders by an editable assistant priority. Names and counts are editable;
-  the current dialog starts with two TAs. Lecture/session-scoped persistence of
-  these defaults is still pending.
+  new scopes start with two TAs. Assistant names/count/priority and the next slot
+  ID persist on this device per BetterIlias session and lecture, with a separate
+  exercise fallback when no course context exists. They never publish a native
+  allocation automatically, and an open editor keeps its draft across rerenders.
 - Per-member tutor notes carry compact `[BI:<ta_id>|<ta_name>]` markers. Native
   `saveStatusAll` batches preserve unrelated grade/status fields and support
   fingerprint conflict checks and read-back verification. The 200-character note
-  budget is enforced, but current formatting may shorten existing note text;
-  refusing or explicitly reviewing that truncation remains a follow-up.
+  budget now refuses oversized allocations without truncation. Only a recognized
+  terminal marker can be replaced; human text and whitespace remain unchanged.
+  The API requires the snapshot fingerprint, rejects unknown/duplicate targets,
+  and rechecks the native form before posting while echoing its fresh grades.
 - Assignment/unassigned/TA ZIP bundles have live byte-progress feedback and include
   a `betterilias-feedback.json` manifest and `feedback/team-<id>/` or
   `feedback/user-<id>/` recipient folders. This is a BetterIlias bundle workflow, not a claim

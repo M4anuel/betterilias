@@ -34,16 +34,18 @@ def _owner():
 
 
 class SharedLock:
-    def __init__(self, key, timeout=60):
+    def __init__(self, key, timeout=60, directory=None):
         self.key = hashlib.sha256(str(key).encode()).hexdigest()
         self.timeout, self.file = timeout, None
+        self.directory = directory
 
     def acquire(self):
         if _held.get().get(self.key) == _owner():
             return True
-        settings.coordination_path.mkdir(parents=True, exist_ok=True)
+        directory = self.directory or settings.coordination_path
+        directory.mkdir(parents=True, exist_ok=True)
         if self.file is None:
-            self.file = open(settings.coordination_path / (self.key + '.lock'), 'a+b')
+            self.file = open(directory / (self.key + '.lock'), 'a+b')
             # Windows also denies reads of a byte locked by another handle.
             # Inspect file size without reading the locked region.
             if os.fstat(self.file.fileno()).st_size == 0:

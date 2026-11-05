@@ -74,8 +74,8 @@ def test_parse_exercise_submissions_includes_evaluation_by_file_url():
 
 @pytest.mark.asyncio
 async def test_upload_submission_feedback_file_flow():
-    client = IliasClient()
-    client.is_authenticated = True
+    client = IliasClient(manager=MagicMock())
+    client.session_manager.has_cookies.return_value = True
 
     page_html = read_fixture("upload_1.html")
     uploaded_html = read_fixture("uploaded_now_remove.html")
@@ -123,8 +123,8 @@ async def test_upload_submission_feedback_file_flow():
 
 @pytest.mark.asyncio
 async def test_delete_submission_feedback_file_flow():
-    client = IliasClient()
-    client.is_authenticated = True
+    client = IliasClient(manager=MagicMock())
+    client.session_manager.has_cookies.return_value = True
 
     uploaded_html = read_fixture("uploaded_now_remove.html")
     empty_html = read_fixture("upload_1.html")

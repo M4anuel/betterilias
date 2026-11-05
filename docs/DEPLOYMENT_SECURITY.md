@@ -117,11 +117,18 @@ published universal requests/minute allowance and does not reveal Bern's setting
 Ask Bern's [ILIAS support](https://teachinghub.unibe.ch/journey_der_lehre/tools/ilias/index_ger.html)
 about expected aggregated traffic and supported integration before a broad rollout.
 
-Before load testing or public release, implement shared outbound concurrency/rate
-budgets, per-tenant fairness, GET coalescing, and 429/Retry-After backoff with jitter.
-Do not automatically replay writes or treat every 403 as rate limiting. Measure
-native requests per user workflow (especially bulk TA jobs), not only inbound
-API requests. Existing view locks limit conflicting state operations, not total
-request rate. Additional backends behind the same egress IP do not increase an
-upstream per-IP allowance. Video media commonly streams directly from Opencast;
-not all bytes pass through this VPS.
+Shared outbound concurrency/rate budgets, native-session fairness, allowlisted
+in-worker GET coalescing and 429/503 Retry-After handling are implemented. See
+[configuration, offline load measurements and limitations](OUTBOUND_TRAFFIC.md).
+The defaults are conservative application settings, not a verified university
+allowance or proof of 100-user production capacity. Writes are not replayed and
+403 is not treated as rate limiting. Measure native requests per user workflow
+(especially bulk TA jobs), not only inbound API requests. Existing view locks
+still serve a separate purpose from the outbound budget. Additional backends
+behind the same egress IP do not increase an upstream per-IP allowance. Video
+media commonly streams directly from Opencast; not all bytes pass through this
+VPS. Exact outbound origins, per-connection public-address pinning, external
+credential/cookie isolation and resource-proxy restrictions are implemented in
+the separate [outbound target policy](OUTBOUND_TARGET_SECURITY.md). Validate the
+installation's actual media origins and authenticated download/expiry flows in
+staging before rollout; traffic volume control alone is not target authorization.
