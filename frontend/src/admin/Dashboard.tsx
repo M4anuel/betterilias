@@ -22,20 +22,33 @@ export function AdminDashboard() {
   const [key, setKey] = useState('');
   const [signingIn, setSigningIn] = useState(false);
   const password = useRef<HTMLInputElement>(null);
+  const authVersion = useRef(0);
   const authenticated = !!session?.authenticated;
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const update = () => { theme.applyTheme(); setDark(theme.isDarkEffective()); };
+    media.addEventListener('change', update);
+    window.addEventListener('storage', update);
+    return () => { media.removeEventListener('change', update); window.removeEventListener('storage', update); };
+  }, []);
   useEffect(() => { document.title = `${t('admin.title')} · BetterIlias`; }, [language]);
   const check = useCallback(async () => {
+    const current = ++authVersion.current;
     setChecking(true); setError(''); setDisabled(false);
-    try { setSession(await adminRequest<AdminSession>('session')); }
+    try {
+      const result = await adminRequest<AdminSession>('session');
+      if (current === authVersion.current) setSession(result);
+    }
     catch (err) {
+      if (current !== authVersion.current) return;
       if (err instanceof AdminError && err.status === 404) setDisabled(true);
       else setError('admin.unavailable');
-    } finally { setChecking(false); }
+    } finally { if (current === authVersion.current) setChecking(false); }
   }, []);
-  useEffect(() => { void check(); }, [check]);
+  useEffect(() => { void check(); return () => { ++authVersion.current; }; }, [check]);
   useEffect(() => {
     if (!authenticated || !session?.expires_at) return;
-    const timer = window.setTimeout(() => { setSession(null); setError('admin.expired'); },
+    const timer = window.setTimeout(() => { ++authVersion.current; setSession(null); setError('admin.expired'); },
       Math.max(0, session.expires_at * 1000 - Date.now()));
     return () => window.clearTimeout(timer);
   }, [authenticated, session?.expires_at]);
@@ -45,6 +58,7 @@ export function AdminDashboard() {
     event.preventDefault();
     if (!key || signingIn) return;
     const body = JSON.stringify({ key });
+    ++authVersion.current;
     setKey(''); setError(''); setSigningIn(true);
     try { setSession(await adminRequest<AdminSession>('session', { method: 'POST', body })); }
     catch (err) {
@@ -54,10 +68,11 @@ export function AdminDashboard() {
     } finally { setSigningIn(false); }
   }
   async function logout() {
+    ++authVersion.current;
     try { await adminRequest('session', { method: 'DELETE' }); setSession(null); setError(''); }
     catch { setError('admin.logout_failed'); }
   }
-  const expired = useCallback(() => { setSession(null); setError('admin.expired'); }, []);
+  const expired = useCallback(() => { ++authVersion.current; setSession(null); setError('admin.expired'); }, []);
 
   return <div className="admin-shell">
     <a className="admin-skip" href="#admin-main">{t('admin.skip')}</a>
@@ -65,9 +80,9 @@ export function AdminDashboard() {
       <a href="/" className="admin-brand" aria-label={t('admin.back_app')}><span>Better</span><span>Ilias</span></a>
       <span className="admin-header-label"><ShieldCheck size={16} aria-hidden="true" />{t('admin.title')}</span>
       <div className="admin-header-actions">
-        <label className="admin-language"><span className="sr-only">{t('admin.language')}</span>
-          <select value={language} onChange={e => setLanguage(e.target.value)}>{Object.entries(languages).map(([code, item]) => <option key={code} value={code}>{item.name}</option>)}</select>
-        </label>
+        <div className="admin-language"><label htmlFor="admin-language" className="sr-only">{t('admin.language')}</label>
+          <select id="admin-language" value={language} onChange={e => setLanguage(e.target.value)}>{Object.entries(languages).map(([code, item]) => <option key={code} value={code}>{item.name}</option>)}</select>
+        </div>
         <button type="button" className="admin-icon-button" aria-label={t(dark ? 'admin.light' : 'admin.dark')} onClick={() => { theme.setThemeMode(dark ? 'light' : 'dark'); setDark(!dark); }}>{dark ? <Sun size={20} /> : <Moon size={20} />}</button>
         {authenticated && <button type="button" className="admin-button admin-logout" aria-label={t('admin.logout')} onClick={() => void logout()}><LogOut size={17} aria-hidden="true" /><span>{t('admin.logout')}</span></button>}
       </div>

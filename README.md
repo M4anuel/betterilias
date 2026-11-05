@@ -189,3 +189,8 @@ metadata-only by default; raw HTML needs explicit development opt-in and has
 bounded retention. The `/api/system/logs` viewer is development-only. Capture
 de-identified evidence and add a regression instead of guessing a native form or
 treating an unverified write as successful.
+
+Server operators can use the separate [administrator dashboard](docs/ADMIN_DASHBOARD.md)
+at `/admin/` after configuring its independent administrator key. It shows
+sanitized diagnostic events and operational metrics using short-lived admin
+sessions, separate from student authentication.

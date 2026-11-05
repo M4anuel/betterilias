@@ -72,6 +72,7 @@ last successful write and maximum retention apply to the responding worker.
 Outbound admission counters are shared aggregates since the budget database was
 created. Mean request duration comes from retained API events. These figures do
 not prove the service or university is reachable, or represent lifetime totals.
+Retained API request figures also include the dashboard's own diagnostic reads.
 
 Events are newest-first with category/code filters and cursor pagination.
 Expandable rows show only safe, known fields: request/operation/worker IDs,
@@ -104,9 +105,10 @@ refresh with mocked diagnostics across 320, 390, 430,
 are saved under `scratch/admin-dashboard-review` for visual inspection. These are
 emulated browser checks, not live ILIAS or physical iOS/Android validation.
 
-Verification on 5 November 2026: **571 backend tests passed, 341 skipped**;
+Verification on 5 November 2026, combined with the landing-page integration:
+**571 backend tests passed, 349 skipped**;
 **20 admin browser regressions passed**; production multi-page build and locale
-validation (**1,781 keys**) passed. Screenshots were visually reviewed for phone,
+validation (**1,876 keys**) passed. Screenshots were visually reviewed for phone,
 tablet and desktop density, wrapping, alignment and dark/light contrast; this
 caught and corrected a German tablet refresh-button wrap. Existing dependency
 deprecation and bundle-size warnings remain.

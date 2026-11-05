@@ -462,6 +462,37 @@ export const cache = {
   },
 
   // --- Semester Courses Cache ---
+  hasCachedSemesterData(): boolean {
+    try {
+      if (localStorage.getItem('betterilias_visited') === 'true') {
+        return true;
+      }
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('ilias_semester_cache_')) {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const data = JSON.parse(raw);
+            if (data?.courses && Array.isArray(data.courses) && data.courses.length > 0) {
+              return true;
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  },
+
+  markVisited() {
+    try {
+      localStorage.setItem('betterilias_visited', 'true');
+    } catch {
+      // ignore
+    }
+  },
+
   getCachedSemester(semId: string): SemesterScreenResponse | null {
     try {
       const raw = localStorage.getItem(`ilias_semester_cache_${semId}`);
