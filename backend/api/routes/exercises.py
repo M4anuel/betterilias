@@ -460,7 +460,9 @@ async def apply_ta_allocation(
     while preserving existing marks and grades.
     Validates fingerprint to detect concurrent tutor modifications.
     """
-    from backend.services.ta_allocation import ApplyAllocationResponse, compute_distribution_fingerprint
+    from backend.services.ta_allocation import ApplyAllocationResponse, compute_distribution_fingerprint, validate_allocation_notice
+    if req.exercise_ref_id != exercise_id or req.ass_id != ass_id:
+        raise HTTPException(400, detail=t('allocation.invalid_context'))
     # Fetch current fresh submissions from ILIAS
     subs_resp = await client.get_exercise_submissions(ref_id=exercise_id, ass_id=ass_id)
     sub_map = {s.member_id: s for s in subs_resp.submissions}
@@ -470,31 +472,38 @@ async def apply_ta_allocation(
     current_notices = [s.notice or "" for s in subs_resp.submissions]
     server_fp = compute_distribution_fingerprint(current_unit_ids, current_notices)
 
-    if req.fingerprint and req.fingerprint != server_fp:
+    if req.fingerprint != server_fp:
         return ApplyAllocationResponse(
             success=False,
             updated_count=0,
             failed_count=len(req.items),
             message=t("Die Abgaben oder Notizen wurden zwischenzeitlich geändert. Bitte laden Sie die Vorschau neu."),
-            errors=["Conflict: Fingerprint mismatch. Notes or submissions changed concurrently."],
+            errors=[t("Die Abgaben oder Notizen wurden zwischenzeitlich geändert. Bitte laden Sie die Vorschau neu.")],
         )
 
     target_updates = []
+    seen_members = set()
     for item in req.items:
         m_id = item.get("member_id")
         notice = item.get("notice", "")
-        if not m_id or m_id not in sub_map:
-            continue
+        if not m_id or m_id not in sub_map or m_id in seen_members or not m_id.isdecimal():
+            raise HTTPException(400, detail=t('allocation.invalid_members'))
+        seen_members.add(m_id)
         sub = sub_map[m_id]
+        try:
+            validate_allocation_notice(sub.notice or '', notice)
+        except ValueError as exc:
+            raise HTTPException(409, detail=str(exc)) from exc
         target_updates.append((m_id, notice, sub.passed_status or "not_graded", sub.mark))
 
     if not target_updates:
-        return ApplyAllocationResponse(success=True, updated_count=0, failed_count=0, message="No updates needed.")
+        return ApplyAllocationResponse(success=True, updated_count=0, failed_count=0, message=t('allocation.no_updates'))
 
     updated_count, errors = await client.apply_ta_allocation_batch(
         exercise_ref_id=exercise_id,
         ass_id=ass_id,
         target_updates=target_updates,
+        expected_fingerprint=server_fp,
     )
 
     if errors:

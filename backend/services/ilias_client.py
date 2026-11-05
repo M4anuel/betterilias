@@ -1,4 +1,5 @@
 from backend.outbound_budget import OutboundUnavailable
+from backend.outbound_targets import OutboundTargetRejected, TargetPolicy, RESOURCE_READ
 from backend.coordination import SharedLock, coordinated
 import asyncio
 from backend.i18n import t
@@ -341,7 +342,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                         course_title=parsed.title,
                         client=self,
                     )
-                except OutboundUnavailable:
+                except (OutboundUnavailable, OutboundTargetRejected):
                     raise
                 except Exception as cal_err:
                     logger.debug(f"Opportunistic calendar ingest skipped for {ref_id}: {cal_err}")
@@ -364,11 +365,10 @@ class IliasClient(AuthoringMixin, ManagementMixin):
         if track < 0 or track >= len(captions):
             raise HTTPException(404, t('player.no_captions'))
         caption = captions[track]
-        target = urllib.parse.urlparse(caption['url'])
-        base = urllib.parse.urlparse(settings.ilias_base_url)
-        trusted = target.hostname == base.hostname or target.hostname == 'opencast.unibe.ch' or (target.hostname or '').endswith('.opencast.unibe.ch')
-        if not trusted or target.scheme != 'https' or target.port not in (None, 443):
-            raise HTTPException(400, t('player.captions_failed'))
+        try:
+            TargetPolicy().validate_url(caption['url'])
+        except OutboundTargetRejected as exc:
+            raise HTTPException(400, t('player.captions_failed')) from exc
         async with self.session_manager.get_http_client() as client:
             async with client.stream('GET', caption['url'], follow_redirects=False) as response:
                 if response.status_code in (401, 403):
@@ -545,7 +545,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                     parsed = parse_course_materials(resp.text, container_ref_id=session_ref_id)
                     if parsed.items:
                         return parsed.items
-                except OutboundUnavailable:
+                except (OutboundUnavailable, OutboundTargetRejected):
                     raise
                 except Exception:
                     continue
@@ -591,7 +591,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                             if ep.id not in seen_ids:
                                 all_episodes.append(ep)
                                 seen_ids.add(ep.id)
-                    except OutboundUnavailable:
+                    except (OutboundUnavailable, OutboundTargetRejected):
                         raise
                     except Exception as e:
                         logger.warning(f"Error fetching podcast page {page_url}: {e}")
@@ -743,7 +743,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                             detail.team_members = [m.login for m in team_screen.members]
                 except SessionExpiredError:
                     raise
-                except OutboundUnavailable:
+                except (OutboundUnavailable, OutboundTargetRejected):
                     raise
                 except Exception as te:
                     logger.debug(f"Could not fetch team management screen for {ref_id}/{ass_id}: {te}")
@@ -781,7 +781,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                             detail.last_submission = last_sub
             except SessionExpiredError:
                 raise
-            except OutboundUnavailable:
+            except (OutboundUnavailable, OutboundTargetRejected):
                 raise
             except Exception as e:
                 logger.debug(f"Could not fetch student submission screen: {e}")
@@ -1010,7 +1010,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                     create_url = pres_detail.create_team_url
             except SessionExpiredError:
                 raise
-            except OutboundUnavailable:
+            except (OutboundUnavailable, OutboundTargetRejected):
                 raise
             except Exception as e:
                 logger.debug(f"Using fallback createTeam URL: {e}")
@@ -1059,7 +1059,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                         )
                         if expanded_screen.candidates:
                             course_screen = expanded_screen
-                except OutboundUnavailable:
+                except (OutboundUnavailable, OutboundTargetRejected):
                     raise
                 except Exception as e:
                     logger.warning(f"Failed to expand course user list to 800 rows: {e}")
@@ -1318,7 +1318,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                                 lu_resp.text, base_url=settings.ilias_base_url
                             )
                             self_uid = lu_screen.current_user_id
-                    except OutboundUnavailable:
+                    except (OutboundUnavailable, OutboundTargetRejected):
                         raise
                     except Exception as e:
                         logger.debug(f"Could not resolve self_uid from listUsers: {e}")
@@ -1507,7 +1507,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                         fb_post_resp = await client.post(modal_action, data=modal_payload)
                         if fb_post_resp.status_code in [200, 302] and "alert-danger" not in fb_post_resp.text:
                             feedback_saved = True
-                except OutboundUnavailable:
+                except (OutboundUnavailable, OutboundTargetRejected):
                     raise
                 except Exception as fb_err:
                     logger.warning(f"Failed submitting feedback modal form: {fb_err}")
@@ -1529,7 +1529,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                         if grade_data.rtoken:
                             save_data["rtoken"] = grade_data.rtoken
                         await client.post(save_url, data=save_data)
-                    except OutboundUnavailable:
+                    except (OutboundUnavailable, OutboundTargetRejected):
                         raise
                     except Exception as sl_err:
                         logger.warning(f"Failed fallback saveCommentForLearners: {sl_err}")
@@ -1556,13 +1556,12 @@ class IliasClient(AuthoringMixin, ManagementMixin):
         """
         import html
         self._ensure_authenticated()
-        client = self.session_manager.get_http_client()
 
         # Build full URL if relative
-        clean_url = html.unescape(download_url).strip()
-        full_url = urllib.parse.urljoin(settings.ilias_base_url, clean_url)
+        full_url = TargetPolicy().resource_url(html.unescape(download_url))
+        client = self.session_manager.get_http_client()
 
-        req = client.build_request("GET", full_url)
+        req = client.build_request("GET", full_url, extensions={RESOURCE_READ: True})
         try:
             resp = await client.send(req, stream=True)
         except BaseException:
@@ -1759,6 +1758,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
         exercise_ref_id: str,
         ass_id: str,
         target_updates: List[Tuple[str, str, str, Optional[str]]],
+        expected_fingerprint: Optional[str] = None,
     ) -> Tuple[int, List[str]]:
         """
         Submits batch note updates via cmd[saveStatusAll] while echoing existing status/mark.
@@ -1767,6 +1767,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
         Returns (updated_count, list_of_errors).
         """
         from backend.services.exercise_bulk import build_bulk_note_payload
+        from backend.services.ta_allocation import compute_distribution_fingerprint, validate_allocation_notice
         self._ensure_authenticated()
 
         exercise_url = (
@@ -1779,6 +1780,23 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             resp = await client.get(exercise_url)
             self._check_response_for_session_loss(resp, exercise_url)
 
+            latest = parse_exercise_submissions(resp.text, exercise_ref_id=exercise_ref_id)
+            fingerprint = compute_distribution_fingerprint(
+                [sub.member_id for sub in latest.submissions], [sub.notice or '' for sub in latest.submissions])
+            if expected_fingerprint and fingerprint != expected_fingerprint:
+                return 0, [t('allocation.note_changed')]
+            current = {sub.member_id: sub for sub in latest.submissions}
+            refreshed_updates = []
+            for member_id, notice, _, _ in target_updates:
+                sub = current.get(str(member_id))
+                if sub is None:
+                    return 0, [t('allocation.invalid_members')]
+                try:
+                    validate_allocation_notice(sub.notice or '', notice)
+                except ValueError as exc:
+                    return 0, [str(exc)]
+                refreshed_updates.append((member_id, notice, sub.passed_status, sub.mark))
+            target_updates = refreshed_updates
             action_url, encoded_body = build_bulk_note_payload(resp.text, target_updates)
 
             # 2. Submit batch POST with form-urlencoded content bytes
@@ -1804,11 +1822,11 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                 m_str = str(member_id)
                 sub = verified_map.get(m_str)
                 if not sub:
-                    errors.append(f"Member {m_str} missing in read-back verification.")
+                    errors.append(t('allocation.member_missing', member=m_str))
                     continue
                 # Check that marker is present in the actual saved notice
-                if expected_notice and expected_notice not in (sub.notice or ""):
-                    errors.append(f"Notice for member {m_str} was not persisted correctly in ILIAS.")
+                if expected_notice != (sub.notice or ""):
+                    errors.append(t('allocation.not_persisted', member=m_str))
                 else:
                     verified_count += 1
 
@@ -1902,7 +1920,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                     detail.instruction_files = files
                 except SessionExpiredError:
                     raise
-                except OutboundUnavailable:
+                except (OutboundUnavailable, OutboundTargetRejected):
                     raise
                 except Exception as fe:
                     logger.debug(f"Could not load instruction files for {ass_id}: {fe}")

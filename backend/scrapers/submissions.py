@@ -365,7 +365,7 @@ def parse_exercise_submissions(html_content: str, exercise_ref_id: str) -> Exerc
             f"textarea[name*='notice[{member_id}]'], input[name*='notice[{member_id}]'], textarea[name*='notice['], input[name*='notice[']"
         )
         if notice_input:
-            notice = notice_input.get_text(strip=True) or notice_input.get("value") or notice
+            notice = notice_input.get_text() if notice_input.name == 'textarea' else notice_input.get('value', '')
 
         from backend.services.ta_allocation import parse_ta_marker
         assigned_ta_id, assigned_ta_name, _ = parse_ta_marker(notice)

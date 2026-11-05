@@ -45,5 +45,16 @@ def get_session_manager(response: Response, manager=Depends(get_optional_session
     return manager
 
 
-def get_ilias_client(manager: SessionManager = Depends(get_session_manager)) -> IliasClient:
+def get_ilias_client(request: Request, manager: SessionManager = Depends(get_session_manager)) -> IliasClient:
+    # Native URLs are assembled by many existing service methods. Reject query
+    # delimiters in public IDs before they can become a second native command.
+    numeric = {'ref_id', 'course_id', 'exercise_id', 'ass_id', 'member_id',
+               'delivered_id', 'session_ref_id', 'team_id', 'user_id'}
+    for name, value in request.path_params.items():
+        if name in numeric and not re.fullmatch(r'[0-9]+', str(value)):
+            raise HTTPException(400, detail=t('validation.invalid'))
+    for name in ('ass_id', 'member_id', 'delivered_id'):
+        values = request.query_params.getlist(name)
+        if len(values) > 1 or any(not re.fullmatch(r'[0-9]+', value) for value in values):
+            raise HTTPException(400, detail=t('validation.invalid'))
     return IliasClient(manager=manager)

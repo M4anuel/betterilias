@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     outbound_queue_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
     outbound_read_retries: int = Field(default=2, ge=0, le=3)
     outbound_coalesce_max_bytes: int = Field(default=2_097_152, ge=0, le=8_388_608)
+    outbound_media_origins: List[str] = ['https://opencast.unibe.ch', 'https://dist.opencast.unibe.ch']
+    outbound_allow_local_ilias: bool = False
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
