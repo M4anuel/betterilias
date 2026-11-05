@@ -12,6 +12,7 @@ import {
   Settings as SettingsIcon,
   Info,
   Gauge,
+  Sparkles,
 } from 'lucide-react';
 import { SettingsGear } from './SettingsGear';
 import { ToggleSwitch } from './ToggleSwitch';
@@ -29,6 +30,7 @@ interface SettingsDropdownProps {
   isAuthenticated: boolean;
   userName?: string | null;
   onOpenExtensionInfo: () => void;
+  onOpenLanding?: () => void;
 }
 
 export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
@@ -40,6 +42,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   isAuthenticated,
   userName,
   onOpenExtensionInfo,
+  onOpenLanding,
 }) => {
   const language = useLanguage();
   const [currentMode, setCurrentMode] = useState<ThemeMode>(() => theme.getThemeMode());
@@ -373,6 +376,22 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
 
         {/* 3. Helpful Quick Links */}
         <div className="border-t border-slate-100 pt-3 dark:border-slate-800 space-y-1">
+          {isAuthenticated && onOpenLanding && (
+            <button
+              type="button"
+              onClick={() => {
+                closePanel();
+                onOpenLanding();
+              }}
+              className="w-full flex items-center justify-between rounded-xl p-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-[#0AACA5]" />
+                <span>{t("Über BetterIlias & Features")}</span>
+              </div>
+              <span className="text-[10px] text-slate-400">{t("Info")}</span>
+            </button>
+          )}
           <a
             href="https://ilias.unibe.ch"
             target="_blank"

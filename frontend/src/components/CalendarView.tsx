@@ -298,12 +298,38 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
 
+  // Real-time optimistic color state while dragging color pickers
+  const [localCourseColors, setLocalCourseColors] = useState<Record<string, string>>({});
+  const colorCommitTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(colorCommitTimerRef.current).forEach(clearTimeout);
+    };
+  }, []);
+
   const [hiddenCourses, setHiddenCourses] = useState<string[]>(() =>
     cache.getHiddenCalendarCourses('ALL')
   );
   const [ignoredCoursesLocal, setIgnoredCoursesLocal] = useState<string[]>(() =>
     cache.getIgnoredCalendarCourses()
   );
+
+  // Manual schedule hint banner dismissal state
+  const [isScheduleWarningDismissed, setIsScheduleWarningDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ilias_calendar_dismiss_schedule_warning') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissScheduleWarning = () => {
+    setIsScheduleWarningDismissed(true);
+    try {
+      localStorage.setItem('ilias_calendar_dismiss_schedule_warning', 'true');
+    } catch {}
+  };
 
   // Courses & Calendar Status Panel Filters
   const [panelSemesterFilter, setPanelSemesterFilter] = useState<string>('ALL');
@@ -629,6 +655,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         (c.imported_lecture_count ?? 0) > 0 || (c.custom_rule_count ?? 0) > 0;
       byId.set(c.course_ref_id, {
         ...c,
+        color: localCourseColors[c.course_ref_id] || c.color,
         course_title: cache.getDisplayName(c.course_ref_id, c.course_title),
         item_type: c.item_type || 'crs',
         ignored_missing_schedule: isIgnored,
@@ -645,7 +672,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           course_title: cache.getDisplayName(c.ref_id, c.title),
           semester: c.semester || null,
           item_type: c.item_type || 'crs',
-          color: COURSE_COLOR_PALETTE[idx % COURSE_COLOR_PALETTE.length],
+          color: localCourseColors[c.ref_id] || COURSE_COLOR_PALETTE[idx % COURSE_COLOR_PALETTE.length],
           status: 'not_imported',
           feed_status: 'not_checked',
           status_message: t('calendar.status.not_checked'),
@@ -665,7 +692,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       if (semDiff !== 0) return semDiff;
       return a.course_title.localeCompare(b.course_title);
     });
-  }, [calendarData, allMemberships, coursesList, ignoredCoursesLocal, language]);
+  }, [calendarData, allMemberships, coursesList, ignoredCoursesLocal, localCourseColors, language]);
 
   // Available semesters that contain courses in the calendar
   const availableCalendarSemesters = useMemo(() => {
@@ -760,7 +787,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     });
   };
 
-  const handleColorChange = async (courseRefId: string, color: string) => {
+  const handleColorInput = (courseRefId: string, color: string) => {
+    // Immediately update UI live with 0ms lag while dragging
+    setLocalCourseColors((prev) => ({ ...prev, [courseRefId]: color }));
+
+    // Debounce server commit while continuous drag events fire
+    if (colorCommitTimerRef.current[courseRefId]) {
+      clearTimeout(colorCommitTimerRef.current[courseRefId]);
+    }
+    colorCommitTimerRef.current[courseRefId] = setTimeout(() => {
+      void commitColorChange(courseRefId, color);
+    }, 400);
+  };
+
+  const commitColorChange = async (courseRefId: string, color: string) => {
+    if (colorCommitTimerRef.current[courseRefId]) {
+      clearTimeout(colorCommitTimerRef.current[courseRefId]);
+      delete colorCommitTimerRef.current[courseRefId];
+    }
     try {
       const updated = await api.updateCourseColor(courseRefId, color);
       setCalendarData(updated);
@@ -1369,11 +1413,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
       )}
 
-      {coursesNeedingScheduleCount > 0 && (
+      {coursesNeedingScheduleCount > 0 && !isScheduleWarningDismissed && (
         <div className="rounded-2xl border border-amber-200/90 bg-amber-50/80 px-4 py-3.5 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-          <div className="flex items-start gap-2.5">
+          <div className="flex items-start gap-2.5 min-w-0 flex-1">
             <Sparkles className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="font-bold">
                 {t('calendar.manual_schedule_hint_title', {
                   count: coursesNeedingScheduleCount,
@@ -1384,16 +1428,27 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              const firstNeeding = mergedCourses.find((c) => c.needs_manual_schedule);
-              openRuleModal(firstNeeding?.course_ref_id);
-            }}
-            className="min-h-11 sm:min-h-9 shrink-0 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition cursor-pointer"
-          >
-            {t('calendar.add_schedule')}
-          </button>
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={() => {
+                const firstNeeding = mergedCourses.find((c) => c.needs_manual_schedule);
+                openRuleModal(firstNeeding?.course_ref_id);
+              }}
+              className="min-h-11 sm:min-h-9 shrink-0 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition cursor-pointer"
+            >
+              {t('calendar.add_schedule')}
+            </button>
+            <button
+              type="button"
+              onClick={handleDismissScheduleWarning}
+              aria-label={t('Schliessen')}
+              title={t('Schliessen')}
+              className="min-h-11 min-w-11 sm:min-h-9 sm:min-w-9 flex items-center justify-center rounded-xl p-2 text-amber-800 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40 transition cursor-pointer shrink-0"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -2251,15 +2306,23 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <label
                           className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full cursor-pointer shadow-2xs border border-white/50"
-                          style={{ backgroundColor: course.color }}
+                          style={{ backgroundColor: localCourseColors[course.course_ref_id] || course.color }}
                           title={t('calendar.change_color')}
                         >
                           <input
                             type="color"
-                            value={course.color}
-                            onChange={(e) =>
-                              handleColorChange(course.course_ref_id, e.target.value)
+                            value={localCourseColors[course.course_ref_id] || course.color}
+                            onInput={(e) =>
+                              handleColorInput(course.course_ref_id, (e.target as HTMLInputElement).value)
                             }
+                            onChange={(e) => {
+                              const col = e.target.value;
+                              handleColorInput(course.course_ref_id, col);
+                              void commitColorChange(course.course_ref_id, col);
+                            }}
+                            onBlur={(e) => {
+                              void commitColorChange(course.course_ref_id, e.target.value);
+                            }}
                             aria-label={`${t('calendar.change_color')}: ${course.course_title}`}
                             className="sr-only"
                           />

@@ -12,6 +12,7 @@ interface HeaderProps {
   isSidebarCollapsed: boolean;
   onLogout?: () => void;
   onOpenExtensionInfo: () => void;
+  onOpenLanding?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -21,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   isSidebarCollapsed,
   onLogout,
   onOpenExtensionInfo,
+  onOpenLanding,
 }) => {
   useLanguage();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -113,6 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
           isAuthenticated={Boolean(authStatus?.authenticated)}
           userName={authStatus?.user_name}
           onOpenExtensionInfo={onOpenExtensionInfo}
+          onOpenLanding={onOpenLanding}
         />
       </div>
     </header>
