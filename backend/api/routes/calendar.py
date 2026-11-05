@@ -1,3 +1,4 @@
+from starlette.concurrency import run_in_threadpool
 import asyncio
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -133,7 +134,8 @@ async def update_schedule_rule(
     tenant_key = _resolve_tenant_key(request, client)
     base_url = _resolve_base_url(request)
     try:
-        return calendar_service.update_rule(
+        return await run_in_threadpool(
+            calendar_service.update_rule,
             tenant_key=tenant_key,
             rule_id=rule_id,
             rule_in=payload,
@@ -155,7 +157,8 @@ async def duplicate_schedule_rule(
     tenant_key = _resolve_tenant_key(request, client)
     base_url = _resolve_base_url(request)
     try:
-        return calendar_service.duplicate_rule(
+        return await run_in_threadpool(
+            calendar_service.duplicate_rule,
             tenant_key=tenant_key,
             rule_id=rule_id,
             semester=semester,
@@ -175,7 +178,8 @@ async def delete_schedule_rule(
     tenant_key = _resolve_tenant_key(request, client)
     base_url = _resolve_base_url(request)
     try:
-        return calendar_service.delete_rule(
+        return await run_in_threadpool(
+            calendar_service.delete_rule,
             tenant_key=tenant_key,
             rule_id=rule_id,
             semester=semester,
@@ -196,7 +200,8 @@ async def update_course_color(
     tenant_key = _resolve_tenant_key(request, client)
     base_url = _resolve_base_url(request)
     try:
-        return calendar_service.update_course_color(
+        return await run_in_threadpool(
+            calendar_service.update_course_color,
             tenant_key=tenant_key,
             course_ref_id=course_ref_id,
             color=payload.color,
@@ -217,7 +222,8 @@ async def update_course_ignore_schedule(
 ):
     tenant_key = _resolve_tenant_key(request, client)
     base_url = _resolve_base_url(request)
-    return calendar_service.update_course_ignored_missing_schedule(
+    return await run_in_threadpool(
+        calendar_service.update_course_ignored_missing_schedule,
         tenant_key=tenant_key,
         course_ref_id=course_ref_id,
         ignored=payload.ignored,

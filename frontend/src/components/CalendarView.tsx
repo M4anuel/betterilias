@@ -305,6 +305,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     cache.getIgnoredCalendarCourses()
   );
 
+  // Manual schedule hint banner dismissal state
+  const [isScheduleWarningDismissed, setIsScheduleWarningDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ilias_calendar_dismiss_schedule_warning') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissScheduleWarning = () => {
+    setIsScheduleWarningDismissed(true);
+    try {
+      localStorage.setItem('ilias_calendar_dismiss_schedule_warning', 'true');
+    } catch {}
+  };
+
   // Courses & Calendar Status Panel Filters
   const [panelSemesterFilter, setPanelSemesterFilter] = useState<string>('ALL');
   const [panelCategoryFilter, setPanelCategoryFilter] = useState<'all' | 'courses' | 'groups'>(
@@ -1369,11 +1385,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
       )}
 
-      {coursesNeedingScheduleCount > 0 && (
+      {coursesNeedingScheduleCount > 0 && !isScheduleWarningDismissed && (
         <div className="rounded-2xl border border-amber-200/90 bg-amber-50/80 px-4 py-3.5 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-          <div className="flex items-start gap-2.5">
+          <div className="flex items-start gap-2.5 min-w-0 flex-1">
             <Sparkles className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="font-bold">
                 {t('calendar.manual_schedule_hint_title', {
                   count: coursesNeedingScheduleCount,
@@ -1384,16 +1400,27 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              const firstNeeding = mergedCourses.find((c) => c.needs_manual_schedule);
-              openRuleModal(firstNeeding?.course_ref_id);
-            }}
-            className="min-h-11 sm:min-h-9 shrink-0 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition cursor-pointer"
-          >
-            {t('calendar.add_schedule')}
-          </button>
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={() => {
+                const firstNeeding = mergedCourses.find((c) => c.needs_manual_schedule);
+                openRuleModal(firstNeeding?.course_ref_id);
+              }}
+              className="min-h-11 sm:min-h-9 shrink-0 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition cursor-pointer"
+            >
+              {t('calendar.add_schedule')}
+            </button>
+            <button
+              type="button"
+              onClick={handleDismissScheduleWarning}
+              aria-label={t('Schliessen')}
+              title={t('Schliessen')}
+              className="min-h-11 min-w-11 sm:min-h-9 sm:min-w-9 flex items-center justify-center rounded-xl p-2 text-amber-800 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40 transition cursor-pointer shrink-0"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
 
