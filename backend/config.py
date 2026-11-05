@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     coordination_dir: str = '.coordination'
     # Private diagnostics; never serve this directory as static content.
     observability_dir: str = '.observability'
+    log_console_level: Literal['INFO', 'WARNING', 'ERROR', 'OFF'] = 'INFO'
     observability_retention_days: int = Field(default=7, ge=1, le=30)
     observability_max_events: int = Field(default=50000, ge=100, le=500000)
     observability_queue_size: int = Field(default=2048, ge=16, le=10000)

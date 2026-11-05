@@ -11,7 +11,8 @@ combined with a user's support report; handle the store accordingly.
 `backend/observability.py` accepts only registered event codes and constrained
 metadata. Schema version 1 contains UTC Unix timestamps, category, random worker,
 request and operation IDs, optional HTTP method/status/duration, fixed operation
-name and outcome. An incoming `X-Request-Id` is ignored; the response receives a
+name and outcome, severity and a fixed component label for legacy warnings.
+An incoming `X-Request-Id` is ignored; the response receives a
 fresh ID that a user can voluntarily include in a support report. IDs do not
 identify or persistently track a user. No actor identifier is stored.
 
@@ -36,12 +37,27 @@ signed URL are deliberately omitted; investigate a reproducible example through
 a controlled support process before changing the allowlist. Compatibility events
 do not automatically relax any outbound restriction.
 
-Legacy console messages and tracebacks are replaced with fixed JSON level/source
-codes. Legacy warnings/errors also enter the event store. HTTPX INFO logging and
+Structured events are written as JSON lines to **stderr** and the private SQLite
+store. Both outputs carry the same safe payload and correlation IDs. Severity
+is INFO for ordinary requests/lifecycle/audit activity, WARNING for security and
+compatibility rejections or unsuccessful write results, and ERROR for failed
+requests, HTTP 5xx and legacy errors. Legacy messages and tracebacks are replaced
+with fixed codes and component labels (`auth`, `calendar`, `scraper`, `outbound`,
+`server`, `application`); their text is never interpolated. HTTPX INFO logging and
 Uvicorn's raw URL access logger are suppressed; the request middleware replaces
 the latter. This intentionally sacrifices free-text debugging detail. Do not add
 another raw logging handler or run with a logging configuration that overrides
-these controls. Reverse proxies, hosting platforms and extension/browser logs
+these controls. Set `LOG_CONSOLE_LEVEL=INFO` (default), `WARNING`, `ERROR` or `OFF`
+to choose console verbosity; this does not change private event persistence.
+Console writes run on the background writer, not the request thread. A broken
+collector increments `console_errors` without stopping database logging. A
+blocking collector can stall the shared writer and eventually fill its bounded
+queue; monitor queue depth, last-write time and dropped counts.
+
+Console output is a second copy of diagnostic data: configure supervisor or
+container log rotation/expiry to match the chosen purpose and retention. The
+application's SQLite retention cannot delete copies held by a log collector.
+Reverse proxies, hosting platforms and extension/browser logs
 are outside this application's filter: configure their URL/header logging and
 retention separately. Never log admin keys or signed calendar feed URLs there.
 
@@ -84,7 +100,8 @@ physical erasure from SSDs, filesystem snapshots or backups.
 
 The queue never waits for disk on a normal request. It does not replay failed
 native writes. `dropped`, `storage_errors`, queue depth, writer liveness and last
-write time expose losses **for the worker answering the admin request**; they
+write time expose losses **for the worker answering the admin request**;
+`console_errors` reports collector failures in that process. These counters
 reset on restart. Event counts/timing summaries cover only retained records
 across the shared volume, not lifetime totals or a complete monitoring system.
 Outbound-budget counters/queue/cooldown are shared aggregates since that budget
@@ -141,6 +158,8 @@ Only `X-Admin-Key` authenticates `/api/admin/events` and `/api/admin/summary`.
 Student headers/cookies, bearer tokens and URL parameters do not grant admin
 access. Every response is `no-store`; access/rejections are audited without the
 supplied key. Events support `limit=1..200` and a monotonic `before` cursor.
+Both the events API and local inspection support fixed `category` and `code`
+filters; unknown filter values are rejected without logging their contents.
 Summary includes retained event counts, request timing/error aggregates, current
 worker writer status, and aggregate outbound admission metrics.
 
@@ -149,6 +168,19 @@ rate limits there. Do not place the key in the public React bundle, extension
 storage, URLs, browser localStorage or screenshots. There is no admin login/UI,
 role management, per-admin attribution, key revocation history or MFA yet. A
 future browser dashboard needs its own server-mediated administrator sessions.
+
+For local inspection under the backend OS account, no admin key is needed:
+
+```text
+python -m backend.diagnostics events --category security --limit 50
+python -m backend.diagnostics events --code outbound.unsupported_resource
+python -m backend.diagnostics events --category audit --before 1234
+```
+
+These commands return JSON containing newest-first events and a `next_before`
+cursor. They open SQLite read-only, do not start a writer or create missing data
+directories, and exclude expired events. Limits are 1–200 records per page.
+Treat any redirected output as a private export with its own expiry/access rules.
 
 ## Operator decisions before public hosting
 
@@ -177,8 +209,14 @@ access, legacy log sanitization, raw-capture opt-in/expiry/limits, shared-proces
 SQLite writes, queue overload and storage failure. These are offline tests, not
 live ILIAS or physical-device validation. No frontend workflow is introduced.
 
-Verified on 5 November 2026: full backend suite **556 passed, 329 skipped**;
+Foundation baseline verified on 5 November 2026: full backend suite **556 passed, 329 skipped**;
 Chrome browser allocation/outbound regressions **32 passed**; frontend production
 build and locale validation (**1,660 keys**) passed; launcher syntax and isolated
 `python -m backend.diagnostics prune` smoke check passed. Existing dependency
 deprecation and frontend bundle-size warnings remain.
+
+The console logging integration passed **562 backend tests, 329 skipped**,
+including **17 focused logging regressions**, plus the frontend build and launcher
+syntax check. An isolated smoke check verified actual JSON console output and
+filtered read-only CLI inspection. Browser/device checks were not repeated for
+this backend-only logging extension.

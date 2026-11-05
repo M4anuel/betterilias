@@ -45,6 +45,12 @@ OPERATIONS = frozenset('grade allocation feedback_upload feedback_delete feedbac
     'auth_sync auth_logout auth_claim auth_handoff'.split())
 OUTCOMES = frozenset(('started', 'returned', 'partial', 'rejected', 'uncertain', 'failed'))
 METHODS = frozenset(('GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'))
+COMPONENTS = frozenset(('auth', 'calendar', 'scraper', 'outbound', 'server', 'application'))
+CATEGORIES = frozenset(EVENTS.values())
+_console = logging.getLogger('betterilias.events')
+_console.addHandler(logging.NullHandler())
+_console.propagate = False
+_console_failures = 0
 _request = ContextVar('diagnostic_request', default=None)
 _operation = ContextVar('diagnostic_operation', default=None)
 _dispatch = ContextVar('diagnostic_dispatch', default=None)
@@ -153,8 +159,13 @@ class EventStore:
                 self.dropped += len(batch)
                 # Never log the underlying exception (it may contain a path).
             finally:
-                for _ in batch:
-                    self.pending.task_done()
+                # Output on the writer thread, including when SQLite failed.
+                # Request handlers never wait for a slow terminal/collector.
+                for event in batch:
+                    try:
+                        _write_console(event)
+                    finally:
+                        self.pending.task_done()
 
     def flush(self):
         self.pending.join()
@@ -163,16 +174,9 @@ class EventStore:
         self._stop.set()
         self._thread.join(timeout=3)
 
-    def read(self, *, before=None, limit=100):
-        # Readers cannot accidentally change the database or return expired data.
-        if not self.path.exists():
-            return []
-        with closing(sqlite3.connect(self.path.resolve().as_uri() + '?mode=ro', uri=True, timeout=.5)) as db:
-            rows = db.execute('SELECT id,data FROM events WHERE ts >= ? AND id < ? '
-                              'ORDER BY id DESC LIMIT ?',
-                              (time.time() - self.retention_seconds, before or 9223372036854775807,
-                               max(1, min(limit, 200)))).fetchall()
-        return [{'id': row[0], **json.loads(row[1])} for row in rows]
+    def read(self, *, before=None, limit=100, category=None, code=None):
+        return read_events(self.path, retention_seconds=self.retention_seconds,
+                           before=before, limit=limit, category=category, code=code)
 
     def summary(self):
         counts = []
@@ -187,6 +191,7 @@ class EventStore:
                     (time.time() - self.retention_seconds,)).fetchone()
         return {'worker': self.worker, 'queue_depth': self.pending.qsize(), 'dropped': self.dropped,
                 'storage_errors': self.storage_errors, 'last_write': self.last_write,
+                'console_errors': _console_failures,
                 'writer_alive': self._thread.is_alive(), 'retention_seconds': self.retention_seconds,
                 'retained_counts': dict(counts),
                 'retained_request_metrics': dict(zip(('count', 'mean_ms', 'max_ms', 'server_errors'),
@@ -205,7 +210,7 @@ def get_store():
     return _store
 
 
-def emit(code, *, status=None, duration_ms=None, method=None, operation=None, outcome=None):
+def emit(code, *, status=None, duration_ms=None, method=None, operation=None, outcome=None, component=None):
     """Deliberately no **fields, message, URL, exception, actor or request body."""
     if code not in EVENTS:
         raise ValueError('Unknown diagnostic event code')
@@ -224,6 +229,9 @@ def emit(code, *, status=None, duration_ms=None, method=None, operation=None, ou
         event['operation'] = operation
     if outcome in OUTCOMES:
         event['outcome'] = outcome
+    if component in COMPONENTS:
+        event['component'] = component
+    event['level'] = _event_level(event)
     try:
         store = get_store()
         event['worker'] = store.worker
@@ -335,8 +343,14 @@ class DiagnosticMiddleware:
 class PrivateHandler(logging.StreamHandler):
     def emit(self, record):
         if record.levelno >= logging.WARNING:
-            emit("runtime.error" if record.levelno >= logging.ERROR else "runtime.warning")
-        super().emit(record)
+            name = record.name
+            component = ('auth' if name.startswith('ilias.auth') else
+                         'calendar' if name.startswith('ilias.calendar') else
+                         'scraper' if name.startswith('ilias.scraper') else
+                         'outbound' if name.startswith(('httpx', 'httpcore', 'ilias.outbound')) else
+                         'server' if name.startswith('uvicorn') else 'application')
+            emit("runtime.error" if record.levelno >= logging.ERROR else "runtime.warning",
+                 component=component)
 
 
 class PrivateFormatter(logging.Formatter):
@@ -352,6 +366,11 @@ class PrivateFormatter(logging.Formatter):
 
 
 def configure_logging():
+    console_handler = ConsoleHandler()
+    console_handler.setFormatter(logging.Formatter('%(message)s'))
+    _console.handlers[:] = [console_handler]
+    _console.setLevel(100 if settings.log_console_level == 'OFF' else settings.log_console_level)
+    _console.propagate = False
     handler = PrivateHandler()
     handler.setLevel(logging.WARNING)
     handler.setFormatter(PrivateFormatter())
@@ -367,6 +386,58 @@ def configure_logging():
     logging.getLogger('uvicorn.access').disabled = True
     logging.getLogger('httpx').setLevel(logging.WARNING)
     logging.getLogger('httpcore').setLevel(logging.WARNING)
+
+
+def _event_level(event):
+    if (event['code'] in ('runtime.error', 'request.failed') or event.get('status', 0) >= 500):
+        return 'ERROR'
+    if (event.get('category', EVENTS.get(event['code'])) in ('security', 'compatibility') or event['code'] == 'runtime.warning'
+            or event.get('status', 0) >= 400
+            or event.get('outcome') in ('partial', 'uncertain', 'failed', 'rejected')):
+        return 'WARNING'
+    return 'INFO'
+
+
+def _write_console(event):
+    global _console_failures
+    try:
+        _console.log(getattr(logging, event.get('level', _event_level(event))),
+                     '%s', json.dumps(event, separators=(',', ':')))
+    except (OSError, ValueError):
+        # Logging must never stop the writer or dump a raw exception to stderr.
+        _console_failures += 1
+
+
+class ConsoleHandler(logging.StreamHandler):
+    def handleError(self, record):
+        # Broken pipes/collectors must not cause logging's fallback traceback.
+        global _console_failures
+        _console_failures += 1
+
+
+def read_events(path, *, retention_seconds, before=None, limit=100, category=None, code=None):
+    """Read-only local/admin inspection; never starts a writer or creates files."""
+    if category is not None and category not in CATEGORIES:
+        raise ValueError('Unknown diagnostic category')
+    if code is not None and code not in EVENTS:
+        raise ValueError('Unknown diagnostic event code')
+    path = Path(path)
+    if not path.exists():
+        return []
+    predicates = ['ts >= ?', 'id < ?']
+    values = [time.time() - retention_seconds, before or 9223372036854775807]
+    if code:
+        predicates.append('code = ?')
+        values.append(code)
+    if category:
+        codes = [name for name, group in EVENTS.items() if group == category]
+        predicates.append('code IN (' + ','.join('?' for _ in codes) + ')')
+        values.extend(codes)
+    values.append(max(1, min(limit, 200)))
+    with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=.5)) as db:
+        rows = db.execute('SELECT id,data FROM events WHERE ' + ' AND '.join(predicates) +
+                          ' ORDER BY id DESC LIMIT ?', values).fetchall()
+    return [{'id': row[0], **json.loads(row[1])} for row in rows]
 
 
 def shutdown():

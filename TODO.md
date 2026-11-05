@@ -35,6 +35,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   retention, privacy-safe parser artifacts and separately keyed read-only admin
   diagnostics. Dashboard UI, administrator sessions and operator privacy review
   remain open before public hosting.
+- [x] Connect structured events to JSON console logging and private storage;
+  retain safe severity/component context, configurable console verbosity,
+  collector failure counters, and filtered read-only local/admin inspection.
 - [x] Add shared outbound request budgets, native-session fairness, allowlisted
   in-worker GET coalescing, 429/Retry-After handling and offline multi-process
   10/25/50/100-user load scenarios. See [traffic controls, measurements and

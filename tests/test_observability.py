@@ -3,6 +3,7 @@ import asyncio
 from contextlib import contextmanager
 import json
 import logging
+import io
 import multiprocessing
 import os
 import sqlite3
@@ -153,6 +154,10 @@ def test_admin_requires_independent_key_and_never_exposes_raw_pages(store, monke
     assert response.headers['cache-control'] == 'no-store'
     assert len(response.json()['events']) == 1
     assert response.json()['next_before']
+    filtered = client.get('/api/admin/events?code=outbound.busy', headers={'X-Admin-Key': 'k' * 43})
+    assert [r['code'] for r in filtered.json()['events']] == ['outbound.busy']
+    assert client.get('/api/admin/events?category=' + SECRET,
+                      headers={'X-Admin-Key': 'k' * 43}).status_code == 422
     assert client.get('/api/admin/summary', headers={'X-Admin-Key': 'k' * 43}).status_code == 200
     monkeypatch.setattr(settings, 'app_env', 'production')
     assert client.get('/api/system/logs', headers={'X-Admin-Key': 'k' * 43}).status_code == 404
@@ -283,3 +288,103 @@ def test_size_pressure_keeps_new_events_and_reuses_bounded_pages(tmp_path):
         assert instance.storage_errors == 0
     finally:
         instance.close()
+
+
+@pytest.fixture
+def console(monkeypatch):
+    stream = io.StringIO()
+    handler = obs.ConsoleHandler(stream)
+    handler.setFormatter(logging.Formatter('%(message)s'))
+    monkeypatch.setattr(obs._console, 'handlers', [handler])
+    previous = obs._console.level
+    obs._console.setLevel(logging.INFO)
+    yield stream
+    obs._console.setLevel(previous)
+
+
+def test_console_and_store_share_safe_correlated_event(store, console):
+    token = obs._request.set('b' * 32)
+    try:
+        record = logging.LogRecord('ilias.auth.' + SECRET, logging.ERROR, SECRET, 1,
+                                   'Cookie=%s', (SECRET,), (ValueError, ValueError(SECRET), None))
+        obs.PrivateHandler().emit(record)
+    finally:
+        obs._request.reset(token)
+    store.flush()
+    written = json.loads(console.getvalue())
+    persisted = store.read()[0]
+    persisted.pop('id')
+    assert written == persisted
+    assert written['level'] == 'ERROR'
+    assert written['component'] == 'auth'
+    assert written['request_id'] == 'b' * 32
+    assert SECRET not in console.getvalue()
+
+
+def test_console_threshold_preserves_private_records(store, console):
+    obs._console.setLevel(logging.WARNING)
+    obs.emit('request.completed', method='GET', status=200)
+    obs.emit('outbound.unsupported_resource')
+    store.flush()
+    assert len(store.read()) == 2
+    lines = console.getvalue().splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0])['code'] == 'outbound.unsupported_resource'
+    assert json.loads(lines[0])['level'] == 'WARNING'
+
+
+def test_console_still_receives_events_when_storage_fails(store, console, monkeypatch):
+    @contextmanager
+    def failed_storage():
+        raise OSError(SECRET)
+        yield
+    monkeypatch.setattr(store, '_connect', failed_storage)
+    obs.emit('outbound.network_error', status=502)
+    store.flush()
+    assert store.storage_errors >= 1
+    assert json.loads(console.getvalue())['code'] == 'outbound.network_error'
+    assert SECRET not in console.getvalue()
+
+
+def test_broken_console_does_not_stop_database_logging(store, monkeypatch):
+    class BrokenStream:
+        def write(self, content):
+            raise OSError(SECRET)
+        def flush(self):
+            raise OSError(SECRET)
+    monkeypatch.setattr(obs._console, 'handlers', [obs.ConsoleHandler(BrokenStream())])
+    previous = obs._console.level
+    obs._console.setLevel(logging.INFO)
+    failures = obs._console_failures
+    try:
+        obs.emit('worker.started')
+        store.flush()
+        assert store.read()[0]['code'] == 'worker.started'
+        assert store._thread.is_alive()
+        assert store.summary()['console_errors'] > failures
+    finally:
+        obs._console.setLevel(previous)
+
+
+def test_local_log_inspection_filters_without_starting_a_writer(store, monkeypatch, capsys):
+    from backend.diagnostics import main
+    monkeypatch.setattr(settings, 'observability_dir', str(store.directory))
+    obs.emit('outbound.origin_not_allowed')
+    obs.emit('request.completed', status=200)
+    obs.emit('outbound.unsupported_resource')
+    store.flush()
+    def unexpected_writer():
+        pytest.fail('Read-only inspection started a writer')
+    monkeypatch.setattr('backend.diagnostics.get_store', unexpected_writer)
+    assert main(['events', '--category', 'security', '--limit', '1']) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert len(result['events']) == 1
+    assert result['events'][0]['code'] == 'outbound.origin_not_allowed'
+    assert main(['events', '--code', 'outbound.unsupported_resource']) == 0
+    assert json.loads(capsys.readouterr().out)['events'][0]['category'] == 'compatibility'
+
+
+def test_reading_missing_log_does_not_create_directory(tmp_path):
+    directory = tmp_path / 'missing'
+    assert obs.read_events(directory / 'events.sqlite3', retention_seconds=86400) == []
+    assert not directory.exists()

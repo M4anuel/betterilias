@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 
 from backend.config import settings
 from backend.i18n import t
-from backend.observability import emit, get_store
+from backend.observability import CATEGORIES, EVENTS, emit, get_store
 from backend.outbound_budget import OutboundBudget
 
 
@@ -26,9 +26,12 @@ router = APIRouter(prefix='/admin', tags=['Private diagnostics'], dependencies=[
 
 @router.get('/events')
 def events(before: int | None = Query(default=None, ge=1, le=9223372036854775807),
-           limit: int = Query(default=100, ge=1, le=200)):
+           limit: int = Query(default=100, ge=1, le=200),
+           category: str | None = Query(default=None), code: str | None = Query(default=None)):
+    if (category is not None and category not in CATEGORIES) or (code is not None and code not in EVENTS):
+        raise HTTPException(422, detail=t('validation.invalid'))
     try:
-        rows = get_store().read(before=before, limit=limit)
+        rows = get_store().read(before=before, limit=limit, category=category, code=code)
     except (OSError, sqlite3.Error):
         raise HTTPException(503, detail=t('diagnostics.unavailable')) from None
     return {'events': rows, 'next_before': rows[-1]['id'] if len(rows) == limit else None}
