@@ -1703,7 +1703,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             <span>{t("Informationen")}</span>
           </button>
 
-          {/* Tutor Abgaben & Noten Tab: ONLY shown if tutor access is detected! */}
+          {/* Tutor Abgaben & NotenTab: ONLY shown if tutor access is detected! */}
           {overviewData?.has_ta_access && (
             <button
               type="button"
@@ -1715,7 +1715,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               }`}
             >
               <Award className="h-3.5 w-3.5" />
-              <span>{t("Abgaben & Noten (Tutor)")}</span>
+              <span>{t("Abgaben & Noten")}</span>
             </button>
           )}
         </div>
