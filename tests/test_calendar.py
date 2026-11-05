@@ -662,6 +662,76 @@ async def test_calendar_sync_progress_and_nonblocking_read(tmp_path, monkeypatch
     assert stale_res.sync_progress is not None
     assert stale_res.sync_progress.is_syncing is False
 
+
+
+@pytest.mark.anyio
+async def test_color_update_during_active_sync(tmp_path, monkeypatch):
+    """
+    Verify:
+    1. While a background calendar sync is running (holding 'calendar-sync:'),
+       editing a course color via PUT /api/calendar/courses/{ref_id}/color does NOT fail
+       with 503 CoordinationBusy ("Another operation is still running. Please try again shortly.").
+    2. The updated color is saved and returned immediately.
+    """
+    from backend.coordination import SharedLock
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    from backend.auth.session import SessionManager
+    from backend.config import settings
+
+    test_service = CalendarService(storage_dir=tmp_path / '.calendar')
+    monkeypatch.setattr('backend.api.routes.calendar.calendar_service', test_service)
+    tenant = 'test-concurrent-color-tenant'
+    monkeypatch.setattr(settings, 'sessions_dir', str(tmp_path / 'sessions'))
+    headers = {'X-Session-Id': tenant}
+    SessionManager(tenant).save_cookies({'PHPSESSID': 'fake'})
+
+    # Seed state with a course
+    state = test_service._load_tenant_state(tenant)
+    state['courses'] = {
+        'c123': {
+            'course_ref_id': 'c123',
+            'course_title': 'Informatik I',
+            'semester': 'HS2026',
+            'item_type': 'crs',
+            'color': '#2563EB',
+            'status': 'imported_with_lectures',
+            'needs_manual_schedule': False,
+            'ignored_missing_schedule': False,
+            'imported_event_count': 10,
+            'imported_lecture_count': 10,
+            'imported_deadline_count': 0,
+            'custom_rule_count': 0,
+        }
+    }
+    state['sync_progress'] = {
+        'is_syncing': True,
+        'current': 2,
+        'total': 10,
+        'current_course_title': 'Informatik I',
+        'updated_at': time.time(),
+    }
+    test_service._save_tenant_state(tenant, state)
+
+    client = TestClient(app)
+
+    # Acquire the background sync lock for this tenant (simulating active network crawling)
+    sync_lock_key = f"calendar-sync:{test_service.storage_dir.resolve()}:{tenant}"
+    async with SharedLock(sync_lock_key).async_():
+        # Update course color while sync is actively running
+        res = client.put(
+            "/api/calendar/courses/c123/color",
+            json={"color": "#10B981"},
+            headers=headers,
+        )
+        assert res.status_code == 200, f"Expected 200, got {res.status_code}: {res.text}"
+        data = res.json()
+        updated_c = next(c for c in data["courses"] if c["course_ref_id"] == "c123")
+        assert updated_c["color"] == "#10B981"
+
+    # Verify updated color persists in storage
+    saved_state = test_service._load_tenant_state(tenant)
+    assert saved_state["colors"]["c123"] == "#10B981"
 from tests.test_localisation_browser import local_site, ROOT
 
 

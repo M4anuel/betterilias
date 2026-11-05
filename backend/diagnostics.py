@@ -11,6 +11,7 @@ from backend.observability import CATEGORIES, EVENTS, configure_logging, get_sto
 from backend.config import settings
 from backend.scrapers.dumper import prune_failed_dumps
 from backend.coordination import CoordinationBusy
+from backend.admin_sessions import prune as prune_admin_sessions
 
 
 def main(argv=None):
@@ -44,6 +45,7 @@ def main(argv=None):
         with store._connect() as db:
             store._prune(db)
         prune_failed_dumps(strict=True)
+        prune_admin_sessions()
         print(json.dumps({'status': 'pruned'}))
     except (OSError, sqlite3.Error, CoordinationBusy):
         print(json.dumps({'status': 'unavailable'}))

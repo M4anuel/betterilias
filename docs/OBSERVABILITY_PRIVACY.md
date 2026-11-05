@@ -1,6 +1,6 @@
 # Private diagnostics and logging foundation
 
-This is operational groundwork for a future admin dashboard, not a declaration
+This is the operational foundation for the [admin dashboard](ADMIN_DASHBOARD.md), not a declaration
 of GDPR/DSGVO compliance. The operator must establish and document the purpose,
 legal basis, access policy and necessary retention before hosting for others.
 Pseudonymous request/operation identifiers can still be personal data when
@@ -154,7 +154,9 @@ Generate a **separate random secret**, for example:
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-Only `X-Admin-Key` authenticates `/api/admin/events` and `/api/admin/summary`.
+Operator tools authenticate `/api/admin/events` and `/api/admin/summary` with
+`X-Admin-Key`. The `/admin/` browser dashboard uses a separate, revocable,
+30-minute HttpOnly cookie issued after a JSON administrator-key sign-in.
 Student headers/cookies, bearer tokens and URL parameters do not grant admin
 access. Every response is `no-store`; access/rejections are audited without the
 supplied key. Events support `limit=1..200` and a monotonic `before` cursor.
@@ -165,9 +167,13 @@ worker writer status, and aggregate outbound admission metrics.
 
 Keep the API behind HTTPS and an operator-only network/proxy boundary; configure
 rate limits there. Do not place the key in the public React bundle, extension
-storage, URLs, browser localStorage or screenshots. There is no admin login/UI,
-role management, per-admin attribution, key revocation history or MFA yet. A
-future browser dashboard needs its own server-mediated administrator sessions.
+storage, URLs, browser localStorage or screenshots. The dashboard clears the key
+from its form after submission and retains only the HttpOnly capability. Named
+administrator accounts, role management, per-admin attribution, key revocation
+history and MFA remain unimplemented. See the [session boundary, deployment and
+dashboard checks](ADMIN_DASHBOARD.md). Expired administrator capability digests
+and the bounded one-minute failed-login counter are also purged by the scheduled
+retention command.
 
 For local inspection under the backend OS account, no admin key is needed:
 

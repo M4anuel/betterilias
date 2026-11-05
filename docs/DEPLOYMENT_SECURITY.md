@@ -20,8 +20,9 @@ explicit development opt-in and is never captured in production. Retention also
 removes legacy raw captures when private defaults apply. See the
 [logging and privacy foundation](OBSERVABILITY_PRIVACY.md) for bounded event
 storage, separately keyed read-only admin diagnostics and the scheduled expiry
-job. The future browser admin login/dashboard and operator privacy review remain
-unfinished; no student capability grants administrator access.
+job. The separate [admin dashboard](ADMIN_DASHBOARD.md) now uses short-lived,
+revocable HttpOnly capabilities. Named administrator identity/MFA and operator
+privacy review remain unfinished; no student capability grants administrator access.
 
 ## Authentication
 
@@ -55,7 +56,7 @@ Long-lived capabilities remain in extension storage, frontend localStorage,
 headers, and private server persistence; this is not a complete migration to
 HttpOnly-only authentication. Protect these stores and do not log headers or
 auth request/response bodies. Database-backed stable user identity, device
-revocation, and browser administrator sessions remain separate follow-up work.
+revocation, and named administrator identity/MFA remain separate follow-up work.
 
 ## URL changes
 

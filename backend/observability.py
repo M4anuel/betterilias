@@ -33,6 +33,7 @@ EVENTS = {
     'outbound.network_error': 'operational', 'coordination.busy': 'operational',
     'write.started': 'audit', 'write.finished': 'audit',
     'admin.read': 'audit', 'admin.rejected': 'security',
+    'admin.login': 'audit', 'admin.logout': 'audit',
     'runtime.warning': 'operational', 'runtime.error': 'operational',
     'worker.started': 'operational', 'worker.stopped': 'operational',
 }

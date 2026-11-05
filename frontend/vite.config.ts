@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    rollupOptions: { input: { app: 'index.html', admin: 'admin/index.html' } },
+  },
   plugins: [
     react(),
     tailwindcss(),

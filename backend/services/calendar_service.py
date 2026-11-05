@@ -589,7 +589,7 @@ class CalendarService:
             return f"{m.group(1).upper()}{m.group(2)}"
         return None
 
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-sync:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     async def discover_courses_from_agenda_and_memberships(
         self,
         tenant_key: str,
@@ -728,7 +728,7 @@ class CalendarService:
             base_url=base_url,
         )
 
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     async def ingest_course_page_html(
         self,
         tenant_key: str,
@@ -850,7 +850,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return True
 
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-sync:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     async def sync_semester_calendar(
         self,
         tenant_key: str,
@@ -946,22 +946,27 @@ class CalendarService:
 
                 courses_dict[cid] = info.model_dump(mode="json")
 
-                state["courses"] = courses_dict
-                state["colors"] = colors_dict
-                state["imported_events"] = imported_map
-                self._save_tenant_state(tenant_key, state)
+                latest_state = self._load_tenant_state(tenant_key)
+                colors_dict.update(latest_state.get("colors", {}))
+                latest_state.setdefault("courses", {}).update(courses_dict)
+                latest_state.setdefault("colors", {}).update(colors_dict)
+                latest_state.setdefault("imported_events", {}).update(imported_map)
+                latest_state["sync_progress"] = state["sync_progress"]
+                self._save_tenant_state(tenant_key, latest_state)
 
-            state["courses"] = courses_dict
-            state["colors"] = colors_dict
-            state["imported_events"] = imported_map
-            state["sync_progress"] = {
+            latest_state = self._load_tenant_state(tenant_key)
+            colors_dict.update(latest_state.get("colors", {}))
+            latest_state.setdefault("courses", {}).update(courses_dict)
+            latest_state.setdefault("colors", {}).update(colors_dict)
+            latest_state.setdefault("imported_events", {}).update(imported_map)
+            latest_state["sync_progress"] = {
                 "is_syncing": False,
                 "current": total_courses,
                 "total": total_courses,
                 "current_course_title": None,
                 "updated_at": time.time(),
             }
-            self._save_tenant_state(tenant_key, state)
+            self._save_tenant_state(tenant_key, latest_state)
         except Exception as exc:
             state["sync_progress"] = {
                 "is_syncing": False,
@@ -993,7 +998,7 @@ class CalendarService:
         if rule_in.end_date < rule_in.start_date:
             raise ValueError(t("calendar.validation.end_after_start_date"))
 
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     @audit('calendar_create')
     def create_rule(
         self,
@@ -1034,7 +1039,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, None, base_url=base_url)
 
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     @audit('calendar_update')
     def update_rule(
         self,
@@ -1069,7 +1074,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, None, base_url=base_url)
 
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     @audit('calendar_duplicate')
     def duplicate_rule(
         self,
@@ -1097,7 +1102,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     @audit('calendar_delete')
     def delete_rule(
         self,
@@ -1115,7 +1120,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     @audit('calendar_color')
     def update_course_color(
         self,
@@ -1138,7 +1143,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     @audit('calendar_ignore')
     def update_course_ignored_missing_schedule(
         self,
@@ -1162,7 +1167,7 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     @audit('calendar_import')
     def import_raw_ics_for_course(
         self,
@@ -1236,7 +1241,7 @@ class CalendarService:
         return generate_ics_feed(events=events, semester=semester or get_current_semester())
 
     @coordinated(lambda self, *args, **kwargs: "calendar-tokens:" + str(self.storage_dir.resolve()))
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     @audit('calendar_token_rotate')
     def rotate_subscription_token(
         self,
@@ -1280,7 +1285,7 @@ class CalendarService:
         )
 
     @coordinated(lambda self, *args, **kwargs: "calendar-tokens:" + str(self.storage_dir.resolve()))
-    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     @audit('calendar_token_revoke')
     def revoke_subscription_token(self, tenant_key: str) -> None:
         state = self._load_tenant_state(tenant_key)

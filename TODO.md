@@ -27,14 +27,17 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 - [ ] Build a responsive bilingual landing/get-started page with extension
   installation, ILIAS sign-in/sync instructions, a BetterIlias preview, and clear
   expired-session/reconnect guidance.
-- [ ] Build an authenticated admin dashboard with separate administrator
+- [x] Build an authenticated admin dashboard with separate administrator
   authorization, health/worker/queue metrics, sanitized error reports and audit
   records; keep raw student pages and credentials out of public diagnostics.
+  The independent `/admin/` page uses short-lived HttpOnly admin cookies,
+  responsive bilingual metrics/log views, filters and event details. Deployment
+  and remaining identity/MFA limitations: [admin dashboard](docs/ADMIN_DASHBOARD.md).
 - [x] Add the [private logging foundation](docs/OBSERVABILITY_PRIVACY.md): fixed
   security/compatibility events, request timing, write outcomes, bounded local
   retention, privacy-safe parser artifacts and separately keyed read-only admin
-  diagnostics. Dashboard UI, administrator sessions and operator privacy review
-  remain open before public hosting.
+  diagnostics. Dashboard UI and administrator sessions are implemented separately;
+  operator privacy review remains open before public hosting.
 - [x] Connect structured events to JSON console logging and private storage;
   retain safe severity/component context, configurable console verbosity,
   collector failure counters, and filtered read-only local/admin inspection.
