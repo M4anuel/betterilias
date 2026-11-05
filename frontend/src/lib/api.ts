@@ -38,6 +38,7 @@ import {
 import { cache } from './cache';
 import type { VideoStreamInfo } from '../types';
 import { navigationGuard } from './navigationGuard';
+import { considerDiagnosticResponse, clientDiagnostic } from './diagnosticReports';
 
 
 const API_BASE = '/api';
@@ -71,12 +72,16 @@ export async function sessionFetch(input: string, init?: RequestInit & { trackPe
       headers,
     });
 
+    if (!input.startsWith(`${API_BASE}/diagnostics/`)) considerDiagnosticResponse(response.headers, sessionId);
     if (response.status === 401) {
       window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
     } else if (response.ok && !input.startsWith(`${API_BASE}/auth/`)) {
       window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
     }
     return response;
+  } catch (error) {
+    if (!(error instanceof DOMException && error.name === 'AbortError') && !input.startsWith(`${API_BASE}/diagnostics/`)) void clientDiagnostic('CLIENT_CONNECTION');
+    throw error;
   } finally {
     if (isMutation && init?.trackPending !== false) {
       navigationGuard.decrementPending();
@@ -168,6 +173,7 @@ export const api = {
       xhr.onerror = () => reject(new Error(t('authoring.uncertain')));
       xhr.onabort = () => reject(new Error(t('authoring.uncertain')));
       xhr.onload = () => {
+        considerDiagnosticResponse({ get: name => xhr.getResponseHeader(name) }, sessionId);
         let data;
         try { data = JSON.parse(xhr.responseText); } catch { reject(new Error(t('authoring.uncertain'))); return; }
         if (xhr.status === 401) window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));

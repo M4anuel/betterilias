@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { DiagnosticConsent } from './components/DiagnosticConsent';
 import './index.css';
 import { importSessionFromUrl } from './lib/mobileSession';
 
@@ -15,6 +16,7 @@ async function bootstrap() {
         {connectionError && <p role="alert" className="bg-amber-50 p-4 text-amber-900 dark:bg-amber-950 dark:text-amber-100">{connectionError}</p>}
         <App />
       </ErrorBoundary>
+      <DiagnosticConsent />
     </React.StrictMode>
   );
 }

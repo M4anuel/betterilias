@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     coordination_dir: str = '.coordination'
     # Private diagnostics; never serve this directory as static content.
     observability_dir: str = '.observability'
+    diagnostic_reports_dir: str = '.diagnostic_reports'
+    diagnostic_reports_retention_days: int = Field(default=30, ge=1, le=30)
+    diagnostic_reports_max_count: int = Field(default=1000, ge=10, le=10000)
+    diagnostic_reports_max_mb: int = Field(default=32, ge=16, le=256)
+    diagnostic_report_operator_name: str = Field(default='', max_length=120)
+    diagnostic_report_privacy_url: str = ''
     log_console_level: Literal['INFO', 'WARNING', 'ERROR', 'OFF'] = 'INFO'
     observability_retention_days: int = Field(default=7, ge=1, le=30)
     observability_max_events: int = Field(default=50000, ge=100, le=500000)
@@ -37,6 +43,10 @@ class Settings(BaseSettings):
     @property
     def observability_path(self) -> Path:
         return BASE_DIR / self.observability_dir
+
+    @property
+    def diagnostic_reports_path(self) -> Path:
+        return BASE_DIR / self.diagnostic_reports_dir
 
     # ILIAS Configuration
     ilias_base_url: str = "https://ilias.unibe.ch"

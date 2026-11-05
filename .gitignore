@@ -52,3 +52,4 @@ dist-ssr/
 
 .coordination/
 .observability/
+.diagnostic_reports/
