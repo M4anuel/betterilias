@@ -1,3 +1,4 @@
+from backend.observability import audit
 from backend.coordination import coordinated
 import asyncio
 import hashlib
@@ -494,6 +495,7 @@ async def preview_feedback_import(
 @coordinated(lambda exercise_ref_id, *args, **kwargs: 'exercise-write:' + exercise_ref_id)
 @coordinated(lambda exercise_ref_id, ass_id, *args, **kwargs: 'assignment:' + exercise_ref_id + ':' + ass_id)
 @coordinated(lambda exercise_ref_id, ass_id, session_id, request, client: 'feedback:' + session_id + ':' + request.staged_import_id)
+@audit('feedback_import')
 async def commit_feedback_import(
     exercise_ref_id: str,
     ass_id: str,

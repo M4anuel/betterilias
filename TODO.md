@@ -30,6 +30,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 - [ ] Build an authenticated admin dashboard with separate administrator
   authorization, health/worker/queue metrics, sanitized error reports and audit
   records; keep raw student pages and credentials out of public diagnostics.
+- [x] Add the [private logging foundation](docs/OBSERVABILITY_PRIVACY.md): fixed
+  security/compatibility events, request timing, write outcomes, bounded local
+  retention, privacy-safe parser artifacts and separately keyed read-only admin
+  diagnostics. Dashboard UI, administrator sessions and operator privacy review
+  remain open before public hosting.
 - [x] Add shared outbound request budgets, native-session fairness, allowlisted
   in-worker GET coalescing, 429/Retry-After handling and offline multi-process
   10/25/50/100-user load scenarios. See [traffic controls, measurements and

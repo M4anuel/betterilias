@@ -1657,5 +1657,6 @@
   "allocation.remove_assistant": "Remove assistant {name}",
   "allocation.member_missing": "Participant {member} was missing when verifying the saved allocation. Refresh the submissions.",
   "allocation.not_persisted": "The allocation note for participant {member} could not be confirmed in ILIAS. Refresh the submissions before trying again.",
-  "outbound.target_blocked": "This link cannot be fetched safely through BetterIlias. Open it directly in ILIAS or reconnect your ILIAS session."
+  "outbound.target_blocked": "This link cannot be fetched safely through BetterIlias. Open it directly in ILIAS or reconnect your ILIAS session.",
+  "diagnostics.unavailable": "Diagnostics are temporarily unavailable."
 }

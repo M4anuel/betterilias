@@ -1,3 +1,4 @@
+from backend.observability import audit
 """Repository authoring shared by courses and folders, with verified writes."""
 from urllib.parse import urlencode
 from pathlib import PurePath
@@ -90,6 +91,7 @@ class AuthoringMixin:
             raise AuthoringError('authoring.uncertain', 502) from exc
         raise AuthoringError('authoring.uncertain', 502)
 
+    @audit('folder_create')
     async def create_folder(self, ref_id: str, request: CreateFolderRequest):
         self._ensure_authenticated()
         title = request.title.strip()
@@ -105,6 +107,7 @@ class AuthoringMixin:
             form.values[form.template_field] = template
             return await self._submit_creation(client, ref_id, before, form, title, 'fold')
 
+    @audit('course_upload')
     async def upload_course_file(self, ref_id, upload, license_value):
         self._ensure_authenticated()
         # Stream the spooled UploadFile to httpx; avoid reading large lectures into memory.

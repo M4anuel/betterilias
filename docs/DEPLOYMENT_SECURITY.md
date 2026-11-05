@@ -15,6 +15,14 @@ contents and are not an authenticated administration dashboard. There is no
 maintenance UI entry in the frontend to gate; Vite's production build alone must
 never grant access to backend diagnostics. The server's runtime mode is authoritative.
 
+Parser artifacts now contain only fixed metadata by default. Raw HTML requires
+explicit development opt-in and is never captured in production. Retention also
+removes legacy raw captures when private defaults apply. See the
+[logging and privacy foundation](OBSERVABILITY_PRIVACY.md) for bounded event
+storage, separately keyed read-only admin diagnostics and the scheduled expiry
+job. The future browser admin login/dashboard and operator privacy review remain
+unfinished; no student capability grants administrator access.
+
 ## Authentication
 
 Login is through the Chrome/Firefox companion only; the headed browser helper,
@@ -47,7 +55,7 @@ Long-lived capabilities remain in extension storage, frontend localStorage,
 headers, and private server persistence; this is not a complete migration to
 HttpOnly-only authentication. Protect these stores and do not log headers or
 auth request/response bodies. Database-backed stable user identity, device
-revocation, and administrator authentication remain separate follow-up work.
+revocation, and browser administrator sessions remain separate follow-up work.
 
 ## URL changes
 

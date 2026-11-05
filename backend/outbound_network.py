@@ -34,7 +34,7 @@ class PublicNetworkBackend(httpcore.AsyncNetworkBackend):
             raise httpcore.ConnectError('DNS returned no addresses')
         local_native = self.policy.allow_local and (host.lower(), port) == self.policy.native[1:]
         if not local_native and not all(public_address(address) for address in addresses):
-            raise OutboundTargetRejected()
+            raise OutboundTargetRejected("private_address")
         last_error = None
         for address in addresses:
             remaining = deadline - time.monotonic()

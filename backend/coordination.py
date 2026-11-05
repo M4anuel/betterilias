@@ -138,6 +138,8 @@ def atomic_json(path, data):
             json.dump(data, file, ensure_ascii=False, indent=2)
             file.flush()
             os.fsync(file.fileno())
+        from backend.observability import mark_dispatch
+        mark_dispatch()
         os.replace(name, path)
     finally:
         if os.path.exists(name):

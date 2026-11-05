@@ -18,6 +18,7 @@ import httpx
 from backend.config import settings
 from backend.outbound_budget import OutboundBudget, OutboundUnavailable
 from backend.outbound_network import EgressTransport
+from backend.observability import emit, mark_dispatch
 
 
 def safe_read(request):
@@ -130,6 +131,9 @@ class BudgetTransport(httpx.AsyncBaseTransport):
         for attempt in range(self.retries + 1):
             permit = await self.budget.acquire(self.identity)
             try:
+                # Conservative: unknown native GET commands can mutate too.
+                if not readonly:
+                    mark_dispatch()
                 response = await self.inner.handle_async_request(request)
             except BaseException:
                 await permit.close()
@@ -141,6 +145,7 @@ class BudgetTransport(httpx.AsyncBaseTransport):
                 response.stream = BudgetStream(response.stream, permit)
             if response.status_code not in (429, 503):
                 return response
+            emit('outbound.throttled', status=response.status_code)
             delay = retry_delay(response.headers.get('retry-after'), attempt)
             try:
                 await self.budget.cooldown(delay)

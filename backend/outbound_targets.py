@@ -13,12 +13,14 @@ import httpx
 
 from backend.config import settings
 from backend.i18n import t
+from backend.observability import emit
 
 RESOURCE_READ = 'betterilias.resource_read'
 
 
 class OutboundTargetRejected(Exception):
-    def __init__(self):
+    def __init__(self, reason="malformed_url"):
+        emit("outbound." + reason)
         # Never include attacker-supplied URLs, signed query strings or IPs.
         super().__init__(t('outbound.target_blocked'))
 
@@ -80,7 +82,7 @@ class TargetPolicy:
         parsed = self._parse(str(value))
         target = origin(parsed)
         if target != self.native and target not in self.media:
-            raise OutboundTargetRejected()
+            raise OutboundTargetRejected("origin_not_allowed")
         return parsed
 
     def resource_url(self, raw):
@@ -95,13 +97,13 @@ class TargetPolicy:
         lowered = [(key.lower(), value.lower()) for key, value in query]
         keys = [key for key, _ in lowered]
         if len(set(keys)) != len(keys) or any(key.startswith('cmd[') for key in keys):
-            raise OutboundTargetRejected()
+            raise OutboundTargetRejected('ambiguous_command')
         values = dict(lowered)
         command = values.get('cmd', '')
         reads = {'sendfile', 'download', 'downloadfile', 'downloadall', 'downloadreturned', 'sendassignedfile', 'downloadfeedbackfile'}
         if ((command and command not in reads) or
                 any(key.startswith('fallbackcmd') and value not in reads for key, value in lowered)):
-            raise OutboundTargetRejected()
+            raise OutboundTargetRejected("unsafe_command")
         if path.endswith('/ilias.php') and command in reads:
             return str(parsed.copy_with(fragment=None))
         if (not command and path.endswith('/ilias.php') and values.get('ref_id', '').isdecimal()
@@ -118,7 +120,7 @@ class TargetPolicy:
                     '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.mp4', '.mp3', '.webm',
                     '.ogg', '.vtt', '.srt', '.zip', '.txt', '.csv', '.docx', '.xlsx', '.pptx', '.py', '.ipynb', '.tar', '.gz'}):
             return str(parsed.copy_with(fragment=None))
-        raise OutboundTargetRejected()
+        raise OutboundTargetRejected("unsupported_resource")
 
     def prepare(self, request):
         parsed = self.validate_url(str(request.url))
@@ -128,7 +130,7 @@ class TargetPolicy:
         if not native:
             if (request.method not in ('GET', 'HEAD') or request.headers.get('transfer-encoding')
                     or request.headers.get('content-length', '0') != '0'):
-                raise OutboundTargetRejected()
+                raise OutboundTargetRejected('external_write')
             # HTTPX carries extensions through redirects. An external media
             # response may only lead back to a native resource read, never a
             # grade/editor command with the authenticated native cookie jar.

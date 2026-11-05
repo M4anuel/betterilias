@@ -15,10 +15,27 @@ class Settings(BaseSettings):
 
     app_env: Literal['production', 'development', 'test'] = 'production'
     coordination_dir: str = '.coordination'
+    # Private diagnostics; never serve this directory as static content.
+    observability_dir: str = '.observability'
+    observability_retention_days: int = Field(default=7, ge=1, le=30)
+    observability_max_events: int = Field(default=50000, ge=100, le=500000)
+    observability_queue_size: int = Field(default=2048, ge=16, le=10000)
+    observability_max_mb: int = Field(default=32, ge=4, le=256)
+    # Empty disables admin routes. Independent of all student credentials.
+    admin_api_key: str = ''
+    # Raw pages can contain student data. Capture only with explicit dev consent.
+    capture_failed_html: bool = False
+    failed_html_retention_hours: int = Field(default=24, ge=1, le=168)
+    failed_html_max_files: int = Field(default=20, ge=1, le=100)
+    failed_html_max_bytes: int = Field(default=1048576, ge=1024, le=5242880)
 
     @property
     def coordination_path(self) -> Path:
         return BASE_DIR / self.coordination_dir
+
+    @property
+    def observability_path(self) -> Path:
+        return BASE_DIR / self.observability_dir
 
     # ILIAS Configuration
     ilias_base_url: str = "https://ilias.unibe.ch"

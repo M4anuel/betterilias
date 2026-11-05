@@ -1,3 +1,4 @@
+from backend.observability import audit
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
@@ -13,6 +14,7 @@ router = APIRouter(prefix='/auth', tags=['Authentication'])
 
 
 @router.post('/mobile-session', response_model=MobileSessionResponse)
+@audit('auth_handoff')
 async def prepare_mobile_session(response: Response,
     client: IliasClient = Depends(get_ilias_client),
     manager: SessionManager = Depends(get_session_manager)):
@@ -27,6 +29,7 @@ class HandoffClaim(BaseModel):
 
 
 @router.post('/claim')
+@audit('auth_claim')
 def claim_connection(payload: HandoffClaim, response: Response):
     sid = claim_handoff(payload.token)
     if not sid or not SessionManager(sid).has_cookies():
@@ -48,6 +51,7 @@ async def check_status(response: Response, manager=Depends(get_optional_session_
 
 
 @router.post('/sync', response_model=ExtensionSyncResponse)
+@audit('auth_sync')
 async def sync_extension_cookies(payload: ExtensionSyncInput, response: Response):
     # Extension-only login: never inherit an ambient browser/default session.
     response.headers['Cache-Control'] = 'no-store'
@@ -109,6 +113,7 @@ async def sync_extension_cookies(payload: ExtensionSyncInput, response: Response
 
 
 @router.post('/logout')
+@audit('auth_logout')
 def logout(response: Response, manager: SessionManager = Depends(get_session_manager)):
     cleared = manager.clear_session()
     response.delete_cookie('betterilias_session', path='/api')

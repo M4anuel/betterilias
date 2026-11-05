@@ -31,9 +31,9 @@ def test_safe_parser_dumps_on_exception(tmp_path, monkeypatch):
     assert err.dump_path.exists()
 
     content = err.dump_path.read_text(encoding="utf-8")
-    assert "ILIAS SCRAPER DUMP" in content
-    assert "Simulated parsing crash" in content
-    assert corrupted_html in content
+    assert "diagnostic metadata only" in content
+    assert "Simulated parsing crash" not in content
+    assert corrupted_html not in content
 
 
 def test_safe_parser_empty_html(tmp_path, monkeypatch):
@@ -62,5 +62,6 @@ def test_list_and_get_failed_dumps(tmp_path, monkeypatch):
 
     content = get_dump_content(dump_path.name)
     assert content is not None
-    assert "<div>raw data</div>" in content
+    assert "<div>raw data</div>" not in content
+    assert "diagnostic metadata only" in content
 

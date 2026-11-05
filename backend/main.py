@@ -1,5 +1,6 @@
 import httpx
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,14 +16,26 @@ from backend.i18n import LanguageMiddleware, t
 from backend.coordination import CoordinationBusy
 from backend.outbound_budget import OutboundUnavailable
 from backend.outbound_targets import OutboundTargetRejected
+from backend.observability import DiagnosticMiddleware, configure_logging, emit, shutdown
+from backend.api.routes import admin
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
+configure_logging()
 logger = logging.getLogger("ilias.main")
 
+
+@asynccontextmanager
+async def lifespan(app):
+    configure_logging()
+    emit('worker.started')
+    try:
+        yield
+    finally:
+        emit('worker.stopped')
+        shutdown()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="ILIAS Alternative API",
     description="High-performance backend & scraper bridge for Uni Bern ILIAS",
     version="1.0.0",
@@ -31,6 +44,7 @@ app = FastAPI(
     openapi_url='/openapi.json' if settings.app_env == 'development' else None,
 )
 app.add_middleware(LanguageMiddleware)
+app.add_middleware(DiagnosticMiddleware)
 
 
 @app.exception_handler(OutboundTargetRejected)
@@ -41,6 +55,7 @@ async def outbound_target_rejected_handler(request: Request, exc: OutboundTarget
 
 @app.exception_handler(OutboundUnavailable)
 async def outbound_unavailable_handler(request: Request, exc: OutboundUnavailable):
+    emit('outbound.busy', status=503)
     return JSONResponse(status_code=503,
         content={'detail': t('outbound.write_uncertain') if exc.write_uncertain or request.method not in ('GET', 'HEAD', 'OPTIONS') else t('outbound.busy'),
                  'code': 'ILIAS_BUSY'},
@@ -49,11 +64,13 @@ async def outbound_unavailable_handler(request: Request, exc: OutboundUnavailabl
 
 @app.exception_handler(CoordinationBusy)
 async def coordination_busy_handler(request: Request, exc: CoordinationBusy):
+    emit('coordination.busy', status=503)
     return JSONResponse(status_code=503, content={'detail': t('coordination.busy')}, headers={'Retry-After': '1'})
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError):
+    emit('input.invalid', status=422)
     return JSONResponse(status_code=422, content={"detail": [
         {"loc": list(error['loc']), "type": error['type'],
          "msg": t('validation.required' if error['type'] == 'missing' else 'validation.invalid')}
@@ -75,12 +92,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Content-Length", "Content-Disposition", "X-Session-Id"],
+    expose_headers=["Content-Length", "Content-Disposition", "X-Session-Id", "X-Request-Id"],
 )
 
 
 @app.exception_handler(SessionExpiredError)
 async def session_expired_handler(request: Request, exc: SessionExpiredError):
+    emit('auth.rejected', status=401)
     logger.warning(f"Session expired or unauthorized request: {exc}")
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -114,6 +132,7 @@ async def scraping_error_handler(request: Request, exc: ScrapingParsingError):
 
 @app.exception_handler(httpx.TimeoutException)
 async def httpx_timeout_handler(request: Request, exc: httpx.TimeoutException):
+    emit('outbound.timeout', status=504)
     logger.warning(f"ILIAS timeout on {request.url.path}: {exc}")
     return JSONResponse(
         status_code=status.HTTP_504_GATEWAY_TIMEOUT,
@@ -127,6 +146,7 @@ async def httpx_timeout_handler(request: Request, exc: httpx.TimeoutException):
 
 @app.exception_handler(httpx.NetworkError)
 async def httpx_network_handler(request: Request, exc: httpx.NetworkError):
+    emit('outbound.network_error', status=502)
     logger.warning(f"ILIAS network error on {request.url.path}: {exc}")
     return JSONResponse(
         status_code=status.HTTP_502_BAD_GATEWAY,
@@ -145,6 +165,7 @@ app.include_router(materials.router, prefix="/api")
 app.include_router(exercises.router, prefix="/api")
 app.include_router(calendar.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
 
 @app.get("/health")

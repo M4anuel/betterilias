@@ -1,3 +1,4 @@
+from backend.observability import audit
 """Verified repository management; native URLs and confirmation fields stay server-side."""
 import hashlib
 import json
@@ -130,6 +131,7 @@ class ManagementMixin:
             review, _ = await self._review_selection(client, ref_id, item_ids)
             return review
 
+    @audit('material_delete')
     async def delete_materials(self, ref_id, request):
         self._ensure_authenticated()
         async with self.session_manager.get_http_client() as client:
@@ -160,6 +162,7 @@ class ManagementMixin:
             logger.info('Deleted repository items parent=%s items=%s', ref_id, [(item.ref_id, item.title) for item in review.items])
             return {'success': True, 'deleted_ids': request.item_ids, 'affected': review.items}
 
+    @audit('material_order')
     async def save_material_order(self, ref_id, request):
         self._ensure_authenticated()
         async with self.session_manager.get_http_client() as client:

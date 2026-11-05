@@ -183,6 +183,9 @@ Follow [AGENTS.md](AGENTS.md) for contribution rules and
 [DEVELOPMENT.md](docs/DEVELOPMENT.md) for required checks, optional browser tests,
 translation changes and scraper-repair procedures.
 
-When native ILIAS markup changes, inspect `logs/failed_html_dump_*.html` or the
-development-only `/api/system/logs` endpoints. Capture sanitized evidence and add a regression
-instead of guessing a native form or treating an unverified write as successful.
+When native ILIAS markup changes, consult the
+[private diagnostics guide](docs/OBSERVABILITY_PRIVACY.md). Parser artifacts are
+metadata-only by default; raw HTML needs explicit development opt-in and has
+bounded retention. The `/api/system/logs` viewer is development-only. Capture
+de-identified evidence and add a regression instead of guessing a native form or
+treating an unverified write as successful.

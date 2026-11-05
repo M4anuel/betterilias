@@ -1,3 +1,4 @@
+from backend.observability import audit
 from backend.outbound_budget import OutboundUnavailable
 from backend.outbound_targets import OutboundTargetRejected, TargetPolicy, RESOURCE_READ
 from backend.coordination import SharedLock, coordinated
@@ -461,6 +462,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             fields=prepared.fields if available else [], ilias_url=source,
         )
 
+    @audit('membership')
     async def change_course_membership(self, ref_id: str, request: MembershipRequest) -> MembershipResult:
         self._ensure_authenticated()
         async with self.session_manager.get_http_client() as client:
@@ -788,6 +790,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
 
             return detail
 
+    @audit('submission_upload')
     async def upload_student_assignment_file(
         self,
         exercise_ref_id: str,
@@ -893,6 +896,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                 raise StudentUploadError(t('upload.unconfirmed'), 409)
             return detail
 
+    @audit('submission_delete')
     async def delete_student_assignment_file(
         self,
         exercise_ref_id: str,
@@ -979,6 +983,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
 
         return await self.get_student_assignment_detail(exercise_ref_id, ass_id)
 
+    @audit('team_create')
     async def create_student_team(
         self, exercise_ref_id: str, ass_id: str
     ) -> StudentAssignmentDetail:
@@ -1108,6 +1113,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                 candidates=course_screen.candidates,
             )
 
+    @audit('team_add')
     async def add_student_team_members(
         self,
         exercise_ref_id: str,
@@ -1254,6 +1260,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
         step2_resp = await client.post(step2_action, data=step2_data)
         self._check_response_for_session_loss(step2_resp, step2_action)
 
+    @audit('team_remove')
     async def remove_student_team_members(
         self, exercise_ref_id: str, ass_id: str, member_ids: List[str]
     ) -> StudentAssignmentDetail:
@@ -1270,6 +1277,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             )
         return await self.get_student_assignment_detail(exercise_ref_id, ass_id)
 
+    @audit('team_delete')
     async def delete_student_team(
         self, exercise_ref_id: str, ass_id: str
     ) -> StudentAssignmentDetail:
@@ -1375,6 +1383,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
 
     @coordinated(lambda self, exercise_ref_id, *args, **kwargs: 'exercise-write:' + exercise_ref_id)
     @coordinated(lambda self, *args, **kwargs: self.session_manager.native_view_lock_key)
+    @audit('grade')
     async def grade_student_submission(
         self, exercise_ref_id: str, grade_data: GradeSubmissionRequest
     ) -> GradeSubmissionResponse:
@@ -1655,6 +1664,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             self._cache_exercise_cmd_nodes_from_html(exercise_ref_id, resp.text, url=str(resp.url))
             return parse_feedback_files(resp.text, base_url=settings.ilias_base_url)
 
+    @audit('feedback_upload')
     async def upload_submission_feedback_file(
         self,
         exercise_ref_id: str,
@@ -1723,6 +1733,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                 return parsed
             return await self.get_submission_feedback_files(exercise_ref_id, member_id, ass_id, feedback_url=page_url, http_client=client)
 
+    @audit('feedback_delete')
     async def delete_submission_feedback_file(
         self,
         exercise_ref_id: str,
@@ -1753,6 +1764,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
 
 
     @coordinated(lambda self, *args, **kwargs: self.session_manager.native_view_lock_key)
+    @audit('allocation')
     async def apply_ta_allocation_batch(
         self,
         exercise_ref_id: str,
@@ -1853,6 +1865,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             resp.raise_for_status()
             return parse_ta_assignments_list(resp.text, exercise_ref_id=ref_id)
 
+    @audit('assignment_order')
     async def update_ta_assignment_order(
         self, ref_id: str, orders: Dict[str, int]
     ) -> TAAssignmentListResponse:
@@ -1926,6 +1939,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                     logger.debug(f"Could not load instruction files for {ass_id}: {fe}")
             return detail
 
+    @audit('assignment_save')
     async def save_ta_assignment(
         self, ref_id: str, data: SaveTAAssignmentRequest
     ) -> TAAssignmentDetailResponse:
@@ -1988,6 +2002,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                 raise ValueError(t('editor.save_unconfirmed'))
             return saved
 
+    @audit('assignment_delete')
     async def delete_ta_assignment(self, ref_id: str, ass_id: str) -> bool:
         """Follow the confirmation once, then verify deletion even after a timeout."""
         from backend.scrapers.dumper import ScrapingParsingError
@@ -2061,6 +2076,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             self._check_response_for_session_loss(resp, url)
             return parse_instruction_files(resp.text, base_url=settings.ilias_base_url)
 
+    @audit('instruction_upload')
     async def upload_instruction_file(
         self,
         ref_id: str,
@@ -2130,6 +2146,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                 raise StudentUploadError(t('upload.unconfirmed'), 409)
             return updated
 
+    @audit('instruction_delete')
     async def delete_instruction_file(
         self, ref_id: str, ass_id: str, file_id: str
     ) -> bool:

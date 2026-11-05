@@ -1,5 +1,8 @@
 from backend.i18n import t
 import functools
+import hashlib
+import secrets
+import time
 import logging
 import os
 import re
@@ -8,6 +11,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from backend.config import settings
+from backend.coordination import SharedLock, CoordinationBusy
+from backend.observability import emit
 
 logger = logging.getLogger("ilias.scraper.dumper")
 
@@ -27,45 +32,75 @@ class ScrapingParsingError(Exception):
         return f"Parsing failed for context '{self.context}': {self.message}{dump_info}"
 
 
+METADATA_MARKER = '<!-- BetterIlias diagnostic metadata only -->'
+
+
+def _prune_dumps_locked():
+    directory = settings.log_path
+    if not directory.exists():
+        return
+    raw_allowed = settings.app_env == 'development' and settings.capture_failed_html
+    retained = []
+    for path in directory.glob('failed_html_dump_*.html'):
+        if path.is_symlink() or not path.is_file():
+            continue
+        info = path.stat()
+        expired = info.st_mtime < time.time() - settings.failed_html_retention_hours * 3600
+        # Purge old raw captures too when switching to private defaults.
+        with path.open('rb') as file:
+            metadata_only = file.read(len(METADATA_MARKER)).decode('ascii', errors='replace') == METADATA_MARKER
+        if expired or info.st_size > settings.failed_html_max_bytes or (not raw_allowed and not metadata_only):
+            path.unlink()
+        else:
+            retained.append((info.st_mtime, path))
+    retained.sort(reverse=True)
+    for _, path in retained[settings.failed_html_max_files:]:
+        path.unlink()
+
+
+def prune_failed_dumps(*, strict=False):
+    try:
+        with SharedLock('private-diagnostic-dumps', timeout=0).sync():
+            _prune_dumps_locked()
+    except (OSError, CoordinationBusy):
+        if strict:
+            raise
+        # A diagnostic failure must not hide the original parser failure.
+        pass
+
+
 def dump_failed_html(
     html: str,
     context: str,
     error: Optional[Exception] = None,
     extra_info: Optional[Dict[str, Any]] = None,
-) -> Path:
+) -> Optional[Path]:
+    """Write bounded metadata; raw HTML requires explicit development opt-in.
+
+    Never persist exception text or extra_info: both can contain credentials or
+    student content. Parser context is hashed to avoid dynamic names/identifiers.
     """
-    Dumps raw HTML to logs/failed_html_dump_{context}_{timestamp}.html
-    for debugging and the AI Maintenance Protocol.
-    """
-    logs_dir = settings.log_path
-    logs_dir.mkdir(parents=True, exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
-    safe_context = re.sub(r"[^\w\-]", "_", context)
-    dump_filename = f"failed_html_dump_{safe_context}_{timestamp}.html"
-    dump_path = logs_dir / dump_filename
-
-    header_comment = (
-        f"<!--\n"
-        f"ILIAS SCRAPER DUMP\n"
-        f"Context: {context}\n"
-        f"Timestamp: {datetime.now(timezone.utc).isoformat()}\n"
-        f"Error: {str(error) if error else 'No error provided'}\n"
-    )
-    if extra_info:
-        for k, v in extra_info.items():
-            header_comment += f"{k}: {v}\n"
-    header_comment += "-->\n"
-
+    emit('parser.failed')
     try:
-        with open(dump_path, "w", encoding="utf-8", errors="replace") as f:
-            f.write(header_comment)
-            f.write(html or "<!-- EMPTY HTML RECEIVED -->")
-        logger.error(f"Dumped failed HTML to: {dump_path} (Reason: {error})")
-    except Exception as io_err:
-        logger.critical(f"Failed to write HTML dump to {dump_path}: {io_err}")
-
-    return dump_path
+        with SharedLock('private-diagnostic-dumps', timeout=0).sync():
+            logs_dir = settings.log_path
+            logs_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+            if os.name != 'nt':
+                logs_dir.chmod(0o700)
+            _prune_dumps_locked()
+            context_key = hashlib.sha256(str(context).encode()).hexdigest()[:12]
+            timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f')
+            dump_path = logs_dir / f'failed_html_dump_{context_key}_{timestamp}_{secrets.token_hex(4)}.html'
+            raw_allowed = settings.app_env == 'development' and settings.capture_failed_html
+            content = (html or '<!-- EMPTY HTML -->') if raw_allowed else METADATA_MARKER
+            content = content.encode('utf-8', errors='replace')[:settings.failed_html_max_bytes]
+            fd = os.open(dump_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, 'wb') as file:
+                file.write(content)
+            _prune_dumps_locked()
+            return dump_path
+    except (OSError, CoordinationBusy):
+        return None
 
 
 def safe_parser(context_name: str, check_empty: bool = False):
@@ -114,6 +149,7 @@ def safe_parser(context_name: str, check_empty: bool = False):
 
 def list_failed_dumps() -> List[Dict[str, Any]]:
     """List all failed HTML dumps in logs directory."""
+    prune_failed_dumps()
     logs_dir = settings.log_path
     if not logs_dir.exists():
         return []
@@ -123,7 +159,7 @@ def list_failed_dumps() -> List[Dict[str, Any]]:
         stat = file_path.stat()
         name = file_path.name
         # Extract context and timestamp from failed_html_dump_{context}_{timestamp}.html
-        match = re.match(r"failed_html_dump_(.+)_(\d{8}_\d{6})\.html", name)
+        match = re.match(r"failed_html_dump_(.+?)_(\d{8}_\d{6})(?:_\d+)?(?:_[a-f0-9]+)?\.html", name)
         context = match.group(1) if match else "unknown"
         created_at = datetime.fromtimestamp(stat.st_mtime).isoformat()
 
@@ -145,7 +181,8 @@ def get_dump_content(filename: str) -> Optional[str]:
     # Prevent path traversal
     safe_name = Path(filename).name
     target_path = settings.log_path / safe_name
-    if target_path.exists() and target_path.is_file():
+    prune_failed_dumps()
+    if target_path.exists() and not target_path.is_symlink() and target_path.is_file():
         return target_path.read_text(encoding="utf-8", errors="replace")
     return None
 

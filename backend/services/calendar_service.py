@@ -1,3 +1,4 @@
+from backend.observability import audit
 from backend.outbound_targets import OutboundTargetRejected
 from backend.outbound_budget import OutboundUnavailable
 from backend.coordination import coordinated, atomic_json
@@ -993,6 +994,7 @@ class CalendarService:
             raise ValueError(t("calendar.validation.end_after_start_date"))
 
     @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @audit('calendar_create')
     def create_rule(
         self,
         tenant_key: str,
@@ -1033,6 +1035,7 @@ class CalendarService:
         return self.build_semester_response(tenant_key, None, base_url=base_url)
 
     @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @audit('calendar_update')
     def update_rule(
         self,
         tenant_key: str,
@@ -1067,6 +1070,7 @@ class CalendarService:
         return self.build_semester_response(tenant_key, None, base_url=base_url)
 
     @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @audit('calendar_duplicate')
     def duplicate_rule(
         self,
         tenant_key: str,
@@ -1094,6 +1098,7 @@ class CalendarService:
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
     @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @audit('calendar_delete')
     def delete_rule(
         self,
         tenant_key: str,
@@ -1111,6 +1116,7 @@ class CalendarService:
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
     @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @audit('calendar_color')
     def update_course_color(
         self,
         tenant_key: str,
@@ -1133,6 +1139,7 @@ class CalendarService:
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
     @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @audit('calendar_ignore')
     def update_course_ignored_missing_schedule(
         self,
         tenant_key: str,
@@ -1156,6 +1163,7 @@ class CalendarService:
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
     @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @audit('calendar_import')
     def import_raw_ics_for_course(
         self,
         tenant_key: str,
@@ -1229,6 +1237,7 @@ class CalendarService:
 
     @coordinated(lambda self, *args, **kwargs: "calendar-tokens:" + str(self.storage_dir.resolve()))
     @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @audit('calendar_token_rotate')
     def rotate_subscription_token(
         self,
         tenant_key: str,
@@ -1272,6 +1281,7 @@ class CalendarService:
 
     @coordinated(lambda self, *args, **kwargs: "calendar-tokens:" + str(self.storage_dir.resolve()))
     @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @audit('calendar_token_revoke')
     def revoke_subscription_token(self, tenant_key: str) -> None:
         state = self._load_tenant_state(tenant_key)
         tokens = self._load_tokens()
