@@ -1443,7 +1443,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   }, [taSubmissionsData?.submissions]);
 
   const advancedGradingFilters = (
-    <div className="flex min-w-0 max-w-full items-center gap-2.5 flex-wrap">
+    <div className="flex items-center gap-2.5 flex-wrap shrink-0">
       {/* Submission Radio Group */}
       <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 text-xs shrink-0">
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1.5 hidden md:inline whitespace-nowrap shrink-0">
@@ -1459,7 +1459,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           }`}
           title={t("Alle Abgaben anzeigen")}
         >
-          {t("Alle (")}{filterCounts.total})
+          <span className="whitespace-nowrap">{t("Alle (")}{filterCounts.total})</span>
         </button>
         <button
           type="button"
@@ -1471,7 +1471,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           }`}
           title={t("Nur eingereichte Abgaben anzeigen")}
         >
-          {t("Eingereicht (")}{filterCounts.submitted})
+          <span className="whitespace-nowrap">{t("Eingereicht (")}{filterCounts.submitted})</span>
         </button>
         <button
           type="button"
@@ -1483,7 +1483,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           }`}
           title={t("Nur noch nicht eingereichte anzeigen")}
         >
-          {t("Nicht eingereicht (")}{filterCounts.notSubmitted})
+          <span className="whitespace-nowrap">{t("Nicht eingereicht (")}{filterCounts.notSubmitted})</span>
         </button>
       </div>
 
@@ -1517,7 +1517,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           }`}
           title={t("Offene / noch nicht bewertete Abgaben filtern")}
         >
-          {t("Offen (")}{filterCounts.notGraded})
+          <span className="whitespace-nowrap">{t("Offen (")}{filterCounts.notGraded})</span>
         </button>
         <button
           type="button"
@@ -1529,7 +1529,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           }`}
           title={t("Bestandene Abgaben filtern")}
         >
-          {t("Bestanden (")}{filterCounts.passed})
+          <span className="whitespace-nowrap">{t("Bestanden (")}{filterCounts.passed})</span>
         </button>
         <button
           type="button"
@@ -1541,7 +1541,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           }`}
           title={t("Nicht bestandene Abgaben filtern")}
         >
-          {t("Nicht bestanden (")}{filterCounts.failed})
+          <span className="whitespace-nowrap">{t("Nicht bestanden (")}{filterCounts.failed})</span>
         </button>
       </div>
 
@@ -2082,10 +2082,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             </div>
           </div>
 
-          {/* TA Grading Menu Bar (Left/Center: Quick-Filters + Advanced Filters, Right: Search, Sorting indicator, Action buttons) */}
-          <div className="grading-toolbar flex flex-col 2xl:flex-row 2xl:items-start justify-between gap-3.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            {/* Left/Middle: All Filters (Quick-Filters + Advanced Filters) */}
-            <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+          {/* TA Grading Menu Bar (Organized in distinct rows: Filters on top, Search & Actions below) */}
+          <div className="grading-toolbar flex flex-col gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+            {/* Top Row: Filters (Quick-Filters + Advanced Filters) */}
+            <div className="flex flex-wrap items-center gap-2.5">
               {/* Quick-Filters collection */}
               <div className="single-row-filters flex items-center gap-1.5 flex-wrap shrink-0">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 hidden sm:inline whitespace-nowrap shrink-0">
@@ -2119,12 +2119,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               </div>
 
               {/* Advanced Filters: Submission Radio toggle + Grade Multi-select + Tutor */}
-              <div className="desktop-only flex min-w-0 max-w-full items-center gap-2.5 flex-wrap">{advancedGradingFilters}</div>
+              <div className="desktop-only flex items-center gap-2.5 flex-wrap shrink-0">{advancedGradingFilters}</div>
             </div>
 
-            {/* Right: Search, Sorting Indicator & Action Buttons (reorganized on top of / below each other) */}
-            <div className="grading-search flex flex-col sm:flex-row 2xl:flex-col items-stretch sm:items-center 2xl:items-end justify-between 2xl:justify-start gap-2.5 shrink-0">
-              <div className="flex flex-col gap-0.5">
+            {/* Bottom Row: Search, Sorting Indicator & Action Buttons */}
+            <div className="grading-search flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0 pt-0.5 border-t border-slate-100/80 dark:border-slate-800/60">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2.5">
                 <div className="relative w-full sm:w-56">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                   <input
@@ -2135,16 +2135,16 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                     className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800 pl-8 pr-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-hidden transition"
                   />
                 </div>
-                {/* Greyed-out sorting indication under search */}
-                <div className="desktop-only flex items-center gap-1 px-1 text-[10px] text-slate-400 dark:text-slate-500">
+                {/* Greyed-out sorting indication under/beside search */}
+                <div className="desktop-only flex items-center gap-1 px-1 text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
                   <span>{t("Sortiert:")}</span>
                   <span className="text-slate-500 dark:text-slate-400 font-semibold">{sortFieldLabel}</span>
                   <span className="font-bold">{taSortOrder === 'asc' ? '↑' : '↓'}</span>
                 </div>
               </div>
 
-              {/* Action Buttons: ZIP, Distribute, 3-Dot (reorganized on top of / below each other) */}
-              <div className="flex items-center gap-2 flex-wrap">
+              {/* Action Buttons: ZIP, Feedback, Distribute, 3-Dot */}
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
                 {/* Export ZIP Trigger */}
                 {(selectedTaAssId || taSubmissionsData?.active_assignment_id) && (
                   <TAExportZipButton
