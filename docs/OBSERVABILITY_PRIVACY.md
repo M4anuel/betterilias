@@ -131,6 +131,11 @@ data retention policy.
 
 ## Parser captures
 
+The opt-in [diagnostic report workflow](DIAGNOSTIC_REPORTS.md) is separate from
+these development artifacts and routine event logs. It offers once/always/no,
+settings-based withdrawal/deletion, text-free structural evidence, a private
+SQLite report store and an open/resolved administrator review workflow.
+
 `@safe_parser` still creates a diagnostic artifact on failure, but by default it
 contains only a fixed metadata marker. Its name contains a hash of the parser
 context, timestamp and random suffix. Neither exception text nor `extra_info`

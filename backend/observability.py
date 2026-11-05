@@ -34,6 +34,9 @@ EVENTS = {
     'write.started': 'audit', 'write.finished': 'audit',
     'admin.read': 'audit', 'admin.rejected': 'security',
     'admin.login': 'audit', 'admin.logout': 'audit',
+    'report.created': 'audit', 'report.deleted': 'audit', 'report.preference_changed': 'audit',
+    'report.resolved': 'audit', 'report.reopened': 'audit',
+    'report.unavailable': 'operational',
     'runtime.warning': 'operational', 'runtime.error': 'operational',
     'worker.started': 'operational', 'worker.stopped': 'operational',
 }
@@ -269,6 +272,8 @@ def audit(operation):
         raise ValueError('Unknown audit operation')
     def decorate(fn):
         def start():
+            from backend.diagnostic_reports import operation_context
+            operation_context(operation)
             state = {'sent': False}
             tokens = (_operation.set(secrets.token_hex(16)),
                       _dispatch.set((*(_dispatch.get() or ()), state)))
@@ -277,6 +282,8 @@ def audit(operation):
         def finish(state, tokens, result=None, failed=False):
             try:
                 outcome = ('uncertain' if state['sent'] else 'rejected') if failed else _returned_outcome(result)
+                from backend.diagnostic_reports import operation_context
+                operation_context(operation, outcome)
                 emit('write.finished', operation=operation, outcome=outcome)
             finally:
                 _dispatch.reset(tokens[1])
@@ -317,6 +324,7 @@ class DiagnosticMiddleware:
         # Never trust an incoming correlation ID and never inspect query/header
         # values. No route path or IP is retained, even for 404/validation errors.
         request_id = secrets.token_hex(16)
+        scope.setdefault('state', {})['diagnostic_request_id'] = request_id
         token = _request.set(request_id)
         started, status_code = time.monotonic(), 500
         async def wrapped_send(message):

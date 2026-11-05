@@ -18,6 +18,8 @@ from backend.outbound_budget import OutboundUnavailable
 from backend.outbound_targets import OutboundTargetRejected
 from backend.observability import DiagnosticMiddleware, configure_logging, emit, shutdown
 from backend.api.routes import admin
+from backend.api.routes import diagnostics
+from backend.diagnostic_reports import ReportMiddleware, problem
 
 configure_logging()
 logger = logging.getLogger("ilias.main")
@@ -45,16 +47,19 @@ app = FastAPI(
 )
 app.add_middleware(LanguageMiddleware)
 app.add_middleware(DiagnosticMiddleware)
+app.add_middleware(ReportMiddleware)
 
 
 @app.exception_handler(OutboundTargetRejected)
 async def outbound_target_rejected_handler(request: Request, exc: OutboundTargetRejected):
+    problem('OUTBOUND_TARGET_BLOCKED')
     return JSONResponse(status_code=400, content={'detail': t('outbound.target_blocked'), 'code': 'OUTBOUND_TARGET_BLOCKED'},
                         headers={'Cache-Control': 'no-store'})
 
 
 @app.exception_handler(OutboundUnavailable)
 async def outbound_unavailable_handler(request: Request, exc: OutboundUnavailable):
+    problem('ILIAS_BUSY')
     emit('outbound.busy', status=503)
     return JSONResponse(status_code=503,
         content={'detail': t('outbound.write_uncertain') if exc.write_uncertain or request.method not in ('GET', 'HEAD', 'OPTIONS') else t('outbound.busy'),
@@ -64,6 +69,7 @@ async def outbound_unavailable_handler(request: Request, exc: OutboundUnavailabl
 
 @app.exception_handler(CoordinationBusy)
 async def coordination_busy_handler(request: Request, exc: CoordinationBusy):
+    problem('COORDINATION_BUSY')
     emit('coordination.busy', status=503)
     return JSONResponse(status_code=503, content={'detail': t('coordination.busy')}, headers={'Retry-After': '1'})
 
@@ -92,7 +98,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Content-Length", "Content-Disposition", "X-Session-Id", "X-Request-Id"],
+    expose_headers=["Content-Length", "Content-Disposition", "X-Session-Id", "X-Request-Id",
+                    "X-Diagnostic-Capture", "X-Diagnostic-Code", "X-Diagnostic-Report"],
 )
 
 
@@ -112,11 +119,13 @@ async def session_expired_handler(request: Request, exc: SessionExpiredError):
 
 @app.exception_handler(SubmissionListingError)
 async def submission_listing_error_handler(request: Request, exc: SubmissionListingError):
+    problem('SUBMISSIONS_INCOMPLETE')
     return JSONResponse(status_code=502, content={'detail': str(exc), 'code': 'SUBMISSIONS_INCOMPLETE'})
 
 
 @app.exception_handler(ScrapingParsingError)
 async def scraping_error_handler(request: Request, exc: ScrapingParsingError):
+    problem('PARSING_FAILED')
     logger.error(f"Scraping error: {exc}")
     return JSONResponse(
         status_code=status.HTTP_502_BAD_GATEWAY,
@@ -132,6 +141,7 @@ async def scraping_error_handler(request: Request, exc: ScrapingParsingError):
 
 @app.exception_handler(httpx.TimeoutException)
 async def httpx_timeout_handler(request: Request, exc: httpx.TimeoutException):
+    problem('ILIAS_TIMEOUT')
     emit('outbound.timeout', status=504)
     logger.warning(f"ILIAS timeout on {request.url.path}: {exc}")
     return JSONResponse(
@@ -146,6 +156,7 @@ async def httpx_timeout_handler(request: Request, exc: httpx.TimeoutException):
 
 @app.exception_handler(httpx.NetworkError)
 async def httpx_network_handler(request: Request, exc: httpx.NetworkError):
+    problem('ILIAS_NETWORK_ERROR')
     emit('outbound.network_error', status=502)
     logger.warning(f"ILIAS network error on {request.url.path}: {exc}")
     return JSONResponse(
@@ -166,6 +177,7 @@ app.include_router(exercises.router, prefix="/api")
 app.include_router(calendar.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(diagnostics.router, prefix="/api")
 
 
 @app.get("/health")

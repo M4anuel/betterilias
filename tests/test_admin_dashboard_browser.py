@@ -53,6 +53,8 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
                 retained_counts={'request.completed': 1200, 'outbound.origin_not_allowed': 3},
                 retained_request_metrics=dict(count=1200, mean_ms=123.4, max_ms=900, server_errors=2)),
                 outbound=dict(requests=900, rejected=0, queue_wait_seconds=10, throttles=1, cooldown_until=0, queued=2))
+        elif path.endswith('/reports'):
+            data = dict(reports=[], counts=[], next_before=None)
         elif path.endswith('/events'):
             query = parse_qs(urlparse(request.url).query)
             if state['hold'] and query.get('category') == ['security']:
@@ -112,7 +114,7 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
         pw.expect(page.get_by_text(tr('admin.outcome.uncertain'), exact=True)).to_be_visible()
         # A failed refresh retains the existing data and reports its staleness.
         state['fail'] = True
-        page.get_by_role('button', name=tr('admin.refresh'), exact=True).click()
+        page.locator('.admin-heading').get_by_role('button', name=tr('admin.refresh'), exact=True).click()
         pw.expect(page.get_by_role('alert')).to_contain_text(tr('admin.refresh_failed'))
         pw.expect(page.locator('.admin-event')).to_have_count(3)
         state['fail'] = False
@@ -140,7 +142,7 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
             page.get_by_label(tr('admin.auto'), exact=True).check()
             with page.expect_request('**/api/admin/summary'):
                 page.clock.fast_forward(30001)
-            pw.expect(page.get_by_role('button', name=tr('admin.refresh'), exact=True)).to_be_enabled()
+            pw.expect(page.locator('.admin-heading').get_by_role('button', name=tr('admin.refresh'), exact=True)).to_be_enabled()
             page.get_by_label(tr('admin.auto'), exact=True).uncheck()
             de = json.loads((ROOT / 'locales/de.json').read_text(encoding='utf-8')).__getitem__
             page.get_by_label(tr('admin.language'), exact=True).select_option('de')
@@ -164,7 +166,7 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
         password.press('Enter')
         pw.expect(page.locator('.admin-event')).to_have_count(2)
         state['expired'] = True
-        page.get_by_role('button', name=tr('admin.refresh'), exact=True).click()
+        page.locator('.admin-heading').get_by_role('button', name=tr('admin.refresh'), exact=True).click()
         pw.expect(password).to_be_focused()
         pw.expect(page.get_by_role('alert')).to_contain_text(tr('admin.expired'))
         pw.expect(page.locator('.admin-event')).to_have_count(0)
@@ -193,6 +195,8 @@ def test_admin_loading_disabled_and_error_states(local_site, language, scheme, m
                 retention_seconds=604800, retained_counts={},
                 retained_request_metrics=dict(count=0, mean_ms=None, max_ms=None, server_errors=0)),
                 outbound=dict(requests=0, rejected=0, queued=0, throttles=0, cooldown_until=0, queue_wait_seconds=0))
+        elif path.endswith('/reports'):
+            data = dict(reports=[], counts=[], next_before=None)
         elif path.endswith('/events'):
             data = dict(events=[], next_before=None)
         route.fulfill(status=status, content_type='application/json', body=json.dumps(data))

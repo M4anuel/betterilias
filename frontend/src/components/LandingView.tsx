@@ -20,8 +20,14 @@ import {
   ShieldCheck,
   Sliders,
   CheckCircle2,
+  Clock,
+  PlusCircle,
+  AlertTriangle,
+  Download,
+  LogIn,
+  RefreshCw,
+  Rocket,
 } from 'lucide-react';
-import { theme } from '../lib/theme';
 
 interface LandingViewProps {
   onOpenApp: () => void;
@@ -49,10 +55,6 @@ export const LandingView: React.FC<LandingViewProps> = ({
     // If it's the calendar (which only has calendar.jpg)
     if (baseName === 'calendar') return '/calendar.jpg';
     return isDarkActive ? `/${baseName}_dark.jpg` : `/${baseName}_light.jpg`;
-  };
-
-  const getSubImageSrc = (baseName: string, suffix: string) => {
-    return isDarkActive ? `/${baseName}_dark_${suffix}.jpg` : `/${baseName}_light_${suffix}.jpg`;
   };
 
   return (
@@ -305,7 +307,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
           </div>
         </div>
 
-        {/* Highlight 3: Timetable & Calendar */}
+        {/* Highlight 3: Timetable & Calendar with Custom Hours */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           <div className="lg:col-span-5 space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold">
@@ -324,7 +326,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 <span>{t("landing.feature_calendar_point1")}</span>
               </li>
               <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                <PlusCircle className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
                 <span>{t("landing.feature_calendar_point2")}</span>
               </li>
               <li className="flex items-start gap-2.5">
@@ -353,9 +355,95 @@ export const LandingView: React.FC<LandingViewProps> = ({
           </div>
         </div>
 
-        {/* Highlight 4: Exercises, Submissions & TA Grading */}
+        {/* Highlight 4: Mobile-Friendly Showcase */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           <div className="lg:col-span-7 order-2 lg:order-1">
+            <div className="flex items-center justify-center gap-4 sm:gap-6">
+              <div
+                onClick={() => setZoomedImage({ src: getImageSrc('mobile_overview'), title: t("landing.mobile_overview_preview") })}
+                className="group relative w-44 sm:w-56 rounded-3xl overflow-hidden border-4 border-slate-800 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl cursor-pointer hover:scale-105 transition"
+              >
+                <img
+                  src={getImageSrc('mobile_overview')}
+                  alt={t("landing.mobile_overview_preview")}
+                  className="w-full h-auto object-cover"
+                />
+                <div className="p-2 text-center bg-slate-900/90 text-white text-[11px] font-bold">
+                  {t("landing.mobile_overview_preview")}
+                </div>
+              </div>
+              <div
+                onClick={() => setZoomedImage({ src: getImageSrc('mobile_lecture_mms'), title: t("landing.mobile_lecture_preview") })}
+                className="group relative w-44 sm:w-56 rounded-3xl overflow-hidden border-4 border-slate-800 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl cursor-pointer hover:scale-105 transition"
+              >
+                <img
+                  src={getImageSrc('mobile_lecture_mms')}
+                  alt={t("landing.mobile_lecture_preview")}
+                  className="w-full h-auto object-cover"
+                />
+                <div className="p-2 text-center bg-slate-900/90 text-white text-[11px] font-bold">
+                  {t("landing.mobile_lecture_preview")}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="lg:col-span-5 space-y-4 order-1 lg:order-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
+              <Smartphone className="h-4 w-4 text-emerald-500" />
+              <span>{t("landing.feature_mobile_badge")}</span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              {t("landing.feature_mobile_title")}
+            </h3>
+            <p className="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed">
+              {t("landing.feature_mobile_desc")}
+            </p>
+            <ul className="space-y-2.5 pt-2 text-sm text-slate-600 dark:text-slate-300">
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                <span>{t("landing.feature_mobile_point1")}</span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                <span>{t("landing.feature_mobile_point2")}</span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                <span>{t("landing.feature_mobile_point3")}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Highlight 5: Exercises, Submissions & TA Grading */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="lg:col-span-5 space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-300 text-xs font-bold">
+              <FileCheck className="h-4 w-4 text-[#0AACA5]" />
+              <span>{t("landing.feature_exercises_badge")}</span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              {t("landing.feature_exercises_title")}
+            </h3>
+            <p className="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed">
+              {t("landing.feature_exercises_desc")}
+            </p>
+            <ul className="space-y-2.5 pt-2 text-sm text-slate-600 dark:text-slate-300">
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                <span>{t("landing.feature_exercises_point1")}</span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                <span>{t("landing.feature_exercises_point2")}</span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                <span>{t("landing.feature_exercises_point3")}</span>
+              </li>
+            </ul>
+          </div>
+          <div className="lg:col-span-7">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div
                 onClick={() => setZoomedImage({ src: getImageSrc('assignments_details'), title: t("landing.feature_exercises_title") })}
@@ -385,37 +473,29 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </div>
             </div>
           </div>
-          <div className="lg:col-span-5 space-y-4 order-1 lg:order-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-300 text-xs font-bold">
-              <FileCheck className="h-4 w-4 text-[#0AACA5]" />
-              <span>{t("landing.feature_exercises_badge")}</span>
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {t("landing.feature_exercises_title")}
-            </h3>
-            <p className="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed">
-              {t("landing.feature_exercises_desc")}
-            </p>
-            <ul className="space-y-2.5 pt-2 text-sm text-slate-600 dark:text-slate-300">
-              <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                <span>{t("landing.feature_exercises_point1")}</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                <span>{t("landing.feature_exercises_point2")}</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                <span>{t("landing.feature_exercises_point3")}</span>
-              </li>
-            </ul>
-          </div>
         </div>
 
-        {/* Highlight 5: Podcasts & Video Player */}
+        {/* Highlight 6: Podcasts & Video Player */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          <div className="lg:col-span-5 space-y-4">
+          <div className="lg:col-span-7 order-2 lg:order-1">
+            <div
+              onClick={() => setZoomedImage({ src: getImageSrc('podcast_streaming_videoplayer'), title: t("landing.feature_video_title") })}
+              className="group relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl cursor-pointer hover:shadow-2xl transition"
+            >
+              <img
+                src={getImageSrc('podcast_streaming_videoplayer')}
+                alt={t("landing.feature_video_title")}
+                className="w-full h-auto object-cover group-hover:scale-[1.01] transition duration-200"
+              />
+              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 text-white text-xs font-semibold backdrop-blur-xs">
+                  <ZoomIn className="h-3.5 w-3.5" />
+                  <span>{t("landing.zoom")}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="lg:col-span-5 space-y-4 order-1 lg:order-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-bold">
               <PlayCircle className="h-4 w-4 text-sky-500" />
               <span>{t("landing.feature_video_badge")}</span>
@@ -441,47 +521,11 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </li>
             </ul>
           </div>
-          <div className="lg:col-span-7">
-            <div
-              onClick={() => setZoomedImage({ src: getImageSrc('podcast_streaming_videoplayer'), title: t("landing.feature_video_title") })}
-              className="group relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl cursor-pointer hover:shadow-2xl transition"
-            >
-              <img
-                src={getImageSrc('podcast_streaming_videoplayer')}
-                alt={t("landing.feature_video_title")}
-                className="w-full h-auto object-cover group-hover:scale-[1.01] transition duration-200"
-              />
-              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 text-white text-xs font-semibold backdrop-blur-xs">
-                  <ZoomIn className="h-3.5 w-3.5" />
-                  <span>{t("landing.zoom")}</span>
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* Highlight 6: Full ILIAS Structures & Math */}
+        {/* Highlight 7: ILIAS Structures & Project Status Notice */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          <div className="lg:col-span-7 order-2 lg:order-1">
-            <div
-              onClick={() => setZoomedImage({ src: getImageSrc('support_for_ilias_structures'), title: t("landing.feature_structures_title") })}
-              className="group relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl cursor-pointer hover:shadow-2xl transition"
-            >
-              <img
-                src={getImageSrc('support_for_ilias_structures')}
-                alt={t("landing.feature_structures_title")}
-                className="w-full h-auto object-cover group-hover:scale-[1.01] transition duration-200"
-              />
-              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 text-white text-xs font-semibold backdrop-blur-xs">
-                  <ZoomIn className="h-3.5 w-3.5" />
-                  <span>{t("landing.zoom")}</span>
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="lg:col-span-5 space-y-4 order-1 lg:order-2">
+          <div className="lg:col-span-5 space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-bold">
               <FolderTree className="h-4 w-4 text-rose-500" />
               <span>{t("landing.feature_structures_badge")}</span>
@@ -506,10 +550,34 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 <span>{t("landing.feature_structures_point3")}</span>
               </li>
             </ul>
+
+            {/* Development note informing user */}
+            <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-300 flex items-start gap-2.5">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <span>{t("landing.feature_structures_note")}</span>
+            </div>
+          </div>
+          <div className="lg:col-span-7">
+            <div
+              onClick={() => setZoomedImage({ src: getImageSrc('support_for_ilias_structures'), title: t("landing.feature_structures_title") })}
+              className="group relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl cursor-pointer hover:shadow-2xl transition"
+            >
+              <img
+                src={getImageSrc('support_for_ilias_structures')}
+                alt={t("landing.feature_structures_title")}
+                className="w-full h-auto object-cover group-hover:scale-[1.01] transition duration-200"
+              />
+              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 text-white text-xs font-semibold backdrop-blur-xs">
+                  <ZoomIn className="h-3.5 w-3.5" />
+                  <span>{t("landing.zoom")}</span>
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Highlight 7: Browser Companion Extension */}
+        {/* Highlight 8: Browser Companion Extension (with Single-Line GitHub Links) */}
         <div className="rounded-3xl p-6 sm:p-10 border border-teal-200/80 dark:border-teal-900/60 bg-gradient-to-br from-teal-50/50 via-white to-sky-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-teal-950/30 shadow-xl">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-7 space-y-4">
@@ -541,34 +609,61 @@ export const LandingView: React.FC<LandingViewProps> = ({
                   <span>{t("landing.extension_point4")}</span>
                 </div>
               </div>
-              <div className="pt-3">
+
+              {/* Action buttons */}
+              <div className="pt-2 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={onOpenExtensionInfo}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0AACA5] hover:bg-[#088b85] text-white text-xs font-bold shadow-md transition cursor-pointer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0AACA5] hover:bg-[#088b85] text-white text-xs font-bold shadow-md transition cursor-pointer shrink-0"
                 >
                   <Puzzle className="h-4 w-4" />
                   <span>{t("landing.extension_cta")}</span>
                 </button>
               </div>
             </div>
-            <div className="lg:col-span-5 flex flex-col items-center justify-center p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs text-center space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 shadow-2xs font-bold">
-                  Chrome
-                </div>
-                <span className="text-slate-400 font-bold">&</span>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 shadow-2xs font-bold">
-                  Firefox
-                </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                  {t("landing.extension_box_title")}
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {t("landing.extension_box_desc")}
-                </p>
+
+            {/* Extension GitHub Links Box (Single line, handsome cards) */}
+            <div className="lg:col-span-5 flex flex-col p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs space-y-3">
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                {t("landing.extension_box_title")}
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {t("landing.extension_store_note")}
+              </p>
+
+              <div className="space-y-2 pt-1">
+                {/* Google Chrome Link */}
+                <a
+                  href="https://github.com/M4anuel/betterilias/tree/main/extensions/chrome"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold transition shadow-2xs group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950/70 text-amber-700 dark:text-amber-400 font-extrabold text-[11px]">
+                      Cr
+                    </span>
+                    <span className="whitespace-nowrap">{t("landing.extension_github_chrome")}</span>
+                  </div>
+                  <ExternalLink className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition shrink-0" />
+                </a>
+
+                {/* Mozilla Firefox Link */}
+                <a
+                  href="https://github.com/M4anuel/betterilias/tree/main/extensions/firefox"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold transition shadow-2xs group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-400 font-extrabold text-[11px]">
+                      Fx
+                    </span>
+                    <span className="whitespace-nowrap">{t("landing.extension_github_firefox")}</span>
+                  </div>
+                  <ExternalLink className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition shrink-0" />
+                </a>
               </div>
             </div>
           </div>
@@ -602,11 +697,6 @@ export const LandingView: React.FC<LandingViewProps> = ({
                     <td className="p-3.5 sm:p-4 font-bold text-teal-600 dark:text-teal-400">{t("landing.comp_speed_better")}</td>
                   </tr>
                   <tr>
-                    <td className="p-3.5 sm:p-4 font-semibold text-slate-800 dark:text-slate-200">{t("landing.comp_names_title")}</td>
-                    <td className="p-3.5 sm:p-4 text-slate-500 dark:text-slate-400">{t("landing.comp_names_standard")}</td>
-                    <td className="p-3.5 sm:p-4 font-bold text-teal-600 dark:text-teal-400">{t("landing.comp_names_better")}</td>
-                  </tr>
-                  <tr>
                     <td className="p-3.5 sm:p-4 font-semibold text-slate-800 dark:text-slate-200">{t("landing.comp_theme_title")}</td>
                     <td className="p-3.5 sm:p-4 text-slate-500 dark:text-slate-400">{t("landing.comp_theme_standard")}</td>
                     <td className="p-3.5 sm:p-4 font-bold text-teal-600 dark:text-teal-400">{t("landing.comp_theme_better")}</td>
@@ -626,28 +716,96 @@ export const LandingView: React.FC<LandingViewProps> = ({
                     <td className="p-3.5 sm:p-4 text-slate-500 dark:text-slate-400">{t("landing.comp_ta_standard")}</td>
                     <td className="p-3.5 sm:p-4 font-bold text-teal-600 dark:text-teal-400">{t("landing.comp_ta_better")}</td>
                   </tr>
+                  <tr>
+                    <td className="p-3.5 sm:p-4 font-semibold text-slate-800 dark:text-slate-200">{t("landing.comp_mobile_title")}</td>
+                    <td className="p-3.5 sm:p-4 text-slate-500 dark:text-slate-400">{t("landing.comp_mobile_standard")}</td>
+                    <td className="p-3.5 sm:p-4 font-bold text-teal-600 dark:text-teal-400">{t("landing.comp_mobile_better")}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
           </div>
         </div>
 
-        {/* Bottom CTA Card */}
-        <div className="rounded-3xl p-8 sm:p-12 text-center bg-gradient-to-r from-[#033683] to-[#0AACA5] text-white shadow-2xl space-y-6">
-          <h3 className="text-2xl sm:text-4xl font-black tracking-tight">
-            {t("landing.bottom_cta_title")}
-          </h3>
-          <p className="max-w-xl mx-auto text-sm sm:text-base text-teal-50">
-            {t("landing.bottom_cta_desc")}
-          </p>
-          <div className="pt-2">
+        {/* Quickstart Guide (Schnellstart-Anleitung) */}
+        <div className="rounded-3xl p-8 sm:p-12 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl space-y-8">
+          <div className="text-center max-w-2xl mx-auto space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold uppercase tracking-wider">
+              <Rocket className="h-3.5 w-3.5 text-indigo-500" />
+              <span>{t("landing.quickstart_badge")}</span>
+            </div>
+            <h3 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+              {t("landing.quickstart_title")}
+            </h3>
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400">
+              {t("landing.quickstart_desc")}
+            </p>
+          </div>
+
+          {/* 4 Steps Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Step 1 */}
+            <div className="flex flex-col p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 dark:bg-teal-950/70 text-[#0AACA5] font-black text-sm shadow-2xs">
+                1
+              </div>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                {t("landing.step1_title")}
+              </h4>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                {t("landing.step1_desc")}
+              </p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="flex flex-col p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 font-black text-sm shadow-2xs">
+                2
+              </div>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                {t("landing.step2_title")}
+              </h4>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                {t("landing.step2_desc")}
+              </p>
+            </div>
+
+            {/* Step 3 */}
+            <div className="flex flex-col p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 dark:bg-purple-950/70 text-purple-600 dark:text-purple-400 font-black text-sm shadow-2xs">
+                3
+              </div>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                {t("landing.step3_title")}
+              </h4>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                {t("landing.step3_desc")}
+              </p>
+            </div>
+
+            {/* Step 4 */}
+            <div className="flex flex-col p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 font-black text-sm shadow-2xs">
+                4
+              </div>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                {t("landing.step4_title")}
+              </h4>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                {t("landing.step4_desc")}
+              </p>
+            </div>
+          </div>
+
+          {/* Action button inside quickstart */}
+          <div className="text-center pt-4">
             <button
               type="button"
               onClick={onOpenApp}
-              className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-white text-slate-900 font-extrabold text-sm shadow-xl hover:bg-slate-100 hover:scale-105 transition cursor-pointer"
+              className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-gradient-to-r from-[#033683] to-[#0AACA5] hover:opacity-95 text-white font-extrabold text-sm shadow-xl hover:scale-105 transition cursor-pointer"
             >
               <span>{t("landing.cta_open_betterilias")}</span>
-              <ArrowRight className="h-4 w-4 text-[#0AACA5]" />
+              <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>

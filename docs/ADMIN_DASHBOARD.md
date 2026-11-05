@@ -87,8 +87,10 @@ and sequenced so an older filter response cannot replace the current view.
 Expired/revoked sessions remove diagnostic data from the rendered page and return
 focus to sign-in. A logout failure remains visible until retried or expiry.
 
-There are no raw HTML dumps, student records, credential views, settings writes
-or destructive operations on this dashboard. See
+The [consented report panel](DIAGNOSTIC_REPORTS.md) adds grouped error reports,
+text-free outlines, safe JSON downloads and reversible open/resolved transitions.
+There are no raw HTML dumps, student records, credential views or native ILIAS
+settings/destructive operations on this dashboard. See
 [logging and privacy](OBSERVABILITY_PRIVACY.md) for storage bounds, operator
 retention/legal-basis responsibilities and limitations. Diagnostic identifiers
 remain potentially personal when linked to a user's support report.

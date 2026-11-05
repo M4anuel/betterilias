@@ -6,6 +6,7 @@ import type { TranslationKey } from '../lib/i18n';
 import { theme } from '../lib/theme';
 import { AdminError, adminRequest } from './api';
 import type { AdminEvent, AdminSession, AdminSummary, EventPage } from './api';
+import { ReportsPanel } from './Reports';
 
 const categories = ['security', 'compatibility', 'operational', 'audit', 'request'];
 function label(key: string) { return t(key as TranslationKey); }
@@ -91,6 +92,7 @@ export function AdminDashboard() {
       {authenticated ? <>
         {error && <div role="alert" className="admin-alert">{label(error)}</div>}
         <Overview onExpired={expired} expires={session.expires_at} />
+        <ReportsPanel onExpired={expired} />
       </> : <section className="admin-login admin-panel" aria-labelledby="admin-login-title">
         <div className="admin-emblem"><ShieldCheck size={28} aria-hidden="true" /></div>
         <p className="admin-eyebrow">BetterIlias · {t('admin.title')}</p>

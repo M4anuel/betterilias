@@ -1,8 +1,9 @@
 """Read-only foundation for an admin dashboard; disabled without a separate key."""
 import secrets
 import sqlite3
+from typing import Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel, Field, SecretStr
 
 from backend.config import settings
@@ -10,6 +11,8 @@ from backend.i18n import t
 from backend.observability import CATEGORIES, EVENTS, emit, get_store
 from backend.outbound_budget import OutboundBudget
 from backend import admin_sessions
+from backend import diagnostic_reports
+from backend.api.routes.diagnostics import storage
 
 
 def administrator(request: Request, response: Response, x_admin_key: str | None = Header(default=None)):
@@ -108,3 +111,32 @@ def summary():
                 'event_catalogue': EVENTS}
     except (OSError, sqlite3.Error):
         raise HTTPException(503, detail=t('diagnostics.unavailable')) from None
+
+
+@router.get('/reports', dependencies=[Depends(administrator)])
+def reports(state: Literal['open', 'resolved', 'all'] = 'open',
+            kind: Literal['parsing', 'upstream', 'security', 'concurrency', 'application', 'client'] | None = None,
+            before: int | None = Query(default=None, ge=1, le=9223372036854775807),
+            limit: int = Query(default=50, ge=1, le=100)):
+    return storage(diagnostic_reports.list_reports, state, kind, before, limit)
+
+
+@router.get('/reports/{report_id}', dependencies=[Depends(administrator)])
+def report(report_id: str = Path(pattern=r'^[a-f0-9]{32}$')):
+    result = storage(diagnostic_reports.get_report, report_id)
+    if result is None:
+        raise HTTPException(410, detail=t('reports.changed'))
+    return result
+
+
+class ReportState(BaseModel):
+    state: Literal['open', 'resolved']
+    revision: int = Field(ge=1)
+
+
+@router.patch('/reports/{report_id}', dependencies=[Depends(administrator), Depends(browser_mutation)])
+def update_report(payload: ReportState, report_id: str = Path(pattern=r'^[a-f0-9]{32}$')):
+    changed = storage(diagnostic_reports.set_state, report_id, payload.state, payload.revision)
+    if not changed:
+        raise HTTPException(409, detail=t('reports.changed'))
+    return storage(diagnostic_reports.get_report, report_id)

@@ -1,3 +1,4 @@
+import { clientDiagnostic } from '../lib/diagnosticReports';
 import { t, useLanguage } from '../lib/i18n';
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
@@ -24,7 +25,8 @@ class ErrorBoundaryImpl extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error caught by ErrorBoundary:', error, errorInfo);
+    console.error('CLIENT_RENDER');
+    void clientDiagnostic('CLIENT_RENDER');
   }
 
   private handleReload = () => {

@@ -34,7 +34,10 @@ def get_optional_session_manager(
     if not valid_session_id(sid):
         return None
     manager = SessionManager(session_id=sid)
-    return manager if manager.has_cookies() else None
+    if manager.has_cookies():
+        request.state.diagnostic_session_id = manager.session_id
+        return manager
+    return None
 
 
 def get_session_manager(response: Response, manager=Depends(get_optional_session_manager)) -> SessionManager:

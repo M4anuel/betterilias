@@ -24,7 +24,7 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   maintenance endpoints by server runtime mode, replace long-lived URL session
   credentials, and coordinate workers sharing one VPS data volume. See
   [deployment security and limitations](docs/DEPLOYMENT_SECURITY.md).
-- [ ] Build a responsive bilingual landing/get-started page with extension
+- [x] Build a responsive bilingual landing/get-started page with extension
   installation, ILIAS sign-in/sync instructions, a BetterIlias preview, and clear
   expired-session/reconnect guidance.
 - [x] Build an authenticated admin dashboard with separate administrator
@@ -41,6 +41,13 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 - [x] Connect structured events to JSON console logging and private storage;
   retain safe severity/component context, configurable console verbosity,
   collector failure counters, and filtered read-only local/admin inspection.
+- [x] Add [consented diagnostic reports](docs/DIAGNOSTIC_REPORTS.md): once/always/no
+  choices, editable sharing and deletion in settings, text-free parser evidence,
+  bounded SQLite storage and grouped open/resolved admin review with safe exports.
+- [ ] When stable user accounts/profiles exist, move diagnostic-report preferences
+  from connection scope to the profile, preserving withdrawal/deletion and policy
+  versioning. Add reviewed named-maintainer attribution/fix references if needed;
+  resolved reports currently expire instead of forming a permanent bug archive.
 - [x] Add shared outbound request budgets, native-session fairness, allowlisted
   in-worker GET coalescing, 429/Retry-After handling and offline multi-process
   10/25/50/100-user load scenarios. See [traffic controls, measurements and
