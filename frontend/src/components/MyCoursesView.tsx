@@ -80,7 +80,7 @@ export const MyCoursesView: React.FC<{
       {items.map(course => <article key={course.ref_id} data-course-id={course.ref_id}
         className="flex min-w-0 items-start rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <button type="button" onClick={() => course.item_type === 'grp' ? onOpenGroup(course.ref_id) : onOpenCourse(course.ref_id)}
-          className="flex min-h-28 min-w-0 flex-1 gap-3 rounded-xl p-4 text-left hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-teal-500 dark:hover:bg-slate-800">
+          className="relative flex min-h-28 min-w-0 flex-1 gap-3 rounded-xl p-4 text-left hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-teal-500 dark:hover:bg-slate-800">
           <span className="mt-1 shrink-0 text-teal-600 dark:text-teal-400" aria-hidden="true">{course.item_type === 'grp' ? <Users className="h-5 w-5" /> : <CourseIcon iconName={cache.getCourseIcon(course.ref_id, course)} className="h-5 w-5" />}</span>
           <span className="min-w-0 flex-1">
             <span className="block break-words text-base font-semibold leading-snug">{name(course)}</span>
