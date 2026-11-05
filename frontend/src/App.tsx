@@ -1026,8 +1026,6 @@ export const App: React.FC = () => {
     isRepositorySelected={repositoryId !== null}
     onSelectCalendar={() => { handleNavigateCalendar(); setMobileNavigationOpen(false); }}
     isCalendarSelected={isCalendarOpen}
-    onSelectLanding={() => { handleNavigateLanding(); setMobileNavigationOpen(false); }}
-    isLandingSelected={isLandingOpen}
     isCollapsed={isMobile ? false : isSidebarCollapsed}
     onToggleCollapse={isMobile ? () => setMobileNavigationOpen(false) : handleToggleSidebar}
     onOpenNicknameModal={() => { setMobileNavigationOpen(false); setIsNicknameModalOpen(true); }}

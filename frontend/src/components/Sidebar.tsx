@@ -1,6 +1,6 @@
 import { t, useLanguage } from '../lib/i18n';
 import React, { useMemo } from 'react';
-import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library, Users, Calendar, Sparkles } from 'lucide-react';
+import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library, Users, Calendar } from 'lucide-react';
 import { CourseItem } from '../types';
 import { cache } from '../lib/cache';
 import { CourseIcon } from './CourseIcon';
@@ -18,8 +18,6 @@ interface SidebarProps {
   isMyCoursesSelected: boolean;
   onSelectCalendar?: () => void;
   isCalendarSelected?: boolean;
-  onSelectLanding?: () => void;
-  isLandingSelected?: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onOpenNicknameModal: () => void;
@@ -39,8 +37,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMyCoursesSelected,
   onSelectCalendar,
   isCalendarSelected = false,
-  onSelectLanding,
-  isLandingSelected = false,
   isCollapsed,
   onToggleCollapse,
   onOpenNicknameModal,
@@ -107,7 +103,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </span>}
     </div>
   );
-  const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isMyCoursesSelected && !isCalendarSelected && !isLandingSelected;
+  const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isMyCoursesSelected && !isCalendarSelected;
   const customSections = customOrder?.some(item => item.type === 'section');
   const placed = new Set<string>();
 
@@ -126,7 +122,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {onSelectCalendar && renderNavigation(t('calendar.sidebar_nav'), Calendar, isCalendarSelected, onSelectCalendar)}
       {renderNavigation(t('my_courses.title'), Users, isMyCoursesSelected, onSelectMyCourses)}
       {renderNavigation(t('Magazin'), Library, isRepositorySelected, onSelectRepository)}
-      {onSelectLanding && renderNavigation(t('Über BetterIlias'), Sparkles, isLandingSelected, onSelectLanding)}
       <div className="pt-2 pb-1"><div className="h-px bg-slate-100 dark:bg-slate-800" /></div>
       {customSections ? <div className="space-y-1">
         {customOrder?.map(item => {

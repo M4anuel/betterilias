@@ -378,7 +378,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
 
         {/* 3. Helpful Quick Links */}
         <div className="border-t border-slate-100 pt-3 dark:border-slate-800 space-y-1">
-          {onOpenLanding && (
+          {isAuthenticated && onOpenLanding && (
             <button
               type="button"
               onClick={() => {
