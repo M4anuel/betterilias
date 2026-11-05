@@ -298,6 +298,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
 
+  // Real-time optimistic color state while dragging color pickers
+  const [localCourseColors, setLocalCourseColors] = useState<Record<string, string>>({});
+  const colorCommitTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(colorCommitTimerRef.current).forEach(clearTimeout);
+    };
+  }, []);
+
   const [hiddenCourses, setHiddenCourses] = useState<string[]>(() =>
     cache.getHiddenCalendarCourses('ALL')
   );
@@ -645,6 +655,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         (c.imported_lecture_count ?? 0) > 0 || (c.custom_rule_count ?? 0) > 0;
       byId.set(c.course_ref_id, {
         ...c,
+        color: localCourseColors[c.course_ref_id] || c.color,
         course_title: cache.getDisplayName(c.course_ref_id, c.course_title),
         item_type: c.item_type || 'crs',
         ignored_missing_schedule: isIgnored,
@@ -661,7 +672,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           course_title: cache.getDisplayName(c.ref_id, c.title),
           semester: c.semester || null,
           item_type: c.item_type || 'crs',
-          color: COURSE_COLOR_PALETTE[idx % COURSE_COLOR_PALETTE.length],
+          color: localCourseColors[c.ref_id] || COURSE_COLOR_PALETTE[idx % COURSE_COLOR_PALETTE.length],
           status: 'not_imported',
           feed_status: 'not_checked',
           status_message: t('calendar.status.not_checked'),
@@ -681,7 +692,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       if (semDiff !== 0) return semDiff;
       return a.course_title.localeCompare(b.course_title);
     });
-  }, [calendarData, allMemberships, coursesList, ignoredCoursesLocal, language]);
+  }, [calendarData, allMemberships, coursesList, ignoredCoursesLocal, localCourseColors, language]);
 
   // Available semesters that contain courses in the calendar
   const availableCalendarSemesters = useMemo(() => {
@@ -776,7 +787,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     });
   };
 
-  const handleColorChange = async (courseRefId: string, color: string) => {
+  const handleColorInput = (courseRefId: string, color: string) => {
+    // Immediately update UI live with 0ms lag while dragging
+    setLocalCourseColors((prev) => ({ ...prev, [courseRefId]: color }));
+
+    // Debounce server commit while continuous drag events fire
+    if (colorCommitTimerRef.current[courseRefId]) {
+      clearTimeout(colorCommitTimerRef.current[courseRefId]);
+    }
+    colorCommitTimerRef.current[courseRefId] = setTimeout(() => {
+      void commitColorChange(courseRefId, color);
+    }, 400);
+  };
+
+  const commitColorChange = async (courseRefId: string, color: string) => {
+    if (colorCommitTimerRef.current[courseRefId]) {
+      clearTimeout(colorCommitTimerRef.current[courseRefId]);
+      delete colorCommitTimerRef.current[courseRefId];
+    }
     try {
       const updated = await api.updateCourseColor(courseRefId, color);
       setCalendarData(updated);
@@ -2278,15 +2306,23 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <label
                           className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full cursor-pointer shadow-2xs border border-white/50"
-                          style={{ backgroundColor: course.color }}
+                          style={{ backgroundColor: localCourseColors[course.course_ref_id] || course.color }}
                           title={t('calendar.change_color')}
                         >
                           <input
                             type="color"
-                            value={course.color}
-                            onChange={(e) =>
-                              handleColorChange(course.course_ref_id, e.target.value)
+                            value={localCourseColors[course.course_ref_id] || course.color}
+                            onInput={(e) =>
+                              handleColorInput(course.course_ref_id, (e.target as HTMLInputElement).value)
                             }
+                            onChange={(e) => {
+                              const col = e.target.value;
+                              handleColorInput(course.course_ref_id, col);
+                              void commitColorChange(course.course_ref_id, col);
+                            }}
+                            onBlur={(e) => {
+                              void commitColorChange(course.course_ref_id, e.target.value);
+                            }}
                             aria-label={`${t('calendar.change_color')}: ${course.course_title}`}
                             className="sr-only"
                           />
