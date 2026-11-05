@@ -1,6 +1,6 @@
 import { t, useLanguage } from '../lib/i18n';
 import React, { useState } from 'react';
-import { Menu, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Menu, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import { AuthStatus } from '../types';
 import { SettingsGear } from './SettingsGear';
 import { SettingsDropdown } from './SettingsDropdown';
@@ -12,6 +12,7 @@ interface HeaderProps {
   isSidebarCollapsed: boolean;
   onLogout?: () => void;
   onOpenExtensionInfo: () => void;
+  onOpenLanding?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -21,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   isSidebarCollapsed,
   onLogout,
   onOpenExtensionInfo,
+  onOpenLanding,
 }) => {
   useLanguage();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -87,6 +89,20 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
 
+        {/* About BetterIlias Button */}
+        {onOpenLanding && (
+          <button
+            type="button"
+            onClick={onOpenLanding}
+            aria-label={t("Über BetterIlias")}
+            title={t("Über BetterIlias")}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-teal-600 dark:hover:text-teal-400 text-xs font-semibold shadow-2xs transition cursor-pointer shrink-0"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-[#0AACA5]" />
+            <span className="hidden md:inline">{t("Über BetterIlias")}</span>
+          </button>
+        )}
+
         {/* Settings Menu Button */}
         <button
           onClick={toggleSettings}
@@ -113,6 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
           isAuthenticated={Boolean(authStatus?.authenticated)}
           userName={authStatus?.user_name}
           onOpenExtensionInfo={onOpenExtensionInfo}
+          onOpenLanding={onOpenLanding}
         />
       </div>
     </header>
