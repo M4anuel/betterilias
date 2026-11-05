@@ -24,7 +24,7 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   maintenance endpoints by server runtime mode, replace long-lived URL session
   credentials, and coordinate workers sharing one VPS data volume. See
   [deployment security and limitations](docs/DEPLOYMENT_SECURITY.md).
-- [ ] Build a responsive bilingual landing/get-started page with extension
+- [x] Build a responsive bilingual landing/get-started page with extension
   installation, ILIAS sign-in/sync instructions, a BetterIlias preview, and clear
   expired-session/reconnect guidance.
 - [ ] Build an authenticated admin dashboard with separate administrator
