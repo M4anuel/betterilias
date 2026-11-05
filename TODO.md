@@ -27,17 +27,27 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 - [x] Build a responsive bilingual landing/get-started page with extension
   installation, ILIAS sign-in/sync instructions, a BetterIlias preview, and clear
   expired-session/reconnect guidance.
-- [ ] Build an authenticated admin dashboard with separate administrator
+- [x] Build an authenticated admin dashboard with separate administrator
   authorization, health/worker/queue metrics, sanitized error reports and audit
   records; keep raw student pages and credentials out of public diagnostics.
+  The independent `/admin/` page uses short-lived HttpOnly admin cookies,
+  responsive bilingual metrics/log views, filters and event details. Deployment
+  and remaining identity/MFA limitations: [admin dashboard](docs/ADMIN_DASHBOARD.md).
 - [x] Add the [private logging foundation](docs/OBSERVABILITY_PRIVACY.md): fixed
   security/compatibility events, request timing, write outcomes, bounded local
   retention, privacy-safe parser artifacts and separately keyed read-only admin
-  diagnostics. Dashboard UI, administrator sessions and operator privacy review
-  remain open before public hosting.
+  diagnostics. Dashboard UI and administrator sessions are implemented separately;
+  operator privacy review remains open before public hosting.
 - [x] Connect structured events to JSON console logging and private storage;
   retain safe severity/component context, configurable console verbosity,
   collector failure counters, and filtered read-only local/admin inspection.
+- [x] Add [consented diagnostic reports](docs/DIAGNOSTIC_REPORTS.md): once/always/no
+  choices, editable sharing and deletion in settings, text-free parser evidence,
+  bounded SQLite storage and grouped open/resolved admin review with safe exports.
+- [ ] When stable user accounts/profiles exist, move diagnostic-report preferences
+  from connection scope to the profile, preserving withdrawal/deletion and policy
+  versioning. Add reviewed named-maintainer attribution/fix references if needed;
+  resolved reports currently expire instead of forming a permanent bug archive.
 - [x] Add shared outbound request budgets, native-session fairness, allowlisted
   in-worker GET coalescing, 429/Retry-After handling and offline multi-process
   10/25/50/100-user load scenarios. See [traffic controls, measurements and

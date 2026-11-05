@@ -92,6 +92,7 @@ export const cache = {
   },
 
   setSessionId(sessionId: string | null) {
+    const previousSession = inMemorySessionId;
     inMemorySessionId = sessionId?.trim() || null;
     try {
       if (localStorage.getItem('betterilias_cache_owner') !== inMemorySessionId) {
@@ -105,8 +106,9 @@ export const cache = {
         localStorage.removeItem(SESSION_ID_KEY);
       }
     } catch (e) {
-      console.error('Failed to update session ID', e);
+      console.error('Failed to update session ID');
     }
+    if (previousSession !== inMemorySessionId) window.dispatchEvent(new Event('betterilias-session-changed'));
   },
 
   clearSessionContent() {

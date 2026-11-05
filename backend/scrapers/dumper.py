@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, List, Optional
 from backend.config import settings
 from backend.coordination import SharedLock, CoordinationBusy
 from backend.observability import emit
+from backend.diagnostic_reports import capture_structure, register_parser
 
 logger = logging.getLogger("ilias.scraper.dumper")
 
@@ -81,6 +82,7 @@ def dump_failed_html(
     student content. Parser context is hashed to avoid dynamic names/identifiers.
     """
     emit('parser.failed')
+    capture_structure(html, context)
     try:
         with SharedLock('private-diagnostic-dumps', timeout=0).sync():
             logs_dir = settings.log_path
@@ -108,6 +110,7 @@ def safe_parser(context_name: str, check_empty: bool = False):
     Decorator that wraps HTML parsing functions in a try/except block.
     If parsing fails (or returns empty data if check_empty=True), dumps the raw HTML.
     """
+    register_parser(context_name)
     def decorator(func: Callable):
         @functools.wraps(func)
         def wrapper(html_content: str, *args, **kwargs):

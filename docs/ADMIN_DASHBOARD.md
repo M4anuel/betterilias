@@ -1,0 +1,116 @@
+# Administrator dashboard
+
+The independent `/admin/` page shows private operational metrics and sanitized
+events. It has a separate Vite HTML/React entry and does not initialize the
+student app, import ILIAS handoffs or alter the landing page. It shares the
+existing language/theme helpers and English/Swiss German catalogues.
+
+## Run and sign in
+
+Use this feature's checkout/worktree for **both backend and frontend**. Configure
+`ADMIN_API_KEY` in its private `.env` or environment with a separately generated
+random secret of at least 43 characters:
+
+```text
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Start the normal local development launcher, then open
+`http://localhost:5173/admin/`. Enter the administrator key in the password field.
+The key is sent once in a JSON POST and removed from the form immediately;
+neither localStorage nor sessionStorage stores it. The UI never uses the
+student's `X-Session-Id` or bearer credential. A disabled server displays an
+unavailable-access message and exposes no private diagnostics.
+
+Build with `npm --prefix frontend run build`. The result includes the existing
+`frontend/dist/index.html` and **`frontend/dist/admin/index.html`**. Configure the
+HTTPS proxy/static host to serve `/admin/` from that file rather than rewriting
+it to the student/landing app. Keep `/api` on the same origin. Preserve the
+independent admin input if the landing page changes Vite's build entry points.
+This feature does not add links to or modify the landing page.
+
+## Access boundary
+
+The login endpoint issues a separate random capability in an HttpOnly,
+SameSite=Strict `betterilias_admin` cookie scoped to `/api/admin`. It is Secure
+in production and expires after **30 minutes**, without sliding renewal. Local
+HTTP testing requires `APP_ENV=development`; public deployment requires HTTPS.
+GET `/api/admin/session` lets the page restore an unexpired session after reload.
+Student headers/cookies and this admin cookie cannot authorize each other's APIs.
+
+Only a keyed digest of the random capability and its expiry are stored in
+`COORDINATION_DIR/admin-sessions.sqlite3`. All workers must share the same local
+volume and configured key. Key rotation invalidates existing cookies immediately;
+do not reuse retired keys. Logout deletes the server record and the browser
+cookie, so replaying that capability fails. At most 32 active sessions are kept;
+further sign-ins evict the oldest. Expired session and one-minute failed-attempt
+records are removed during database access and by the existing scheduled
+`python -m backend.diagnostics prune` job. No login IP/user identifier is stored.
+
+JSON login/logout requests require `X-Admin-Request: 1`, which ordinary cross-site
+forms cannot set. Strict cookies and the existing CORS policy provide the other
+browser boundary. Invalid explicit `X-Admin-Key` headers never fall back to a
+valid ambient cookie. Direct operator tools can continue using that separate
+header for read-only diagnostics; no key is accepted from URL parameters.
+
+Repeated invalid keys receive 429 after ten failures within a minute, with a
+bounded shared counter. A valid key continues to work, so an attacker cannot
+lock out an operator simply by exhausting this counter. Configure proxy-level
+request/body limits as well. Login, rejected access and logout generate fixed
+audit/security events without capturing keys or cookies. Responses are no-store.
+
+This is an operator dashboard using one shared secret, not a directory of named
+administrators. It provides no per-admin attribution, password recovery, SSO or
+MFA. Keep the page/API behind an operator-only network/proxy boundary. Institutional
+administrator identity and MFA can be added later without reusing student login.
+
+## Reading the page
+
+Cards distinguish retained API requests/errors/security rejections from current
+worker loss counters. Writer health, pending records, storage/console errors,
+last successful write and maximum retention apply to the responding worker.
+Outbound admission counters are shared aggregates since the budget database was
+created. Mean request duration comes from retained API events. These figures do
+not prove the service or university is reachable, or represent lifetime totals.
+Retained API request figures also include the dashboard's own diagnostic reads.
+
+Events are newest-first with category/code filters and cursor pagination.
+Expandable rows show only safe, known fields: request/operation/worker IDs,
+method/status/duration, operation/result and component. The UI does not dump
+arbitrary server JSON. A reported write return is labelled separately from
+verified persistence, and uncertain results warn against blindly retrying.
+
+Refresh is manual by default. Optional 30-second refresh pauses while the tab is
+hidden or a request is in progress. Refresh failures keep existing figures and
+mark them stale; filter changes clear the previous list. Requests are cancelled
+and sequenced so an older filter response cannot replace the current view.
+Expired/revoked sessions remove diagnostic data from the rendered page and return
+focus to sign-in. A logout failure remains visible until retried or expiry.
+
+The [consented report panel](DIAGNOSTIC_REPORTS.md) adds grouped error reports,
+text-free outlines, safe JSON downloads and reversible open/resolved transitions.
+There are no raw HTML dumps, student records, credential views or native ILIAS
+settings/destructive operations on this dashboard. See
+[logging and privacy](OBSERVABILITY_PRIVACY.md) for storage bounds, operator
+retention/legal-basis responsibilities and limitations. Diagnostic identifiers
+remain potentially personal when linked to a user's support report.
+
+## Verification
+
+Backend tests cover secure cookie flags/path, expiry, key rotation, logout replay,
+CSRF headers, student/admin separation, storage bounds, malformed/failed logins,
+storage failure and exclusion of secrets from responses/events/disk records.
+Opt-in Chromium regressions exercise real rendered sign-in, filters, pagination,
+refresh failures, logout, expiry, delayed-filter ordering and optional automatic
+refresh with mocked diagnostics across 320, 390, 430,
+768 and 1280 px plus short landscape, in English/light and German/dark. Screenshots
+are saved under `scratch/admin-dashboard-review` for visual inspection. These are
+emulated browser checks, not live ILIAS or physical iOS/Android validation.
+
+Verification on 5 November 2026, combined with the landing-page integration:
+**571 backend tests passed, 349 skipped**;
+**20 admin browser regressions passed**; production multi-page build and locale
+validation (**1,876 keys**) passed. Screenshots were visually reviewed for phone,
+tablet and desktop density, wrapping, alignment and dark/light contrast; this
+caught and corrected a German tablet refresh-button wrap. Existing dependency
+deprecation and bundle-size warnings remain.
