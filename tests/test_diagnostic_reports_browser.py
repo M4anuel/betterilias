@@ -118,6 +118,7 @@ def test_consent_choices_preferences_and_withdrawal(local_site, width, height, l
         sharing.select_option('never')
         pw.expect(sharing).to_have_value('never')
         pw.expect(settings.get_by_text(tr('reports.preference_saved'), exact=True)).to_be_visible()
+        settings.get_by_role('button', name=tr('reports.details'), exact=True).click()
         settings.get_by_role('button', name=tr('reports.delete_button'), exact=True).click()
         settings.get_by_role('button', name=tr('reports.delete_now'), exact=True).click()
         pw.expect(settings.get_by_text(tr('reports.deleted'), exact=True)).to_be_visible()

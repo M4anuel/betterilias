@@ -377,8 +377,6 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
           )}
         </div>
 
-        <DiagnosticSettings />
-        <BrowserStatisticsSettings />
         <MobileSessionShare isAuthenticated={isAuthenticated} />
 
         {/* 3. Helpful Quick Links */}
@@ -446,7 +444,11 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
           </button>
         </div>
 
-        {/* 4. Logout Action */}
+        {/* 4. Error Diagnostics */}
+        <DiagnosticSettings />
+        <BrowserStatisticsSettings />
+
+        {/* 5. Logout Action */}
         {isAuthenticated && onLogout && (
           <div className="border-t border-slate-100 pt-2 dark:border-slate-800">
             <button
