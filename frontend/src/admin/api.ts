@@ -12,6 +12,7 @@ export interface ActivityBucket { start: number; end: number; count: number }
 export interface ActivitySummary {
   active: number; last_24_hours: number; as_of: number;
   recent: ActivityBucket[]; hourly: ActivityBucket[];
+  browsers?: ActivitySummary;
 }
 export interface AdminSummary {
   activity?: ActivitySummary;

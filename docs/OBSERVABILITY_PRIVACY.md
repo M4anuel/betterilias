@@ -222,6 +222,14 @@ Report consent does not control this operational measurement. Document it in
 the operator notice and apply the same private-volume/backup exclusions and
 hourly purge schedule. It does not create a stable user profile. See
 [activity definitions and storage](ADMIN_DASHBOARD.md#connection-activity-graphs-and-database-locations).
+An independent, default-off browser-statistics setting additionally permits a
+random browser UUID in localStorage for at most 90 days. Only after that opt-in
+does the app send it on authenticated app requests. A domain-separated HMAC and
+minute activity, never the raw UUID or a browser-to-session mapping, are retained
+in the same 24-hour bounded store. Admins see only aggregate participating-browser
+counts. Disabling removes the local ID and stops sending; old samples expire
+under the existing 24-hour purge. This is a separate purpose/choice from report
+sharing and must remain separately described in the public notice.
 
 `tests/test_observability.py` exercises input exclusion (including token-bearing
 URLs and unknown paths), generated correlation IDs, distinct rejection reasons,

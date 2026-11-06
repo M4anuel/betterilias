@@ -87,6 +87,33 @@ def test_activity_failure_does_not_fail_student_requests(clock, monkeypatch):
     activity.record('private-credential')
 
 
+def test_browser_counts_survive_reconnection_and_separate_browser_profiles(clock):
+    browser = '12345678-1234-4234-8234-123456789abc'
+    other = '12345678-1234-4234-8234-123456789abd'
+    activity.record('first-connection', browser)
+    activity.record('reconnected', browser)
+    result = activity.summary()
+    assert result['last_24_hours'] == 2
+    assert result['browsers']['last_24_hours'] == 1
+    activity.record('reconnected', other)
+    activity.record('reconnected', 'not-a-browser-uuid')
+    assert activity.summary()['browsers']['active'] == 2
+    assert browser.encode() not in (settings.observability_path / 'activity.sqlite3').read_bytes()
+    assert browser not in str(activity.summary())
+    clock[0] += 86400
+    assert activity.summary()['browsers']['last_24_hours'] == 0
+
+
+def test_existing_activity_database_is_migrated_without_losing_counts(clock):
+    path = settings.observability_path / 'activity.sqlite3'
+    path.parent.mkdir(parents=True)
+    with sqlite3.connect(path) as db:
+        db.execute('CREATE TABLE activity (minute INTEGER, owner TEXT, seen REAL, PRIMARY KEY(minute,owner))')
+        db.execute('INSERT INTO activity VALUES(?,?,?)', (int(clock[0] // 60), 'legacy-hash', clock[0]))
+    assert activity.summary()['active'] == 1
+    assert activity.summary()['browsers']['active'] == 0
+
+
 def test_admin_without_trailing_slash_redirects():
     response = TestClient(app).get('/admin', follow_redirects=False)
     assert response.status_code == 308 and response.headers['location'] == '/admin/'

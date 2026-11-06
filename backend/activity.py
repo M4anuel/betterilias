@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import hashlib
 import hmac
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -26,7 +27,14 @@ def database():
         db.execute(f'PRAGMA max_page_count={32 * 1024 * 1024 // size}')
         db.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
         db.execute('CREATE TABLE IF NOT EXISTS activity '
-                   '(minute INTEGER NOT NULL, owner TEXT NOT NULL, seen REAL NOT NULL, PRIMARY KEY(minute,owner))')
+                   "(minute INTEGER NOT NULL, owner TEXT NOT NULL, seen REAL NOT NULL, "
+                   "kind TEXT NOT NULL DEFAULT 'connection', PRIMARY KEY(minute,owner))")
+        if 'kind' not in {row[1] for row in db.execute('PRAGMA table_info(activity)')}:
+            try:
+                db.execute("ALTER TABLE activity ADD COLUMN kind TEXT NOT NULL DEFAULT 'connection'")
+            except sqlite3.OperationalError as exc:
+                if 'duplicate column' not in str(exc).lower():
+                    raise
         db.execute('CREATE INDEX IF NOT EXISTS activity_seen ON activity(seen)')
         db.execute("INSERT OR IGNORE INTO meta VALUES('secret',?)", (secrets.token_hex(32),))
         if os.name != 'nt':
@@ -46,7 +54,7 @@ def _prune(db, now):
                    '(SELECT rowid FROM activity ORDER BY seen LIMIT ?)', (excess,))
 
 
-def record(session_id):
+def record(session_id, browser_id=None):
     """Called only after tenant credential validation, on the dependency thread pool.
 
     Failure is deliberately isolated from the student action. No credential,
@@ -57,8 +65,12 @@ def record(session_id):
         with database() as db:
             secret = db.execute("SELECT value FROM meta WHERE key='secret'").fetchone()[0]
             owner = hmac.new(bytes.fromhex(secret), session_id.encode(), hashlib.sha256).hexdigest()
-            db.execute('INSERT INTO activity VALUES(?,?,?) ON CONFLICT(minute,owner) '
+            db.execute('INSERT INTO activity(minute,owner,seen) VALUES(?,?,?) ON CONFLICT(minute,owner) '
                        'DO UPDATE SET seen=excluded.seen', (int(now // 60), owner, now))
+            if isinstance(browser_id, str) and re.fullmatch(r'[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}', browser_id):
+                browser = hmac.new(bytes.fromhex(secret), ('browser:' + browser_id).encode(), hashlib.sha256).hexdigest()
+                db.execute("INSERT INTO activity VALUES(?,?,?,'browser') ON CONFLICT(minute,owner) "
+                           'DO UPDATE SET seen=excluded.seen', (int(now // 60), browser, now))
             _prune(db, now)
     except (OSError, sqlite3.Error):
         pass
@@ -73,16 +85,19 @@ def summary():
     now = time.time()
     with database() as db:
         _prune(db, now)
-        totals = db.execute('SELECT count(DISTINCT owner) FROM activity').fetchone()[0]
-        active = db.execute('SELECT count(DISTINCT owner) FROM activity WHERE seen > ?', (now - 300,)).fetchone()[0]
-
-        def series(window, step):
+        def series(kind, window, step):
             start = now - window
             values = dict(db.execute('SELECT min(?,CAST((seen-?)/? AS INTEGER)),count(DISTINCT owner) '
-                                     'FROM activity WHERE seen > ? GROUP BY 1',
-                                     (window // step - 1, start, step, start)))
+                                     'FROM activity WHERE seen > ? AND kind=? GROUP BY 1',
+                                     (window // step - 1, start, step, start, kind)))
             return [{'start': start + index * step, 'end': start + (index + 1) * step,
                      'count': values.get(index, 0)} for index in range(window // step)]
 
-        return {'active': active, 'last_24_hours': totals, 'as_of': now,
-                'recent': series(3600, 300), 'hourly': series(86400, 3600)}
+        def counts(kind):
+            totals = db.execute('SELECT count(DISTINCT owner) FROM activity WHERE kind=?', (kind,)).fetchone()[0]
+            active = db.execute('SELECT count(DISTINCT owner) FROM activity WHERE kind=? AND seen > ?',
+                                (kind, now - 300)).fetchone()[0]
+            return {'active': active, 'last_24_hours': totals, 'as_of': now,
+                    'recent': series(kind, 3600, 300), 'hourly': series(kind, 86400, 3600)}
+
+        return {**counts('connection'), 'browsers': counts('browser')}

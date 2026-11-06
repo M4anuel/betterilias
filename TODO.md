@@ -4,6 +4,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Add separate, default-off browser statistics consent with a random browser
+  UUID that survives ILIAS reconnection for at most 90 days. Show aggregate
+  participating-browser graphs alongside connection counts, with 24-hour server
+  retention, withdrawal, header isolation and no browser/session identity map.
+
 - [x] Accept `/admin` as well as `/admin/` and add responsive connection-activity
   graphs for five-minute active connections and rolling 24-hour distinct usage;
   keep pseudonymous samples separate from logs with a 24-hour expiry. See

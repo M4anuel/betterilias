@@ -54,6 +54,9 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
                 retained_request_metrics=dict(count=1200, mean_ms=123.4, max_ms=900, server_errors=2)),
                 outbound=dict(requests=900, rejected=0, queue_wait_seconds=10, throttles=1, cooldown_until=0, queued=2),
                 activity=dict(active=3, last_24_hours=17, as_of=now,
+                    browsers=dict(active=2, last_24_hours=11, as_of=now,
+                        recent=[dict(start=now-3600+i*300, end=now-3600+(i+1)*300, count=i%3) for i in range(12)],
+                        hourly=[dict(start=now-86400+i*3600, end=now-86400+(i+1)*3600, count=i%5) for i in range(24)]),
                     recent=[dict(start=now-3600+i*300, end=now-3600+(i+1)*300, count=i%4) for i in range(12)],
                     hourly=[dict(start=now-86400+i*3600, end=now-86400+(i+1)*3600, count=i%7) for i in range(24)]))
         elif path.endswith('/reports'):
@@ -113,6 +116,14 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
         charts.first.locator('summary').click()
         pw.expect(charts.first.locator('tbody tr')).to_have_count(12)
         charts.first.locator('summary').click()
+        subject = page.get_by_label(tr('admin.activity_subject'), exact=True)
+        subject.select_option('browsers')
+        pw.expect(page.get_by_text(tr('admin.activity_browser_hint'), exact=True)).to_be_visible()
+        pw.expect(page.locator('.activity-totals strong').last).to_have_text('11')
+        page.locator('.activity-section').scroll_into_view_if_needed()
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        page.screenshot(path=str(artifacts / f'browser-activity-{width}-{language}-{scheme}.png'), full_page=True)
+        subject.select_option('connections')
         page.locator('.admin-event summary').first.click()
         pw.expect(page.get_by_text('a' * 32, exact=True)).to_be_visible()
         category = page.get_by_label(tr('admin.category'), exact=True)

@@ -1,4 +1,5 @@
 import { DiagnosticSettings } from './DiagnosticSettings';
+import { BrowserStatisticsSettings } from './BrowserStatisticsSettings';
 import { t, useLanguage, languages, setLanguage } from '../lib/i18n';
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -377,6 +378,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
         </div>
 
         <DiagnosticSettings />
+        <BrowserStatisticsSettings />
         <MobileSessionShare isAuthenticated={isAuthenticated} />
 
         {/* 3. Helpful Quick Links */}

@@ -39,6 +39,7 @@ import { cache } from './cache';
 import type { VideoStreamInfo } from '../types';
 import { navigationGuard } from './navigationGuard';
 import { considerDiagnosticResponse, clientDiagnostic } from './diagnosticReports';
+import { browserStatisticsHeaders, browserStatisticsId } from './browserStatistics';
 
 
 const API_BASE = '/api';
@@ -53,6 +54,8 @@ export function apiError(error: { detail?: unknown }): string | undefined {
 export async function sessionFetch(input: string, init?: RequestInit & { trackPending?: boolean }): Promise<Response> {
   const sessionId = cache.getSessionId();
   const headers = new Headers(init?.headers);
+  if (sessionId) browserStatisticsHeaders(input, headers);
+  else headers.delete('X-BetterIlias-Browser-Id');
   headers.set('Accept-Language', getLanguage());
   if (sessionId && !headers.has('X-Session-Id')) {
     headers.set('X-Session-Id', sessionId);
@@ -167,6 +170,8 @@ export const api = {
       xhr.setRequestHeader('Accept-Language', getLanguage());
       const sessionId = cache.getSessionId();
       if (sessionId) xhr.setRequestHeader('X-Session-Id', sessionId);
+      const browserId = browserStatisticsId();
+      if (sessionId && browserId) xhr.setRequestHeader('X-BetterIlias-Browser-Id', browserId);
       xhr.upload.onprogress = event => { if (event.lengthComputable) onProgress(Math.round(event.loaded / event.total * 100)); };
       // The body is transferred, but ILIAS still has to receive, save and verify it.
       xhr.upload.onload = () => onProgress(100);
