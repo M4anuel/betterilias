@@ -10,6 +10,63 @@ from tests.test_mobile_refinement_browser import mock_api, assert_no_overflow
 pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '1', reason='Opt-in browser tests')
 
 
+@pytest.mark.parametrize('language,scheme', [('de', 'dark'), ('de', 'light'), ('en', 'dark'), ('en', 'light')])
+def test_membership_scrolling_stays_inside_workspace(local_site, language, scheme):
+    pw = pytest.importorskip('playwright.sync_api')
+    tr = json.loads((ROOT / 'locales' / f'{language}.json').read_text(encoding='utf-8')).__getitem__
+    courses = [dict(ref_id=str(100 + index), title=f'{index:02d} Course with a longer membership title',
+                    semester='HS2026', item_type='grp' if index % 5 == 0 else 'crs',
+                    url=f'https://ilias.unibe.ch/go/crs/{100 + index}') for index in range(30)]
+    def respond(route):
+        if urlparse(route.request.url).path.endswith('/memberships'):
+            route.fulfill(content_type='application/json', body=json.dumps(dict(courses=courses)))
+        else:
+            mock_api(route)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=dict(width=1440, height=766), color_scheme=scheme)
+        page.add_init_script(f"localStorage.setItem('betterilias_language', '{language}'); localStorage.setItem('betterilias_theme_mode', '{scheme}');")
+        page.route('**/api/**', respond)
+        page.goto(local_site + '/?view=my-courses')
+        rows = page.locator('article[data-course-id]')
+        pw.expect(rows).to_have_count(30)
+        artifacts = ROOT / 'scratch' / 'my-courses-scroll-checks'
+        artifacts.mkdir(parents=True, exist_ok=True)
+        for width, height in [(1440, 766), (320, 740), (390, 844), (430, 900), (768, 1024), (1280, 900), (844, 390)]:
+            page.set_viewport_size(dict(width=width, height=height))
+            page.locator('main').evaluate('element => { element.scrollTop = element.scrollHeight; }')
+            metrics = page.evaluate('''() => {
+                const main = document.querySelector('main'), shell = document.querySelector('.app-shell');
+                const last = [...main.querySelectorAll('article')].at(-1).getBoundingClientRect();
+                const bounds = main.getBoundingClientRect();
+                return {documentHeight:document.documentElement.scrollHeight, viewport:innerHeight,
+                    shellHeight:shell.getBoundingClientRect().height, mainBottom:bounds.bottom,
+                    lastBottom:last.bottom, mainScroll:main.scrollTop, mainHeight:main.clientHeight,
+                    mainContent:main.scrollHeight};
+            }''')
+            assert metrics['documentHeight'] <= height + 1, json.dumps(metrics)
+            assert metrics['mainBottom'] <= height + 1, metrics
+            assert 0 <= metrics['mainBottom'] - metrics['lastBottom'] <= 33, metrics
+            assert_no_overflow(page)
+            pw.expect(page.locator('header')).to_be_in_viewport()
+            pw.expect(rows.last).to_be_in_viewport()
+            page.screenshot(path=str(artifacts / f'{language}-{scheme}-{width}-{height}.png'), animations='disabled')
+            search = page.get_by_role('searchbox', name=tr('my_courses.search'))
+            search.fill('29 Course')
+            pw.expect(rows).to_have_count(1)
+            assert page.evaluate('document.documentElement.scrollHeight <= innerHeight + 1')
+            search.fill('no matching membership')
+            pw.expect(page.get_by_text(tr('my_courses.no_results'), exact=True)).to_be_visible()
+            assert page.evaluate('document.documentElement.scrollHeight <= innerHeight + 1')
+            search.fill('')
+            pw.expect(rows).to_have_count(30)
+        courses.clear()
+        page.get_by_role('button', name=tr('my_courses.refresh'), exact=True).click()
+        pw.expect(page.get_by_text(tr('my_courses.empty'), exact=True)).to_be_visible()
+        assert page.evaluate('document.documentElement.scrollHeight <= innerHeight + 1')
+        browser.close()
+
+
 @pytest.mark.parametrize('width,height', [(320, 740), (390, 800), (430, 800), (768, 850), (1280, 900), (740, 360)])
 @pytest.mark.parametrize('language,scheme', [('de', 'dark'), ('de', 'light'), ('en', 'dark'), ('en', 'light')])
 def test_membership_search_sort_pin_navigation_and_persistence(local_site, width, height, language, scheme):

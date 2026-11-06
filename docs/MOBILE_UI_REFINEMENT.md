@@ -1,5 +1,20 @@
 # Mobile UI refinement
 
+## My Courses & Groups scrolling
+
+The screen-reader full course title uses absolute positioning through `sr-only`.
+Its course button must establish a positioning context; otherwise the hidden
+titles can escape the scrolling workspace and extend the document, creating a
+second scrollbar and blank space below the app. Positioning the button relatively
+keeps the full accessible title inside its card without changing the visible grid.
+
+`test_membership_scrolling_stays_inside_workspace` checks a 30-item list, search
+results, no results and an empty list at 320/390/430/768/1280 px, 1440 x 766 and
+short landscape in German/English and light/dark mode. It checks document height,
+the last card and bottom padding, and captures screenshots for visual inspection.
+These are Chromium emulation checks; no physical-device or live ILIAS validation
+is implied.
+
 ## Stable sidebar collapse and foregrounds
 
 All navigation/course rows share a 44 px height, the same icon wrapper and an

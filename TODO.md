@@ -119,6 +119,10 @@ no lecture dates.
 
 ## Mobile usability
 
+- [x] Remove the extra document scrollbar and blank space in My Courses & Groups
+  by containing screen-reader course titles within their buttons; verify long,
+  filtered and empty lists across viewport sizes, languages and themes.
+
 - [x] Keep sidebar icons/rows stationary throughout collapse, prevent header
   wrapping, unify primary icon/label colours and keep compact-rail editing accessible.
 
