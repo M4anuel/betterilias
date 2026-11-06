@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SemesterView } from './components/SemesterView';
 import { LandingView } from './components/LandingView';
+import { LegalModal } from './components/LegalModal';
 import { CalendarView } from './components/CalendarView';
 import { CourseView } from './components/CourseView';
 import { MyCoursesView } from './components/MyCoursesView';
@@ -124,6 +125,18 @@ export const App: React.FC = () => {
   // --- Auth & Session State ---
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
+  const initialParamsForLegal = new URLSearchParams(window.location.search);
+  const initialViewForLegal = initialParamsForLegal.get('view');
+  const isInitialImprint = initialViewForLegal === 'imprint' || initialViewForLegal === 'impressum';
+  const isInitialPrivacy = initialViewForLegal === 'privacy' || initialViewForLegal === 'datenschutz';
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState(isInitialImprint || isInitialPrivacy);
+  const [legalModalTab, setLegalModalTab] = useState<'imprint' | 'privacy'>(
+    isInitialPrivacy ? 'privacy' : 'imprint'
+  );
+  const handleOpenLegal = useCallback((tab: 'imprint' | 'privacy' = 'imprint') => {
+    setLegalModalTab(tab);
+    setIsLegalModalOpen(true);
+  }, []);
   const authRequestSeq = useRef(0);
   const [changeNotifications, setChangeNotifications] = useState<ChangeNotification[]>([]);
   const [membershipDialog, setMembershipDialog] = useState<{ refId: string; title: string; action: MembershipAction } | null>(null);
@@ -1044,6 +1057,7 @@ export const App: React.FC = () => {
         isSidebarCollapsed={isMobile ? !mobileNavigationOpen : isSidebarCollapsed}
         onLogout={handleLogout}
         onOpenExtensionInfo={() => setIsExtensionModalOpen(true)}
+        onOpenLegal={handleOpenLegal}
       />
 
       {/* Main Workspace Layout */}
@@ -1092,6 +1106,7 @@ export const App: React.FC = () => {
               onOpenApp={handleOpenApp}
               onOpenExtensionInfo={() => setIsExtensionModalOpen(true)}
               isAuthenticated={Boolean(authStatus?.authenticated)}
+              onOpenLegal={handleOpenLegal}
             />
           ) : myCourses ? (
             <MyCoursesView key={`${cache.getSessionId()}_${membershipVersion}`} onOpenCourse={handleSelectCourse}
@@ -1199,6 +1214,13 @@ export const App: React.FC = () => {
 
       {/* Global Download Progress Bar & Dock */}
       <DownloadProgressBar />
+
+      {/* Legal & Privacy Policy Modal */}
+      <LegalModal
+        isOpen={isLegalModalOpen}
+        onClose={() => setIsLegalModalOpen(false)}
+        initialTab={legalModalTab}
+      />
 
       {/* Global Confirmation & Alert Dialog */}
       <ConfirmModal />

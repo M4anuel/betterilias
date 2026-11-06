@@ -33,12 +33,14 @@ interface LandingViewProps {
   onOpenApp: () => void;
   onOpenExtensionInfo: () => void;
   isAuthenticated?: boolean;
+  onOpenLegal?: (tab: 'imprint' | 'privacy') => void;
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({
   onOpenApp,
   onOpenExtensionInfo,
   isAuthenticated = false,
+  onOpenLegal,
 }) => {
   useLanguage();
   const [imageThemeOverride, setImageThemeOverride] = useState<'auto' | 'light' | 'dark'>('auto');
@@ -810,6 +812,51 @@ export const LandingView: React.FC<LandingViewProps> = ({
           </div>
         </div>
       </section>
+
+      {/* Landing Page Legal & Info Footer */}
+      <footer className="w-full border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 py-8 px-4 sm:px-8 mt-12 transition-colors">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
+          <div className="space-y-1 text-center md:text-left">
+            <div className="flex items-center justify-center md:justify-start gap-2">
+              <span className="font-extrabold text-[#033683] dark:text-white">Better</span>
+              <span className="font-extrabold text-[#0AACA5]">Ilias</span>
+              <span className="text-[10px] text-slate-400">· Open Source</span>
+            </div>
+            <p className="max-w-md text-[11px] leading-relaxed">
+              {t("landing.footer_disclaimer")}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+            {onOpenLegal && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onOpenLegal('imprint')}
+                  className="font-medium hover:text-[#0AACA5] transition cursor-pointer underline underline-offset-2"
+                >
+                  {t("Impressum")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenLegal('privacy')}
+                  className="font-medium hover:text-[#0AACA5] transition cursor-pointer underline underline-offset-2"
+                >
+                  {t("Datenschutz")}
+                </button>
+              </>
+            )}
+            <a
+              href="https://github.com/M4anuel/betterilias"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium hover:text-[#0AACA5] transition underline underline-offset-2"
+            >
+              GitHub
+            </a>
+          </div>
+        </div>
+      </footer>
 
       {/* Lightbox / Zoomed image modal */}
       {zoomedImage && (

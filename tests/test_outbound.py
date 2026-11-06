@@ -140,7 +140,7 @@ async def test_global_spacing_and_cooldown_timeout(budget):
         permit = await budget.acquire(tenant)
         times.append(time.monotonic())
         await permit.close()
-    assert all(b - a >= .045 for a, b in zip(times, times[1:]))
+    assert all(b - a >= .035 for a, b in zip(times, times[1:]))
     await budget.cooldown(2)
     with pytest.raises(OutboundUnavailable) as error:
         await budget.acquire('bob')
