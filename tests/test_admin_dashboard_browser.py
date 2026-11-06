@@ -52,7 +52,10 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
                 console_errors=0, last_write=now, writer_alive=True, retention_seconds=604800,
                 retained_counts={'request.completed': 1200, 'outbound.origin_not_allowed': 3},
                 retained_request_metrics=dict(count=1200, mean_ms=123.4, max_ms=900, server_errors=2)),
-                outbound=dict(requests=900, rejected=0, queue_wait_seconds=10, throttles=1, cooldown_until=0, queued=2))
+                outbound=dict(requests=900, rejected=0, queue_wait_seconds=10, throttles=1, cooldown_until=0, queued=2),
+                activity=dict(active=3, last_24_hours=17, as_of=now,
+                    recent=[dict(start=now-3600+i*300, end=now-3600+(i+1)*300, count=i%4) for i in range(12)],
+                    hourly=[dict(start=now-86400+i*3600, end=now-86400+(i+1)*3600, count=i%7) for i in range(24)]))
         elif path.endswith('/reports'):
             data = dict(reports=[], counts=[], next_before=None)
         elif path.endswith('/events'):
@@ -80,7 +83,8 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.add_init_script("localStorage.setItem('betterilias_language',%s); localStorage.setItem('betterilias_session_id','student-credential');" % json.dumps(language))
         page.route('**/api/**', respond)
-        page.goto(local_site + '/admin/')
+        page.goto(local_site + '/admin')
+        assert page.url.endswith('/admin/')
         password = page.get_by_label(tr('admin.key'), exact=True)
         pw.expect(password).to_be_focused()
         password.fill('draft')
@@ -96,6 +100,19 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
         password.press('Enter')
         pw.expect(page.get_by_role('heading', name=tr('admin.overview'), exact=True)).to_be_visible()
         pw.expect(page.locator('.admin-event')).to_have_count(2)
+        charts = page.locator('.activity-chart')
+        pw.expect(charts).to_have_count(2)
+        slider = charts.first.get_by_role('slider')
+        slider.focus()
+        slider.press('Home')
+        pw.expect(slider).to_have_value('0')
+        pw.expect(charts.first.locator('.activity-value')).to_contain_text('0')
+        slider.press('End')
+        pw.expect(slider).to_have_value('11')
+        assert slider.bounding_box()['height'] >= 44
+        charts.first.locator('summary').click()
+        pw.expect(charts.first.locator('tbody tr')).to_have_count(12)
+        charts.first.locator('summary').click()
         page.locator('.admin-event summary').first.click()
         pw.expect(page.get_by_text('a' * 32, exact=True)).to_be_visible()
         category = page.get_by_label(tr('admin.category'), exact=True)

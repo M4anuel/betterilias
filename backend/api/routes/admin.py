@@ -12,6 +12,7 @@ from backend.observability import CATEGORIES, EVENTS, emit, get_store
 from backend.outbound_budget import OutboundBudget
 from backend import admin_sessions
 from backend import diagnostic_reports
+from backend import activity
 from backend.api.routes.diagnostics import storage
 
 
@@ -108,7 +109,7 @@ def events(before: int | None = Query(default=None, ge=1, le=9223372036854775807
 def summary():
     try:
         return {'diagnostics': get_store().summary(), 'outbound': OutboundBudget().snapshot(),
-                'event_catalogue': EVENTS}
+                'event_catalogue': EVENTS, 'activity': activity.summary()}
     except (OSError, sqlite3.Error):
         raise HTTPException(503, detail=t('diagnostics.unavailable')) from None
 

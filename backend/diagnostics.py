@@ -14,6 +14,7 @@ from backend.coordination import CoordinationBusy
 from backend.admin_sessions import prune as prune_admin_sessions
 from backend.diagnostic_reports import prune as prune_reports
 from backend import diagnostic_reports
+from backend import activity
 
 
 def main(argv=None):
@@ -69,6 +70,7 @@ def main(argv=None):
         prune_failed_dumps(strict=True)
         prune_admin_sessions()
         prune_reports()
+        activity.prune()
         print(json.dumps({'status': 'pruned'}))
     except (OSError, sqlite3.Error, CoordinationBusy):
         print(json.dumps({'status': 'unavailable'}))

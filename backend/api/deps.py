@@ -36,6 +36,11 @@ def get_optional_session_manager(
     manager = SessionManager(session_id=sid)
     if manager.has_cookies():
         request.state.diagnostic_session_id = manager.session_id
+        # Status polling, reporting and admin traffic do not represent app use.
+        if (request.url.path.startswith('/api/') and request.method not in ('HEAD', 'OPTIONS')
+                and not request.url.path.startswith(('/api/auth/', '/api/admin/', '/api/diagnostics/'))):
+            from backend.activity import record
+            record(manager.session_id)
         return manager
     return None
 

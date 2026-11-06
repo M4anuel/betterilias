@@ -1,0 +1,88 @@
+"""Bounded, pseudonymous connection activity; never a user directory or event log."""
+from contextlib import contextmanager
+import hashlib
+import hmac
+import os
+import secrets
+import sqlite3
+import time
+
+from backend.config import settings
+
+RETENTION = 86400
+MAX_ROWS = 100000
+
+
+@contextmanager
+def database():
+    directory = settings.observability_path
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path = directory / 'activity.sqlite3'
+    db = sqlite3.connect(path, timeout=.2)
+    try:
+        db.execute('PRAGMA journal_mode=DELETE')
+        db.execute('PRAGMA secure_delete=ON')
+        size = db.execute('PRAGMA page_size').fetchone()[0]
+        db.execute(f'PRAGMA max_page_count={32 * 1024 * 1024 // size}')
+        db.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+        db.execute('CREATE TABLE IF NOT EXISTS activity '
+                   '(minute INTEGER NOT NULL, owner TEXT NOT NULL, seen REAL NOT NULL, PRIMARY KEY(minute,owner))')
+        db.execute('CREATE INDEX IF NOT EXISTS activity_seen ON activity(seen)')
+        db.execute("INSERT OR IGNORE INTO meta VALUES('secret',?)", (secrets.token_hex(32),))
+        if os.name != 'nt':
+            directory.chmod(0o700)
+            path.chmod(0o600)
+        with db:
+            yield db
+    finally:
+        db.close()
+
+
+def _prune(db, now):
+    db.execute('DELETE FROM activity WHERE seen <= ?', (now - RETENTION,))
+    excess = db.execute('SELECT count(*) FROM activity').fetchone()[0] - MAX_ROWS
+    if excess > 0:
+        db.execute('DELETE FROM activity WHERE rowid IN '
+                   '(SELECT rowid FROM activity ORDER BY seen LIMIT ?)', (excess,))
+
+
+def record(session_id):
+    """Called only after tenant credential validation, on the dependency thread pool.
+
+    Failure is deliberately isolated from the student action. No credential,
+    path, IP, account name or owner digest enters ordinary diagnostic events.
+    """
+    try:
+        now = time.time()
+        with database() as db:
+            secret = db.execute("SELECT value FROM meta WHERE key='secret'").fetchone()[0]
+            owner = hmac.new(bytes.fromhex(secret), session_id.encode(), hashlib.sha256).hexdigest()
+            db.execute('INSERT INTO activity VALUES(?,?,?) ON CONFLICT(minute,owner) '
+                       'DO UPDATE SET seen=excluded.seen', (int(now // 60), owner, now))
+            _prune(db, now)
+    except (OSError, sqlite3.Error):
+        pass
+
+
+def prune():
+    with database() as db:
+        _prune(db, time.time())
+
+
+def summary():
+    now = time.time()
+    with database() as db:
+        _prune(db, now)
+        totals = db.execute('SELECT count(DISTINCT owner) FROM activity').fetchone()[0]
+        active = db.execute('SELECT count(DISTINCT owner) FROM activity WHERE seen > ?', (now - 300,)).fetchone()[0]
+
+        def series(window, step):
+            start = now - window
+            values = dict(db.execute('SELECT min(?,CAST((seen-?)/? AS INTEGER)),count(DISTINCT owner) '
+                                     'FROM activity WHERE seen > ? GROUP BY 1',
+                                     (window // step - 1, start, step, start)))
+            return [{'start': start + index * step, 'end': start + (index + 1) * step,
+                     'count': values.get(index, 0)} for index in range(window // step)]
+
+        return {'active': active, 'last_24_hours': totals, 'as_of': now,
+                'recent': series(3600, 300), 'hourly': series(86400, 3600)}

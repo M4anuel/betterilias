@@ -8,7 +8,13 @@ export interface AdminEvent {
 }
 export interface EventPage { events: AdminEvent[]; next_before: number | null }
 export interface AdminSession { authenticated: boolean; expires_at: number | null }
+export interface ActivityBucket { start: number; end: number; count: number }
+export interface ActivitySummary {
+  active: number; last_24_hours: number; as_of: number;
+  recent: ActivityBucket[]; hourly: ActivityBucket[];
+}
 export interface AdminSummary {
+  activity?: ActivitySummary;
   event_catalogue: Record<string, string>;
   diagnostics: {
     worker: string; queue_depth: number; dropped: number; storage_errors: number;

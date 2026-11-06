@@ -4,6 +4,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Accept `/admin` as well as `/admin/` and add responsive connection-activity
+  graphs for five-minute active connections and rolling 24-hour distinct usage;
+  keep pseudonymous samples separate from logs with a 24-hour expiry. See
+  [definitions, privacy and proxy setup](docs/ADMIN_DASHBOARD.md).
+
 - [x] Recover manual companion sync when an open app tab has no content-script
   receiver or session header, using separate one-use connection codes per tab.
   Verify header authentication and cookie acceptance with and without the bridge.

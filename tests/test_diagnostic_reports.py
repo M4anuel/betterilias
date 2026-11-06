@@ -33,6 +33,7 @@ def site(tmp_path, monkeypatch):
                         ('app_env', 'test'), ('admin_api_key', ADMIN), ('log_console_level', 'OFF')]:
         monkeypatch.setattr(settings, name, value)
     store = EventStore(tmp_path / 'events')
+    monkeypatch.setattr(settings, 'observability_dir', str(tmp_path / 'events'))
     monkeypatch.setattr('backend.observability.get_store', lambda: store)
     monkeypatch.setattr('backend.api.routes.admin.get_store', lambda: store)
     for owner in ('alpha', 'beta'):

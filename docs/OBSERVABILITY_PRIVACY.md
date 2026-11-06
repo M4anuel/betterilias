@@ -213,6 +213,16 @@ proof that the service as a whole meets every obligation:
 
 ## Verification
 
+The admin dashboard additionally uses a **separate** private
+`.observability/activity.sqlite3` store for rolling 24-hour connection counts.
+Unlike events, this contains a secret-HMAC pseudonymous connection key and
+minute-level timestamps, capped at 100,000 samples/32 MiB. It stores no raw
+credential or account identity and exposes only aggregate counts to admins.
+Report consent does not control this operational measurement. Document it in
+the operator notice and apply the same private-volume/backup exclusions and
+hourly purge schedule. It does not create a stable user profile. See
+[activity definitions and storage](ADMIN_DASHBOARD.md#connection-activity-graphs-and-database-locations).
+
 `tests/test_observability.py` exercises input exclusion (including token-bearing
 URLs and unknown paths), generated correlation IDs, distinct rejection reasons,
 nested/uncertain/partial write outcomes, independent disabled-by-default admin

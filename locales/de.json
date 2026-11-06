@@ -1972,5 +1972,19 @@
   "reports.details": "Was wird geteilt?",
   "reports.occurred_at": "Fehler aufgetreten",
   "reports.pending_hint": "Ein textfreier Entwurf wird bis zu 10 Minuten privat vorgehalten, während du wählst. Im Wartungsbereich ist er erst nach deiner Zustimmung verfügbar.",
-  "admin.event.report.unavailable": "Berichtsdienst nicht verfügbar"
+  "admin.event.report.unavailable": "Berichtsdienst nicht verfügbar",
+  "admin.activity_title": "Verbindungsaktivität",
+  "admin.activity_hint": "Authentifizierte App-Nutzung, keine genaue Personenzahl oder offenen Browser-Tabs. Erneutes Verbinden kann doppelt zählen; geteilte Verbindungen zählen einmal. Statusabfragen im Hintergrund, Admin-Zugriffe und Berichtsanfragen zählen nicht. App-Aktualisierungen zählen als Nutzung. Minutenstichproben verfallen nach 24 Stunden; Speichergrenzen können die Zahlen verringern. Jedes Diagrammintervall zählt unterschiedliche Verbindungen; die Balken dürfen daher nicht addiert werden.",
+  "admin.activity_now": "Aktive Verbindungen",
+  "admin.activity_five_minutes": "Nutzung in den letzten 5 Minuten",
+  "admin.activity_day": "Verbindungen der letzten 24 Stunden",
+  "admin.activity_unique": "Unterschiedliche Verbindungen im gesamten Zeitraum",
+  "admin.activity_recent": "Letzte Stunde · 5-Minuten-Intervalle",
+  "admin.activity_hourly": "Letzte 24 Stunden · Stundenintervalle",
+  "admin.activity_scale": "Diagrammmaximum: {count}",
+  "admin.activity_select": "Zeitintervall auswählen",
+  "admin.activity_bucket": "{start}–{end}: {count} Verbindungen",
+  "admin.activity_table": "Werte als Tabelle anzeigen",
+  "admin.activity_interval": "Zeitintervall",
+  "admin.activity_connections": "Verbindungen"
 }

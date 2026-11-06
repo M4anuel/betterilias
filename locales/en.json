@@ -1972,5 +1972,19 @@
   "reports.details": "What is shared?",
   "reports.occurred_at": "Error occurred",
   "reports.pending_hint": "A text-free candidate is held privately for up to 10 minutes while you choose. It is not available in the maintainer dashboard until you agree.",
-  "admin.event.report.unavailable": "Report service unavailable"
+  "admin.event.report.unavailable": "Report service unavailable",
+  "admin.activity_title": "Connection activity",
+  "admin.activity_hint": "Authenticated app activity, not exact people or open browser tabs. Reconnecting can count twice; shared connections count once. Background status checks, admin traffic and report requests are excluded. App refreshes count as activity. Minute samples expire after 24 hours; storage limits can reduce counts. Each graph interval counts distinct connections, so bars must not be added together.",
+  "admin.activity_now": "Active connections",
+  "admin.activity_five_minutes": "Activity in the last 5 minutes",
+  "admin.activity_day": "Connections in the last 24 hours",
+  "admin.activity_unique": "Distinct connections across the whole period",
+  "admin.activity_recent": "Last hour · 5-minute intervals",
+  "admin.activity_hourly": "Last 24 hours · hourly intervals",
+  "admin.activity_scale": "Chart maximum: {count}",
+  "admin.activity_select": "Select a time interval",
+  "admin.activity_bucket": "{start}–{end}: {count} connections",
+  "admin.activity_table": "Show values as a table",
+  "admin.activity_interval": "Time interval",
+  "admin.activity_connections": "Connections"
 }

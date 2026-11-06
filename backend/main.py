@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 
@@ -48,6 +48,11 @@ app = FastAPI(
 app.add_middleware(LanguageMiddleware)
 app.add_middleware(DiagnosticMiddleware)
 app.add_middleware(ReportMiddleware)
+
+
+@app.get('/admin', include_in_schema=False)
+def admin_directory():
+    return RedirectResponse('/admin/', status_code=308)
 
 
 @app.exception_handler(OutboundTargetRejected)

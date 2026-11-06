@@ -7,6 +7,7 @@ import { theme } from '../lib/theme';
 import { AdminError, adminRequest } from './api';
 import type { AdminEvent, AdminSession, AdminSummary, EventPage } from './api';
 import { ReportsPanel } from './Reports';
+import { Activity as ActivityPanel } from './Activity';
 
 const categories = ['security', 'compatibility', 'operational', 'audit', 'request'];
 function label(key: string) { return t(key as TranslationKey); }
@@ -190,6 +191,7 @@ function Overview({ onExpired, expires }: { onExpired: () => void; expires: numb
       <Stat title={t('admin.rejections')} value={diagnostic ? number(security) : '—'} note={t('admin.rejections_hint')} />
       <Stat title={t('admin.dropped')} value={number(diagnostic?.dropped)} note={t('admin.current_worker')} alert={!!diagnostic?.dropped} />
     </section>
+    <ActivityPanel data={summary?.activity} />
     <div className="admin-health-grid">
       <section className="admin-panel" aria-labelledby="admin-writer"><div className="admin-section-heading"><h2 id="admin-writer">{t('admin.writer')}</h2>{diagnostic && <span className={`admin-badge ${diagnostic.writer_alive && !diagnostic.storage_errors ? 'admin-good' : 'admin-bad'}`}>{diagnostic.writer_alive && !diagnostic.storage_errors ? <Check size={14} /> : <TriangleAlert size={14} />}{t(diagnostic.writer_alive && !diagnostic.storage_errors ? 'admin.running' : 'admin.attention')}</span>}</div>
         <dl className="admin-facts"><Fact name={t('admin.queue')} value={number(diagnostic?.queue_depth)} /><Fact name={t('admin.storage_errors')} value={number(diagnostic?.storage_errors)} /><Fact name={t('admin.console_errors')} value={number(diagnostic?.console_errors)} /><Fact name={t('admin.last_write')} value={date(diagnostic?.last_write)} /><Fact name={t('admin.worker_id')} value={<code>{diagnostic?.worker || '—'}</code>} /><Fact name={t('admin.retention')} value={diagnostic ? t('admin.days', { count: number(diagnostic.retention_seconds / 86400) }) : '—'} /></dl>
