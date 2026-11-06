@@ -13,6 +13,7 @@ interface HeaderProps {
   onLogout?: () => void;
   onOpenExtensionInfo: () => void;
   onOpenLanding?: () => void;
+  onOpenLegal?: (tab?: 'imprint' | 'privacy') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onOpenExtensionInfo,
   onOpenLanding,
+  onOpenLegal,
 }) => {
   useLanguage();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -116,6 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
           userName={authStatus?.user_name}
           onOpenExtensionInfo={onOpenExtensionInfo}
           onOpenLanding={onOpenLanding}
+          onOpenLegal={onOpenLegal}
         />
       </div>
     </header>

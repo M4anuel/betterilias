@@ -14,6 +14,7 @@ import {
   Info,
   Gauge,
   Sparkles,
+  Scale,
 } from 'lucide-react';
 import { SettingsGear } from './SettingsGear';
 import { ToggleSwitch } from './ToggleSwitch';
@@ -32,6 +33,7 @@ interface SettingsDropdownProps {
   userName?: string | null;
   onOpenExtensionInfo: () => void;
   onOpenLanding?: () => void;
+  onOpenLegal?: (tab?: 'imprint' | 'privacy') => void;
 }
 
 export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
@@ -44,6 +46,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   userName,
   onOpenExtensionInfo,
   onOpenLanding,
+  onOpenLegal,
 }) => {
   const language = useLanguage();
   const [currentMode, setCurrentMode] = useState<ThemeMode>(() => theme.getThemeMode());
@@ -392,6 +395,22 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
                 <span>{t("Über BetterIlias & Features")}</span>
               </div>
               <span className="text-[10px] text-slate-400">{t("Info")}</span>
+            </button>
+          )}
+          {onOpenLegal && (
+            <button
+              type="button"
+              onClick={() => {
+                closePanel();
+                onOpenLegal('imprint');
+              }}
+              className="w-full flex items-center justify-between rounded-xl p-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Scale className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+                <span>{t("Impressum & Datenschutz")}</span>
+              </div>
+              <span className="text-[10px] text-slate-400">{t("Rechtliches")}</span>
             </button>
           )}
           <a
