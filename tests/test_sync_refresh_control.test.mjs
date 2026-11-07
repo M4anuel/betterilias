@@ -10,9 +10,14 @@ test('SyncRefreshControl component structure, morphing animation classes and sta
   const content = fs.readFileSync(filePath, 'utf-8');
 
   // Verify key design requirements:
-  // 1. Idle state: Checkmark icon with green color and localized "Lokal bereitgestellt" label
+  // 1. Idle state: Checkmark icon with circle and green color and localized "Lokal bereitgestellt" label
+  assert.match(content, /CheckCircle2/);
   assert.match(content, /displayLabel = label \|\| t\(['"]Lokal bereitgestellt['"]\)/);
   assert.match(content, /text-emerald-500/);
+
+  // 1b. Syncing state: Checkmark disappears and text switches to "Synchronisiere..."
+  assert.match(content, /isSyncing \? t\(['"]Synchronisiere\.\.\.['"]\) : displayLabel/);
+  assert.match(content, /w-0 opacity-0 scale-0 overflow-hidden/);
 
   // 2. Separate reload button in idle state with rounded-full styling and subtle borders
   assert.match(content, /rounded-full/);
@@ -20,9 +25,9 @@ test('SyncRefreshControl component structure, morphing animation classes and sta
   assert.match(content, /h-8/);
 
   // 3. Morphing capsule background expanding to the right during syncing
-  // Idle: w-[calc(100%-2.375rem)] (wrapping just the pill)
+  // Idle: w-[calc(100%-2.5rem)] (wrapping just the pill with comfortable spacing)
   // Syncing: w-full (expanding to enclose the circling button)
-  assert.match(content, /w-\[calc\(100%-2\.375rem\)\]/);
+  assert.match(content, /w-\[calc\(100%-2\.5rem\)\]/);
   assert.match(content, /w-full bg-blue-50/);
   assert.match(content, /transition-all duration-300 ease-out/);
 
@@ -56,3 +61,4 @@ test('SyncRefreshControl is deployed across all primary pages', () => {
     );
   }
 });
+
