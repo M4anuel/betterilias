@@ -100,7 +100,9 @@ must use the same trusted local volume; independent VPSs/NFS are unsupported.
 Use **Count by → Participating browser profiles** for a distinct browser view of
 the same five-minute/24-hour windows and graphs. Users can opt in through
 **Settings → Optional browser statistics**. This is off by default, separate from
-error-report sharing, and creates no identifier until the checkbox is enabled.
+error-report sharing, and creates no identifier until the toggle is enabled.
+The compact setting shows a short explanation; its info button opens the full
+data, retention and withdrawal context without changing the toggle.
 No banner is required to decline: leaving the setting off keeps the browser out
 of this measurement. Counts cover authenticated app requests, not anonymous
 landing-page visits, native downloads or users who decline.

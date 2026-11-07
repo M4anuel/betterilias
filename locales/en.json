@@ -2078,5 +2078,7 @@
   "admin.reason.storage_busy": "Database busy or locked",
   "admin.reason.storage_full": "Storage capacity exhausted",
   "admin.reason.file_missing": "Required file missing",
-  "admin.reason.filesystem_error": "Filesystem operation failed"
+  "admin.reason.filesystem_error": "Filesystem operation failed",
+  "statistics.short_hint": "Optionally help count browsers. Browser ID: 90 days; server activity: 24 hours. Disable at any time.",
+  "statistics.details": "About browser statistics"
 }

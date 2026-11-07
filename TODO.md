@@ -4,6 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Keep browser-statistics settings compact with the shared switch, a short
+  explanation and a separate info dialog containing the full privacy context.
+
 - [x] Improve private logs with frozen route templates, literal parser names,
   application/backend source version, fixed failure categories and bounded
   code-only frames. Add request-ID lookup in the dashboard/API/CLI while

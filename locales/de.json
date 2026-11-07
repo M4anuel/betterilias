@@ -2078,5 +2078,7 @@
   "admin.reason.storage_busy": "Datenbank ausgelastet oder gesperrt",
   "admin.reason.storage_full": "Speicherkapazität erschöpft",
   "admin.reason.file_missing": "Erforderliche Datei fehlt",
-  "admin.reason.filesystem_error": "Dateisystemvorgang fehlgeschlagen"
+  "admin.reason.filesystem_error": "Dateisystemvorgang fehlgeschlagen",
+  "statistics.short_hint": "Hilf freiwillig beim Zählen der Browser. Browser-ID: 90 Tage; Serveraktivität: 24 Stunden. Jederzeit ausschaltbar.",
+  "statistics.details": "Informationen zur Browserstatistik"
 }
