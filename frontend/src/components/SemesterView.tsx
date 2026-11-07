@@ -8,6 +8,7 @@ import {
   Clock,
   GraduationCap,
   Calendar,
+  ChevronDown,
   RefreshCw,
   LayoutGrid,
   List,
@@ -149,19 +150,31 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
 
       {/* Semester Switcher Header & Controls */}
       <div className="space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
-              <GraduationCap className="h-6 w-6" style={{ color: 'var(--accent, #0AACA5)' }} />
-              <span>{t("Vorlesungsübersicht")}</span>
-            </h1>
+        {/* Header row: Title on left, Sync furthest on top-right */}
+        <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5 min-w-0">
+            <GraduationCap className="h-6 w-6 shrink-0" style={{ color: 'var(--accent, #0AACA5)' }} />
+            <span className="truncate">{t("Vorlesungsübersicht")}</span>
+          </h1>
 
-          </div>
+          {onManualRefresh && (
+            <div className="ml-auto shrink-0">
+              <SyncRefreshControl
+                isSyncing={isLoading}
+                onRefresh={onManualRefresh}
+                title={t("Übersicht aktualisieren")}
+                ariaLabel={t("Übersicht aktualisieren")}
+              />
+            </div>
+          )}
+        </div>
 
-          {/* Controls: Quick Pills + Clean Semester Dropdown + Dialog Trigger + View Mode */}
+        {/* Controls Toolbar: Unified heights (h-9), distinct dropdown, view toggle */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {/* Left group: Quick Pills + Distinct Semester Dropdown + Dialog Trigger */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Quick Pills */}
-            <div className="desktop-only flex items-center gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+            <div className="desktop-only flex h-9 items-center gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
               {pillIds.map((semId) => {
                 const isActive = semId === selectedSemester;
                 const semMeta = allSemesters.find((s) => s.id === semId);
@@ -172,7 +185,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                     key={semId}
                     type="button"
                     onClick={() => onSelectSemester(semId)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                    className={`h-7 flex items-center rounded-lg px-3 text-xs font-bold transition cursor-pointer ${
                       isActive
                         ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-white/50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50'
@@ -184,108 +197,84 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
               })}
             </div>
 
-            {/* Clean Dropdown: Only semesters (No overfilled settings options) */}
-            <div className="semester-select-controls relative flex min-w-0 flex-wrap items-center gap-1.5">
-              <div className="relative min-w-0 flex-1">
-                <select
-                  value={selectedSemester}
-                  onChange={(e) => onSelectSemester(e.target.value)}
-                  aria-label={t('semester.choose')}
-                  className="w-full min-w-0 appearance-none rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-xs font-semibold text-slate-700 shadow-xs hover:border-slate-300 focus:outline-hidden transition cursor-pointer dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                  title={t('semester.choose')}
-                >
-                  {/* Current & Preview */}
-                  <optgroup label={t('semester.current_preview')}>
-                    {currentAndPreview.map((sem) => (
-                      <option key={sem.id} value={sem.id}>
-                        {sem.short}
-                      </option>
-                    ))}
-                  </optgroup>
-
-                  {/* All Past Semesters (Unified, no useless archive split) */}
-                  <optgroup label={t('semester.past')}>
-                    {past.map((sem) => (
-                      <option key={sem.id} value={sem.id}>
-                        {sem.short}
-                      </option>
-                    ))}
-                  </optgroup>
-
-                  {/* Fallback if selected is outside generated list */}
-                  {!allSemesters.some((s) => s.id === selectedSemester) && (
-                    <optgroup label={t('semester.selected')}>
-                      <option value={selectedSemester}>{selectedSemester}</option>
-                    </optgroup>
-                  )}
-                </select>
-                <Calendar className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              </div>
-
-              {/* Dedicated button to open the custom start year/semester dialog */}
-              <button
-                type="button"
-                onClick={() => setIsRangeModalOpen(true)}
-                className="rounded-xl border border-slate-200 bg-white p-1.5 text-slate-500 shadow-xs hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition cursor-pointer"
-                title={t('semester.adjust_start')}
+            {/* Distinct Semester Dropdown: Clear select styling with chevron */}
+            <div className="relative h-9 flex items-center">
+              <select
+                value={selectedSemester}
+                onChange={(e) => onSelectSemester(e.target.value)}
+                aria-label={t('semester.choose')}
+                className="h-9 min-w-[130px] sm:min-w-[140px] appearance-none rounded-xl border border-slate-300/80 bg-slate-50/80 hover:bg-white pl-8 pr-8 text-xs font-semibold text-slate-700 shadow-2xs hover:border-slate-400/80 focus:outline-hidden transition cursor-pointer dark:border-slate-700 dark:bg-slate-800/90 dark:hover:bg-slate-800 dark:text-slate-200"
+                title={t('semester.choose')}
               >
-                <SlidersHorizontal className="h-4 w-4" />
-              </button>
+                {/* Current & Preview */}
+                <optgroup label={t('semester.current_preview')}>
+                  {currentAndPreview.map((sem) => (
+                    <option key={sem.id} value={sem.id}>
+                      {sem.short}
+                    </option>
+                  ))}
+                </optgroup>
 
-              {/* Manual Refresh & Sync Status */}
-              {onManualRefresh && (
-                <SyncRefreshControl
-                  isSyncing={isLoading}
-                  onRefresh={onManualRefresh}
-                  title={t("Übersicht aktualisieren")}
-                  ariaLabel={t("Übersicht aktualisieren")}
-                />
-              )}
+                {/* All Past Semesters (Unified, no useless archive split) */}
+                <optgroup label={t('semester.past')}>
+                  {past.map((sem) => (
+                    <option key={sem.id} value={sem.id}>
+                      {sem.short}
+                    </option>
+                  ))}
+                </optgroup>
+
+                {/* Fallback if selected is outside generated list */}
+                {!allSemesters.some((s) => s.id === selectedSemester) && (
+                  <optgroup label={t('semester.selected')}>
+                    <option value={selectedSemester}>{selectedSemester}</option>
+                  </optgroup>
+                )}
+              </select>
+              <Calendar className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
             </div>
 
-            
-            {onOpenCalendar && (
-              <button
-                type="button"
-                onClick={onOpenCalendar}
-                style={{ backgroundColor: 'var(--accent-light, rgba(10, 172, 165, 0.14))', color: 'var(--accent, #0AACA5)' }}
-                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold hover:opacity-90 transition cursor-pointer"
-                title={t('calendar.sidebar_nav')}
-              >
-                <Calendar className="h-3.5 w-3.5" />
-                <span>{t('calendar.sidebar_nav')}</span>
-              </button>
-            )}
+            {/* Dedicated button to open the custom start year/semester dialog */}
+            <button
+              type="button"
+              onClick={() => setIsRangeModalOpen(true)}
+              className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-500 shadow-2xs hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition cursor-pointer"
+              title={t('semester.adjust_start')}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+            </button>
+          </div>
 
-            {/* View Mode Toggle: Cards vs. List */}
-            <div className="flex items-center gap-0.5 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800" title={t("Ansicht umschalten")}>
-              <button
-                type="button"
-                onClick={() => handleViewModeChange('cards')}
-                className={`rounded-lg p-1.5 transition cursor-pointer ${
-                  viewMode === 'cards'
-                    ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50'
-                }`}
-                title={t("Kartenansicht")}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleViewModeChange('list')}
-                className={`rounded-lg p-1.5 transition cursor-pointer ${
-                  viewMode === 'list'
-                    ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50'
-                }`}
-                title={t("Kompakte Listenansicht")}
-              >
-                <List className="h-4 w-4" />
-              </button>
-            </div>
+          {/* Right group: View Mode Toggle: Cards vs. List */}
+          <div className="flex h-9 items-center gap-0.5 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800" title={t("Ansicht umschalten")}>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('cards')}
+              className={`h-7 w-7 flex items-center justify-center rounded-lg transition cursor-pointer ${
+                viewMode === 'cards'
+                  ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-white/50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50'
+              }`}
+              title={t("Kartenansicht")}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('list')}
+              className={`h-7 w-7 flex items-center justify-center rounded-lg transition cursor-pointer ${
+                viewMode === 'list'
+                  ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-white/50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50'
+              }`}
+              title={t("Kompakte Listenansicht")}
+            >
+              <List className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
+      </div>
 
         {/* Loading state when no data exists yet */}
         {isLoading && !semesterData && (
@@ -421,7 +410,6 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
             ))}
           </div>
         )}
-      </div>
 
       {/* Compact dialog to set custom start semester */}
       <SemesterRangeModal

@@ -25,9 +25,9 @@ test('SyncRefreshControl component structure, morphing animation classes and sta
   assert.match(content, /h-8/);
 
   // 3. Morphing capsule background expanding to the right during syncing
-  // Idle: w-[calc(100%-2.5rem)] (wrapping just the pill with comfortable spacing)
+  // Idle: w-[calc(100%-2.75rem)] (wrapping just the pill with comfortable spacing)
   // Syncing: w-full (expanding to enclose the circling button)
-  assert.match(content, /w-\[calc\(100%-2\.5rem\)\]/);
+  assert.match(content, /w-\[calc\(100%-2\.75rem\)\]/);
   assert.match(content, /w-full bg-blue-50/);
   assert.match(content, /transition-all duration-300 ease-out/);
 

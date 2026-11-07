@@ -43,7 +43,7 @@ export const SyncRefreshControl: React.FC<SyncRefreshControlProps> = ({
 
   return (
     <div
-      className={`relative inline-flex items-center select-none ${className}`}
+      className={`relative inline-flex items-center shrink-0 select-none ${className}`}
       role="status"
       aria-live="polite"
     >
@@ -53,7 +53,7 @@ export const SyncRefreshControl: React.FC<SyncRefreshControlProps> = ({
         className={`absolute left-0 top-0 bottom-0 rounded-full transition-all duration-300 ease-out pointer-events-none motion-reduce:transition-none ${
           isSyncing
             ? 'w-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/80 shadow-2xs'
-            : 'w-[calc(100%-2.5rem)] bg-slate-100 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80'
+            : 'w-[calc(100%-2.75rem)] bg-slate-100 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80'
         }`}
       />
 
@@ -88,7 +88,7 @@ export const SyncRefreshControl: React.FC<SyncRefreshControlProps> = ({
           disabled={disabled || isSyncing}
           aria-label={isSyncing ? t('Synchronisiere...') : buttonAriaLabel}
           title={isSyncing ? t('Synchronisiere...') : buttonTitle}
-          className={`relative z-10 ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-300 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-teal-500 ${
+          className={`relative z-10 ml-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-300 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-teal-500 ${
             isSyncing
               ? 'border border-transparent bg-transparent text-blue-600 dark:text-blue-400 shadow-none cursor-default'
               : 'border border-slate-200/90 dark:border-slate-700/90 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700/70 shadow-2xs cursor-pointer disabled:opacity-50'
