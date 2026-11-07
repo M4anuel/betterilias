@@ -77,18 +77,29 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="relative flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Auth Status Badge */}
         {authStatus?.authenticated ? (
-          <div role="status" aria-label={t("ILIAS-Sitzung aktiv")} title={authStatus.user_name || t("Verbunden")} className="flex items-center gap-2 rounded-full bg-emerald-50 px-2 sm:px-3 py-1 text-xs font-medium text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60">
-            <span className="relative hidden sm:flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+          <div
+            role="status"
+            aria-label={t("ILIAS-Sitzung aktiv")}
+            title={authStatus.user_name || t("Verbunden")}
+            className="group flex h-8 items-center rounded-full border border-transparent bg-transparent px-2 text-xs font-semibold text-emerald-800 transition-all duration-300 ease-out hover:border-emerald-200/80 hover:bg-emerald-50/80 hover:px-3 dark:text-emerald-300 dark:hover:border-emerald-800/60 dark:hover:bg-emerald-950/40 cursor-default"
+          >
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
             </span>
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span className="hidden sm:inline truncate max-w-[150px]">{authStatus.user_name || t("Verbunden")}</span>
+            <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-300 ease-out group-hover:max-w-[160px] group-hover:opacity-100 group-hover:ml-2 truncate">
+              {t("Verbunden")}
+            </span>
           </div>
         ) : (
-          <div role="status" aria-label={t("ILIAS-Sitzung inaktiv")} title={authStatus === null ? t("Prüfe Status...") : t("Nicht angemeldet")} className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2 sm:px-3 py-1 text-xs font-medium text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60">
-            <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-            <span className="hidden sm:inline">{authStatus === null ? t("Prüfe Status...") : t("Nicht angemeldet")}</span>
+          <div
+            role="status"
+            aria-label={t("ILIAS-Sitzung inaktiv")}
+            title={authStatus === null ? t("Prüfe Status...") : t("Nicht angemeldet")}
+            className="flex h-8 items-center gap-1.5 rounded-full bg-amber-50 px-2 sm:px-3 py-1 text-xs font-medium text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60 transition-all duration-300 animate-in fade-in"
+          >
+            <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="hidden sm:inline whitespace-nowrap">{authStatus === null ? t("Prüfe Status...") : t("Nicht angemeldet")}</span>
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, RefreshCw } from 'lucide-react';
+import { CheckCircle, RefreshCw } from 'lucide-react';
 import { t } from '../lib/i18n';
 
 export interface SyncRefreshControlProps {
@@ -73,7 +73,7 @@ export const SyncRefreshControl: React.FC<SyncRefreshControlProps> = ({
               : 'h-3.5 w-3.5 opacity-100 scale-100'
           }`}
         >
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+          <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
         </span>
         <span className="whitespace-nowrap transition-all duration-300">
           {isSyncing ? t('Synchronisiere...') : displayLabel}
