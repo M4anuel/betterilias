@@ -90,8 +90,10 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
                                 is_mobile=width < 768, has_touch=width < 768)
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.add_init_script("localStorage.setItem('betterilias_language',%s); localStorage.setItem('betterilias_session_id','student-credential');" % json.dumps(language))
+        page.add_init_script("localStorage.setItem('betterilias_browser_statistics','retired-identifier')")
         page.route('**/api/**', respond)
         page.goto(local_site + '/admin')
+        assert page.evaluate("localStorage.getItem('betterilias_browser_statistics')") is None
         assert page.url.endswith('/admin/')
         password = page.get_by_label(tr('admin.key'), exact=True)
         pw.expect(password).to_be_focused()

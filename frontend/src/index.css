@@ -767,6 +767,7 @@ summary::-webkit-details-marker { display: none; }
 .phone-only { display: none; }
 dialog.settings-panel {
   position: fixed; inset: var(--settings-top, 4.25rem) auto auto var(--settings-left, calc(100vw - 21rem)); margin: 0; transform: none;
+  overscroll-behavior: contain;
   width: var(--settings-width, 20rem); max-width: calc(100vw - 2rem);
   max-height: var(--settings-height, calc(var(--visible-height, 100dvh) - 5rem));
 }
