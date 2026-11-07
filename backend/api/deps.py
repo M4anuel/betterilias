@@ -40,7 +40,7 @@ def get_optional_session_manager(
         if (request.url.path.startswith('/api/') and request.method not in ('HEAD', 'OPTIONS')
                 and not request.url.path.startswith(('/api/auth/', '/api/admin/', '/api/diagnostics/'))):
             from backend.activity import record
-            record(manager.session_id, request.headers.get('X-BetterIlias-Browser-Id'))
+            record(manager.session_id)
         return manager
     return None
 

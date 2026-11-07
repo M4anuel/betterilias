@@ -95,48 +95,21 @@ expire after 24 hours on reads/writes and the hourly scheduled
 No long-term activity history or per-user drill-down is retained. Shared workers
 must use the same trusted local volume; independent VPSs/NFS are unsupported.
 
-### Optional browser UUID counts
+### Retired browser identifiers
 
-Use **Count by → Participating browser profiles** for a distinct browser view of
-the same five-minute/24-hour windows and graphs. Users can opt in through
-**Settings → Optional browser statistics**. This is off by default, separate from
-error-report sharing, and creates no identifier until the toggle is enabled.
-The compact setting shows a short explanation; its info button opens the full
-data, retention and withdrawal context without changing the toggle.
-No banner is required to decline: leaving the setting off keeps the browser out
-of this measurement. Counts cover authenticated app requests, not anonymous
-landing-page visits, native downloads or users who decline.
+Persistent browser UUID statistics have been removed. The app no longer creates,
+reads or sends browser identifiers, and there is no browser-statistics setting
+or browser-count selector. On app startup it removes the old
+`betterilias_browser_statistics` localStorage entry without reading its contents.
+Offline or cached old app versions need a refresh to perform this local cleanup.
+The API ignores `X-BetterIlias-Browser-Id` headers from older clients.
 
-The browser stores `betterilias_browser_statistics` in localStorage: a random v4
-UUID, policy version and an absolute expiry at most 90 days after opt-in. Reads
-do not extend it. Replacing an ILIAS connection preserves it; clearing browser
-storage, using private browsing or choosing another profile/browser changes it.
-It is a browser-profile estimate, not an exact device/person count. Turning it
-off deletes the local ID and stops future transmission; already collected
-samples still expire after 24 hours. Re-enabling creates a new UUID.
-
-The shared same-origin app fetch helper and course-upload XHR send the UUID in
-`X-BetterIlias-Browser-Id` only with a session credential. Auth/status, diagnostics
-and admin requests do not send it. No UUID enters an ILIAS request or ordinary
-event/report payload. The server accepts only v4 UUID syntax after local tenant
-validation and stores a domain-separated HMAC in the same bounded activity
-database, with `kind=browser`. It stores no mapping between browser and session
-identifiers. Existing connection rows are preserved by an additive migration.
-All metric samples together share the 100,000-row/32 MiB limit and 24-hour purge.
-The header is a client assertion, not a proof of a unique physical device;
-these best-effort counters must not be used for billing or access decisions.
-
-The settings and public privacy page describe this optional pseudonymous
-measurement. A future material policy change must increment the local consent
-version and request a fresh opt-in. Local storage does not avoid rules governing
-optional terminal identifiers; the conservative implementation requires explicit
-opt-in. See [the Baden-Württemberg authority's explanation of cookies and local storage](https://www.baden-wuerttemberg.datenschutz.de/faq-zu-cookies-und-tracking-2/).
-
-Verified using the built frontend in Chromium emulation, with screenshots at
-320/390/430/768/1280 px and short landscape sizes in English/German and light/dark
-mode. The browser regressions exercise consent defaults, UUID survival across
-reconnection, withdrawal, replacement/expiry, header exclusions and graph/table
-interaction. No physical-device or live ILIAS validation is implied.
+Existing activity rows whose legacy `kind` is not `connection` are securely
+removed on backend startup, metric reads/writes and the scheduled prune command.
+Connection rows are preserved. Stop all older backend workers when deploying
+this removal so they cannot continue collecting legacy data. SQLite cleanup
+cannot remove backups or snapshots; apply the operator's deletion process there.
+The dashboard retains only the documented 24-hour connection statistics.
 
 ## Access boundary
 

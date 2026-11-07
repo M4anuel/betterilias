@@ -2021,18 +2021,6 @@
   "admin.activity_table": "Show values as a table",
   "admin.activity_interval": "Time interval",
   "admin.activity_connections": "Connections",
-  "admin.activity_subject": "Count by",
-  "admin.activity_browsers": "Participating browser profiles",
-  "admin.activity_browser_now": "Active participating browsers",
-  "admin.activity_browser_day": "Participating browsers in the last 24 hours",
-  "admin.activity_browser_bucket": "{start}–{end}: {count} browsers",
-  "admin.activity_browser_hint": "Only browsers that opted in through settings are counted, during signed-in app use. The random browser ID survives ILIAS reconnection and expires after 90 days. Different browsers/profiles and cleared storage can count separately. These are not exact device or people counts.",
-  "statistics.title": "Optional browser statistics",
-  "statistics.enable": "Include this browser in usage statistics",
-  "statistics.disclosure": "Help the operator count different browsers using BetterIlias. If enabled, this browser stores a random UUID for up to 90 days and sends it with signed-in app requests. The server stores only a secret-derived pseudonymous key and minute-level activity for 24 hours; administrators see aggregate counts. No name, account ID, IP address or browsing history is included. This choice is separate from error-report sharing and is off by default.",
-  "statistics.withdrawal": "Disable this at any time to delete the local ID and stop sending it. Already collected samples expire after 24 hours. Enabling it again creates a new ID. Private browsing and clearing browser storage can also change the count.",
-  "statistics.storage_error": "Your browser could not save this choice. Browser statistics remain disabled unless a valid previous choice is still stored.",
-  "legal.privacy_browser_statistics": "Optional browser statistics are off by default. After a separate opt-in in settings, a random UUID is stored in localStorage for up to 90 days and sent during signed-in app use. The server stores a separate secret-derived key and minute samples for at most 24 hours, without raw UUIDs, names, IPs or account identifiers. Administrators see aggregate browser counts only. Reconnecting to ILIAS preserves this browser ID. Disabling deletes the local ID and stops future sending; existing samples expire after 24 hours. This choice is independent of error-report sharing.",
   "admin.route_template": "Route template",
   "admin.route_unmatched": "No registered route",
   "admin.parser": "Parser",
@@ -2078,7 +2066,5 @@
   "admin.reason.storage_busy": "Database busy or locked",
   "admin.reason.storage_full": "Storage capacity exhausted",
   "admin.reason.file_missing": "Required file missing",
-  "admin.reason.filesystem_error": "Filesystem operation failed",
-  "statistics.short_hint": "Optionally help count browsers. Browser ID: 90 days; server activity: 24 hours. Disable at any time.",
-  "statistics.details": "About browser statistics"
+  "admin.reason.filesystem_error": "Filesystem operation failed"
 }

@@ -1,5 +1,4 @@
 import { DiagnosticSettings } from './DiagnosticSettings';
-import { BrowserStatisticsSettings } from './BrowserStatisticsSettings';
 import { t, useLanguage, languages, setLanguage } from '../lib/i18n';
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -448,7 +447,6 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
 
         {/* 4. Error Diagnostics */}
         <DiagnosticSettings />
-        <BrowserStatisticsSettings />
 
         {/* 5. Logout Action */}
         {isAuthenticated && onLogout && (

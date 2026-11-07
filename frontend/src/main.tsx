@@ -5,8 +5,10 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { DiagnosticConsent } from './components/DiagnosticConsent';
 import './index.css';
 import { importSessionFromUrl } from './lib/mobileSession';
+import { clearRetiredBrowserStatistics } from './lib/legacyStorage';
 
 async function bootstrap() {
+  clearRetiredBrowserStatistics();
   let connectionError: string | null = null;
   try { await importSessionFromUrl(); }
   catch (error) { connectionError = String((error as Error).message); }

@@ -2021,18 +2021,6 @@
   "admin.activity_table": "Werte als Tabelle anzeigen",
   "admin.activity_interval": "Zeitintervall",
   "admin.activity_connections": "Verbindungen",
-  "admin.activity_subject": "Zählen nach",
-  "admin.activity_browsers": "Teilnehmende Browserprofile",
-  "admin.activity_browser_now": "Aktive teilnehmende Browser",
-  "admin.activity_browser_day": "Teilnehmende Browser der letzten 24 Stunden",
-  "admin.activity_browser_bucket": "{start}–{end}: {count} Browser",
-  "admin.activity_browser_hint": "Es zählen nur Browser, die in den Einstellungen zugestimmt haben, während der angemeldeten App-Nutzung. Die zufällige Browser-ID bleibt beim erneuten Verbinden mit ILIAS erhalten und verfällt nach 90 Tagen. Verschiedene Browser oder Profile sowie gelöschter Browserspeicher können getrennt zählen. Dies sind keine genauen Geräte- oder Personenzahlen.",
-  "statistics.title": "Freiwillige Browserstatistik",
-  "statistics.enable": "Diesen Browser in der Nutzungsstatistik mitzählen",
-  "statistics.disclosure": "Hilf dem Betreiber, unterschiedliche Browser bei der Nutzung von BetterIlias zu zählen. Bei Zustimmung speichert dieser Browser eine zufällige UUID für höchstens 90 Tage und sendet sie bei angemeldeten App-Anfragen. Der Server speichert nur eine aus einem Geheimnis abgeleitete pseudonyme Kennung und minutenbasierte Aktivität für 24 Stunden; die Administration sieht zusammengefasste Zahlen. Namen, Konto-IDs, IP-Adressen und Browserverläufe sind nicht enthalten. Diese Wahl ist von der Fehlerberichtfreigabe getrennt und standardmässig ausgeschaltet.",
-  "statistics.withdrawal": "Du kannst dies jederzeit ausschalten, um die lokale ID zu löschen und nicht mehr zu senden. Bereits erfasste Stichproben verfallen nach 24 Stunden. Erneutes Einschalten erstellt eine neue ID. Privates Surfen und das Löschen des Browserspeichers können die Zählung ebenfalls verändern.",
-  "statistics.storage_error": "Dein Browser konnte diese Wahl nicht speichern. Die Browserstatistik bleibt ausgeschaltet, sofern keine gültige frühere Wahl gespeichert ist.",
-  "legal.privacy_browser_statistics": "Die freiwillige Browserstatistik ist standardmässig ausgeschaltet. Nach einer getrennten Zustimmung in den Einstellungen wird eine zufällige UUID für höchstens 90 Tage im localStorage gespeichert und bei angemeldeter App-Nutzung gesendet. Der Server speichert eine getrennte, aus einem Geheimnis abgeleitete Kennung und Minutenstichproben für höchstens 24 Stunden, ohne ursprüngliche UUID, Namen, IP-Adressen oder Konto-IDs. Die Administration sieht nur zusammengefasste Browserzahlen. Erneutes Verbinden mit ILIAS behält die Browser-ID bei. Ausschalten löscht die lokale ID und beendet die künftige Übermittlung; bestehende Stichproben verfallen nach 24 Stunden. Diese Wahl ist von der Fehlerberichtfreigabe unabhängig.",
   "admin.route_template": "Routenvorlage",
   "admin.route_unmatched": "Keine registrierte Route",
   "admin.parser": "Parser",
@@ -2078,7 +2066,5 @@
   "admin.reason.storage_busy": "Datenbank ausgelastet oder gesperrt",
   "admin.reason.storage_full": "Speicherkapazität erschöpft",
   "admin.reason.file_missing": "Erforderliche Datei fehlt",
-  "admin.reason.filesystem_error": "Dateisystemvorgang fehlgeschlagen",
-  "statistics.short_hint": "Hilf freiwillig beim Zählen der Browser. Browser-ID: 90 Tage; Serveraktivität: 24 Stunden. Jederzeit ausschaltbar.",
-  "statistics.details": "Informationen zur Browserstatistik"
+  "admin.reason.filesystem_error": "Dateisystemvorgang fehlgeschlagen"
 }

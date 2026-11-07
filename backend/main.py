@@ -1,5 +1,6 @@
 import httpx
 import logging
+import sqlite3
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,7 @@ from backend.api.routes import admin
 from backend.api.routes import diagnostics
 from backend.diagnostic_reports import ReportMiddleware, problem
 from backend.diagnostic_metadata import APP_VERSION, register_routes
+from backend import activity
 
 configure_logging()
 logger = logging.getLogger("ilias.main")
@@ -30,6 +32,11 @@ logger = logging.getLogger("ilias.main")
 async def lifespan(app):
     configure_logging()
     emit('worker.started')
+    if (settings.observability_path / 'activity.sqlite3').exists():
+        try:
+            activity.prune()
+        except (OSError, sqlite3.Error) as exc:
+            emit('runtime.error', component='server', error=exc)
     try:
         yield
     finally:

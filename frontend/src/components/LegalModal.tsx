@@ -189,7 +189,6 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                   <li>{t("legal.privacy_data_point3")}</li>
                   <li>{t("legal.privacy_data_point4")}</li>
                   <li>{t("legal.privacy_data_point5")}</li>
-                  <li>{t("legal.privacy_browser_statistics")}</li>
                 </ul>
               </div>
 

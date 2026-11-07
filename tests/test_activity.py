@@ -87,23 +87,6 @@ def test_activity_failure_does_not_fail_student_requests(clock, monkeypatch):
     activity.record('private-credential')
 
 
-def test_browser_counts_survive_reconnection_and_separate_browser_profiles(clock):
-    browser = '12345678-1234-4234-8234-123456789abc'
-    other = '12345678-1234-4234-8234-123456789abd'
-    activity.record('first-connection', browser)
-    activity.record('reconnected', browser)
-    result = activity.summary()
-    assert result['last_24_hours'] == 2
-    assert result['browsers']['last_24_hours'] == 1
-    activity.record('reconnected', other)
-    activity.record('reconnected', 'not-a-browser-uuid')
-    assert activity.summary()['browsers']['active'] == 2
-    assert browser.encode() not in (settings.observability_path / 'activity.sqlite3').read_bytes()
-    assert browser not in str(activity.summary())
-    clock[0] += 86400
-    assert activity.summary()['browsers']['last_24_hours'] == 0
-
-
 def test_existing_activity_database_is_migrated_without_losing_counts(clock):
     path = settings.observability_path / 'activity.sqlite3'
     path.parent.mkdir(parents=True)
@@ -111,7 +94,34 @@ def test_existing_activity_database_is_migrated_without_losing_counts(clock):
         db.execute('CREATE TABLE activity (minute INTEGER, owner TEXT, seen REAL, PRIMARY KEY(minute,owner))')
         db.execute('INSERT INTO activity VALUES(?,?,?)', (int(clock[0] // 60), 'legacy-hash', clock[0]))
     assert activity.summary()['active'] == 1
-    assert activity.summary()['browsers']['active'] == 0
+    assert 'browsers' not in activity.summary()
+
+
+@pytest.mark.parametrize('maintenance', [activity.prune, activity.summary])
+def test_retired_browser_samples_are_purged_without_deleting_connections(clock, maintenance):
+    activity.record('active-connection')
+    with activity.database() as db:
+        db.execute("INSERT INTO activity VALUES(?,?,?,'browser')", (int(clock[0] // 60), 'retired-browser-marker', clock[0]))
+    maintenance()
+    assert activity.summary()['last_24_hours'] == 1
+    assert 'browsers' not in activity.summary()
+    with activity.database() as db:
+        assert db.execute("SELECT count(*) FROM activity WHERE kind='browser'").fetchone()[0] == 0
+    assert b'retired-browser-marker' not in (settings.observability_path / 'activity.sqlite3').read_bytes()
+
+
+def test_legacy_browser_header_is_ignored(clock):
+    test = FastAPI()
+    @test.get('/api/content')
+    def content(manager=Depends(get_optional_session_manager)):
+        return {'authenticated': manager is not None}
+    SessionManager('connection').save_cookies({'PHPSESSID': 'not-a-live-cookie'})
+    response = TestClient(test).get('/api/content', headers={'X-Session-Id': 'connection',
+        'X-BetterIlias-Browser-Id': '12345678-1234-4234-8234-123456789abc'})
+    assert response.status_code == 200
+    with activity.database() as db:
+        assert db.execute('SELECT count(*) FROM activity').fetchone()[0] == 1
+        assert db.execute("SELECT count(*) FROM activity WHERE kind != 'connection'").fetchone()[0] == 0
 
 
 def test_admin_without_trailing_slash_redirects():

@@ -3,7 +3,6 @@ from contextlib import contextmanager
 import hashlib
 import hmac
 import os
-import re
 import secrets
 import sqlite3
 import time
@@ -47,6 +46,9 @@ def database():
 
 
 def _prune(db, now):
+    # Remove all samples collected by the retired persistent-browser feature.
+    # Keep the column for backwards-compatible migration, not new tracking.
+    db.execute("DELETE FROM activity WHERE kind != 'connection'")
     db.execute('DELETE FROM activity WHERE seen <= ?', (now - RETENTION,))
     excess = db.execute('SELECT count(*) FROM activity').fetchone()[0] - MAX_ROWS
     if excess > 0:
@@ -54,7 +56,7 @@ def _prune(db, now):
                    '(SELECT rowid FROM activity ORDER BY seen LIMIT ?)', (excess,))
 
 
-def record(session_id, browser_id=None):
+def record(session_id):
     """Called only after tenant credential validation, on the dependency thread pool.
 
     Failure is deliberately isolated from the student action. No credential,
@@ -67,10 +69,6 @@ def record(session_id, browser_id=None):
             owner = hmac.new(bytes.fromhex(secret), session_id.encode(), hashlib.sha256).hexdigest()
             db.execute('INSERT INTO activity(minute,owner,seen) VALUES(?,?,?) ON CONFLICT(minute,owner) '
                        'DO UPDATE SET seen=excluded.seen', (int(now // 60), owner, now))
-            if isinstance(browser_id, str) and re.fullmatch(r'[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}', browser_id):
-                browser = hmac.new(bytes.fromhex(secret), ('browser:' + browser_id).encode(), hashlib.sha256).hexdigest()
-                db.execute("INSERT INTO activity VALUES(?,?,?,'browser') ON CONFLICT(minute,owner) "
-                           'DO UPDATE SET seen=excluded.seen', (int(now // 60), browser, now))
             _prune(db, now)
     except (OSError, sqlite3.Error):
         pass
@@ -100,4 +98,4 @@ def summary():
             return {'active': active, 'last_24_hours': totals, 'as_of': now,
                     'recent': series(kind, 3600, 300), 'hourly': series(kind, 86400, 3600)}
 
-        return {**counts('connection'), 'browsers': counts('browser')}
+        return counts('connection')
