@@ -262,6 +262,71 @@ function layoutDayEvents(
   return result;
 }
 
+interface CourseColorPickerProps {
+  courseRefId: string;
+  courseTitle: string;
+  color: string;
+  onLivePreview: (courseRefId: string, color: string) => void;
+  onCommit: (courseRefId: string, color: string) => void;
+}
+
+const CourseColorPicker: React.FC<CourseColorPickerProps> = ({
+  courseRefId,
+  courseTitle,
+  color,
+  onLivePreview,
+  onCommit,
+}) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const onLivePreviewRef = useRef(onLivePreview);
+  const onCommitRef = useRef(onCommit);
+  onLivePreviewRef.current = onLivePreview;
+  onCommitRef.current = onCommit;
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+
+    // Native 'input' event fires continuously while dragging slider without network request
+    const handleNativeInput = (e: Event) => {
+      const val = (e.target as HTMLInputElement).value;
+      onLivePreviewRef.current(courseRefId, val);
+    };
+
+    // Native 'change' event fires only when user releases/drops color slider or dismisses picker
+    const handleNativeChange = (e: Event) => {
+      const val = (e.target as HTMLInputElement).value;
+      onCommitRef.current(courseRefId, val);
+    };
+
+    el.addEventListener('input', handleNativeInput);
+    el.addEventListener('change', handleNativeChange);
+
+    return () => {
+      el.removeEventListener('input', handleNativeInput);
+      el.removeEventListener('change', handleNativeChange);
+    };
+  }, [courseRefId]);
+
+  return (
+    <label
+      className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full cursor-pointer shadow-2xs border border-white/50"
+      style={{ backgroundColor: color }}
+      title={t('calendar.change_color')}
+    >
+      <input
+        ref={inputRef}
+        type="color"
+        value={color}
+        onChange={() => {}}
+        onBlur={(e) => onCommitRef.current(courseRefId, e.target.value)}
+        aria-label={`${t('calendar.change_color')}: ${courseTitle}`}
+        className="sr-only"
+      />
+    </label>
+  );
+};
+
 export const CalendarView: React.FC<CalendarViewProps> = ({
   selectedSemester,
   coursesList,
@@ -300,13 +365,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   // Real-time optimistic color state while dragging color pickers
   const [localCourseColors, setLocalCourseColors] = useState<Record<string, string>>({});
-  const colorCommitTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-
-  useEffect(() => {
-    return () => {
-      Object.values(colorCommitTimerRef.current).forEach(clearTimeout);
-    };
-  }, []);
+  const lastCommittedColorRef = useRef<Record<string, string>>({});
 
   const [hiddenCourses, setHiddenCourses] = useState<string[]>(() =>
     cache.getHiddenCalendarCourses('ALL')
@@ -787,29 +846,28 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     });
   };
 
-  const handleColorInput = (courseRefId: string, color: string) => {
-    // Immediately update UI live with 0ms lag while dragging
+  const handleColorLivePreview = (courseRefId: string, color: string) => {
+    // Immediately update UI live with 0ms lag while dragging slider
     setLocalCourseColors((prev) => ({ ...prev, [courseRefId]: color }));
-
-    // Debounce server commit while continuous drag events fire
-    if (colorCommitTimerRef.current[courseRefId]) {
-      clearTimeout(colorCommitTimerRef.current[courseRefId]);
-    }
-    colorCommitTimerRef.current[courseRefId] = setTimeout(() => {
-      void commitColorChange(courseRefId, color);
-    }, 400);
   };
 
   const commitColorChange = async (courseRefId: string, color: string) => {
-    if (colorCommitTimerRef.current[courseRefId]) {
-      clearTimeout(colorCommitTimerRef.current[courseRefId]);
-      delete colorCommitTimerRef.current[courseRefId];
+    const currentSavedColor = calendarData?.courses?.find(
+      (c) => c.course_ref_id === courseRefId
+    )?.color;
+    if (
+      currentSavedColor?.toLowerCase() === color.toLowerCase() ||
+      lastCommittedColorRef.current[courseRefId]?.toLowerCase() === color.toLowerCase()
+    ) {
+      return;
     }
+    lastCommittedColorRef.current[courseRefId] = color;
     try {
       const updated = await api.updateCourseColor(courseRefId, color);
       setCalendarData(updated);
       cache.setCachedCalendar('ALL', updated);
     } catch (err: any) {
+      delete lastCommittedColorRef.current[courseRefId];
       setErrorMsg(err?.message || t('calendar.load_failed'));
     }
   };
@@ -1041,11 +1099,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           end_time_str: ev.end_time || ev.end_time_str || '23:59',
           weekday,
           is_cancelled: Boolean(ev.cancelled || ev.is_cancelled),
-          color: ev.color || courseColorMap.get(ev.course_ref_id) || '#0AACA5',
+          color: localCourseColors[ev.course_ref_id] || courseColorMap.get(ev.course_ref_id) || ev.color || '#0AACA5',
           course_title: cache.getDisplayName(ev.course_ref_id, ev.course_title),
         };
       });
-  }, [calendarData, hiddenCourses, courseColorMap]);
+  }, [calendarData, hiddenCourses, courseColorMap, localCourseColors]);
 
   // Week Monday..Sunday for the current referenceDate
   const weekDays = useMemo(() => {
@@ -2304,29 +2362,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     {/* Course Header Row */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <label
-                          className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full cursor-pointer shadow-2xs border border-white/50"
-                          style={{ backgroundColor: localCourseColors[course.course_ref_id] || course.color }}
-                          title={t('calendar.change_color')}
-                        >
-                          <input
-                            type="color"
-                            value={localCourseColors[course.course_ref_id] || course.color}
-                            onInput={(e) =>
-                              handleColorInput(course.course_ref_id, (e.target as HTMLInputElement).value)
-                            }
-                            onChange={(e) => {
-                              const col = e.target.value;
-                              handleColorInput(course.course_ref_id, col);
-                              void commitColorChange(course.course_ref_id, col);
-                            }}
-                            onBlur={(e) => {
-                              void commitColorChange(course.course_ref_id, e.target.value);
-                            }}
-                            aria-label={`${t('calendar.change_color')}: ${course.course_title}`}
-                            className="sr-only"
-                          />
-                        </label>
+                        <CourseColorPicker
+                          courseRefId={course.course_ref_id}
+                          courseTitle={course.course_title}
+                          color={localCourseColors[course.course_ref_id] || course.color}
+                          onLivePreview={handleColorLivePreview}
+                          onCommit={commitColorChange}
+                        />
                         <button
                           type="button"
                           onClick={() => onSelectCourse(course.course_ref_id)}
