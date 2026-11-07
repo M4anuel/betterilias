@@ -1,4 +1,5 @@
 import { SyncIndicator } from './SyncIndicator';
+import { SyncRefreshControl } from './SyncRefreshControl';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Calendar as CalendarIcon,
@@ -671,6 +672,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         discovered = rawMemberships;
         setAllMemberships(rawMemberships);
         cache.setCachedAllMemberships(rawMemberships);
+        cache.setCachedMyCourses(rawMemberships);
       } else {
         discovered = cache.getCachedAllMemberships()?.courses || [];
       }
@@ -1412,13 +1414,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     >
       {/* Compact Single-Row Top Header & Primary Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-        <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
-          <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" style={{ color: 'var(--accent, #0AACA5)' }} />
-          <span>{t('calendar.title')}</span>
-          {(isLoading || isSyncing) && (
-            <SyncIndicator />
-          )}
-        </h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" style={{ color: 'var(--accent, #0AACA5)' }} />
+            <span>{t('calendar.title')}</span>
+          </h1>
+          <SyncRefreshControl
+            isSyncing={isLoading || isSyncing}
+            onRefresh={handleRecheckCurrentSemester}
+            title={t('calendar.recheck.button')}
+          />
+        </div>
 
         {/* Compact Action Toolbar: Last Save Info + Manual Recheck grouped together, plus Export */}
         <div className="flex flex-wrap items-center gap-2">

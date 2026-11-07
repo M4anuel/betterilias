@@ -1,6 +1,6 @@
 import { t, useLanguage } from './lib/i18n';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { AlertCircle, ExternalLink, Puzzle } from 'lucide-react';
+import { AlertCircle, ExternalLink, Puzzle, X } from 'lucide-react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SemesterView } from './components/SemesterView';
@@ -124,6 +124,12 @@ export const App: React.FC = () => {
   }, [isMobile, mobileNavigationOpen]);
   // --- Auth & Session State ---
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  const [isInactiveBannerDismissed, setIsInactiveBannerDismissed] = useState(false);
+  useEffect(() => {
+    if (authStatus?.authenticated) {
+      setIsInactiveBannerDismissed(false);
+    }
+  }, [authStatus?.authenticated]);
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
   const initialParamsForLegal = new URLSearchParams(window.location.search);
   const initialViewForLegal = initialParamsForLegal.get('view');
@@ -1076,7 +1082,7 @@ export const App: React.FC = () => {
 
         {/* Center Content Area */}
         <main className="min-w-0 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50">
-          {authStatus && !authStatus.authenticated && (
+          {authStatus && !authStatus.authenticated && !isInactiveBannerDismissed && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-2xs dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -1101,6 +1107,15 @@ export const App: React.FC = () => {
                 >
                   <Puzzle className="h-3.5 w-3.5" />
                   <span>{t("Browser-Erweiterung")}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsInactiveBannerDismissed(true)}
+                  aria-label={t("Schliessen")}
+                  title={t("Schliessen")}
+                  className="rounded-lg p-1 text-amber-700 hover:bg-amber-100 hover:text-amber-900 dark:text-amber-300 dark:hover:bg-amber-900/50 dark:hover:text-amber-100 transition cursor-pointer shrink-0 ml-1"
+                >
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
