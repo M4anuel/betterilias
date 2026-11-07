@@ -10,8 +10,8 @@ test('SyncRefreshControl component structure, morphing animation classes and sta
   const content = fs.readFileSync(filePath, 'utf-8');
 
   // Verify key design requirements:
-  // 1. Idle state: Checkmark icon with circle and green color and localized "Lokal bereitgestellt" label
-  assert.match(content, /CheckCircle2/);
+  // 1. Idle state: Checkmark icon with broken circle (CheckCircle) and green color and localized "Lokal bereitgestellt" label
+  assert.match(content, /CheckCircle/);
   assert.match(content, /displayLabel = label \|\| t\(['"]Lokal bereitgestellt['"]\)/);
   assert.match(content, /text-emerald-500/);
 
