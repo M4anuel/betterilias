@@ -1,10 +1,11 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowRight, BookOpen, RefreshCw, Search, SlidersHorizontal, Star, Users } from 'lucide-react';
+import { ArrowRight, BookOpen, Search, SlidersHorizontal, Star, Users } from 'lucide-react';
 import { CourseItem } from '../types';
 import { api } from '../lib/api';
 import { cache } from '../lib/cache';
 import { getLocale, t, useLanguage } from '../lib/i18n';
 import { CourseIcon } from './CourseIcon';
+import { SyncRefreshControl } from './SyncRefreshControl';
 
 type SortOrder = 'name' | 'name-desc' | 'semester' | 'semester-asc';
 type Preferences = { favourites: Record<string, boolean>; sort: SortOrder };
@@ -30,15 +31,18 @@ export const MyCoursesView: React.FC<{
   const container = useRef<HTMLDivElement>(null);
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(() => !cache.getCachedMyCourses());
+  const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState(false);
   const [storageError, setStorageError] = useState(false);
   useEffect(() => {
     let active = true;
     if (revision === 0 && cache.isMyCoursesSaverFresh() && courses && courses.length > 0) {
       setLoading(false);
+      setIsSyncing(false);
       return;
     }
     setLoading(!courses);
+    setIsSyncing(true);
     setError(false);
     api.getMyCourses().then(data => {
       if (active) {
@@ -47,7 +51,12 @@ export const MyCoursesView: React.FC<{
       }
     })
       .catch(() => { if (active) setError(true); })
-      .finally(() => { if (active) setLoading(false); });
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+          setIsSyncing(false);
+        }
+      });
     return () => { active = false; };
   }, [revision]);
   const save = (next: Preferences) => {
@@ -112,11 +121,14 @@ export const MyCoursesView: React.FC<{
     </div>
   </section>;
   return <div ref={container} className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="min-w-0 text-2xl font-bold sm:text-3xl">{t('my_courses.title')}</h1>
-      <button type="button" onClick={() => setRevision(value => value + 1)} disabled={loading} aria-label={t('my_courses.refresh')}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
-        <RefreshCw className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`} /></button>
+      <SyncRefreshControl
+        isSyncing={isSyncing}
+        onRefresh={() => setRevision(value => value + 1)}
+        title={t('my_courses.refresh')}
+        ariaLabel={t('my_courses.refresh')}
+      />
     </div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <label className="min-w-0 text-sm font-medium sm:col-span-2 lg:col-span-1">{t('my_courses.search')}

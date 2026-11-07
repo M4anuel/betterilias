@@ -1,4 +1,5 @@
 import { SyncIndicator } from './SyncIndicator';
+import { SyncRefreshControl } from './SyncRefreshControl';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useMemo } from 'react';
 import {
@@ -153,9 +154,6 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
             <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
               <GraduationCap className="h-6 w-6" style={{ color: 'var(--accent, #0AACA5)' }} />
               <span>{t("Vorlesungsübersicht")}</span>
-              {isLoading && (
-                <SyncIndicator />
-              )}
             </h1>
 
           </div>
@@ -234,18 +232,14 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                 <SlidersHorizontal className="h-4 w-4" />
               </button>
 
-              {/* Manual Refresh Button */}
+              {/* Manual Refresh & Sync Status */}
               {onManualRefresh && (
-                <button
-                  type="button"
-                  onClick={onManualRefresh}
-                  disabled={isLoading}
-                  className="rounded-xl border border-slate-200 bg-white p-1.5 text-slate-500 shadow-xs hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition cursor-pointer disabled:opacity-50"
+                <SyncRefreshControl
+                  isSyncing={isLoading}
+                  onRefresh={onManualRefresh}
                   title={t("Übersicht aktualisieren")}
-                  aria-label={t("Übersicht aktualisieren")}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </button>
+                  ariaLabel={t("Übersicht aktualisieren")}
+                />
               )}
             </div>
 

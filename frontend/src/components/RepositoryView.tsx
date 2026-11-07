@@ -1,10 +1,11 @@
 import { t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useState } from 'react';
-import { ChevronRight, Folder, Home, Lock, RefreshCw } from 'lucide-react';
+import { ChevronRight, Folder, Home, Lock } from 'lucide-react';
 import { api } from '../lib/api';
 import { cache } from '../lib/cache';
 import { RepositoryResponse, MembershipAction } from '../types';
 import { CourseIcon } from './CourseIcon';
+import { SyncRefreshControl } from './SyncRefreshControl';
 
 interface Props {
   refId: string;
@@ -44,9 +45,14 @@ export const RepositoryView: React.FC<Props> = ({ refId, onNavigate, onOpenCours
           aria-current={crumb.ref_id === refId ? 'page' : undefined} className="hover:underline">{crumb.title}</button>
       </React.Fragment>)}
     </nav>
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex flex-wrap items-center justify-between gap-4">
       <h1 className="text-2xl font-bold">{title || <span aria-label={t("Titel wird geladen")} className="block h-8 w-48 rounded bg-slate-200 dark:bg-slate-800" />}</h1>
-      <button type="button" onClick={() => setRevision((v) => v + 1)} disabled={isRefreshing} aria-label={t("Magazin aktualisieren")} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800"><RefreshCw className={`h-4 w-4 ${isRefreshing ? 'motion-safe:animate-spin' : ''}`} /></button>
+      <SyncRefreshControl
+        isSyncing={isRefreshing}
+        onRefresh={() => setRevision((v) => v + 1)}
+        title={t("Magazin aktualisieren")}
+        ariaLabel={t("Magazin aktualisieren")}
+      />
     </div>
     {error && <div role="alert" className="text-red-600">{error} <button type="button" onClick={() => setRevision((v) => v + 1)} className="underline">{t("Erneut versuchen")}</button></div>}
     {!data ? !error && <p role="status">{t("Inhalte werden geladen…")}</p>
