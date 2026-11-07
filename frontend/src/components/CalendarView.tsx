@@ -245,9 +245,13 @@ function layoutDayEvents(
       const startMin = Math.max(gridStartMin, timeToMinutes(p.event.start_time_str));
       const rawEnd = Math.max(startMin + 30, timeToMinutes(p.event.end_time_str));
       const endMin = Math.min(gridEndMin, rawEnd);
-      const durationMin = Math.max(30, endMin - startMin);
-      const topPct = ((startMin - gridStartMin) / totalRange) * 100;
-      const heightPct = Math.max(5, (durationMin / totalRange) * 100);
+      const durationMin = Math.max(25, endMin - startMin);
+      let topPct = ((startMin - gridStartMin) / totalRange) * 100;
+      const heightPct = Math.max(4, (durationMin / totalRange) * 100);
+      // Ensure bottom-aligned or late-night events never poke out of the bottom of the table
+      if (topPct + heightPct > 100) {
+        topPct = Math.max(0, 100 - heightPct);
+      }
       result.push({
         event: p.event,
         topPct,
@@ -612,6 +616,26 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         discoveredCal && discoveredCal.courses.length >= freshCal.courses.length
           ? discoveredCal
           : freshCal;
+
+      // Preserve existing cached calendar if the server returns an empty state
+      // (e.g. during server restart, unauthenticated startup, or session transition)
+      const existingCached = cache.getCachedCalendar('ALL') || cache.getCachedCalendar(selectedSemester);
+      const incomingCoursesCount = effectiveCal?.courses?.length || 0;
+      const incomingEventsCount = effectiveCal?.events?.length || 0;
+      const cachedCoursesCount = existingCached?.courses?.length || 0;
+      const cachedEventsCount = existingCached?.events?.length || 0;
+
+      if (
+        incomingCoursesCount === 0 &&
+        incomingEventsCount === 0 &&
+        (cachedCoursesCount > 0 || cachedEventsCount > 0)
+      ) {
+        console.warn('Preserving populated calendar cache because server returned an empty calendar');
+        if (existingCached) {
+          setCalendarData(existingCached);
+        }
+        return;
+      }
 
       setCalendarData(effectiveCal);
       cache.setCachedCalendar('ALL', effectiveCal);
@@ -1154,17 +1178,23 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return map;
   }, [visibleEvents, weekDays]);
 
-  // Dynamic time range for week/timetable grid (defaults 08:00 - 20:00)
+  // Dynamic time range for week/timetable grid (defaults 08:00 - 20:00, expanding dynamically up to 24:00)
   const { gridStartHour, gridEndHour, hoursList } = useMemo(() => {
     let minH = 8;
     let maxH = 20;
     for (let i = 0; i < 7; i++) {
       for (const ev of weekEventsByDay.get(i) || []) {
         if (ev.all_day) continue;
-        const sh = Math.floor(timeToMinutes(ev.start_time_str) / 60);
-        const eh = Math.ceil(timeToMinutes(ev.end_time_str) / 60);
-        if (sh < minH) minH = Math.max(6, sh);
-        if (eh > maxH) maxH = Math.min(23, eh);
+        const startMin = timeToMinutes(ev.start_time_str);
+        const rawEndMin = ev.end_time_str ? timeToMinutes(ev.end_time_str) : 0;
+        const endMin = rawEndMin > startMin ? rawEndMin : Math.min(1440, startMin + 45);
+
+        const sh = Math.floor(startMin / 60);
+        const eh = Math.ceil(endMin / 60);
+
+        if (sh < minH) minH = Math.max(0, sh);
+        if (sh >= maxH) maxH = Math.min(24, sh + 1);
+        if (eh > maxH) maxH = Math.min(24, eh);
       }
     }
     const hrs: number[] = [];

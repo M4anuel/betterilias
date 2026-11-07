@@ -137,6 +137,23 @@ class CalendarService:
     def _tenant_path(self, tenant_key: str) -> Path:
         return self.tenants_dir / f"{self._sanitize_tenant_key(tenant_key)}.json"
 
+    def migrate_tenant_state(self, source_tenant: str, target_tenant: str) -> None:
+        """Migrate calendar state when a session is refreshed or renewed by the client."""
+        if not source_tenant or not target_tenant or source_tenant == target_tenant:
+            return
+        try:
+            from backend.api.deps import valid_session_id
+            if not valid_session_id(source_tenant) or not valid_session_id(target_tenant):
+                return
+            src_path = self._tenant_path(source_tenant)
+            dst_path = self._tenant_path(target_tenant)
+            if src_path.exists() and not dst_path.exists():
+                import shutil
+                shutil.copy2(src_path, dst_path)
+                logger.info(f"Preserved calendar state across session transition: {source_tenant} -> {target_tenant}")
+        except Exception as e:
+            logger.warning(f"Failed to migrate calendar state: {e}")
+
     def _load_tenant_state(self, tenant_key: str) -> Dict[str, Any]:
         path = self._tenant_path(tenant_key)
         if path.exists():

@@ -107,6 +107,9 @@ async def sync_extension_cookies(payload: ExtensionSyncInput, response: Response
             sid = SessionManager.generate_session_id()
         metadata['user_name'] = user_or_msg
         SessionManager(sid).save_cookies(cookies, metadata=metadata)
+        if payload.session_id and valid_session_id(payload.session_id) and payload.session_id != sid:
+            from backend.services.calendar_service import calendar_service
+            calendar_service.migrate_tenant_state(payload.session_id, sid)
     return ExtensionSyncResponse(success=True, authenticated=is_valid,
         session_id=sid, user_name=user_or_msg if is_valid else None,
         message=t('Erfolgreich mit ILIAS synchronisiert') if is_valid else t('auth.session_required'))

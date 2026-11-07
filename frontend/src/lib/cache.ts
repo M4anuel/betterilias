@@ -95,7 +95,10 @@ export const cache = {
     const previousSession = inMemorySessionId;
     inMemorySessionId = sessionId?.trim() || null;
     try {
-      if (localStorage.getItem('betterilias_cache_owner') !== inMemorySessionId) {
+      const previousOwner = localStorage.getItem('betterilias_cache_owner');
+      // Only clear cached content if explicitly switching from one authenticated user to another.
+      // Do not clear user cache if session is temporarily null (e.g. server restart, offline, initial auth check).
+      if (inMemorySessionId && previousOwner && previousOwner !== inMemorySessionId) {
         cache.clearSessionContent();
       }
       if (inMemorySessionId) localStorage.setItem('betterilias_cache_owner', inMemorySessionId);

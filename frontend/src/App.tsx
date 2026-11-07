@@ -391,7 +391,11 @@ export const App: React.FC = () => {
           if (!isChecked) {
             api
               .getCalendar()
-              .then((cal) => cache.setCachedCalendar('ALL', cal))
+              .then((cal) => {
+                if (cal && (cal.courses.length > 0 || cal.events.length > 0 || !cachedCal)) {
+                  cache.setCachedCalendar('ALL', cal);
+                }
+              })
               .catch(() => {});
           }
         }
