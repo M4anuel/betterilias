@@ -4,18 +4,17 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
-- [x] Keep browser-statistics settings compact with the shared switch, a short
-  explanation and a separate info dialog containing the full privacy context.
+- [x] Remove persistent browser-UUID statistics, its settings and dashboard
+  series; delete the old browser preference on app startup and purge stored
+  browser samples while preserving short-lived connection counts.
+- [x] Anchor desktop/tablet settings below the actual gear button, cap its height
+  to the space below that button, and preserve mobile full-screen settings and
+  QR/address drafts across resizing.
 
 - [x] Improve private logs with frozen route templates, literal parser names,
   application/backend source version, fixed failure categories and bounded
   code-only frames. Add request-ID lookup in the dashboard/API/CLI while
   excluding runtime values, raw exception text, absolute paths and locals.
-
-- [x] Add separate, default-off browser statistics consent with a random browser
-  UUID that survives ILIAS reconnection for at most 90 days. Show aggregate
-  participating-browser graphs alongside connection counts, with 24-hour server
-  retention, withdrawal, header isolation and no browser/session identity map.
 
 - [x] Accept `/admin` as well as `/admin/` and add responsive connection-activity
   graphs for five-minute active connections and rolling 24-hour distinct usage;

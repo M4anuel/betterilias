@@ -673,7 +673,7 @@ main { overflow-wrap: anywhere; }
   overscroll-behavior: contain;
 }
 .app-overlay > div > .flex-1 { min-height: 0; }
-dialog:not(.mobile-navigation):not(.app-overlay) {
+dialog:not(.mobile-navigation):not(.app-overlay):not(.settings-panel) {
   position: fixed;
   top: calc(var(--visible-top, 0px) + var(--visible-height, 100dvh) / 2);
   bottom: auto;
@@ -766,9 +766,9 @@ button > svg:only-child { margin-inline: auto; flex-shrink: 0; }
 summary::-webkit-details-marker { display: none; }
 .phone-only { display: none; }
 dialog.settings-panel {
-  position: fixed; inset: 4.25rem 1rem auto auto; margin: 0; transform: none;
-  width: 20rem; max-width: calc(100vw - 2rem);
-  max-height: calc(var(--visible-height, 100dvh) - 5rem);
+  position: fixed; inset: var(--settings-top, 4.25rem) auto auto var(--settings-left, calc(100vw - 21rem)); margin: 0; transform: none;
+  width: var(--settings-width, 20rem); max-width: calc(100vw - 2rem);
+  max-height: var(--settings-height, calc(var(--visible-height, 100dvh) - 5rem));
 }
 .sidebar-course-title { min-width: 0; overflow-wrap: break-word; }
 .grading-toolbar { overflow-wrap: normal !important; }

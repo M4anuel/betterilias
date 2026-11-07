@@ -1,6 +1,7 @@
 import { DiagnosticSettings } from './DiagnosticSettings';
 import { t, useLanguage, languages, setLanguage } from '../lib/i18n';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Sun,
   Moon,
@@ -24,6 +25,7 @@ import { theme, ThemeMode, ACCENT_PRESETS } from '../lib/theme';
 import { MobileSessionShare } from './MobileSessionShare';
 
 interface SettingsDropdownProps {
+  anchorRef: React.RefObject<HTMLButtonElement | null>;
   isOpen: boolean;
   onClose: () => void;
   gearRotation?: number;
@@ -37,6 +39,7 @@ interface SettingsDropdownProps {
 }
 
 export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
+  anchorRef,
   isOpen,
   onClose,
   gearRotation = 0,
@@ -58,6 +61,49 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   const [customTtlInput, setCustomTtlInput] = useState<string>(() => String(cache.getIliasSaverTtl()));
   const dropdownRef = useRef<HTMLDialogElement>(null);
   const compact = useMediaQuery('(max-width: 767px)');
+  useLayoutEffect(() => {
+    if (!isOpen || compact) return;
+    const panel = dropdownRef.current;
+    const anchor = anchorRef.current;
+    if (!panel || !anchor) return;
+    const viewport = window.visualViewport;
+    let frame = 0;
+    const position = () => {
+      frame = 0;
+      const rect = anchor.getBoundingClientRect();
+      const viewportTop = viewport?.offsetTop || 0;
+      const viewportLeft = viewport?.offsetLeft || 0;
+      const height = viewport?.height || window.innerHeight;
+      const width = viewport?.width || window.innerWidth;
+      const gap = 8;
+      const menuWidth = Math.max(0, Math.min(20 * parseFloat(getComputedStyle(document.documentElement).fontSize), width - 32));
+      const top = Math.max(viewportTop + gap, rect.bottom + gap);
+      const left = Math.max(viewportLeft + 16, Math.min(rect.right - menuWidth, viewportLeft + width - menuWidth - 16));
+      panel.style.setProperty('--settings-top', `${top}px`);
+      panel.style.setProperty('--settings-left', `${left}px`);
+      panel.style.setProperty('--settings-width', `${menuWidth}px`);
+      panel.style.setProperty('--settings-height', `${Math.max(0, viewportTop + height - top - gap)}px`);
+    };
+    const update = () => { if (!frame) frame = requestAnimationFrame(position); };
+    position();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    viewport?.addEventListener('resize', update);
+    viewport?.addEventListener('scroll', update);
+    const observer = new ResizeObserver(update);
+    observer.observe(anchor);
+    if (anchor.parentElement) observer.observe(anchor.parentElement);
+    const header = anchor.closest('header');
+    if (header) observer.observe(header);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+      viewport?.removeEventListener('resize', update);
+      viewport?.removeEventListener('scroll', update);
+    };
+  }, [isOpen, compact, anchorRef]);
   const closePanel = () => {
     dropdownRef.current?.close();
     onClose();
@@ -163,7 +209,7 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
     }
   };
 
-  return (
+  return createPortal(
     <dialog
       ref={dropdownRef}
       aria-label={t("Einstellungen & Design")}
@@ -465,6 +511,6 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
           </div>
         )}
       </div>
-    </dialog>
+    </dialog>, document.body
   );
 };

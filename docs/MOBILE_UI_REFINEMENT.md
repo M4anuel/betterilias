@@ -199,6 +199,21 @@ they do not establish live ILIAS or physical-device acceptance.
 
 ## Nested settings report details
 
+Desktop/tablet settings are portalled outside the blurred header and positioned
+below the actual gear-button rectangle. Keep `.settings-panel` excluded from the
+shared vertically centred dialog rule: that rule's higher selector specificity
+previously pulled a growing menu up over its own close trigger. Settings never
+flip above the trigger; cap height to the viewport space below it and scroll
+inside the panel. Recompute its anchor for resize, scrolling and visual-viewport
+changes. Phones retain the full-screen sheet and its sticky close gear. QR and
+address drafts stay mounted when rotating across this breakpoint.
+
+`tests/test_settings_menu_browser.py` expands the QR code, scrolls to logout,
+checks the desktop trigger's hit area and stable menu top, then resizes across
+the phone breakpoint while preserving the address draft. Screenshots cover
+320/390/430/768/1280/1440 px, short desktop/landscape windows, both languages and
+light/dark mode using Chromium emulation.
+
 The diagnostic-details dialog is portalled to the document body to avoid the
 settings panel's inner scrolling area. Mark it `data-settings-owned` so parent
 outside-click handling does not close settings when a child control is tapped.
