@@ -118,7 +118,8 @@ export const cache = {
     try {
       const prefixes = ['ilias_materials_cache_', 'ilias_semester_cache_', 'ilias_podcast_cache_', CACHE_TS_PREFIX,
         EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX, EXERCISE_INFO_PREFIX, STUDENT_ASSIGNMENT_PREFIX, 'ilias_repository_', MANAGEMENT_CACHE_PREFIX, TA_ASSIGNMENTS_CACHE_PREFIX,
-        TEAM_CANDIDATES_CACHE_PREFIX, TA_ASSIGNMENT_DETAIL_CACHE_PREFIX, MEMBERSHIP_FORM_CACHE_PREFIX, DELETE_REVIEW_CACHE_PREFIX, 'ilias_calendar_'];
+        TEAM_CANDIDATES_CACHE_PREFIX, TA_ASSIGNMENT_DETAIL_CACHE_PREFIX, MEMBERSHIP_FORM_CACHE_PREFIX, DELETE_REVIEW_CACHE_PREFIX, 'ilias_calendar_',
+        'ilias_my_courses_cache_', 'betterilias_my_courses_', 'betterilias_cal_memberships_'];
       for (const key of Object.keys(localStorage)) {
         if (prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
       }
@@ -583,6 +584,7 @@ export const cache = {
 
   invalidateCourseMembership(refId: string) {
     try {
+      this.invalidateMyCourses();
       const repositoryPrefix = `ilias_repository_${this.getSessionId() || 'default'}_`;
       for (const key of Object.keys(localStorage)) {
         if (key.startsWith('ilias_semester_cache_')) localStorage.removeItem(key);
@@ -1225,6 +1227,64 @@ export const cache = {
       localStorage.setItem(key, JSON.stringify(courses));
       this.setCacheTimestamp(key);
     } catch {}
+  },
+
+  // --- My Courses and Groups Cache ---
+  getCachedMyCourses(): any[] | null {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const key = `ilias_my_courses_cache_${scope}`;
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const allMem = this.getCachedAllMemberships();
+      if (allMem?.courses && Array.isArray(allMem.courses) && allMem.courses.length > 0) {
+        return allMem.courses;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  setCachedMyCourses(courses: any[], force: boolean = false) {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const key = `ilias_my_courses_cache_${scope}`;
+      const existing = this.getCachedMyCourses();
+      const existingCount = existing?.length || 0;
+      const incomingCount = courses?.length || 0;
+
+      if (!force && existingCount > 0 && incomingCount === 0) {
+        console.warn('Prevented overwriting populated my_courses cache with empty data');
+        return;
+      }
+
+      localStorage.setItem(key, JSON.stringify(courses));
+      this.setCacheTimestamp(key);
+      this.setCachedAllMemberships(courses);
+    } catch (e) {
+      console.warn('Storage quota exceeded for my_courses cache', e);
+    }
+  },
+
+  isMyCoursesSaverFresh(): boolean {
+    const scope = this.getSessionId() || 'default';
+    return this.isIliasSaverFresh(`ilias_my_courses_cache_${scope}`);
+  },
+
+  invalidateMyCourses() {
+    try {
+      const scope = this.getSessionId() || 'default';
+      const key = `ilias_my_courses_cache_${scope}`;
+      localStorage.removeItem(key);
+      localStorage.removeItem(`${CACHE_TS_PREFIX}${key}`);
+      localStorage.removeItem(`betterilias_cal_memberships_${scope}`);
+    } catch (e) {
+      console.warn('Could not invalidate my courses cache', e);
+    }
   },
 };
 
