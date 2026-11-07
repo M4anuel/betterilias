@@ -4,6 +4,23 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Remove persistent browser-UUID statistics, its settings and dashboard
+  series; delete the old browser preference on app startup and purge stored
+  browser samples while preserving short-lived connection counts.
+- [x] Anchor desktop/tablet settings below the actual gear button, cap its height
+  to the space below that button, and preserve mobile full-screen settings and
+  QR/address drafts across resizing.
+
+- [x] Improve private logs with frozen route templates, literal parser names,
+  application/backend source version, fixed failure categories and bounded
+  code-only frames. Add request-ID lookup in the dashboard/API/CLI while
+  excluding runtime values, raw exception text, absolute paths and locals.
+
+- [x] Accept `/admin` as well as `/admin/` and add responsive connection-activity
+  graphs for five-minute active connections and rolling 24-hour distinct usage;
+  keep pseudonymous samples separate from logs with a 24-hour expiry. See
+  [definitions, privacy and proxy setup](docs/ADMIN_DASHBOARD.md).
+
 - [x] Recover manual companion sync when an open app tab has no content-script
   receiver or session header, using separate one-use connection codes per tab.
   Verify header authentication and cookie acceptance with and without the bridge.

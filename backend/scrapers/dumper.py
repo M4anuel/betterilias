@@ -75,13 +75,14 @@ def dump_failed_html(
     context: str,
     error: Optional[Exception] = None,
     extra_info: Optional[Dict[str, Any]] = None,
+    *, reason: Optional[str] = None,
 ) -> Optional[Path]:
     """Write bounded metadata; raw HTML requires explicit development opt-in.
 
     Never persist exception text or extra_info: both can contain credentials or
     student content. Parser context is hashed to avoid dynamic names/identifiers.
     """
-    emit('parser.failed')
+    emit('parser.failed', parser=context, reason=reason or 'dom_extraction', error=error)
     capture_structure(html, context)
     try:
         with SharedLock('private-diagnostic-dumps', timeout=0).sync():
@@ -115,7 +116,7 @@ def safe_parser(context_name: str, check_empty: bool = False):
         @functools.wraps(func)
         def wrapper(html_content: str, *args, **kwargs):
             if not html_content or not html_content.strip():
-                dump_path = dump_failed_html("", context_name, error=ValueError(t('Empty HTML received')))
+                dump_path = dump_failed_html("", context_name, reason='empty_html')
                 raise ScrapingParsingError(
                     context=context_name,
                     message=t('Received empty HTML content'),
@@ -128,7 +129,7 @@ def safe_parser(context_name: str, check_empty: bool = False):
                     dump_path = dump_failed_html(
                         html_content,
                         context_name,
-                        error=ValueError(t('Parser returned empty result collection'))
+                        reason='empty_result'
                     )
                     raise ScrapingParsingError(
                         context=context_name,

@@ -1,5 +1,5 @@
 import { t, useLanguage } from '../lib/i18n';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Menu, CheckCircle2, AlertCircle } from 'lucide-react';
 import { AuthStatus } from '../types';
 import { SettingsGear } from './SettingsGear';
@@ -29,6 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
   useLanguage();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [gearRotation, setGearRotation] = useState(0);
+  const settingsTrigger = useRef<HTMLButtonElement>(null);
   const toggleSettings = () => {
     setGearRotation(angle => angle + 180);
     setIsSettingsOpen(open => !open);
@@ -106,6 +107,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={toggleSettings}
           data-settings-trigger
+          ref={settingsTrigger}
           aria-label={t("Design & Einstellungen")}
           aria-expanded={isSettingsOpen}
           className={`rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer border ${
@@ -120,6 +122,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Settings Dropdown Panel */}
         <SettingsDropdown
+          anchorRef={settingsTrigger}
           isOpen={isSettingsOpen}
           gearRotation={gearRotation}
           onGearClick={toggleSettings}

@@ -19,6 +19,7 @@ def admin(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, 'admin_api_key', KEY)
     monkeypatch.setattr(settings, 'app_env', 'production')
     monkeypatch.setattr(settings, 'coordination_dir', str(tmp_path / 'coordination'))
+    monkeypatch.setattr(settings, 'observability_dir', str(tmp_path / 'events'))
     store = EventStore(tmp_path / 'events')
     monkeypatch.setattr('backend.observability.get_store', lambda: store)
     monkeypatch.setattr('backend.api.routes.admin.get_store', lambda: store)

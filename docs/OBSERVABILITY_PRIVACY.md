@@ -9,17 +9,21 @@ combined with a user's support report; handle the store accordingly.
 ## What is recorded
 
 `backend/observability.py` accepts only registered event codes and constrained
-metadata. Schema version 1 contains UTC Unix timestamps, category, random worker,
+metadata. Schema version 2 contains UTC Unix timestamps, category, random worker,
 request and operation IDs, optional HTTP method/status/duration, fixed operation
 name and outcome, severity and a fixed component label for legacy warnings.
+It additionally contains the application version, a backend source fingerprint,
+frozen route template, code-defined parser name, fixed failure categories and
+bounded project-code locations where available. Existing schema-1 rows remain
+readable; they are not backfilled with invented context.
 An incoming `X-Request-Id` is ignored; the response receives a
 fresh ID that a user can voluntarily include in a support report. IDs do not
 identify or persistently track a user. No actor identifier is stored.
 
 The schema has no fields for names, usernames, email addresses, IP addresses,
-student/course/assignment IDs, grades, notes, file names, submission contents,
+student/course/assignment IDs, grades, notes, uploaded file names, submission contents,
 cookies, authentication headers, handoff codes, URLs, query strings, user agents,
-exception text or stack traces. Unknown routes are not recorded as raw paths.
+exception text or full stack traces. Unknown routes are not recorded as raw paths.
 Request timing includes streaming; a disconnected/failed stream is a failed
 request even if headers were already sent.
 
@@ -42,8 +46,8 @@ store. Both outputs carry the same safe payload and correlation IDs. Severity
 is INFO for ordinary requests/lifecycle/audit activity, WARNING for security and
 compatibility rejections or unsuccessful write results, and ERROR for failed
 requests, HTTP 5xx and legacy errors. Legacy messages and tracebacks are replaced
-with fixed codes and component labels (`auth`, `calendar`, `scraper`, `outbound`,
-`server`, `application`); their text is never interpolated. HTTPX INFO logging and
+with fixed codes, component labels (`auth`, `calendar`, `scraper`, `outbound`,
+`server`, `application`) and validated code locations; their text is never interpolated. HTTPX INFO logging and
 Uvicorn's raw URL access logger are suppressed; the request middleware replaces
 the latter. This intentionally sacrifices free-text debugging detail. Do not add
 another raw logging handler or run with a logging configuration that overrides
@@ -53,6 +57,70 @@ Console writes run on the background writer, not the request thread. A broken
 collector increments `console_errors` without stopping database logging. A
 blocking collector can stall the shared writer and eventually fill its bounded
 queue; monitor queue depth, last-write time and dropped counts.
+
+## Actionable code context
+
+`backend/diagnostic_metadata.py` snapshots the trusted deployed backend source
+once per worker. Static function/parser names come from its Python AST. Code
+frames contain only repository-relative Python file names, qualified function
+names and bounded line numbers, validated against that source snapshot. No
+source lines, arguments, local variables, exception messages/type names, absolute
+paths or third-party frames are recorded. Dynamically compiled filenames or
+unrecognised functions are omitted, never copied as a fallback. Source files
+must be part of the trusted deployment; do not place uploaded/generated user
+code in `backend/`. Source-less deployments omit frames they cannot validate.
+
+At most 12 project frames are retained per event, with at most 256 traceback
+entries inspected per exception and eight distinct chained/grouped exceptions.
+`stack_truncated` marks limits; this is a debugging selection rather than a full
+traceback. `error_kind` uses fixed categories (for example `read_timeout`,
+`missing_key`, `storage_busy`), never the exception's arbitrary class name or
+message. A known outer category is preserved; otherwise a recognised cause or
+group member supplies it. A cyclic cause cannot create an infinite traversal.
+Legacy ERROR logs inside an `except` block can capture this safe context even
+when the caller omitted `exc_info`; logs outside an exception have only a
+validated static logging location where available.
+
+Route templates are frozen by route-object identity after configuring the
+application router. `/api/exercises/{exercise_id}/submissions/{member_id}/grade`
+can be logged; substituted IDs and query values cannot. Unknown/unregistered
+routes become `unmatched`. Register intentionally added routes before serving
+them; do not derive templates from incoming paths. Events inside thread-pool
+dependencies and async tasks share the request's transient context, which is
+cleared after completion.
+Registration includes FastAPI's lazy included-router contexts and their full
+prefixes. If a route is exposed under multiple aliases, matching selects only
+among frozen code-defined patterns; the incoming path is never transformed into
+a stored template. Ambiguous/unregistered matches remain `unmatched`.
+
+Every event records `app_version` (the API's application version) and `build`
+(`backend-` plus a 16-hex source fingerprint). The fingerprint hashes the sorted
+trusted backend Python sources with normalised line endings, not Git history,
+environment variables, `.env`, session files or user content. It identifies the
+running backend source even in a container without Git, but does not identify
+frontend assets or installed dependency versions. Restart workers after changing
+deployed code. Errors extracting metadata must not fail the original operation.
+
+Parser events distinguish `empty_html`, `empty_result` and `dom_extraction` and
+include only parser names declared by literal `@safe_parser` decorators in the
+source snapshot. Dynamic/unrecognised contexts become `unspecified`. Incomplete
+submission-listing errors also have a dedicated event. Audit outcomes retain
+their previous meaning; the additional code context is not proof of native
+persistence or correct student/file associations. An incorrect HTTP-200 response
+still requires domain-specific consistency checks or independent reproduction.
+
+Administrators can inspect this context in expanded dashboard events, click
+**Show related events**, or filter by an exact 32-character request ID. The CLI
+supports the same bounded private query:
+
+```text
+python -m backend.diagnostics events --request-id <32-hex-request-id> --limit 100
+```
+
+No new debug payload enters optional diagnostic reports, so this does not change
+their consent policy or enable raw dumps. The existing log retention, permissions,
+background queue, console controls and operator obligations still apply. Proxy
+hostnames and signed URLs remain excluded even when an outbound target is blocked.
 
 Console output is a second copy of diagnostic data: configure supervisor or
 container log rotation/expiry to match the chosen purpose and retention. The
@@ -212,6 +280,23 @@ proof that the service as a whole meets every obligation:
 [OWASP logging guidance](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html).
 
 ## Verification
+
+The admin dashboard additionally uses a **separate** private
+`.observability/activity.sqlite3` store for rolling 24-hour connection counts.
+Unlike events, this contains a secret-HMAC pseudonymous connection key and
+minute-level timestamps, capped at 100,000 samples/32 MiB. It stores no raw
+credential or account identity and exposes only aggregate counts to admins.
+Report consent does not control this operational measurement. Document it in
+the operator notice and apply the same private-volume/backup exclusions and
+hourly purge schedule. It does not create a stable user profile. See
+[activity definitions and storage](ADMIN_DASHBOARD.md#connection-activity-graphs-and-database-locations).
+Persistent browser UUID statistics have been removed. The client deletes its
+retired localStorage preference/ID on startup without reading it and no longer
+sends a browser-ID header. The server ignores legacy browser headers and purges
+non-connection samples from the activity database on startup, access and scheduled
+maintenance. Cached/offline clients must refresh for local cleanup, and older
+backend workers must be stopped during rollout. No browser profiles or browser
+count series remain. The existing 24-hour connection counts are unchanged.
 
 `tests/test_observability.py` exercises input exclusion (including token-bearing
 URLs and unknown paths), generated correlation IDs, distinct rejection reasons,

@@ -1,6 +1,7 @@
 """Opt-in integration checks against the production build and packaged popups."""
 import json
 import os
+import secrets
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -95,7 +96,17 @@ def local_site():
         def log_message(self, *args):
             pass
 
-    server = ThreadingHTTPServer(('127.0.0.1', 0), partial(Handler, directory=str(ROOT / 'frontend/dist')))
+    # Windows can assign a low ephemeral port that Chromium refuses (e.g. 1719).
+    # Choose an available high port so UI checks do not fail before loading.
+    for _ in range(20):
+        try:
+            server = ThreadingHTTPServer(('127.0.0.1', 32768 + secrets.randbelow(28000)),
+                                         partial(Handler, directory=str(ROOT / 'frontend/dist')))
+            break
+        except OSError:
+            continue
+    else:
+        raise RuntimeError('Could not allocate a local browser-test server port')
     Thread(target=server.serve_forever, daemon=True).start()
     try:
         yield f'http://127.0.0.1:{server.server_port}'

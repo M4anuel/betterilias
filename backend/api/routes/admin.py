@@ -12,6 +12,7 @@ from backend.observability import CATEGORIES, EVENTS, emit, get_store
 from backend.outbound_budget import OutboundBudget
 from backend import admin_sessions
 from backend import diagnostic_reports
+from backend import activity
 from backend.api.routes.diagnostics import storage
 
 
@@ -23,7 +24,8 @@ def administrator(request: Request, response: Response, x_admin_key: str | None 
     try:
         accepted = (secrets.compare_digest(x_admin_key.encode(), configured.encode()) if x_admin_key is not None
                     else bool(admin_sessions.expires_at(request.cookies.get(admin_sessions.COOKIE))))
-    except (OSError, sqlite3.Error):
+    except (OSError, sqlite3.Error) as exc:
+        emit('runtime.error', component='server', status=503, error=exc)
         raise HTTPException(503, detail=t('diagnostics.unavailable')) from None
     if not accepted:
         emit('admin.rejected', status=404)
@@ -57,7 +59,8 @@ def login(payload: AdminLogin, response: Response):
             raise HTTPException(429 if throttled else 401, detail=t('admin.login_failed'),
                                 headers={'Retry-After': '60'} if throttled else None)
         token, expires = admin_sessions.issue()
-    except (OSError, sqlite3.Error):
+    except (OSError, sqlite3.Error) as exc:
+        emit('runtime.error', component='server', status=503, error=exc)
         raise HTTPException(503, detail=t('diagnostics.unavailable')) from None
     response.set_cookie(admin_sessions.COOKIE, token, max_age=admin_sessions.TTL,
                         secure=settings.app_env == 'production', httponly=True,
@@ -73,7 +76,8 @@ def session(request: Request, response: Response):
         raise HTTPException(404, detail=t('Not Found'))
     try:
         expires = admin_sessions.expires_at(request.cookies.get(admin_sessions.COOKIE))
-    except (OSError, sqlite3.Error):
+    except (OSError, sqlite3.Error) as exc:
+        emit('runtime.error', component='server', status=503, error=exc)
         raise HTTPException(503, detail=t('diagnostics.unavailable')) from None
     return {'authenticated': bool(expires), 'expires_at': expires}
 
@@ -83,7 +87,8 @@ def logout(request: Request, response: Response):
     response.headers['Cache-Control'] = 'no-store'
     try:
         admin_sessions.revoke(request.cookies.get(admin_sessions.COOKIE))
-    except (OSError, sqlite3.Error):
+    except (OSError, sqlite3.Error) as exc:
+        emit('runtime.error', component='server', status=503, error=exc)
         raise HTTPException(503, detail=t('diagnostics.unavailable')) from None
     response.delete_cookie(admin_sessions.COOKIE, path='/api/admin',
                            secure=settings.app_env == 'production', httponly=True, samesite='strict')
@@ -94,12 +99,14 @@ def logout(request: Request, response: Response):
 @router.get('/events', dependencies=[Depends(administrator)])
 def events(before: int | None = Query(default=None, ge=1, le=9223372036854775807),
            limit: int = Query(default=100, ge=1, le=200),
-           category: str | None = Query(default=None), code: str | None = Query(default=None)):
+           category: str | None = Query(default=None), code: str | None = Query(default=None),
+           request_id: str | None = Query(default=None, pattern=r'^[a-f0-9]{32}$')):
     if (category is not None and category not in CATEGORIES) or (code is not None and code not in EVENTS):
         raise HTTPException(422, detail=t('validation.invalid'))
     try:
-        rows = get_store().read(before=before, limit=limit, category=category, code=code)
-    except (OSError, sqlite3.Error):
+        rows = get_store().read(before=before, limit=limit, category=category, code=code, request_id=request_id)
+    except (OSError, sqlite3.Error) as exc:
+        emit('runtime.error', component='server', status=503, error=exc)
         raise HTTPException(503, detail=t('diagnostics.unavailable')) from None
     return {'events': rows, 'next_before': rows[-1]['id'] if len(rows) == limit else None}
 
@@ -108,8 +115,9 @@ def events(before: int | None = Query(default=None, ge=1, le=9223372036854775807
 def summary():
     try:
         return {'diagnostics': get_store().summary(), 'outbound': OutboundBudget().snapshot(),
-                'event_catalogue': EVENTS}
-    except (OSError, sqlite3.Error):
+                'event_catalogue': EVENTS, 'activity': activity.summary()}
+    except (OSError, sqlite3.Error) as exc:
+        emit('runtime.error', component='server', status=503, error=exc)
         raise HTTPException(503, detail=t('diagnostics.unavailable')) from None
 
 

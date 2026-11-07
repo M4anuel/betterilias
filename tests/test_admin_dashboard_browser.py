@@ -22,10 +22,16 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
     requests, errors, held = [], [], []
     now = time.time()
     events = [
-        dict(id=103, timestamp=now, code='outbound.origin_not_allowed', category='security', level='WARNING', request_id='a' * 32, worker='b' * 16),
+        dict(id=103, timestamp=now, code='outbound.origin_not_allowed', category='security', level='WARNING', request_id='a' * 32, worker='b' * 16,
+             route='/api/materials/{ref_id}/download', app_version='1.0.0', build='backend-1234567890abcdef',
+             source=dict(file='backend/outbound_targets.py', function='OutboundTargetRejected.__init__', line=23)),
         dict(id=102, timestamp=now - 5, code='request.completed', category='request', level='INFO', method='GET', status=200, duration_ms=123.4),
     ]
-    older = dict(id=99, timestamp=now - 10, code='write.finished', category='audit', level='WARNING', operation='grade', outcome='uncertain', operation_id='c' * 32)
+    older = dict(id=99, timestamp=now - 10, code='write.finished', category='audit', level='WARNING', operation='grade', outcome='uncertain', operation_id='c' * 32,
+        parser='grading_form', reason='dispatch_interrupted', error_kind='missing_key', app_version='1.0.0',
+        build='backend-1234567890abcdef', route='/api/exercises/{exercise_id}/submissions/{member_id}/grade',
+        stack=[dict(file='backend/services/ilias_client.py', function='IliasClient.update_grade', line=1386),
+               dict(file='backend/scrapers/forms.py', function='extract_grading_form', line=63)], stack_truncated=True)
     def respond(route):
         request = route.request
         path = urlparse(request.url).path
@@ -52,7 +58,10 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
                 console_errors=0, last_write=now, writer_alive=True, retention_seconds=604800,
                 retained_counts={'request.completed': 1200, 'outbound.origin_not_allowed': 3},
                 retained_request_metrics=dict(count=1200, mean_ms=123.4, max_ms=900, server_errors=2)),
-                outbound=dict(requests=900, rejected=0, queue_wait_seconds=10, throttles=1, cooldown_until=0, queued=2))
+                outbound=dict(requests=900, rejected=0, queue_wait_seconds=10, throttles=1, cooldown_until=0, queued=2),
+                activity=dict(active=3, last_24_hours=17, as_of=now,
+                    recent=[dict(start=now-3600+i*300, end=now-3600+(i+1)*300, count=i%4) for i in range(12)],
+                    hourly=[dict(start=now-86400+i*3600, end=now-86400+(i+1)*3600, count=i%7) for i in range(24)]))
         elif path.endswith('/reports'):
             data = dict(reports=[], counts=[], next_before=None)
         elif path.endswith('/events'):
@@ -67,6 +76,8 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
                 result = [event for event in result if event['category'] == query['category'][0]]
             if query.get('code'):
                 result = [event for event in result if event['code'] == query['code'][0]]
+            if query.get('request_id'):
+                result = [event for event in result if event.get('request_id') == query['request_id'][0]]
             data = dict(events=result, next_before=100 if result == events else None)
         else:
             pytest.fail('Admin entry requested student endpoint: ' + path)
@@ -79,8 +90,11 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
                                 is_mobile=width < 768, has_touch=width < 768)
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.add_init_script("localStorage.setItem('betterilias_language',%s); localStorage.setItem('betterilias_session_id','student-credential');" % json.dumps(language))
+        page.add_init_script("localStorage.setItem('betterilias_browser_statistics','retired-identifier')")
         page.route('**/api/**', respond)
-        page.goto(local_site + '/admin/')
+        page.goto(local_site + '/admin')
+        assert page.evaluate("localStorage.getItem('betterilias_browser_statistics')") is None
+        assert page.url.endswith('/admin/')
         password = page.get_by_label(tr('admin.key'), exact=True)
         pw.expect(password).to_be_focused()
         password.fill('draft')
@@ -96,8 +110,30 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
         password.press('Enter')
         pw.expect(page.get_by_role('heading', name=tr('admin.overview'), exact=True)).to_be_visible()
         pw.expect(page.locator('.admin-event')).to_have_count(2)
+        charts = page.locator('.activity-chart')
+        pw.expect(charts).to_have_count(2)
+        slider = charts.first.get_by_role('slider')
+        slider.focus()
+        slider.press('Home')
+        pw.expect(slider).to_have_value('0')
+        pw.expect(charts.first.locator('.activity-value')).to_contain_text('0')
+        slider.press('End')
+        pw.expect(slider).to_have_value('11')
+        assert slider.bounding_box()['height'] >= 44
+        charts.first.locator('summary').click()
+        pw.expect(charts.first.locator('tbody tr')).to_have_count(12)
+        charts.first.locator('summary').click()
         page.locator('.admin-event summary').first.click()
         pw.expect(page.get_by_text('a' * 32, exact=True)).to_be_visible()
+        pw.expect(page.get_by_text('/api/materials/{ref_id}/download', exact=True)).to_be_visible()
+        page.get_by_role('button', name=tr('admin.related_events'), exact=True).click()
+        pw.expect(page.locator('.admin-event')).to_have_count(1)
+        request_filter = page.get_by_label(tr('admin.request_filter'), exact=True)
+        pw.expect(request_filter).to_have_value('a' * 32)
+        request_filter.fill('invalid')
+        pw.expect(page.get_by_role('button', name=tr('admin.apply_filter'), exact=True)).to_be_disabled()
+        page.get_by_role('button', name=tr('admin.clear_filter'), exact=True).click()
+        pw.expect(page.locator('.admin-event')).to_have_count(2)
         category = page.get_by_label(tr('admin.category'), exact=True)
         code = page.get_by_label(tr('admin.event_code'), exact=True)
         category.select_option('security')
@@ -112,6 +148,16 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
         pw.expect(page.locator('.admin-event')).to_have_count(3)
         page.locator('.admin-event summary').last.click()
         pw.expect(page.get_by_text(tr('admin.outcome.uncertain'), exact=True)).to_be_visible()
+        pw.expect(page.get_by_text('grading_form', exact=True)).to_be_visible()
+        pw.expect(page.get_by_text(tr('admin.reason.missing_key'), exact=True)).to_be_visible()
+        stack = page.get_by_role('region', name=tr('admin.code_stack'), exact=True)
+        pw.expect(stack).to_be_visible()
+        pw.expect(stack).to_contain_text('backend/scrapers/forms.py:63')
+        stack.focus()
+        stack.press('ArrowDown')
+        page.locator('.admin-event').last.scroll_into_view_if_needed()
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        page.screenshot(path=str(artifacts / f'code-context-{width}-{language}-{scheme}.png'))
         # A failed refresh retains the existing data and reports its staleness.
         state['fail'] = True
         page.locator('.admin-heading').get_by_role('button', name=tr('admin.refresh'), exact=True).click()

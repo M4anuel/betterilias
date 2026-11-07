@@ -17,6 +17,14 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 Start the normal local development launcher, then open
 `http://localhost:5173/admin/`. Enter the administrator key in the password field.
+`http://localhost:5173/admin` also works: Vite development/preview and the backend
+redirect this exact path to `/admin/`. In production, configure the static host
+to do the same before applying the app's catch-all rewrite. For nginx:
+
+```nginx
+location = /admin { return 308 /admin/; }
+```
+
 The key is sent once in a JSON POST and removed from the form immediately;
 neither localStorage nor sessionStorage stores it. The UI never uses the
 student's `X-Session-Id` or bearer credential. A disabled server displays an
@@ -28,6 +36,80 @@ HTTPS proxy/static host to serve `/admin/` from that file rather than rewriting
 it to the student/landing app. Keep `/api` on the same origin. Preserve the
 independent admin input if the landing page changes Vite's build entry points.
 This feature does not add links to or modify the landing page.
+
+## Connection activity graphs and database locations
+
+Expanded events now show registered route templates, parser names, fixed failure
+reasons, application version/backend source build and code-only stack locations
+when available. **Show related events** resets category/code filters and applies
+the event's request ID. You can also paste a 32-hex request ID into the request
+filter, apply it, and clear it independently. Filtering is performed server-side
+and works with older event rows; it does not change the overview metrics.
+The code-locations region can be scrolled/focused with a keyboard and wraps long
+paths on phones. No exception text, actual URL, source line or local variable is
+displayed. See [the schema and limitations](OBSERVABILITY_PRIVACY.md#actionable-code-context).
+
+The overview shows distinct authenticated connections active in the last five
+minutes and across the rolling last 24 hours. Two interactive bar charts show
+five-minute intervals over the last hour and hourly intervals over the last
+24 hours. Select an interval using the slider (touch or keyboard) or expand the
+data table. Refresh and optional 30-second automatic refresh also update these
+graphs. Counts begin when this feature runs; existing logs are not backfilled.
+
+These are connection counts, not a directory of people. The same saved session
+on multiple devices counts once; reconnecting with a new credential may count
+again. Activity means a request accepted by the local session dependency, not
+proof that an ILIAS cookie is still valid remotely. Anonymous requests, auth
+status polling, admin requests and diagnostic-report requests do not count.
+App data refreshes do count; this is not foreground-tab/online presence.
+Each interval deduplicates independently, so adding bars does not give the
+24-hour distinct total. One sample per connection/minute means historical
+interval boundaries can be approximate by up to one minute.
+
+Private SQLite files are rooted in the **backend's own checkout**, not the
+terminal's working directory (unless an absolute configured path overrides it):
+
+| Default file | Contents |
+| --- | --- |
+| `.observability/events.sqlite3` | Operational/security/audit events |
+| `.observability/activity.sqlite3` | 24-hour pseudonymous connection samples |
+| `.diagnostic_reports/reports.sqlite3` | Consented error reports and sharing preferences |
+| `.coordination/admin-sessions.sqlite3` | Short-lived administrator sessions |
+
+`OBSERVABILITY_DIR`, `DIAGNOSTIC_REPORTS_DIR` and `COORDINATION_DIR` override the
+directories. Files are created lazily; student sessions still live in `.sessions/`.
+The activity database is private and excluded from Git, with a 32 MiB page ceiling
+and at most 100,000 minute samples. Older samples are evicted under pressure;
+collection is best effort and storage failures must not fail student actions.
+Counts can therefore be lower than actual usage. No identity digest is returned
+through the API: administrators receive aggregate counts only.
+
+Samples contain a server-secret HMAC of the session credential, minute and last
+seen time. They contain no raw credential, IP, page URL, name or ILIAS identifier.
+This is still pseudonymous activity data, distinct from the content-free event
+log and optional diagnostic reports. It is not controlled by report-sharing
+consent. Include this operational measurement, its purpose and legal basis in
+the operator's privacy notice; keep it out of backups and public serving. Samples
+expire after 24 hours on reads/writes and the hourly scheduled
+`python -m backend.diagnostics prune` job, including while the server is stopped.
+No long-term activity history or per-user drill-down is retained. Shared workers
+must use the same trusted local volume; independent VPSs/NFS are unsupported.
+
+### Retired browser identifiers
+
+Persistent browser UUID statistics have been removed. The app no longer creates,
+reads or sends browser identifiers, and there is no browser-statistics setting
+or browser-count selector. On app startup it removes the old
+`betterilias_browser_statistics` localStorage entry without reading its contents.
+Offline or cached old app versions need a refresh to perform this local cleanup.
+The API ignores `X-BetterIlias-Browser-Id` headers from older clients.
+
+Existing activity rows whose legacy `kind` is not `connection` are securely
+removed on backend startup, metric reads/writes and the scheduled prune command.
+Connection rows are preserved. Stop all older backend workers when deploying
+this removal so they cannot continue collecting legacy data. SQLite cleanup
+cannot remove backups or snapshots; apply the operator's deletion process there.
+The dashboard retains only the documented 24-hour connection statistics.
 
 ## Access boundary
 

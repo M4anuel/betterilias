@@ -53,6 +53,7 @@ export function apiError(error: { detail?: unknown }): string | undefined {
 export async function sessionFetch(input: string, init?: RequestInit & { trackPending?: boolean }): Promise<Response> {
   const sessionId = cache.getSessionId();
   const headers = new Headers(init?.headers);
+  headers.delete('X-BetterIlias-Browser-Id');
   headers.set('Accept-Language', getLanguage());
   if (sessionId && !headers.has('X-Session-Id')) {
     headers.set('X-Session-Id', sessionId);

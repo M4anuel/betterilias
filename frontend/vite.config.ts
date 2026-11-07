@@ -8,6 +8,25 @@ export default defineConfig({
     rollupOptions: { input: { app: 'index.html', admin: 'admin/index.html' } },
   },
   plugins: [
+    {
+      name: 'admin-directory-redirect',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url?.split('?')[0] === '/admin') {
+            res.writeHead(308, { Location: '/admin/' + (req.url.includes('?') ? '?' + req.url.split('?').slice(1).join('?') : '') });
+            res.end();
+          } else next();
+        });
+      },
+      configurePreviewServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url?.split('?')[0] === '/admin') {
+            res.writeHead(308, { Location: '/admin/' + (req.url.includes('?') ? '?' + req.url.split('?').slice(1).join('?') : '') });
+            res.end();
+          } else next();
+        });
+      },
+    },
     react(),
     tailwindcss(),
   ],

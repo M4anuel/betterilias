@@ -1,9 +1,10 @@
 import httpx
 import logging
+import sqlite3
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 
@@ -20,6 +21,8 @@ from backend.observability import DiagnosticMiddleware, configure_logging, emit,
 from backend.api.routes import admin
 from backend.api.routes import diagnostics
 from backend.diagnostic_reports import ReportMiddleware, problem
+from backend.diagnostic_metadata import APP_VERSION, register_routes
+from backend import activity
 
 configure_logging()
 logger = logging.getLogger("ilias.main")
@@ -29,6 +32,11 @@ logger = logging.getLogger("ilias.main")
 async def lifespan(app):
     configure_logging()
     emit('worker.started')
+    if (settings.observability_path / 'activity.sqlite3').exists():
+        try:
+            activity.prune()
+        except (OSError, sqlite3.Error) as exc:
+            emit('runtime.error', component='server', error=exc)
     try:
         yield
     finally:
@@ -40,7 +48,7 @@ app = FastAPI(
     lifespan=lifespan,
     title="ILIAS Alternative API",
     description="High-performance backend & scraper bridge for Uni Bern ILIAS",
-    version="1.0.0",
+    version=APP_VERSION,
     docs_url='/docs' if settings.app_env == 'development' else None,
     redoc_url='/redoc' if settings.app_env == 'development' else None,
     openapi_url='/openapi.json' if settings.app_env == 'development' else None,
@@ -48,6 +56,11 @@ app = FastAPI(
 app.add_middleware(LanguageMiddleware)
 app.add_middleware(DiagnosticMiddleware)
 app.add_middleware(ReportMiddleware)
+
+
+@app.get('/admin', include_in_schema=False)
+def admin_directory():
+    return RedirectResponse('/admin/', status_code=308)
 
 
 @app.exception_handler(OutboundTargetRejected)
@@ -105,8 +118,7 @@ app.add_middleware(
 
 @app.exception_handler(SessionExpiredError)
 async def session_expired_handler(request: Request, exc: SessionExpiredError):
-    emit('auth.rejected', status=401)
-    logger.warning(f"Session expired or unauthorized request: {exc}")
+    emit('auth.rejected', status=401, reason='session_expired', error=exc)
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
         content={
@@ -120,13 +132,14 @@ async def session_expired_handler(request: Request, exc: SessionExpiredError):
 @app.exception_handler(SubmissionListingError)
 async def submission_listing_error_handler(request: Request, exc: SubmissionListingError):
     problem('SUBMISSIONS_INCOMPLETE')
+    emit('submission.listing_incomplete', status=502, reason='submission_listing_incomplete', error=exc)
     return JSONResponse(status_code=502, content={'detail': str(exc), 'code': 'SUBMISSIONS_INCOMPLETE'})
 
 
 @app.exception_handler(ScrapingParsingError)
 async def scraping_error_handler(request: Request, exc: ScrapingParsingError):
     problem('PARSING_FAILED')
-    logger.error(f"Scraping error: {exc}")
+    logger.error('Scraping error', exc_info=(type(exc), exc, exc.__traceback__))
     return JSONResponse(
         status_code=status.HTTP_502_BAD_GATEWAY,
         content={
@@ -142,8 +155,7 @@ async def scraping_error_handler(request: Request, exc: ScrapingParsingError):
 @app.exception_handler(httpx.TimeoutException)
 async def httpx_timeout_handler(request: Request, exc: httpx.TimeoutException):
     problem('ILIAS_TIMEOUT')
-    emit('outbound.timeout', status=504)
-    logger.warning(f"ILIAS timeout on {request.url.path}: {exc}")
+    emit('outbound.timeout', status=504, error=exc)
     return JSONResponse(
         status_code=status.HTTP_504_GATEWAY_TIMEOUT,
         content={
@@ -157,8 +169,7 @@ async def httpx_timeout_handler(request: Request, exc: httpx.TimeoutException):
 @app.exception_handler(httpx.NetworkError)
 async def httpx_network_handler(request: Request, exc: httpx.NetworkError):
     problem('ILIAS_NETWORK_ERROR')
-    emit('outbound.network_error', status=502)
-    logger.warning(f"ILIAS network error on {request.url.path}: {exc}")
+    emit('outbound.network_error', status=502, error=exc)
     return JSONResponse(
         status_code=status.HTTP_502_BAD_GATEWAY,
         content={
@@ -196,4 +207,7 @@ def root():
         "docs_url": "/docs",
         "health_url": "/health"
     }
+
+
+register_routes(app)
 

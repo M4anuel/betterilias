@@ -14,6 +14,7 @@ from backend.coordination import CoordinationBusy
 from backend.admin_sessions import prune as prune_admin_sessions
 from backend.diagnostic_reports import prune as prune_reports
 from backend import diagnostic_reports
+from backend import activity
 
 
 def main(argv=None):
@@ -25,6 +26,7 @@ def main(argv=None):
     events.add_argument('--code', choices=sorted(EVENTS))
     events.add_argument('--limit', type=int, default=50)
     events.add_argument('--before', type=int)
+    events.add_argument('--request-id', help='Filter by the server-generated 32-character request ID')
     reports = commands.add_parser('reports', help='Inspect consented error reports (applies expiry)')
     reports.add_argument('--state', choices=('open', 'resolved', 'all'), default='open')
     reports.add_argument('--kind', choices=diagnostic_reports.KINDS)
@@ -47,6 +49,9 @@ def main(argv=None):
             print(json.dumps({'status': 'unavailable'}))
             return 1
     if args.command == 'events':
+        import re
+        if args.request_id is not None and not re.fullmatch(r'[a-f0-9]{32}', args.request_id):
+            parser.error('Invalid diagnostic request ID')
         if not 1 <= args.limit <= 200:
             parser.error('limit must be between 1 and 200')
         if args.before is not None and not 1 <= args.before <= 9223372036854775807:
@@ -54,7 +59,7 @@ def main(argv=None):
         try:
             rows = read_events(settings.observability_path / 'events.sqlite3',
                 retention_seconds=settings.observability_retention_days * 86400,
-                category=args.category, code=args.code, before=args.before, limit=args.limit)
+                category=args.category, code=args.code, before=args.before, limit=args.limit, request_id=args.request_id)
             print(json.dumps({'events': rows,
                               'next_before': rows[-1]['id'] if len(rows) == args.limit else None}))
             return 0
@@ -69,6 +74,7 @@ def main(argv=None):
         prune_failed_dumps(strict=True)
         prune_admin_sessions()
         prune_reports()
+        activity.prune()
         print(json.dumps({'status': 'pruned'}))
     except (OSError, sqlite3.Error, CoordinationBusy):
         print(json.dumps({'status': 'unavailable'}))

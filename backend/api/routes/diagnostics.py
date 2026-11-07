@@ -17,8 +17,8 @@ router = APIRouter(prefix='/diagnostics', tags=['Consented diagnostics'])
 def storage(fn, *args):
     try:
         return fn(*args)
-    except (OSError, sqlite3.Error):
-        emit('report.unavailable', status=503)
+    except (OSError, sqlite3.Error) as exc:
+        emit('report.unavailable', status=503, error=exc)
         raise HTTPException(503, detail=t('reports.unavailable'), headers={'Cache-Control': 'no-store'}) from None
 
 
