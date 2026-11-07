@@ -223,6 +223,11 @@ have old saved URLs, which need updating. Browser-store publication/signing is a
 separate account process (especially permanent Firefox installation); generating
 a ZIP does not make it a signed store release.
 
+Publish the production packages or store listings and update the landing/setup
+installation links before inviting users. Those links currently point to the
+development extension source on GitHub, whose app permissions cover localhost;
+that source package cannot connect to an arbitrary hosted hostname.
+
 Before public rollout check extension login in both browsers, expired/revoked
 sessions, native downloads/PDF/video, grading/import safeguards, phone handoff,
 calendar-feed HTTPS URLs, report consent/deletion and admin isolation. Confirm

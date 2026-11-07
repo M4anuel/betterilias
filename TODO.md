@@ -84,7 +84,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   [container hosting](docs/CONTAINER_HOSTING.md).
 - [ ] Select the VPS/domain, configure DNS and registry access, review the public
   privacy/imprint text, establish encrypted backups and test restoration. Validate
-  production companions and real ILIAS workflows on the chosen public HTTPS host.
+  production companions and real ILIAS workflows on the chosen public HTTPS host;
+  publish the browser packages/store listings and update installation links.
 
 ## Teaching-assistant work distribution
 

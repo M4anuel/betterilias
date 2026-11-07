@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def command(args, *, env=None, input=None, check=True):
     result = subprocess.run(args, cwd=ROOT, env=env, input=input, text=True,
+                            encoding='utf-8', errors='replace',
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if check and result.returncode:
         raise RuntimeError('Container command failed: ' + result.stderr[-6000:])
