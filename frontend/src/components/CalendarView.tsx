@@ -287,14 +287,21 @@ const CourseColorPicker: React.FC<CourseColorPickerProps> = ({
     const el = inputRef.current;
     if (!el) return;
 
-    // Native 'input' event fires continuously while dragging slider without network request
+    let rafId: number | null = null;
+
+    // Native 'input' event fires continuously while dragging slider without network request.
+    // requestAnimationFrame synchronizes updates with the monitor refresh rate for 0-lag 60-120fps.
     const handleNativeInput = (e: Event) => {
       const val = (e.target as HTMLInputElement).value;
-      onLivePreviewRef.current(courseRefId, val);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        onLivePreviewRef.current(courseRefId, val);
+      });
     };
 
     // Native 'change' event fires only when user releases/drops color slider or dismisses picker
     const handleNativeChange = (e: Event) => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       const val = (e.target as HTMLInputElement).value;
       onCommitRef.current(courseRefId, val);
     };
@@ -303,6 +310,7 @@ const CourseColorPicker: React.FC<CourseColorPickerProps> = ({
     el.addEventListener('change', handleNativeChange);
 
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       el.removeEventListener('input', handleNativeInput);
       el.removeEventListener('change', handleNativeChange);
     };
@@ -311,7 +319,7 @@ const CourseColorPicker: React.FC<CourseColorPickerProps> = ({
   return (
     <label
       className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full cursor-pointer shadow-2xs border border-white/50"
-      style={{ backgroundColor: color }}
+      style={{ backgroundColor: `var(--course-color-${courseRefId}, ${color})` }}
       title={t('calendar.change_color')}
     >
       <input
@@ -363,8 +371,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
 
-  // Real-time optimistic color state while dragging color pickers
-  const [localCourseColors, setLocalCourseColors] = useState<Record<string, string>>({});
+  // Root calendar container ref for zero-re-render 120fps CSS variable color updates
+  const calendarContainerRef = useRef<HTMLDivElement>(null);
   const lastCommittedColorRef = useRef<Record<string, string>>({});
 
   const [hiddenCourses, setHiddenCourses] = useState<string[]>(() =>
@@ -714,7 +722,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         (c.imported_lecture_count ?? 0) > 0 || (c.custom_rule_count ?? 0) > 0;
       byId.set(c.course_ref_id, {
         ...c,
-        color: localCourseColors[c.course_ref_id] || c.color,
+        color: c.color,
         course_title: cache.getDisplayName(c.course_ref_id, c.course_title),
         item_type: c.item_type || 'crs',
         ignored_missing_schedule: isIgnored,
@@ -731,7 +739,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           course_title: cache.getDisplayName(c.ref_id, c.title),
           semester: c.semester || null,
           item_type: c.item_type || 'crs',
-          color: localCourseColors[c.ref_id] || COURSE_COLOR_PALETTE[idx % COURSE_COLOR_PALETTE.length],
+          color: COURSE_COLOR_PALETTE[idx % COURSE_COLOR_PALETTE.length],
           status: 'not_imported',
           feed_status: 'not_checked',
           status_message: t('calendar.status.not_checked'),
@@ -751,7 +759,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       if (semDiff !== 0) return semDiff;
       return a.course_title.localeCompare(b.course_title);
     });
-  }, [calendarData, allMemberships, coursesList, ignoredCoursesLocal, localCourseColors, language]);
+  }, [calendarData, allMemberships, coursesList, ignoredCoursesLocal, language]);
 
   // Available semesters that contain courses in the calendar
   const availableCalendarSemesters = useMemo(() => {
@@ -847,8 +855,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   const handleColorLivePreview = (courseRefId: string, color: string) => {
-    // Immediately update UI live with 0ms lag while dragging slider
-    setLocalCourseColors((prev) => ({ ...prev, [courseRefId]: color }));
+    // Zero React re-renders: dynamically update CSS custom properties on calendar root at native 120+ FPS
+    const root = calendarContainerRef.current || document.querySelector<HTMLElement>('[data-calendar-root]');
+    if (root) {
+      root.style.setProperty(`--course-color-${courseRefId}`, color);
+      root.style.setProperty(`--course-color-${courseRefId}-bg`, `${color}1F`);
+    }
   };
 
   const commitColorChange = async (courseRefId: string, color: string) => {
@@ -866,8 +878,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       const updated = await api.updateCourseColor(courseRefId, color);
       setCalendarData(updated);
       cache.setCachedCalendar('ALL', updated);
+      const root = calendarContainerRef.current || document.querySelector<HTMLElement>('[data-calendar-root]');
+      if (root) {
+        root.style.removeProperty(`--course-color-${courseRefId}`);
+        root.style.removeProperty(`--course-color-${courseRefId}-bg`);
+      }
     } catch (err: any) {
       delete lastCommittedColorRef.current[courseRefId];
+      const root = calendarContainerRef.current || document.querySelector<HTMLElement>('[data-calendar-root]');
+      if (root) {
+        root.style.removeProperty(`--course-color-${courseRefId}`);
+        root.style.removeProperty(`--course-color-${courseRefId}-bg`);
+      }
       setErrorMsg(err?.message || t('calendar.load_failed'));
     }
   };
@@ -1099,11 +1121,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           end_time_str: ev.end_time || ev.end_time_str || '23:59',
           weekday,
           is_cancelled: Boolean(ev.cancelled || ev.is_cancelled),
-          color: localCourseColors[ev.course_ref_id] || courseColorMap.get(ev.course_ref_id) || ev.color || '#0AACA5',
+          color: courseColorMap.get(ev.course_ref_id) || ev.color || '#0AACA5',
           course_title: cache.getDisplayName(ev.course_ref_id, ev.course_title),
         };
       });
-  }, [calendarData, hiddenCourses, courseColorMap, localCourseColors]);
+  }, [calendarData, hiddenCourses, courseColorMap]);
 
   // Week Monday..Sunday for the current referenceDate
   const weekDays = useMemo(() => {
@@ -1353,7 +1375,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   );
 
   return (
-    <div className="p-4 sm:p-5 lg:p-6 max-w-7xl mx-auto space-y-4 animate-in fade-in duration-200">
+    <div
+      ref={calendarContainerRef}
+      data-calendar-root="true"
+      className="p-4 sm:p-5 lg:p-6 max-w-7xl mx-auto space-y-4 animate-in fade-in duration-200"
+    >
       {/* Compact Single-Row Top Header & Primary Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
@@ -1720,7 +1746,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                 style={{
                                   backgroundColor: isSelected
                                     ? '#ffffff'
-                                    : ev.color || '#0AACA5',
+                                    : `var(--course-color-${ev.course_ref_id}, ${ev.color || '#0AACA5'})`,
                                 }}
                               />
                             ))}
@@ -1760,7 +1786,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         >
                           <div
                             className="w-1.5 self-stretch rounded-full shrink-0"
-                            style={{ backgroundColor: ev.color || '#0AACA5' }}
+                            style={{ backgroundColor: `var(--course-color-${ev.course_ref_id}, ${ev.color || '#0AACA5'})` }}
                           />
                           <div className="min-w-0 flex-1 space-y-1">
                             <div className="flex items-center justify-between gap-2">
@@ -1856,8 +1882,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                   type="button"
                                   onClick={() => setSelectedEvent(ev)}
                                   style={{
-                                    backgroundColor: `${ev.color || '#0AACA5'}22`,
-                                    borderLeft: `3px solid ${ev.color || '#0AACA5'}`,
+                                    backgroundColor: `var(--course-color-${ev.course_ref_id}-bg, ${ev.color || '#0AACA5'}22)`,
+                                    borderLeft: `3px solid var(--course-color-${ev.course_ref_id}, ${ev.color || '#0AACA5'})`,
                                   }}
                                   className="w-full text-left rounded px-1.5 py-1 text-[10px] font-bold text-slate-800 dark:text-slate-100 truncate block cursor-pointer hover:opacity-90"
                                   title={`${ev.title} (${ev.course_title})`}
@@ -1932,8 +1958,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     height: `${pos.heightPct}%`,
                                     left: `calc(${leftPct}% + 2px)`,
                                     width: `calc(${widthPct}% - 4px)`,
-                                    backgroundColor: `${color}1F`,
-                                    borderLeft: `4px solid ${color}`,
+                                    backgroundColor: `var(--course-color-${pos.event.course_ref_id}-bg, ${color}1F)`,
+                                    borderLeft: `4px solid var(--course-color-${pos.event.course_ref_id}, ${color})`,
                                   }}
                                   className={`absolute rounded-lg text-left overflow-hidden shadow-2xs hover:shadow-md transition cursor-pointer bg-white/90 dark:bg-slate-900/90 ${
                                     isUltraShort
@@ -2072,8 +2098,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                               setSelectedEvent(ev);
                             }}
                             style={{
-                              backgroundColor: `${ev.color || '#0AACA5'}20`,
-                              borderLeft: `3px solid ${ev.color || '#0AACA5'}`,
+                              backgroundColor: `var(--course-color-${ev.course_ref_id}-bg, ${ev.color || '#0AACA5'}20)`,
+                              borderLeft: `3px solid var(--course-color-${ev.course_ref_id}, ${ev.color || '#0AACA5'})`,
                             }}
                             className="w-full text-left truncate rounded px-1.5 py-0.5 text-[10px] font-semibold text-slate-800 dark:text-slate-100 block cursor-pointer"
                           >
@@ -2094,7 +2120,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           <span
                             key={ev.uid}
                             className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: ev.color || '#0AACA5' }}
+                            style={{ backgroundColor: `var(--course-color-${ev.course_ref_id}, ${ev.color || '#0AACA5'})` }}
                           />
                         ))}
                       </div>
@@ -2130,7 +2156,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           <div className="flex items-center gap-2.5 min-w-0">
                             <span
                               className="h-3 w-3 rounded-full shrink-0"
-                              style={{ backgroundColor: ev.color || '#0AACA5' }}
+                              style={{ backgroundColor: `var(--course-color-${ev.course_ref_id}, ${ev.color || '#0AACA5'})` }}
                             />
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
@@ -2195,7 +2221,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             <div className="flex items-start gap-3 min-w-0">
                               <div
                                 className="w-1.5 self-stretch rounded-full shrink-0"
-                                style={{ backgroundColor: ev.color || '#0AACA5' }}
+                                style={{ backgroundColor: `var(--course-color-${ev.course_ref_id}, ${ev.color || '#0AACA5'})` }}
                               />
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -2365,7 +2391,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         <CourseColorPicker
                           courseRefId={course.course_ref_id}
                           courseTitle={course.course_title}
-                          color={localCourseColors[course.course_ref_id] || course.color}
+                          color={course.color}
                           onLivePreview={handleColorLivePreview}
                           onCommit={commitColorChange}
                         />
@@ -3199,7 +3225,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               <div className="flex items-start gap-2.5 min-w-0">
                 <span
                   className="mt-1 h-3.5 w-3.5 rounded-full shrink-0"
-                  style={{ backgroundColor: selectedEvent.color || '#0AACA5' }}
+                  style={{ backgroundColor: `var(--course-color-${selectedEvent.course_ref_id}, ${selectedEvent.color || '#0AACA5'})` }}
                 />
                 <div className="min-w-0">
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
