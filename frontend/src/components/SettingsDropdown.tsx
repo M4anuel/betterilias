@@ -100,11 +100,13 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
+      if (e.target instanceof Element && e.target.closest('[data-settings-owned]')) return;
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) && !(e.target as HTMLElement).closest('[data-settings-trigger]')) {
         closePanel();
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.querySelector('dialog[data-settings-owned][open]')) return;
       if (e.key === 'Escape') closePanel();
     };
     document.addEventListener('mousedown', handleClickOutside);

@@ -197,6 +197,20 @@ The native HTTP tests check request counts, filter resets, 800-row pages,
 empty lists, failed/repeated pages and concurrent reads. These are mocked tests;
 they do not establish live ILIAS or physical-device acceptance.
 
+## Nested settings report details
+
+The diagnostic-details dialog is portalled to the document body to avoid the
+settings panel's inner scrolling area. Mark it `data-settings-owned` so parent
+outside-click handling does not close settings when a child control is tapped.
+While the child dialog is open, the parent must not handle Escape. Its React
+`cancel` event must also stop propagation: portals preserve React event ancestry
+even when native DOM elements live outside the parent. Closing restores focus
+to the settings info control. Show deletion feedback inside the active child
+dialog and preserve 44 px touch targets. The diagnostic-report browser matrix
+checks deletion, nested Escape behavior, focus restoration and viewport fit in
+both languages/themes across phone, tablet, desktop and short landscape sizes.
+These are Chromium emulation checks, not physical-device validation.
+
 ## Extension installation guidance
 
 The companion installation dialog uses a native modal with explicit focus

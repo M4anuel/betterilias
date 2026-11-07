@@ -33,12 +33,12 @@ export function DiagnosticSettings() {
   }, [owner]);
 
   useEffect(() => {
-    if (isDetailsOpen) {
-      detailsDialog.current?.showModal();
-    } else {
-      detailsDialog.current?.close();
-    }
-  }, [isDetailsOpen]);
+    if (!isDetailsOpen || !owner) return;
+    const dialog = detailsDialog.current;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog?.showModal();
+    return () => { dialog?.close(); if (previous?.isConnected) previous.focus(); };
+  }, [isDetailsOpen, owner]);
 
   if (!owner) return null;
 
@@ -67,7 +67,7 @@ export function DiagnosticSettings() {
           <button
             type="button"
             onClick={() => setIsDetailsOpen(true)}
-            className="p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition shrink-0 cursor-pointer"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition shrink-0 cursor-pointer"
             aria-label={t('reports.details')}
             title={t('reports.details')}
           >
@@ -107,8 +107,9 @@ export function DiagnosticSettings() {
       {isDetailsOpen && typeof document !== 'undefined' && createPortal(
         <dialog
           ref={detailsDialog}
+          data-settings-owned
           aria-labelledby="diagnostic-details-title"
-          onCancel={() => setIsDetailsOpen(false)}
+          onCancel={event => { event.stopPropagation(); setIsDetailsOpen(false); }}
           className="m-auto max-h-[90dvh] w-[min(32rem,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-900/60 open:flex open:flex-col dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
         >
           {/* Header */}
@@ -124,7 +125,7 @@ export function DiagnosticSettings() {
             <button
               type="button"
               onClick={() => setIsDetailsOpen(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer"
               aria-label={t('Schliessen')}
             >
               <X className="h-4 w-4" />
@@ -165,6 +166,7 @@ export function DiagnosticSettings() {
             </div>
 
             <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              {message && <p role={message === 'reports.unavailable' ? 'alert' : 'status'}>{t(message as TranslationKey)}</p>}
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {t('reports.delete_hint')}
               </p>
@@ -176,7 +178,7 @@ export function DiagnosticSettings() {
                       type="button"
                       disabled={busy}
                       onClick={() => void remove()}
-                      className="px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-xs font-bold hover:bg-red-100 transition cursor-pointer"
+                      className="min-h-11 px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-xs font-bold hover:bg-red-100 transition cursor-pointer"
                     >
                       {t('reports.delete_now')}
                     </button>
@@ -184,7 +186,7 @@ export function DiagnosticSettings() {
                       type="button"
                       disabled={busy}
                       onClick={() => setConfirmDelete(false)}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                      className="min-h-11 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                     >
                       {t('Abbrechen')}
                     </button>
@@ -195,7 +197,7 @@ export function DiagnosticSettings() {
                   type="button"
                   disabled={busy}
                   onClick={() => setConfirmDelete(true)}
-                  className="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition cursor-pointer"
+                  className="min-h-11 w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition cursor-pointer"
                 >
                   {t('reports.delete_button')}
                 </button>
@@ -208,7 +210,7 @@ export function DiagnosticSettings() {
             <button
               type="button"
               onClick={() => setIsDetailsOpen(false)}
-              className="px-4 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition cursor-pointer"
+              className="min-h-11 px-4 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition cursor-pointer"
             >
               {t('Schliessen')}
             </button>
