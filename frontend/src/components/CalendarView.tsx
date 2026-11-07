@@ -671,6 +671,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         discovered = rawMemberships;
         setAllMemberships(rawMemberships);
         cache.setCachedAllMemberships(rawMemberships);
+        cache.setCachedMyCourses(rawMemberships);
       } else {
         discovered = cache.getCachedAllMemberships()?.courses || [];
       }

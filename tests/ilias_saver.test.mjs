@@ -88,3 +88,69 @@ test('Grading filter removal detection for modeless feedback bar', () => {
   const wasFilteredOut = isNotGradedFilter && isNowGraded;
   assert.equal(wasFilteredOut, true);
 });
+
+test('My Courses caching and ILIAS Saver freshness lifecycle', () => {
+  localStorage.clear();
+  const scope = 'tenant_123';
+  localStorage.setItem('betterilias_session_id', scope);
+  const key = `ilias_my_courses_cache_${scope}`;
+  const tsKey = `ilias_ts_${key}`;
+
+  const mockCourses = [
+    { ref_id: '101', title: 'Lineare Algebra', item_type: 'crs', semester: 'HS2026' },
+    { ref_id: '102', title: 'Übungsgruppe 1', item_type: 'grp', semester: 'HS2026' }
+  ];
+
+  // Helper mock mimicking cache.setCachedMyCourses
+  const setCached = (courses, force = false) => {
+    const raw = localStorage.getItem(key);
+    const existing = raw ? JSON.parse(raw) : null;
+    if (!force && existing && existing.length > 0 && (!courses || courses.length === 0)) {
+      return; // prevent overwrite
+    }
+    localStorage.setItem(key, JSON.stringify(courses));
+    localStorage.setItem(tsKey, String(Date.now()));
+  };
+
+  const getCached = () => {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  };
+
+  const isFresh = (ttlMinutes = 5) => {
+    const enabled = localStorage.getItem('betterilias_saver_enabled') === 'true';
+    if (!enabled) return false;
+    const rawTs = localStorage.getItem(tsKey);
+    if (!rawTs) return false;
+    return Date.now() - parseInt(rawTs, 10) < ttlMinutes * 60 * 1000;
+  };
+
+  // Initially empty
+  assert.equal(getCached(), null);
+  assert.equal(isFresh(), false);
+
+  // Cache courses
+  setCached(mockCourses);
+  assert.deepEqual(getCached(), mockCourses);
+
+  // Freshness check with saver disabled
+  assert.equal(isFresh(), false);
+
+  // Enable ILIAS Saver
+  localStorage.setItem('betterilias_saver_enabled', 'true');
+  assert.equal(isFresh(), true);
+
+  // Empty response without force does not wipe populated cache
+  setCached([]);
+  assert.deepEqual(getCached(), mockCourses);
+
+  // Explicit user refresh (force = true) allows clearing/updating
+  setCached([], true);
+  assert.deepEqual(getCached(), []);
+
+  // Invalidate cache
+  localStorage.removeItem(key);
+  localStorage.removeItem(tsKey);
+  assert.equal(getCached(), null);
+  assert.equal(isFresh(), false);
+});

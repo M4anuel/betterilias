@@ -22,21 +22,30 @@ export const MyCoursesView: React.FC<{
         sort: (['name', 'name-desc', 'semester', 'semester-asc'].includes(saved.sort) ? saved.sort : 'name') as SortOrder };
     } catch { return { favourites: {}, sort: 'name' }; }
   });
-  const [courses, setCourses] = useState<CourseItem[] | null>(null);
+  const [courses, setCourses] = useState<CourseItem[] | null>(() => cache.getCachedMyCourses());
   const [query, setQuery] = useState('');
   const [semester, setSemester] = useState('all');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const pendingFocus = useRef<string | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const [revision, setRevision] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !cache.getCachedMyCourses());
   const [error, setError] = useState(false);
   const [storageError, setStorageError] = useState(false);
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    if (revision === 0 && cache.isMyCoursesSaverFresh() && courses && courses.length > 0) {
+      setLoading(false);
+      return;
+    }
+    setLoading(!courses);
     setError(false);
-    api.getMyCourses().then(data => { if (active) setCourses(data.courses); })
+    api.getMyCourses().then(data => {
+      if (active) {
+        setCourses(data.courses);
+        cache.setCachedMyCourses(data.courses, revision > 0);
+      }
+    })
       .catch(() => { if (active) setError(true); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -132,7 +141,7 @@ export const MyCoursesView: React.FC<{
     {storageError && <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">{t('my_courses.storage_error')}</p>}
     {error && <div role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900 dark:bg-amber-950 dark:text-amber-200">{t('my_courses.load_failed')}
       <button type="button" onClick={() => setRevision(value => value + 1)} className="ml-2 min-h-11 underline">{t('Erneut versuchen')}</button></div>}
-    {loading && <p role="status" className="text-sm text-slate-500 dark:text-slate-400">{t('my_courses.loading')}</p>}
+    {loading && !courses && <p role="status" className="text-sm text-slate-500 dark:text-slate-400">{t('my_courses.loading')}</p>}
     {courses && <p role="status" className="text-sm text-slate-500 dark:text-slate-400">{t('my_courses.count', { count: visible.length, total: courses.length })}</p>}
     {renderSection(pinned, t('my_courses.favourites'))}
     {renderSection(others, t('my_courses.other'))}
