@@ -4,6 +4,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Improve private logs with frozen route templates, literal parser names,
+  application/backend source version, fixed failure categories and bounded
+  code-only frames. Add request-ID lookup in the dashboard/API/CLI while
+  excluding runtime values, raw exception text, absolute paths and locals.
+
 - [x] Add separate, default-off browser statistics consent with a random browser
   UUID that survives ILIAS reconnection for at most 90 days. Show aggregate
   participating-browser graphs alongside connection counts, with 24-hour server

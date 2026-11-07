@@ -123,6 +123,8 @@ function Overview({ onExpired, expires }: { onExpired: () => void; expires: numb
   const [before, setBefore] = useState<number | null>(null);
   const [category, setCategory] = useState('');
   const [code, setCode] = useState('');
+  const [requestId, setRequestId] = useState('');
+  const [requestDraft, setRequestDraft] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [auto, setAuto] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -136,6 +138,7 @@ function Overview({ onExpired, expires }: { onExpired: () => void; expires: numb
     const params = new URLSearchParams({ limit: '50' });
     if (category) params.set('category', category);
     if (code) params.set('code', code);
+    if (requestId) params.set('request_id', requestId);
     if (cursor) params.set('before', String(cursor));
     return `events?${params}`;
   }
@@ -148,7 +151,7 @@ function Overview({ onExpired, expires }: { onExpired: () => void; expires: numb
     const current = ++generation.current;
     const abort = new AbortController(); controller.current?.abort(); controller.current = abort;
     setLoading(true); setMore(false); setError('');
-    const filter = `${category}:${code}`;
+    const filter = `${category}:${code}:${requestId}`;
     if (previousFilter.current !== filter) { setEvents([]); setBefore(null); previousFilter.current = filter; }
     void Promise.all([adminRequest<AdminSummary>('summary', { signal: abort.signal }),
       adminRequest<EventPage>(query(), { signal: abort.signal })]).then(([data, page]) => {
@@ -157,7 +160,7 @@ function Overview({ onExpired, expires }: { onExpired: () => void; expires: numb
     }).catch(err => { if (current === generation.current) failed(err); })
       .finally(() => { if (current === generation.current) setLoading(false); });
     return () => abort.abort();
-  }, [category, code, refresh, language, failed]);
+  }, [category, code, requestId, refresh, language, failed]);
   useEffect(() => {
     if (!auto) return;
     const timer = window.setInterval(() => { if (!document.hidden && !loading && !more) setRefresh(n => n + 1); }, 30000);
@@ -202,8 +205,18 @@ function Overview({ onExpired, expires }: { onExpired: () => void; expires: numb
     <section className="admin-panel admin-events" aria-labelledby="admin-events-title">
       <div className="admin-section-heading"><div><h2 id="admin-events-title">{t('admin.events')}</h2><p className="admin-small">{t('admin.events_hint')}</p></div><label className="admin-auto"><input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)} />{t('admin.auto')}</label></div>
       <div className="admin-filters"><div><label htmlFor="admin-category">{t('admin.category')}</label><select id="admin-category" value={category} onChange={e => { setCategory(e.target.value); setCode(''); }}><option value="">{t('admin.all_categories')}</option>{categories.map(item => <option key={item} value={item}>{label(`admin.category.${item}`)}</option>)}</select></div><div><label htmlFor="admin-code">{t('admin.event_code')}</label><select id="admin-code" value={code} onChange={e => setCode(e.target.value)}><option value="">{t('admin.all_codes')}</option>{codes.map(item => <option key={item} value={item}>{item}</option>)}</select></div></div>
+      <form className="admin-request-filter" onSubmit={event => { event.preventDefault(); setRequestId(requestDraft.trim()); }}>
+        <div><label htmlFor="admin-request-filter">{t('admin.request_filter')}</label>
+          <input id="admin-request-filter" value={requestDraft} onChange={event => setRequestDraft(event.target.value.toLowerCase())}
+            autoCapitalize="none" autoComplete="off" spellCheck={false} maxLength={32} aria-describedby="admin-request-hint" />
+          <p id="admin-request-hint" className="admin-small">{t('admin.request_filter_hint')}</p></div>
+        <button type="submit" className="admin-button" disabled={!!requestDraft.trim() && !/^[a-f0-9]{32}$/.test(requestDraft.trim())}>{t('admin.apply_filter')}</button>
+        <button type="button" className="admin-button" disabled={!requestId && !requestDraft} onClick={() => { setRequestId(''); setRequestDraft(''); }}>{t('admin.clear_filter')}</button>
+      </form>
       {loading && <p role="status" className="admin-small">{t('admin.loading')}</p>}
-      {events.length ? <ul className="admin-event-list">{events.map(event => <EventRow key={event.id} event={event} />)}</ul> : !loading && <p className="admin-empty" role="status">{t(error ? 'admin.no_results_error' : 'admin.empty')}</p>}
+      {events.length ? <ul className="admin-event-list">{events.map(event => <EventRow key={event.id} event={event} onRelated={id => {
+        setRequestId(id); setRequestDraft(id); setCategory(''); setCode('');
+      }} />)}</ul> : !loading && <p className="admin-empty" role="status">{t(error ? 'admin.no_results_error' : 'admin.empty')}</p>}
       {before && !loading && <div className="admin-more"><button className="admin-button" disabled={more} onClick={() => void loadMore()}>{t(more ? 'admin.loading' : 'admin.load_more')}<ChevronDown size={17} aria-hidden="true" /></button></div>}
     </section>
   </>;
@@ -213,7 +226,7 @@ function Stat({ title, value, note, icon, alert }: { title: string; value: strin
   return <div className={`admin-panel admin-stat ${alert ? 'admin-stat-alert' : ''}`}><div className="admin-stat-label">{title}{icon}</div><strong>{value}</strong><p className="admin-small">{note}</p></div>;
 }
 function Fact({ name, value }: { name: string; value: ReactNode }) { return <div><dt>{name}</dt><dd>{value}</dd></div>; }
-function EventRow({ event }: { event: AdminEvent }) {
+function EventRow({ event, onRelated }: { event: AdminEvent; onRelated: (id: string) => void }) {
   const level = event.level || (event.code === 'request.failed' || event.code === 'runtime.error' || (event.status || 0) >= 500 ? 'ERROR' :
     event.category === 'security' || event.category === 'compatibility' || event.code === 'runtime.warning' ||
     (event.status || 0) >= 400 || ['partial', 'uncertain', 'failed', 'rejected'].includes(event.outcome || '') ? 'WARNING' : 'INFO');
@@ -228,5 +241,16 @@ function EventRow({ event }: { event: AdminEvent }) {
     {event.method && <Fact name={t('admin.method')} value={<code>{event.method}</code>} />}
     {event.status != null && <Fact name={t('admin.status')} value={number(event.status)} />}
     {event.duration_ms != null && <Fact name={t('admin.duration')} value={t('admin.ms', { value: number(event.duration_ms) })} />}
-  </dl></details></li>;
+    {event.route && <Fact name={t('admin.route_template')} value={<code>{event.route === 'unmatched' ? t('admin.route_unmatched') : event.route}</code>} />}
+    {event.parser && <Fact name={t('admin.parser')} value={<code>{event.parser}</code>} />}
+    {event.reason && <Fact name={t('admin.failure_reason')} value={label(`admin.reason.${event.reason}`)} />}
+    {event.error_kind && event.error_kind !== event.reason && <Fact name={t('admin.error_kind')} value={label(`admin.reason.${event.error_kind}`)} />}
+    {event.app_version && <Fact name={t('admin.app_version')} value={<code>{event.app_version}</code>} />}
+    {event.build && <Fact name={t('admin.backend_build')} value={<code>{event.build}</code>} />}
+    {event.source && <Fact name={t('admin.source_location')} value={<code>{event.source.file}:{event.source.line} · {event.source.function}</code>} />}
+    {!!event.stack?.length && <Fact name={t('admin.code_stack')} value={<div className="admin-code-stack" tabIndex={0} role="region" aria-label={t('admin.code_stack')}><ol>
+      {event.stack.map((frame, index) => <li key={index}><code>{frame.file}:{frame.line} · {frame.function}</code></li>)}
+    </ol></div>} />}
+    {event.stack_truncated && <Fact name={t('admin.code_stack')} value={t('admin.stack_truncated')} />}
+  </dl>{event.request_id && <div className="admin-event-actions"><button type="button" className="admin-button" onClick={() => onRelated(event.request_id!)}>{t('admin.related_events')}</button></div>}</details></li>;
 }

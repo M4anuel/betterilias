@@ -370,10 +370,10 @@ class ReportMiddleware:
                         headers = [(k, v) for k, v in headers if k.lower() != b'cache-control']
                         headers.append((b'cache-control', b'no-store'))
                         message['headers'] = headers
-                    except Exception:
+                    except Exception as exc:
                         # Even a reporting implementation failure must not
                         # replace or replay the original response.
-                        emit('report.unavailable', status=503)
+                        emit('report.unavailable', status=503, error=exc)
             await send(message)
         try:
             await self.app(scope, receive, wrapped)

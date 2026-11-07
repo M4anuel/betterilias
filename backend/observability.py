@@ -14,12 +14,15 @@ import logging
 import os
 from pathlib import Path
 import queue
+import re
 import secrets
 import sqlite3
+import sys
 import threading
 import time
 
 from backend.config import settings
+from backend.diagnostic_metadata import REASONS, error_details, parser_name, release, route_template, source_location
 
 EVENTS = {
     'request.completed': 'request', 'request.failed': 'request',
@@ -37,6 +40,7 @@ EVENTS = {
     'report.created': 'audit', 'report.deleted': 'audit', 'report.preference_changed': 'audit',
     'report.resolved': 'audit', 'report.reopened': 'audit',
     'report.unavailable': 'operational',
+    'submission.listing_incomplete': 'compatibility',
     'runtime.warning': 'operational', 'runtime.error': 'operational',
     'worker.started': 'operational', 'worker.stopped': 'operational',
 }
@@ -58,6 +62,7 @@ _console_failures = 0
 _request = ContextVar('diagnostic_request', default=None)
 _operation = ContextVar('diagnostic_operation', default=None)
 _dispatch = ContextVar('diagnostic_dispatch', default=None)
+_scope = ContextVar('diagnostic_scope', default=None)
 _store = None
 _store_lock = threading.Lock()
 
@@ -178,9 +183,9 @@ class EventStore:
         self._stop.set()
         self._thread.join(timeout=3)
 
-    def read(self, *, before=None, limit=100, category=None, code=None):
+    def read(self, *, before=None, limit=100, category=None, code=None, request_id=None):
         return read_events(self.path, retention_seconds=self.retention_seconds,
-                           before=before, limit=limit, category=category, code=code)
+                           before=before, limit=limit, category=category, code=code, request_id=request_id)
 
     def summary(self):
         counts = []
@@ -194,6 +199,7 @@ class EventStore:
                     "FROM events WHERE ts >= ? AND code IN ('request.completed','request.failed')",
                     (time.time() - self.retention_seconds,)).fetchone()
         return {'worker': self.worker, 'queue_depth': self.pending.qsize(), 'dropped': self.dropped,
+                **release(),
                 'storage_errors': self.storage_errors, 'last_write': self.last_write,
                 'console_errors': _console_failures,
                 'writer_alive': self._thread.is_alive(), 'retention_seconds': self.retention_seconds,
@@ -214,11 +220,32 @@ def get_store():
     return _store
 
 
-def emit(code, *, status=None, duration_ms=None, method=None, operation=None, outcome=None, component=None):
-    """Deliberately no **fields, message, URL, exception, actor or request body."""
+def emit(code, *, status=None, duration_ms=None, method=None, operation=None, outcome=None, component=None,
+         parser=None, reason=None, error=None, source=None):
+    """No arbitrary fields or text. Exceptions are reduced to trusted code metadata."""
     if code not in EVENTS:
         raise ValueError('Unknown diagnostic event code')
-    event = {'schema': 1, 'timestamp': time.time(), 'code': code, 'category': EVENTS[code]}
+    event = {'schema': 2, 'timestamp': time.time(), 'code': code, 'category': EVENTS[code]}
+    try:
+        event.update(release())
+        scope = _scope.get()
+        if scope is not None:
+            event['route'] = route_template(scope)
+        if parser is not None:
+            event['parser'] = parser_name(parser)
+        if isinstance(error, BaseException):
+            event.update(error_details(error))
+            event['reason'] = event['error_kind']
+        if source is not None and isinstance(source, tuple) and len(source) == 3:
+            location = source_location(*source)
+            if location:
+                event['source'] = location
+        if reason in REASONS:
+            event['reason'] = reason
+    except Exception:
+        # Debug-context extraction must never hide the original operation.
+        # No fallback to raw text, paths, exception classes or frame locals.
+        pass
     if _request.get():
         event['request_id'] = _request.get()
     if _operation.get():
@@ -279,12 +306,14 @@ def audit(operation):
                       _dispatch.set((*(_dispatch.get() or ()), state)))
             emit('write.started', operation=operation, outcome='started')
             return state, tokens
-        def finish(state, tokens, result=None, failed=False):
+        def finish(state, tokens, result=None, error=None):
             try:
-                outcome = ('uncertain' if state['sent'] else 'rejected') if failed else _returned_outcome(result)
+                outcome = ('uncertain' if state['sent'] else 'rejected') if error is not None else _returned_outcome(result)
                 from backend.diagnostic_reports import operation_context
                 operation_context(operation, outcome)
-                emit('write.finished', operation=operation, outcome=outcome)
+                reason = {'uncertain': 'dispatch_interrupted', 'rejected': 'operation_rejected',
+                          'partial': 'partial_result', 'failed': 'reported_failure'}.get(outcome)
+                emit('write.finished', operation=operation, outcome=outcome, reason=reason, error=error)
             finally:
                 _dispatch.reset(tokens[1])
                 _operation.reset(tokens[0])
@@ -294,8 +323,8 @@ def audit(operation):
                 state, tokens = start()
                 try:
                     result = await fn(*args, **kwargs)
-                except BaseException:
-                    finish(state, tokens, failed=True)
+                except BaseException as exc:
+                    finish(state, tokens, error=exc)
                     raise
                 finish(state, tokens, result)
                 return result
@@ -305,8 +334,8 @@ def audit(operation):
                 state, tokens = start()
                 try:
                     result = fn(*args, **kwargs)
-                except BaseException:
-                    finish(state, tokens, failed=True)
+                except BaseException as exc:
+                    finish(state, tokens, error=exc)
                     raise
                 finish(state, tokens, result)
                 return result
@@ -322,10 +351,11 @@ class DiagnosticMiddleware:
         if scope['type'] != 'http':
             return await self.app(scope, receive, send)
         # Never trust an incoming correlation ID and never inspect query/header
-        # values. No route path or IP is retained, even for 404/validation errors.
+        # values. Only frozen router templates are retained, never raw paths/IPs.
         request_id = secrets.token_hex(16)
         scope.setdefault('state', {})['diagnostic_request_id'] = request_id
         token = _request.set(request_id)
+        scope_token = _scope.set(scope)
         started, status_code = time.monotonic(), 500
         async def wrapped_send(message):
             nonlocal status_code
@@ -337,15 +367,17 @@ class DiagnosticMiddleware:
                     message['headers'] = [(k, v) for k, v in message['headers'] if k.lower() != b'cache-control']
                     message['headers'].append((b'cache-control', b'no-store'))
             await send(message)
-        failed = False
+        error = None
         try:
             await self.app(scope, receive, wrapped_send)
-        except BaseException:
-            failed = True
+        except BaseException as exc:
+            error = exc
             raise
         finally:
-            emit('request.failed' if failed else 'request.completed', status=status_code,
-                 duration_ms=(time.monotonic() - started) * 1000, method=scope['method'])
+            emit('request.failed' if error is not None else 'request.completed', status=status_code,
+                 duration_ms=(time.monotonic() - started) * 1000, method=scope['method'], error=error,
+                 reason='http_error' if error is None and status_code >= 400 else None)
+            _scope.reset(scope_token)
             _request.reset(token)
 
 
@@ -359,7 +391,10 @@ class PrivateHandler(logging.StreamHandler):
                          'outbound' if name.startswith(('httpx', 'httpcore', 'ilias.outbound')) else
                          'server' if name.startswith('uvicorn') else 'application')
             emit("runtime.error" if record.levelno >= logging.ERROR else "runtime.warning",
-                 component=component)
+                 component=component,
+                 error=(record.exc_info[1] if isinstance(record.exc_info, tuple) and len(record.exc_info) > 1
+                        else sys.exception() if record.levelno >= logging.ERROR else None),
+                 source=(record.pathname, record.funcName, record.lineno))
 
 
 class PrivateFormatter(logging.Formatter):
@@ -424,12 +459,14 @@ class ConsoleHandler(logging.StreamHandler):
         _console_failures += 1
 
 
-def read_events(path, *, retention_seconds, before=None, limit=100, category=None, code=None):
+def read_events(path, *, retention_seconds, before=None, limit=100, category=None, code=None, request_id=None):
     """Read-only local/admin inspection; never starts a writer or creates files."""
     if category is not None and category not in CATEGORIES:
         raise ValueError('Unknown diagnostic category')
     if code is not None and code not in EVENTS:
         raise ValueError('Unknown diagnostic event code')
+    if request_id is not None and not re.fullmatch(r'[a-f0-9]{32}', request_id):
+        raise ValueError('Invalid diagnostic request ID')
     path = Path(path)
     if not path.exists():
         return []
@@ -442,6 +479,9 @@ def read_events(path, *, retention_seconds, before=None, limit=100, category=Non
         codes = [name for name, group in EVENTS.items() if group == category]
         predicates.append('code IN (' + ','.join('?' for _ in codes) + ')')
         values.extend(codes)
+    if request_id is not None:
+        predicates.append("json_extract(data,'$.request_id') = ?")
+        values.append(request_id)
     values.append(max(1, min(limit, 200)))
     with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=.5)) as db:
         rows = db.execute('SELECT id,data FROM events WHERE ' + ' AND '.join(predicates) +

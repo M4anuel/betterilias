@@ -5,7 +5,11 @@ export interface AdminEvent {
   worker?: string; request_id?: string; operation_id?: string;
   method?: string; status?: number; duration_ms?: number; operation?: string;
   outcome?: string; component?: string;
+  route?: string; parser?: string; reason?: string; error_kind?: string;
+  app_version?: string; build?: string; stack_truncated?: boolean;
+  stack?: CodeFrame[]; source?: CodeFrame;
 }
+export interface CodeFrame { file: string; function: string; line: number }
 export interface EventPage { events: AdminEvent[]; next_before: number | null }
 export interface AdminSession { authenticated: boolean; expires_at: number | null }
 export interface ActivityBucket { start: number; end: number; count: number }
@@ -21,6 +25,7 @@ export interface AdminSummary {
     worker: string; queue_depth: number; dropped: number; storage_errors: number;
     console_errors: number; last_write: number | null; writer_alive: boolean;
     retention_seconds: number; retained_counts: Record<string, number>;
+    app_version?: string; build?: string;
     retained_request_metrics: { count: number; mean_ms: number | null; max_ms: number | null; server_errors: number | null };
   };
   outbound: { requests: number; rejected: number; queue_wait_seconds: number; throttles: number; cooldown_until: number; queued: number };

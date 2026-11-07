@@ -39,6 +39,16 @@ This feature does not add links to or modify the landing page.
 
 ## Connection activity graphs and database locations
 
+Expanded events now show registered route templates, parser names, fixed failure
+reasons, application version/backend source build and code-only stack locations
+when available. **Show related events** resets category/code filters and applies
+the event's request ID. You can also paste a 32-hex request ID into the request
+filter, apply it, and clear it independently. Filtering is performed server-side
+and works with older event rows; it does not change the overview metrics.
+The code-locations region can be scrolled/focused with a keyboard and wraps long
+paths on phones. No exception text, actual URL, source line or local variable is
+displayed. See [the schema and limitations](OBSERVABILITY_PRIVACY.md#actionable-code-context).
+
 The overview shows distinct authenticated connections active in the last five
 minutes and across the rolling last 24 hours. Two interactive bar charts show
 five-minute intervals over the last hour and hourly intervals over the last
