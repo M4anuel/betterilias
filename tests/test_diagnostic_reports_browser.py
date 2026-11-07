@@ -119,9 +119,9 @@ def test_consent_choices_preferences_and_withdrawal(local_site, width, height, l
         pw.expect(sharing).to_have_value('never')
         pw.expect(settings.get_by_text(tr('reports.preference_saved'), exact=True)).to_be_visible()
         settings.get_by_role('button', name=tr('reports.details'), exact=True).click()
-        settings.get_by_role('button', name=tr('reports.delete_button'), exact=True).click()
-        settings.get_by_role('button', name=tr('reports.delete_now'), exact=True).click()
-        pw.expect(settings.get_by_text(tr('reports.deleted'), exact=True)).to_be_visible()
+        page.get_by_role('button', name=tr('reports.delete_button'), exact=True).click()
+        page.get_by_role('button', name=tr('reports.delete_now'), exact=True).click()
+        pw.expect(page.get_by_text(tr('reports.deleted'), exact=True)).to_be_visible()
         assert state['deleted'] == 1
         page.screenshot(path=str(artifacts / f'settings-{width}-{language}.png'), full_page=True)
         assert settings.evaluate('e => e.scrollWidth <= e.clientWidth + 1')
