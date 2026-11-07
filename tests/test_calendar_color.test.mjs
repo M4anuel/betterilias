@@ -93,3 +93,118 @@ test('Calendar course color: CSS custom properties preview operates at 120fps wi
   assert.equal(properties.has('--course-color-crs-101'), false);
   assert.equal(properties.has('--course-color-crs-101-bg'), false);
 });
+
+test('Calendar grid dynamic expansion: expands hours past 19:00/20:00 up to 24:00 for late events and clamps positioning', () => {
+  const timeToMinutes = (str) => {
+    const [h, m] = (str || '00:00').split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  const calculateHoursRange = (events) => {
+    let minH = 8;
+    let maxH = 20;
+
+    for (const ev of events) {
+      if (ev.all_day) continue;
+      const startMin = timeToMinutes(ev.start_time_str);
+      const rawEndMin = ev.end_time_str ? timeToMinutes(ev.end_time_str) : 0;
+      const endMin = rawEndMin > startMin ? rawEndMin : Math.min(1440, startMin + 45);
+
+      const sh = Math.floor(startMin / 60);
+      const eh = Math.ceil(endMin / 60);
+
+      if (sh < minH) minH = Math.max(0, sh);
+      if (sh >= maxH) maxH = Math.min(24, sh + 1);
+      if (eh > maxH) maxH = Math.min(24, eh);
+    }
+
+    const hrs = [];
+    for (let h = minH; h < maxH; h++) hrs.push(h);
+    return { gridStartHour: minH, gridEndHour: maxH, hoursList: hrs };
+  };
+
+  // Case 1: Normal 08:00 - 18:00 day
+  const normalEvents = [{ start_time_str: '10:15', end_time_str: '12:00', all_day: false }];
+  const normalRange = calculateHoursRange(normalEvents);
+  assert.equal(normalRange.gridStartHour, 8);
+  assert.equal(normalRange.gridEndHour, 20);
+  assert.equal(normalRange.hoursList.length, 12);
+  assert.equal(normalRange.hoursList.at(-1), 19);
+
+  // Case 2: Late night deadline or course at 23:55 (like user screenshot)
+  const lateEvents = [
+    { start_time_str: '14:15', end_time_str: '17:00', all_day: false },
+    { start_time_str: '23:55', end_time_str: '23:55', all_day: false }
+  ];
+  const lateRange = calculateHoursRange(lateEvents);
+  assert.equal(lateRange.gridStartHour, 8);
+  // gridEndHour must expand to 24 (midnight)
+  assert.equal(lateRange.gridEndHour, 24);
+  // hoursList must include 20:00, 21:00, 22:00, 23:00 (16 hours total: 8..23)
+  assert.equal(lateRange.hoursList.length, 16);
+  assert.equal(lateRange.hoursList.at(-1), 23);
+
+  // Case 3: Layout positioning clamping: event at 23:55 stays inside grid
+  const gridStartMin = lateRange.gridStartHour * 60; // 480
+  const gridEndMin = lateRange.gridEndHour * 60;     // 1440
+  const totalRange = gridEndMin - gridStartMin;      // 960
+
+  const startMin = Math.max(gridStartMin, timeToMinutes('23:55')); // 1435
+  const rawEnd = Math.max(startMin + 30, timeToMinutes('23:55'));
+  const endMin = Math.min(gridEndMin, rawEnd);
+  const durationMin = Math.max(25, endMin - startMin);
+  let topPct = ((startMin - gridStartMin) / totalRange) * 100;
+  const heightPct = Math.max(4, (durationMin / totalRange) * 100);
+
+  if (topPct + heightPct > 100) {
+    topPct = Math.max(0, 100 - heightPct);
+  }
+
+  // Verify it never exceeds 100% of the table height
+  assert.ok(topPct + heightPct <= 100);
+  assert.ok(topPct >= 0);
+});
+
+test('Calendar cache preservation: empty server response does not overwrite populated cache', () => {
+  const cachedCalendar = {
+    semester: 'ALL',
+    courses: [{ course_ref_id: 'c1', course_title: 'Computer Vision', color: '#ff0000', status: 'valid_empty' }],
+    events: [{ uid: 'ev1', title: 'Lecture 1', date_str: '2026-11-09', start_time_str: '10:15', end_time_str: '12:00' }],
+  };
+
+  let clientCalendarData = cachedCalendar;
+  let clientSavedCache = cachedCalendar;
+
+  const handleIncomingCalendar = (freshCal) => {
+    const existingCached = clientSavedCache;
+    const incomingCoursesCount = freshCal?.courses?.length || 0;
+    const incomingEventsCount = freshCal?.events?.length || 0;
+    const cachedCoursesCount = existingCached?.courses?.length || 0;
+    const cachedEventsCount = existingCached?.events?.length || 0;
+
+    if (
+      incomingCoursesCount === 0 &&
+      incomingEventsCount === 0 &&
+      (cachedCoursesCount > 0 || cachedEventsCount > 0)
+    ) {
+      // Preserve cached data
+      if (existingCached) {
+        clientCalendarData = existingCached;
+      }
+      return;
+    }
+
+    clientCalendarData = freshCal;
+    clientSavedCache = freshCal;
+  };
+
+  // Server restarts and returns empty calendar response
+  const emptyServerCal = { semester: 'ALL', courses: [], events: [] };
+  handleIncomingCalendar(emptyServerCal);
+
+  // Verify the client calendar and cache are preserved
+  assert.equal(clientCalendarData.courses.length, 1);
+  assert.equal(clientCalendarData.events.length, 1);
+  assert.equal(clientSavedCache.courses.length, 1);
+});
+

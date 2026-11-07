@@ -732,6 +732,31 @@ async def test_color_update_during_active_sync(tmp_path, monkeypatch):
     # Verify updated color persists in storage
     saved_state = test_service._load_tenant_state(tenant)
     assert saved_state["colors"]["c123"] == "#10B981"
+
+
+def test_calendar_tenant_state_migration_on_session_refresh(tmp_path):
+    from backend.services.calendar_service import CalendarService
+    svc = CalendarService(storage_dir=tmp_path / "cal")
+    old_tenant = "old-session-123"
+    new_tenant = "new-session-456"
+
+    # Populate old tenant state with custom colors, rules, and courses
+    old_state = {
+        "courses": {"crs-1": {"status": "imported_with_lectures", "color": "#ff0000"}},
+        "colors": {"crs-1": "#ff0000"},
+        "rules": [{"course_ref_id": "crs-1", "weekday": 2, "start_time": "14:15", "end_time": "16:00"}],
+        "imported_events": {},
+    }
+    svc._save_tenant_state(old_tenant, old_state)
+
+    # Migrate to new tenant (e.g. after server restart or extension refresh)
+    svc.migrate_tenant_state(old_tenant, new_tenant)
+
+    # Verify new tenant inherits state completely
+    migrated_state = svc._load_tenant_state(new_tenant)
+    assert migrated_state["colors"]["crs-1"] == "#ff0000"
+    assert len(migrated_state["rules"]) == 1
+    assert migrated_state["rules"][0]["course_ref_id"] == "crs-1"
 from tests.test_localisation_browser import local_site, ROOT
 
 
