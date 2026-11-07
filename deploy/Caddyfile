@@ -1,0 +1,25 @@
+{
+	email {$ACME_EMAIL}
+	admin off
+	persist_config off
+	# No access logging. Also suppress HTTP error records, which can otherwise
+	# include request URLs, IPs and custom authentication headers.
+	log default {
+		exclude http.log.access http.log.error
+	}
+}
+
+{$APP_DOMAIN} {
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+	@api path /api /api/* /health
+	handle @api {
+		header >Cache-Control "no-store"
+		reverse_proxy backend:8000
+	}
+	handle {
+		reverse_proxy frontend:8080
+	}
+}

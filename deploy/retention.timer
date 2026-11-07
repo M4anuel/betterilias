@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly BetterIlias private-data retention
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=120
+Unit=retention.service
+
+[Install]
+WantedBy=timers.target
