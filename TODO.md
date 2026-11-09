@@ -44,6 +44,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 - [x] Build a responsive bilingual landing/get-started page with extension
   installation, ILIAS sign-in/sync instructions, a BetterIlias preview, and clear
   expired-session/reconnect guidance.
+- [x] Keep landing-to-course and overview navigation in sync with the URL;
+  preserve the landing view in browser history and honour navigation guards.
 - [x] Build an authenticated admin dashboard with separate administrator
   authorization, health/worker/queue metrics, sanitized error reports and audit
   records; keep raw student pages and credentials out of public diagnostics.

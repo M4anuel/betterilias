@@ -62,6 +62,16 @@ are separate.
 
 ## Semester layouts and Escape navigation
 
+Landing-page exits clear the landing flag only after navigation is approved.
+The same-view shortcuts for courses, semesters and the overview must account for
+that flag, and the initial history entry includes it so Back/Forward restores the
+correct screen. The landing CTA uses the guarded overview handler before marking
+the app visited. `test_landing_course_navigation_matches_url_and_history` checks
+first-time visits, explicit landing URLs, course selection, history and the
+overview CTA in German/English and light/dark mode at 320/390/430/768/1280 px,
+1440 x 766 and short landscape. Screenshots use Chromium emulation with mocked
+ILIAS data, not physical devices or live ILIAS sessions.
+
 Sidebar dividers and their course positions are stored per semester. The old
 global layout migrates once into the selected semester; editing/resetting another
 semester leaves it intact. Nicknames and icons remain shared. Editor drafts still

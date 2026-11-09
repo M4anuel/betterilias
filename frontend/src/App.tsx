@@ -496,9 +496,10 @@ export const App: React.FC = () => {
   const handleSelectSemester = useCallback(
     async (semId: string) => {
       if (!await navigationGuard.confirmNavigation()) return;
-      if (!myCourses && !repositoryId && semId === selectedSemester && selectedCourseId === null && !activeExerciseRefId) {
+      if (!isLandingOpen && !myCourses && !repositoryId && semId === selectedSemester && selectedCourseId === null && !activeExerciseRefId) {
         return;
       }
+      setIsLandingOpen(false);
       setMyCourses(false);
       setRepositoryId(null);
       materialsRequestSeq.current++;
@@ -523,7 +524,7 @@ export const App: React.FC = () => {
       };
       pushAppHistory(nextState, '', stateToUrl(nextState));
     },
-    [myCourses, repositoryId, isCalendarOpen, selectedSemester, selectedCourseId, activeExerciseRefId, loadSemesters]
+    [isLandingOpen, myCourses, repositoryId, isCalendarOpen, selectedSemester, selectedCourseId, activeExerciseRefId, loadSemesters]
   );
 
   // --- Course Selection Handler ---
@@ -531,12 +532,14 @@ export const App: React.FC = () => {
     async (courseRefId: string) => {
       if (!await navigationGuard.confirmNavigation()) return;
       if (
+        !isLandingOpen &&
         courseRefId === selectedCourseId &&
         currentContainerId === courseRefId &&
         !activeExerciseRefId
       ) {
         return;
       }
+      setIsLandingOpen(false);
       setMyCourses(false);
       setRepositoryId(null);
       setIsCalendarOpen(false);
@@ -556,7 +559,7 @@ export const App: React.FC = () => {
       };
       pushAppHistory(nextState, '', stateToUrl(nextState));
     },
-    [selectedCourseId, currentContainerId, activeExerciseRefId, selectedSemester, loadCourseMaterials]
+    [isLandingOpen, selectedCourseId, currentContainerId, activeExerciseRefId, selectedSemester, loadCourseMaterials]
   );
 
   // --- Subfolder Navigation Handler ---
@@ -611,8 +614,8 @@ export const App: React.FC = () => {
   // --- Return to Semester Overview ---
   const handleNavigateHome = useCallback(async () => {
     if (!await navigationGuard.confirmNavigation()) return false;
+    if (!isLandingOpen && !myCourses && !repositoryId && !isCalendarOpen && selectedCourseId === null && !activeExerciseRefId) return true;
     setIsLandingOpen(false);
-    if (!myCourses && !repositoryId && !isCalendarOpen && selectedCourseId === null && !activeExerciseRefId) return true;
     setMyCourses(false);
     setRepositoryId(null);
     setIsCalendarOpen(false);
@@ -635,13 +638,11 @@ export const App: React.FC = () => {
     };
     pushAppHistory(nextState, '', stateToUrl(nextState));
     return true;
-  }, [myCourses, repositoryId, isCalendarOpen, selectedCourseId, activeExerciseRefId, selectedSemester]);
+  }, [isLandingOpen, myCourses, repositoryId, isCalendarOpen, selectedCourseId, activeExerciseRefId, selectedSemester]);
 
   // --- Open App from Landing ---
-  const handleOpenApp = useCallback(() => {
-    cache.markVisited();
-    setIsLandingOpen(false);
-    handleNavigateHome();
+  const handleOpenApp = useCallback(async () => {
+    if (await handleNavigateHome()) cache.markVisited();
   }, [handleNavigateHome]);
 
   const handleNavigateLanding = useCallback(async () => {
@@ -802,6 +803,7 @@ export const App: React.FC = () => {
     // Session links have already been imported before the first render.
     // Prime History Stack
     const currentState: NavigationState = {
+      isLandingOpen,
       repositoryId,
       myCourses,
       isCalendarOpen,
