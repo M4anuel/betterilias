@@ -274,10 +274,9 @@ const DistributeWorkEditor: React.FC<DistributeWorkModalProps & { scope: string 
     <dialog ref={dialogRef} aria-labelledby="allocation-title" aria-busy={isSubmitting}
       onCancel={event => { event.preventDefault(); if (!isSubmitting) onClose(); }}
       onClick={event => { if (event.target === event.currentTarget && !isSubmitting) onClose(); }}
-      className="m-auto w-[calc(100%-1.5rem)] max-w-2xl p-0 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-xs">
-      <div className="relative w-full max-h-[calc(var(--visible-height,100dvh)-2rem)] flex flex-col overflow-hidden">
+      className="m-auto open:flex flex-col w-[calc(100%-1.5rem)] max-w-2xl p-0 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xl backdrop:bg-slate-900/60 backdrop:backdrop-blur-xs">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 dark:border-slate-800/80 px-5 py-4">
           <div className="flex min-w-0 items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
               <Users className="h-5 w-5" />
@@ -450,9 +449,9 @@ const DistributeWorkEditor: React.FC<DistributeWorkModalProps & { scope: string 
             <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-2">
               {t("Vorschau der Zuweisung")}
             </label>
-            <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <div role="region" aria-label={t("Vorschau der Zuweisung")} tabIndex={0} className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
               <table className="w-full table-fixed text-left text-xs [overflow-wrap:anywhere]">
-                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800 sticky top-0">
+                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10">
                   <tr>
                     <th className="py-2 px-3">{t("Student / Team")}</th>
                     <th className="py-2 px-3">{t("Zugewiesener Tutor")}</th>
@@ -509,7 +508,6 @@ const DistributeWorkEditor: React.FC<DistributeWorkModalProps & { scope: string 
           </button>
           </div>
         </div>
-      </div>
     </dialog>
   );
 };

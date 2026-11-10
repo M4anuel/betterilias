@@ -11,6 +11,58 @@ from backend.services.ta_allocation import compute_distribution_fingerprint
 pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '1', reason='Opt-in browser tests')
 
 
+@pytest.mark.parametrize('language,scheme', [('de', 'dark'), ('de', 'light'), ('en', 'dark'), ('en', 'light')])
+def test_allocation_has_no_outer_scrollbar(local_site, language, scheme):
+    pw = pytest.importorskip('playwright.sync_api')
+    tr = json.loads((ROOT / 'locales' / f'{language}.json').read_text(encoding='utf-8')).__getitem__
+    def respond(route):
+        if urlparse(route.request.url).path.endswith('/submissions'):
+            members = [dict(member_id=str(101+i), student_name=f'Student {i+1}, Alexandra Example',
+                            submission_status='submitted', passed_status='not_graded', notice='', files=[]) for i in range(15)]
+            route.fulfill(content_type='application/json', body=json.dumps(dict(
+                exercise=dict(ref_id='200', title='Exercises', total_participants=15, submitted_count=15, graded_count=0),
+                active_assignment_id='20', available_assignments=[dict(ass_id='20', title='Assignment one', url='#')],
+                submissions=members, listing_complete=True,
+                fingerprint=compute_distribution_fingerprint([m['member_id'] for m in members], [''] * 15))))
+        else:
+            mock_api(route)
+    artifacts = ROOT / 'scratch' / 'allocation-scroll-review'
+    artifacts.mkdir(parents=True, exist_ok=True)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport=dict(width=1280, height=900), color_scheme=scheme)
+        page.add_init_script(f"localStorage.setItem('betterilias_language','{language}'); localStorage.setItem('betterilias_theme_mode','{scheme}'); localStorage.setItem('betterilias_session_id','alice');")
+        page.route('**/api/**', respond)
+        page.route('https://cdn.jsdelivr.net/**', lambda route: route.abort())
+        page.goto(local_site + '/?course=42&exercise=200&tab=submissions', wait_until='domcontentloaded')
+        trigger = page.get_by_role('button', name=tr('Arbeit auf Tutoren verteilen'), exact=True)
+        trigger.click()
+        dialog = page.get_by_role('dialog', name=tr('Arbeit verteilen'), exact=True)
+        pw.expect(dialog).to_be_visible()
+        for width, height in [(320, 740), (390, 844), (430, 900), (768, 900), (1280, 900), (667, 375)]:
+            page.set_viewport_size(dict(width=width, height=height))
+            pw.expect(dialog.get_by_role('button', name=tr('Schliessen'), exact=True)).to_be_in_viewport()
+            pw.expect(dialog.get_by_role('button', name=tr('Verteilung in ILIAS speichern'), exact=True)).to_be_in_viewport()
+            assert dialog.evaluate('e => e.scrollHeight <= e.clientHeight'), 'The dialog itself must not scroll'
+            assert dialog.evaluate('e => e.scrollTop === 0')
+            assert dialog.evaluate('e => e.scrollWidth <= e.clientWidth')
+            assert_no_overflow(page)
+            preview = dialog.get_by_role('region', name=tr('Vorschau der Zuweisung'), exact=True)
+            assert preview.evaluate('e => e.scrollHeight > e.clientHeight')
+            preview.focus()
+            preview.press('End')
+            dialog.locator('tbody tr').last.scroll_into_view_if_needed()
+            pw.expect(dialog.locator('tbody tr').last).to_be_in_viewport()
+            assert dialog.evaluate('e => e.scrollTop === 0')
+            pw.expect(dialog.get_by_role('button', name=tr('Schliessen'), exact=True)).to_be_in_viewport()
+            pw.expect(dialog.get_by_role('button', name=tr('Verteilung in ILIAS speichern'), exact=True)).to_be_in_viewport()
+            page.screenshot(path=str(artifacts / f'{language}-{scheme}-{width}-{height}.png'), animations='disabled')
+        page.keyboard.press('Escape')
+        pw.expect(dialog).to_have_count(0)
+        pw.expect(trigger).to_be_focused()
+        browser.close()
+
+
 @pytest.mark.parametrize('width,height', [(320, 740), (390, 844), (430, 900), (768, 900), (1280, 900), (667, 375)])
 @pytest.mark.parametrize('language,scheme', [('de', 'dark'), ('en', 'light')])
 def test_allocation_defaults_drafts_and_note_guard(local_site, width, height, language, scheme):
@@ -49,6 +101,7 @@ def test_allocation_defaults_drafts_and_note_guard(local_site, width, height, la
         page.add_init_script(f"""localStorage.setItem('betterilias_language','{language}');
             if (!localStorage.getItem('betterilias_session_id')) localStorage.setItem('betterilias_session_id','alice');""")
         page.route('**/api/**', respond)
+        page.route('https://cdn.jsdelivr.net/**', lambda route: route.abort())
         def open_dialog():
             trigger = page.get_by_role('button', name=tr('Arbeit auf Tutoren verteilen'), exact=True)
             trigger.click()

@@ -4,6 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Remove the redundant outer scrollbar from the work-distribution dialog;
+  keep its heading/actions visible and allow the body and assignment preview to scroll.
+
 - [x] Reveal the login-status label on mouse hover even when a hybrid device
   reports no hover support; provide keyboard focus, touch access and a 44 px target.
 

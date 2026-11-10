@@ -252,6 +252,23 @@ These are Chromium emulation checks with mocked API/clipboard responses, not
 physical iOS Safari/Android Chrome or live ILIAS validation. Safari companion
 compatibility remains a separate, unfinished task.
 
+## Work-distribution dialog scrolling
+
+The native dialog is the flex container for its fixed header/footer and shrinking,
+scrollable body. A second wrapper with the same viewport height limit previously
+overflowed the dialog's content box because of its borders, causing a third scrollbar.
+The assignment preview retains its own labelled, keyboard-focusable scrolling region
+and opaque sticky headings so rows do not show through while scrolling.
+
+The allocation browser regression uses 15 submissions at 320/390/430/768/1280 px
+and 667 x 375, in German/English and both themes. It verifies zero outer overflow,
+reachable close/save actions and scrolling to the final preview row. Existing
+roster editing, reordering, draft persistence, saving and note-budget checks remain.
+The surrounding submission toolbar wraps filter and action groups at tablet widths
+instead of expanding the page after a resize.
+Phone and desktop screenshots are inspected; these are mocked Chromium emulation
+checks, not physical-device or live ILIAS validation.
+
 ## Login-status hover on hybrid devices
 
 The header status label uses explicit hover/focus selectors rather than Tailwind's
