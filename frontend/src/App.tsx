@@ -3,6 +3,9 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { AlertCircle, ExternalLink, Puzzle, X } from 'lucide-react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { SidebarResizer, SIDEBAR_MIN_WIDTH, SIDEBAR_COLLAPSE_WIDTH } from './components/SidebarResizer';
+import { SidebarPin, SidebarPinsProvider } from './lib/sidebarPins';
+import { WorkspaceWidth } from './lib/workspaceWidth';
 import { SemesterView } from './components/SemesterView';
 import { LandingView } from './components/LandingView';
 import { LegalModal } from './components/LegalModal';
@@ -115,6 +118,20 @@ export const App: React.FC = () => {
   const language = useLanguage();
   const approvedHistoryNavigation = useRef(false);
   const isMobile = useMobileViewport();
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try { return Math.max(SIDEBAR_MIN_WIDTH, Math.min(1600, Number(localStorage.getItem('betterilias_sidebar_width')) || 256)); }
+    catch { return 256; }
+  });
+  const [workspaceWidth, setWorkspaceWidth] = useState(window.innerWidth);
+  const workspaceRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const resize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', resize);
+    const observer = new ResizeObserver(([entry]) => setWorkspaceWidth(entry.borderBoxSize[0]?.inlineSize ?? entry.contentRect.width));
+    if (workspaceRef.current) observer.observe(workspaceRef.current);
+    return () => { window.removeEventListener('resize', resize); observer.disconnect(); };
+  }, []);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const mobileNavigation = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -274,6 +291,18 @@ export const App: React.FC = () => {
   );
   const [isNicknameModalOpen, setIsNicknameModalOpen] = useState(false);
   const [nicknamesVersion, setNicknamesVersion] = useState(0);
+  const effectiveSidebarWidth = Math.min(sidebarWidth, viewportWidth / 2);
+  const resizeSidebar = (width: number, save: boolean) => {
+    const collapsed = width < SIDEBAR_COLLAPSE_WIDTH;
+    setIsSidebarCollapsed(collapsed);
+    if (!collapsed) setSidebarWidth(Math.min(Math.max(SIDEBAR_MIN_WIDTH, width), viewportWidth / 2));
+    if (save) {
+      cache.setSidebarCollapsed(collapsed);
+      if (!collapsed) {
+        try { localStorage.setItem('betterilias_sidebar_width', String(Math.min(Math.max(SIDEBAR_MIN_WIDTH, width), viewportWidth / 2))); } catch { /* Storage may be disabled. */ }
+      }
+    }
+  };
 
   // Flat list of all courses across categories
   const allCourses: CourseItem[] = (semesterData?.courses || []).map((course) => ({
@@ -1086,7 +1115,30 @@ export const App: React.FC = () => {
     materialsData !== null && materialsData.container_ref_id === currentContainerId;
   const effectiveMaterialsData = isMatchingContainer ? materialsData : null;
 
+  const navigatePin = async (pin: SidebarPin) => {
+    if (!await navigationGuard.confirmNavigation()) return;
+    const url = new URL(pin.href, location.href);
+    const courseId = url.searchParams.get('course');
+    if (!courseId) return;
+    const containerId = url.searchParams.get('folder') || courseId;
+    const exerciseId = url.searchParams.get('exercise');
+    setIsLandingOpen(false); setMyCourses(false); setRepositoryId(null); setIsCalendarOpen(false);
+    setSelectedCourseId(courseId); setCurrentContainerId(containerId);
+    setActiveExerciseRefId(exerciseId); setActiveExerciseTab(null);
+    activeContainerRef.current = containerId;
+    loadCourseMaterials(containerId, containerId === courseId);
+    const state: NavigationState = { semester: selectedSemester, courseId, containerId, exerciseId };
+    pushAppHistory(state, '', pin.href);
+    setMobileNavigationOpen(false);
+    if (url.hash) requestAnimationFrame(() => {
+      try { document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView({ block: 'start' }); }
+      catch { /* Ignore malformed saved anchors. */ }
+    });
+  };
+
   const sidebar = <Sidebar
+    width={effectiveSidebarWidth}
+    onSelectPin={navigatePin}
     semester={selectedSemester}
     courses={allCourses}
     selectedCourseId={selectedCourseId}
@@ -1107,7 +1159,7 @@ export const App: React.FC = () => {
   />;
 
   return (
-    <div className="app-shell flex w-full flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden text-slate-900 dark:text-slate-100 font-sans transition-colors duration-150">
+    <SidebarPinsProvider><div className="app-shell flex w-full flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden text-slate-900 dark:text-slate-100 font-sans transition-colors duration-150">
       {/* Top Header */}
       <Header
         authStatus={authStatus}
@@ -1128,10 +1180,13 @@ export const App: React.FC = () => {
           onCancel={() => setMobileNavigationOpen(false)}
           onClick={event => { if (event.target === event.currentTarget) setMobileNavigationOpen(false); }}>
           {sidebar}
-        </dialog> : <div id="course-navigation" className="flex shrink-0">{sidebar}</div>}
+        </dialog> : <div id="course-navigation" className="relative flex shrink-0">{sidebar}
+          <SidebarResizer width={effectiveSidebarWidth} collapsed={isSidebarCollapsed} maximum={viewportWidth / 2} onResize={resizeSidebar} />
+        </div>}
 
         {/* Center Content Area */}
-        <main className="min-w-0 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50">
+        <main ref={workspaceRef} className={`@container/workspace min-w-0 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50 ${workspaceWidth < 768 ? 'workspace-compact' : ''}`}>
+          <WorkspaceWidth.Provider value={workspaceWidth}>
           {authStatus && !authStatus.authenticated && !isInactiveBannerDismissed && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-2xs dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
               <div className="flex items-center gap-2">
@@ -1227,6 +1282,7 @@ export const App: React.FC = () => {
               onOpenCalendar={handleNavigateCalendar}
             />
           )}
+          </WorkspaceWidth.Provider>
         </main>
       </div>
 
@@ -1294,7 +1350,7 @@ export const App: React.FC = () => {
 
       {/* Global Confirmation & Alert Dialog */}
       <ConfirmModal />
-    </div>
+    </div></SidebarPinsProvider>
   );
 };
 export default App;

@@ -94,7 +94,7 @@ export const MyCoursesView: React.FC<{
   const control = 'my-courses-control min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 text-base text-slate-900 focus-visible:outline-2 focus-visible:outline-teal-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 sm:text-sm';
   const renderSection = (items: CourseItem[], title: string) => items.length > 0 && <section aria-label={title} className="space-y-3">
     <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300">{title}<span className="rounded-full bg-slate-200 px-2 text-xs dark:bg-slate-800">{items.length}</span></h2>
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-3 @2xl/workspace:grid-cols-2 @4xl/workspace:grid-cols-3">
       {items.map(course => <article key={course.ref_id} data-course-id={course.ref_id}
         className="flex min-w-0 items-start rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <button type="button" onClick={() => course.item_type === 'grp' ? onOpenGroup(course.ref_id) : onOpenCourse(course.ref_id)}
@@ -130,8 +130,8 @@ export const MyCoursesView: React.FC<{
         ariaLabel={t('my_courses.refresh')}
       />
     </div>
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <label className="min-w-0 text-sm font-medium sm:col-span-2 lg:col-span-1">{t('my_courses.search')}
+    <div className="grid gap-3 @xl/workspace:grid-cols-2 @4xl/workspace:grid-cols-3">
+      <label className="min-w-0 text-sm font-medium @xl/workspace:col-span-2 @4xl/workspace:col-span-1">{t('my_courses.search')}
         <span className="relative mt-1 block"><Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input type="search" value={query} onChange={event => setQuery(event.target.value)} className={`${control} pl-10`} /></span></label>
       <button type="button" className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-teal-500 dark:text-teal-300 sm:hidden"

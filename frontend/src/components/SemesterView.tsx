@@ -342,7 +342,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
 
                 {viewMode === 'cards' ? (
                   /* Cards Grid View */
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 @2xl/workspace:grid-cols-2 @4xl/workspace:grid-cols-3 gap-4">
                     {courses.map((course) => {
                       const displayName = cache.getDisplayName(course.ref_id, course.title);
                       const iconName = cache.getCourseIcon(course.ref_id, course);
