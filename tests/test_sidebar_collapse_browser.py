@@ -79,6 +79,14 @@ def test_sidebar_icons_and_rows_stay_fixed_through_collapse(local_site, language
         page.screenshot(path=str(artifacts / f'{language}-{custom}-{height}-expanded.png'))
         sidebar.get_by_role('button', name=tr('Seitenleiste einklappen'), exact=True).click()
         pw.expect(sidebar).to_have_attribute('data-sidebar-collapsed', 'true')
+        # Square hit areas and centered icons apply to every rail action.
+        geometry = sidebar.locator('button').evaluate_all('''buttons => buttons.map(button => {
+            const r=button.getBoundingClientRect(), i=button.querySelector('svg').getBoundingClientRect();
+            const aside=button.closest('aside').getBoundingClientRect();
+            return {w:r.width,h:r.height,dx:(i.x+i.width/2)-(r.x+r.width/2),
+                dy:(i.y+i.height/2)-(r.y+r.height/2),rail:(r.x+r.width/2)-(aside.x+aside.width/2)};
+        })''')
+        assert all(abs(r['w']-44)<=1 and abs(r['h']-44)<=1 and abs(r['dx'])<=1 and abs(r['dy'])<=1 and abs(r['rail'])<=1 for r in geometry), geometry
         page.wait_for_timeout(250)
         page.screenshot(path=str(artifacts / f'{language}-{custom}-{height}-collapsed.png'))
         # The editor remains reachable by keyboard in the compact rail.

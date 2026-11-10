@@ -1830,8 +1830,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                   onClick={() => onNavigateFolder(folder.ref_id)}
                   className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs transition hover:border-amber-300 hover:shadow-xs cursor-pointer gap-2.5 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-amber-700/60"
                 >
-                  <div className="flex items-start gap-3 truncate pr-2">
-                    <SidebarPinButton pin={materialPin(courseRefId, courseNickname, materialsData.container_ref_id, folder)} />
+                  <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shrink-0 group-hover:scale-105 transition">
                       <Folder className="h-5 w-5 fill-amber-100 dark:fill-amber-950/60" />
                     </div>
@@ -1845,6 +1844,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                         </span>
                       )}
                     </div>
+                    <SidebarPinButton pin={materialPin(courseRefId, courseNickname, materialsData.container_ref_id, folder)} />
                   </div>
 
                   <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-[10px]">

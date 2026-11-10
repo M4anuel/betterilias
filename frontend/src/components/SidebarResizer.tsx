@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { t } from '../lib/i18n';
 
-export const SIDEBAR_MIN_WIDTH = 200;
-export const SIDEBAR_COLLAPSE_WIDTH = 180;
+export const SIDEBAR_MIN_WIDTH = 160;
+export const SIDEBAR_COLLAPSE_WIDTH = 140;
 
 export function SidebarResizer({ width, collapsed, maximum, onResize }: {
   width: number; collapsed: boolean; maximum: number; onResize: (width: number, save: boolean) => void;

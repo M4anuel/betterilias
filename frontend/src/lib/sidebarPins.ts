@@ -42,6 +42,21 @@ export function courseHref(courseId: string, containerId = courseId, exerciseId?
   return `?${params}`;
 }
 
+/** Compare destinations rather than query-string order or unrelated view preferences. */
+export function activeSidebarPin(pins: SidebarPin[], courseId: string | null): SidebarPin | undefined {
+  if (!courseId) return;
+  const current = new URL(window.location.href);
+  if (current.searchParams.get('course') !== courseId) return;
+  return pins.filter(pin => {
+    const target = new URL(pin.href, window.location.href);
+    return pin.courseId === courseId && target.origin === current.origin && target.pathname === current.pathname &&
+      target.searchParams.get('course') === courseId &&
+      (target.searchParams.get('folder') || courseId) === (current.searchParams.get('folder') || courseId) &&
+      target.searchParams.get('exercise') === current.searchParams.get('exercise') &&
+      (!target.hash || target.hash === current.hash);
+  }).sort((a, b) => Number(Boolean(new URL(b.href, current).hash)) - Number(Boolean(new URL(a.href, current).hash)))[0];
+}
+
 export function materialPin(courseId: string, courseTitle: string, containerId: string, item: MaterialItem): SidebarPin | null {
   const exercise = item.item_type === 'exc' || /ilexercise|ilobjexercisegui|\/go\/exc\//i.test(item.url);
   const href = item.item_type === 'fold' ? courseHref(courseId, item.ref_id)
@@ -63,18 +78,18 @@ function useSidebarPinsStore() {
       window.removeEventListener('betterilias-session-changed', update);
     };
   }, []);
-  const toggle = (pin: SidebarPin) => {
+  const updatePin = (pin: SidebarPin, removeOnly = false) => {
     const storageKey = key();
     if (!storageKey || !safePinHref(pin.href)) return false;
     const current = readPins();
-    const next = current.some(p => p.id === pin.id) ? current.filter(p => p.id !== pin.id) : [...current, pin].slice(-300);
+    const next = removeOnly || current.some(p => p.id === pin.id) ? current.filter(p => p.id !== pin.id) : [...current, pin].slice(-300);
     try {
       localStorage.setItem(storageKey, JSON.stringify(next));
       window.dispatchEvent(new Event(changed));
       return true;
     } catch { return false; }
   };
-  return { pins, toggle, available: Boolean(key()) };
+  return { pins, toggle: (pin: SidebarPin) => updatePin(pin), remove: (pin: SidebarPin) => updatePin(pin, true), available: Boolean(key()) };
 }
 
 const PinsContext = createContext<ReturnType<typeof useSidebarPinsStore> | null>(null);

@@ -2072,5 +2072,8 @@
   "sidebar.pin": "{title} an Seitenleiste anheften",
   "sidebar.unpin": "{title} von Seitenleiste lösen",
   "sidebar.section": "Kursabschnitt",
+  "sidebar.remove_title": "Anheftung entfernen?",
+  "sidebar.remove_message": "«{title}» aus der Seitenleiste entfernen? Du kannst den Eintrag auf seiner Kursseite wieder anheften.",
+  "sidebar.remove_confirm": "Anheftung entfernen",
   "sidebar.save_error": "Die Anheftung konnte nicht gespeichert werden. Erlaube lokalen Speicher und versuche es erneut."
 }

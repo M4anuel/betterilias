@@ -692,6 +692,21 @@ main { overflow-wrap: anywhere; }
 .sidebar-resizer::after { content: ''; position: absolute; inset: 0 6px; background: transparent; }
 .sidebar-resizer:hover::after, .sidebar-resizer:focus-visible::after,
 .sidebar-resizer.is-resizing::after { background: var(--accent); }
+.confirmation-dialog:modal { overscroll-behavior: contain; }
+.confirmation-dialog::backdrop { overflow: hidden; overscroll-behavior: contain; }
+.sidebar-pin-button .pin-icon-hover { display: none; }
+.sidebar-pin-button[aria-pressed="true"],
+.sidebar-pin-button:not([data-pin-hover-suppressed]):is(:hover, :focus-visible) { color: var(--accent-text); }
+.sidebar-pin-button:not([data-pin-hover-suppressed]):is(:hover, :focus-visible) .pin-icon-rest { display: none; }
+.sidebar-pin-button:not([data-pin-hover-suppressed]):is(:hover, :focus-visible) .pin-icon-hover { display: block; }
+.sidebar-navigation-row[aria-current="page"], .sidebar-pin-link[aria-current="page"] {
+  box-shadow: inset 3px 0 var(--accent-text);
+}
+@media (forced-colors: active) {
+  .sidebar-navigation-row[aria-current="page"], .sidebar-pin-link[aria-current="page"] {
+    outline: 2px solid Highlight; outline-offset: -2px;
+  }
+}
 .pinnable-block-content > div > :first-child { padding-right: 3rem; min-height: 2.75rem; }
 .workspace-compact .desktop-only { display: none; }
 .workspace-compact .phone-only { display: block; }

@@ -6,8 +6,6 @@ import { ActiveDialogState, registerDialogListener } from '../lib/dialog';
 export const ConfirmModal: React.FC = () => {
   const [dialogState, setDialogState] = useState<ActiveDialogState | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const confirmButtonRef = useRef<HTMLButtonElement>(null);
-  const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     return registerDialogListener((state) => {
@@ -27,14 +25,6 @@ export const ConfirmModal: React.FC = () => {
           // If already open or showModal fails in unsupported test runners
         }
       }
-      // Focus appropriate action button
-      setTimeout(() => {
-        if (dialogState.isAlert) {
-          confirmButtonRef.current?.focus();
-        } else {
-          cancelButtonRef.current?.focus();
-        }
-      }, 50);
     } else {
       if (el.open) {
         el.close();
@@ -46,12 +36,14 @@ export const ConfirmModal: React.FC = () => {
 
   const handleConfirm = () => {
     const resolve = dialogState.resolve;
+    dialogRef.current?.close();
     setDialogState(null);
     resolve(true);
   };
 
   const handleCancel = () => {
     const resolve = dialogState.resolve;
+    dialogRef.current?.close();
     setDialogState(null);
     resolve(false);
   };
@@ -117,7 +109,7 @@ export const ConfirmModal: React.FC = () => {
         e.preventDefault();
         handleCancel();
       }}
-      className="m-auto w-[min(30rem,92vw)] max-h-[90dvh] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 sm:p-6 text-slate-900 dark:text-slate-100 shadow-2xl backdrop:bg-black/60 dark:backdrop:bg-black/80 backdrop:backdrop-blur-xs transition-colors"
+      className="confirmation-dialog m-auto w-[min(30rem,92vw)] max-h-[90dvh] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 sm:p-6 text-slate-900 dark:text-slate-100 shadow-2xl backdrop:bg-black/60 dark:backdrop:bg-black/80 backdrop:backdrop-blur-xs transition-colors"
     >
       <div className="flex items-start gap-3.5 sm:gap-4">
         {renderIcon()}
@@ -142,29 +134,30 @@ export const ConfirmModal: React.FC = () => {
           type="button"
           onClick={handleCancel}
           aria-label={t("Schliessen")}
-          className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+          className="absolute top-2 right-2 flex h-11 w-11 items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5">
+      <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5">
         {!dialogState.isAlert && (
           <button
-            ref={cancelButtonRef}
+            // React's autoFocus runs before showModal; native autofocus runs as it opens.
+            ref={button => { if (button) button.autofocus = true; }}
             type="button"
             onClick={handleCancel}
-            className="min-h-[44px] sm:min-h-[38px] px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/80 transition cursor-pointer text-center"
+            className="min-h-[44px] px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/80 transition cursor-pointer text-center"
           >
             {cancelLabel}
           </button>
         )}
 
         <button
-          ref={confirmButtonRef}
+          ref={button => { if (button) button.autofocus = Boolean(dialogState.isAlert); }}
           type="button"
           onClick={handleConfirm}
-          className={`min-h-[44px] sm:min-h-[38px] px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer text-center focus:outline-hidden focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${confirmBtnClasses()}`}
+          className={`min-h-[44px] px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${confirmBtnClasses()}`}
         >
           {confirmLabel}
         </button>

@@ -2072,5 +2072,8 @@
   "sidebar.pin": "Pin {title} to sidebar",
   "sidebar.unpin": "Unpin {title} from sidebar",
   "sidebar.section": "Course section",
+  "sidebar.remove_title": "Remove sidebar pin?",
+  "sidebar.remove_message": "Remove “{title}” from the sidebar? You can pin it again from its course page.",
+  "sidebar.remove_confirm": "Remove pin",
   "sidebar.save_error": "Could not save this pin. Allow local storage and try again."
 }

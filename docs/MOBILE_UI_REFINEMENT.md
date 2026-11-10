@@ -259,6 +259,16 @@ brief, width/collapse limits, workspace container queries, account-scoped pins
 and browser coverage. The mobile drawer uses the full visible viewport and safe
 areas; desktop resizing preserves mounted editors and adapts the content pane.
 
+The compact rail now uses centered 44 px square buttons rather than full-width
+rectangles with expanded padding. Expanded minimum/collapse widths are 160/140 px.
+One pinned destination takes precedence over the parent course's highlight;
+unpinned destinations retain the course highlight. Sidebar removal is confirmed,
+while content toggles remain instant. Small sidebar pin glyphs keep full touch
+targets. Grey unpinned pins light up on hover; saved pins stay lit and show a
+struck-through pin on hover/focus. Unpinning immediately restores grey. Folder-card pins follow the name
+at the trailing edge. Native confirmation autofocus/close preserves safe initial
+focus and returns it on cancellation, including inside the mobile drawer.
+
 ## Work-distribution dialog scrolling
 
 The native dialog is the flex container for its fixed header/footer and shrinking,

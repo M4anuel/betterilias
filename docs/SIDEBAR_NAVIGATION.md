@@ -15,8 +15,8 @@ mobile interactions and tablet/desktop layouts.
 
 ## Behavior
 
-- Drag the sidebar's right edge. Its expanded minimum is 200 CSS px; dragging
-  below 180 px collapses to the existing 64 px rail. Expand restores the preferred
+- Drag the sidebar's right edge. Its expanded minimum is 160 CSS px; dragging
+  below 140 px collapses to the existing 64 px rail. Expand restores the preferred
   width. A narrower browser clamps the displayed width without discarding the
   saved preference.
 - Focus the divider and use Left/Right to change width by 16 px, Home to collapse,
@@ -27,6 +27,18 @@ mobile interactions and tablet/desktop layouts.
   folders, exercise headers/action menus and content sections expose pin/unpin.
   Pins sit under their original course even if it is absent from the selected
   semester. Collapsing hides the nested links until the sidebar is expanded.
+- Collapsed actions are 44 px squares with centered icons. Sidebar pin icons are
+  small, retaining 44 px targets. Unpinned controls show a grey pin that lights up
+  on hover/focus. Pinned controls stay lit and preview a struck-through pin only
+  on hover/focus. Unpinning resets to grey immediately, until the next hover/focus.
+  Every pin control uses a pointer cursor.
+- Only one destination is selected: a matching pinned folder, exercise or section
+  takes precedence over its course. Unpinned folders fall back to the course.
+  Matching ignores query-string order and unrelated semester/tab preferences.
+- Removing a pin from the sidebar opens the shared native confirmation dialog.
+  Cancel/Escape returns focus to the pin; successful removal focuses the course.
+  Content controls still toggle instantly. Confirmation cannot change another
+  account's pins if the active session changes while it is open.
 - Folder/exercise anchors open BetterIlias routes. Content sections use stable
   hash anchors and scroll after their content loads. Forums and other items
   currently opened in ILIAS retain their ILIAS URLs; this does not add controls
@@ -56,6 +68,20 @@ and 320/390/430/768 px and short-landscape mobile drawers in both languages/them
 These are Chromium emulation checks with mocked API data, not physical iOS Safari,
 Android Chrome or live ILIAS verification. Existing sidebar, navigation, allocation,
 course-card and mobile regressions are retained.
+
+Refinement coverage also checks square/centered collapsed controls, the lower
+collapse threshold, exclusive selection and unpinned-folder fallback, folder-card
+action placement, hover/focus icon feedback, cancellation/focus return, confirmed
+phone removal and account switching during confirmation. Confirmation screenshots
+cover both languages/themes, phone/tablet sizes and short landscape. Native
+autofocus selects Cancel when showModal opens; explicit close runs before React
+unmounts the dialog so the browser restores focus. Stacked actions follow DOM order.
+
+Refinement verification (2026-11-10): 615 backend tests passed (413 opt-in/environment
+skips), 71 related browser cases passed, and the final 17 sidebar cases passed after
+the pin-state clarification. The production build, 2077-key locale check and
+launcher syntax check passed. Final screenshots were inspected in both themes and
+languages, including selection, collapsed/narrow rails and mobile confirmations.
 
 Recovery verification (2026-11-10): the backend suite passed with 615 tests
 and 413 opt-in/environment skips. The production build, 2074-key locale check,

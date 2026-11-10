@@ -4,7 +4,7 @@ import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library, Users, Calend
 import { CourseItem } from '../types';
 import { cache } from '../lib/cache';
 import { CourseIcon } from './CourseIcon';
-import { SidebarPin, useSidebarPins } from '../lib/sidebarPins';
+import { SidebarPin, activeSidebarPin, useSidebarPins } from '../lib/sidebarPins';
 import { SidebarPinButton } from './SidebarPinButton';
 
 interface SidebarProps {
@@ -50,6 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const language = useLanguage();
   const { pins } = useSidebarPins();
+  const activePin = activeSidebarPin(pins, selectedCourseId);
   const visibleCourses = [...courses];
   for (const pin of pins) {
     if (!visibleCourses.some(course => course.ref_id === pin.courseId)) {
@@ -80,7 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Every row keeps its geometry and inherits one foreground colour. Wrapping
   // icons also avoids the global SVG-only button centering rule during collapse.
-  const rowClass = (selected: boolean) => `group flex h-11 min-h-11 w-full min-w-0 items-center gap-3 overflow-hidden rounded-xl px-4 py-2 text-left text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)] cursor-pointer ${
+  const rowClass = (selected: boolean) => `sidebar-navigation-row group flex h-11 min-h-11 min-w-0 items-center gap-3 overflow-hidden rounded-xl py-2 text-left text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)] cursor-pointer ${isCollapsed ? 'mx-auto w-11 justify-center px-0' : 'w-full px-4'} ${
     selected ? '' : 'text-slate-700 hover:bg-slate-100/80 hover:text-[var(--accent)] dark:text-slate-200 dark:hover:bg-slate-800/80'
   }`;
   const selectedStyle = { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' };
@@ -94,8 +95,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   );
   const renderCourseButton = (course: CourseItem) => {
     const displayName = cache.getDisplayName(course.ref_id, course.title);
-    const isSelected = selectedCourseId === course.ref_id;
-    return <div key={course.ref_id}><button type="button" onClick={() => onSelectCourse(course.ref_id)}
+    const isSelected = selectedCourseId === course.ref_id && !activePin;
+    return <div key={course.ref_id} data-sidebar-course={course.ref_id}><button type="button" onClick={() => onSelectCourse(course.ref_id)}
       className={rowClass(isSelected)} style={isSelected ? selectedStyle : undefined}
       aria-label={displayName} aria-current={isSelected ? 'page' : undefined} title={course.title}>
       {icon(<CourseIcon iconName={cache.getCourseIcon(course.ref_id, course)} className="h-4 w-4" />)}
@@ -107,25 +108,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </span>}
     </button>
       {!isCollapsed && pins.filter(pin => pin.courseId === course.ref_id).map(pin => {
-        const active = `${window.location.search}${window.location.hash}` === pin.href;
+        const active = activePin?.id === pin.id;
         const external = new URL(pin.href, location.href).origin !== location.origin;
         return <div key={pin.id} className="ml-5 flex min-w-0 items-center border-l border-slate-200 pl-1 dark:border-slate-700">
           <a href={pin.href} title={pin.title} aria-current={active ? 'page' : undefined}
             target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined}
             style={active ? selectedStyle : undefined}
-            className="flex min-h-11 min-w-0 flex-1 items-center rounded-lg px-2 text-xs text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="sidebar-pin-link flex min-h-11 min-w-0 flex-1 items-center rounded-lg px-2 text-xs text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
             onClick={event => {
               if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
               if (new URL(pin.href, location.href).origin !== location.origin) return;
               event.preventDefault(); onSelectPin(pin);
             }}><span className="truncate">{pin.title}</span></a>
-          <SidebarPinButton pin={pin} />
+          <SidebarPinButton pin={pin} sidebar />
         </div>;
       })}
     </div>;
   };
   const renderDivider = (key: string, title: string, custom: boolean) => (
-    <div key={key} title={title} className={`flex shrink-0 items-center overflow-hidden px-4 ${custom ? 'h-8' : 'h-7'}`}>
+    <div key={key} title={title} className={`flex shrink-0 items-center overflow-hidden ${isCollapsed ? 'justify-center' : 'px-4'} ${custom ? 'h-8' : 'h-7'}`}>
       {isCollapsed ? <span className={`h-px w-6 shrink-0 rounded-full ${custom ? 'bg-[var(--accent)] opacity-60' : 'bg-slate-200 dark:bg-slate-700'}`} />
         : <span className="flex min-w-0 flex-1 items-center gap-2">
           <span className={`min-w-0 truncate whitespace-nowrap text-[10px] font-bold uppercase tracking-wider ${custom ? 'text-[var(--accent)]' : 'text-slate-400 dark:text-slate-400'}`}>{title}</span>
@@ -138,10 +139,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const placed = new Set<string>();
 
   return <aside data-sidebar-collapsed={isCollapsed} style={{ width: isMobile ? '100%' : isCollapsed ? 64 : width }} className="relative flex h-full min-h-0 shrink-0 select-none flex-col overflow-hidden border-r border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-    <div className="flex h-14 shrink-0 items-center justify-between gap-2 overflow-hidden border-b border-slate-100 px-3 dark:border-slate-800">
+    <div className={`flex h-14 shrink-0 items-center gap-2 overflow-hidden border-b border-slate-100 dark:border-slate-800 ${isCollapsed ? 'justify-center px-2' : 'justify-between px-3'}`}>
       {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">{t('Meine Vorlesungen')}</span>}
       <button type="button" onClick={onToggleCollapse}
-        className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        className={`${isCollapsed ? '' : 'ml-auto'} flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200`}
         aria-label={isMobile ? t('Schliessen') : isCollapsed ? t('Seitenleiste ausklappen') : t('Seitenleiste einklappen')}
         title={isMobile ? t('Schliessen') : isCollapsed ? t('Seitenleiste ausklappen') : t('Seitenleiste einklappen')}>
         {isMobile ? <X className="h-5 w-5" /> : isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -171,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </nav>
     <div className="flex h-16 shrink-0 items-center justify-center border-t border-slate-100 px-2 dark:border-slate-800">
       <button type="button" onClick={onOpenNicknameModal} aria-label={t('Vorlesungen anpassen')} title={t('Vorlesungen anpassen')}
-        className="flex h-11 w-full min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">
+        className={`flex h-11 ${isCollapsed ? 'w-11 shrink-0' : 'w-full'} min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800`}>
         {icon(<Edit3 className="h-4 w-4" />)}
         {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap">{t('Vorlesungen anpassen')}</span>}
       </button>
