@@ -1,6 +1,7 @@
 """Real browser management feedback; mocked API data, no live ILIAS writes."""
 import json
 import os
+import time
 from urllib.parse import urlparse
 
 import pytest
@@ -23,6 +24,8 @@ def test_management_shared_feedback_and_unconfirmed_upload(local_site, language,
     context = dict(ref_id='42', can_create=True, can_manage=True, can_edit_page=False, creatable_types=['file', 'fold'])
     items = []
     calls = []
+    pending_reviews = []
+    pending_deletions = []
     state = dict(unconfirmed=True, refresh_failure=False, invalid_uploads=0)
     def respond(route):
         path = urlparse(route.request.url).path
@@ -58,8 +61,14 @@ def test_management_shared_feedback_and_unconfirmed_upload(local_site, language,
                 items.append(item)
                 body = dict(success=True, items=[item])
         elif path.endswith('/deletion-review'):
+            if state.get('hold_review'):
+                pending_reviews.append(route)
+                return
             body = dict(items=[dict(ref_id='52', title='notes.pdf', item_type='file', children=[])], revision='a'*64, descendants=0)
         elif path.endswith('/batch/delete'):
+            if state.get('hold_delete'):
+                pending_deletions.append(route)
+                return
             items[:] = [item for item in items if item['ref_id'] != '52']
             body = dict(success=True, deleted_ids=['52'])
         elif path.endswith('/materials'):
@@ -82,6 +91,12 @@ def test_management_shared_feedback_and_unconfirmed_upload(local_site, language,
         add = panel.get_by_role('button', name=tr('authoring.add'), exact=True)
         feedback = panel.locator('[data-management-feedback]')
         dialog = page.get_by_role('dialog')
+        def take_pending(requests):
+            deadline = time.monotonic() + 5
+            while not requests and time.monotonic() < deadline:
+                page.wait_for_timeout(10)
+            assert requests, 'Expected a held backend request'
+            return requests.pop(0)
         def open_form(kind):
             pw.expect(add).to_be_enabled()
             add.click()
@@ -131,8 +146,58 @@ def test_management_shared_feedback_and_unconfirmed_upload(local_site, language,
         panel.get_by_role('button', name=tr('management.reload'), exact=True).click()
         delete = panel.get_by_role('button', name=tr('management.delete_item', name='notes.pdf'), exact=True)
         pw.expect(delete).to_be_enabled()
+        state.update(hold_review=True, hold_delete=True)
         delete.click()
-        dialog.get_by_role('button', name=tr('management.confirm_delete'), exact=True).click()
+        confirm = dialog.get_by_role('button', name=tr('management.confirm_delete'), exact=True)
+        cancel = dialog.get_by_role('button', name=tr('authoring.cancel'), exact=True)
+        pw.expect(dialog).to_be_visible()
+        pw.expect(confirm).to_be_disabled()
+        pw.expect(confirm).to_have_attribute('aria-busy', 'true')
+        pw.expect(confirm.locator('svg')).to_be_visible()
+        pw.expect(cancel).to_be_enabled()
+        pw.expect(cancel).to_be_focused()
+        page.emulate_media(reduced_motion='reduce')
+        assert confirm.locator('svg').evaluate('(icon) => getComputedStyle(icon).animationName') == 'none'
+        page.emulate_media(reduced_motion='no-preference')
+        # Dismissing an in-flight review must not reopen the dialog on its late response.
+        cancel.click()
+        pw.expect(dialog).to_have_count(0)
+        pw.expect(delete).to_be_focused()
+        review_body = dict(items=[dict(ref_id='52', title='notes.pdf', item_type='file', children=[])], revision='a'*64, descendants=0)
+        take_pending(pending_reviews).fulfill(content_type='application/json', body=json.dumps(review_body))
+        pw.expect(dialog).to_have_count(0)
+        delete.click()
+        pw.expect(confirm).to_be_disabled()
+        take_pending(pending_reviews).fulfill(status=503, content_type='application/json', body=json.dumps(dict(detail=tr('management.inspection_incomplete'))))
+        pw.expect(dialog.get_by_role('alert')).to_contain_text(tr('management.inspection_incomplete'))
+        pw.expect(confirm).to_be_disabled()
+        pw.expect(confirm).to_have_attribute('aria-busy', 'false')
+        dialog.get_by_role('button', name=tr('Erneut versuchen'), exact=True).click()
+        pw.expect(confirm).to_have_attribute('aria-busy', 'true')
+        take_pending(pending_reviews).fulfill(content_type='application/json', body=json.dumps(review_body))
+        pw.expect(confirm).to_be_enabled()
+        # Cached previews still wait for a fresh review before enabling deletion.
+        cancel.click()
+        delete.click()
+        pw.expect(confirm).to_be_disabled()
+        pw.expect(confirm.locator('svg')).to_be_visible()
+        page.screenshot(path=str(artifacts/f'{language}-{scheme}-{width}-review-loading.png'), animations='disabled')
+        take_pending(pending_reviews).fulfill(content_type='application/json', body=json.dumps(review_body))
+        pw.expect(confirm).to_be_enabled()
+        confirm.click()
+        pw.expect(dialog).to_be_visible()
+        pw.expect(confirm).to_be_disabled()
+        pw.expect(confirm).to_have_attribute('aria-busy', 'true')
+        pw.expect(confirm.locator('svg')).to_be_visible()
+        pw.expect(cancel).to_be_disabled()
+        page.keyboard.press('Escape')
+        pw.expect(dialog).to_be_visible()
+        page.screenshot(path=str(artifacts/f'{language}-{scheme}-{width}-deleting.png'), animations='disabled')
+        items[:] = [item for item in items if item['ref_id'] != '52']
+        request = take_pending(pending_deletions)
+        assert not pending_deletions
+        assert len([call for call in calls if call[1].endswith('/batch/delete')]) == 1
+        request.fulfill(content_type='application/json', body=json.dumps(dict(success=True, deleted_ids=['52'])))
         pw.expect(dialog).to_have_count(0)
         pw.expect(feedback.get_by_role('status')).to_have_text(tr('management.deleted'))
         page.screenshot(path=str(artifacts/f'{language}-{scheme}-{width}-deleted.png'), animations='disabled')

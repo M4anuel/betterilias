@@ -4,6 +4,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Open deletion review immediately; keep Cancel available during inspection,
+  disable confirmation with a spinner until ready, and show deletion progress until completion.
 - [x] Unify management creation/upload/delete/order feedback in dismissible banners;
   prevent unconfirmed upload success and distinguish saved writes from refresh failures.
 - [x] Discover course-upload metadata inside empty native HTML templates across

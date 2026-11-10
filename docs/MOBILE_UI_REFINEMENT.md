@@ -321,6 +321,17 @@ iOS Safari/Android Chrome or live ILIAS validation. Native upload tests also cov
 an initially empty widget whose metadata controls exist only inside a template.
 The reported production failure still needs a live retry after deployment.
 
+Deletion review now opens immediately with the selected item names. Only confirmation
+waits for a fresh backend inspection, with a spinner in that button; Cancel/Escape
+remain available during the read. Late responses after cancellation are ignored.
+Cached previews never enable confirmation before the fresh review arrives. Inspection
+errors stay in the dialog with a retry action. During the actual deletion, confirmation
+shows its spinner again, dismissal is disabled, and confirmed success closes the
+dialog and shows the shared banner. Spinner space is reserved to keep buttons stable,
+animation respects reduced motion, and native Cancel autofocus/focus return is retained.
+The same emulated viewport/language/theme matrix covers delayed reviews/deletions,
+cancelled requests, failed inspection/retry and cached previews, with screenshots.
+
 ## Custom Confirmation & Navigation Dialog System
 
 Browser-native window.confirm and window.alert dialogs have been entirely replaced across student and TA workflows with a responsive custom dialog system (ConfirmModal.tsx and dialog.ts):
