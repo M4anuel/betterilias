@@ -168,7 +168,7 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
         port = reserve.getsockname()[1]
     prefs = {'marionette.port': port, 'browser.shell.checkDefaultBrowser': False,
              'browser.startup.page': 0, 'browser.startup.homepage_override.mstone': 'ignore',
-             'extensions.webextensions.uuids': json.dumps({'betterilias-companion@m4anuel.ch': uuid})}
+             'extensions.webextensions.uuids': json.dumps({'betterilias-companion@betterilias.ch': uuid})}
     (profile / 'user.js').write_text('\n'.join(f'user_pref({json.dumps(k)}, {json.dumps(v)});' for k, v in prefs.items()))
     package = tmp_path / 'companion.xpi'
     with zipfile.ZipFile(package, 'w') as archive:

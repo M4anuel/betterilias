@@ -32,6 +32,7 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
         with zipfile.ZipFile(output / f'betterilias-{browser}.zip') as archive:
             assert 'manifest.json' in archive.namelist()
     firefox_manifest = json.loads((output / 'firefox/manifest.json').read_text())
+    assert firefox_manifest['browser_specific_settings']['gecko']['id'] == 'betterilias-companion@betterilias.ch'
     assert firefox_manifest['browser_specific_settings']['gecko']['data_collection_permissions'] == {
         'required': ['authenticationInfo']
     }
