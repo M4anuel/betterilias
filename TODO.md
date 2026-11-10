@@ -4,6 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Reveal the login-status label on mouse hover even when a hybrid device
+  reports no hover support; provide keyboard focus, touch access and a 44 px target.
+
 - [x] Remove persistent browser-UUID statistics, its settings and dashboard
   series; delete the old browser preference on app startup and purge stored
   browser samples while preserving short-lived connection counts.

@@ -2,6 +2,35 @@
 
 @custom-variant dark (&:is(.dark, .dark *));
 
+/* Hybrid devices can report hover:none even when a mouse is attached.
+   Keep the status reveal independent of Tailwind's hover media query. */
+.session-status-label {
+  max-width: 0;
+  margin-left: 0;
+  opacity: 0;
+  transition: max-width 300ms ease-out, margin-left 300ms ease-out, opacity 300ms ease-out;
+}
+
+.session-status:is(:hover, :focus) .session-status-label {
+  max-width: 10rem;
+  margin-left: 0.5rem;
+  opacity: 1;
+}
+
+.session-status:is(:hover, :focus) {
+  border-color: var(--color-emerald-200);
+  background: var(--color-emerald-50);
+}
+
+.dark .session-status:is(:hover, :focus) {
+  border-color: var(--color-emerald-800);
+  background: var(--color-emerald-950);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-status-label { transition: none; }
+}
+
 :root {
   --brand-better: #033683;
   --brand-ilias: #0AACA5;

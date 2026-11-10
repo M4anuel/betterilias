@@ -1,6 +1,6 @@
 import { t, useLanguage } from '../lib/i18n';
 import React, { useRef, useState } from 'react';
-import { Menu, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Menu, AlertCircle } from 'lucide-react';
 import { AuthStatus } from '../types';
 import { SettingsGear } from './SettingsGear';
 import { SettingsDropdown } from './SettingsDropdown';
@@ -80,16 +80,22 @@ export const Header: React.FC<HeaderProps> = ({
           <div
             role="status"
             aria-label={t("ILIAS-Sitzung aktiv")}
-            title={authStatus.user_name || t("Verbunden")}
-            className="group flex h-8 items-center rounded-full border border-transparent bg-transparent px-2 text-xs font-semibold text-emerald-800 transition-all duration-300 ease-out hover:border-emerald-200/80 hover:bg-emerald-50/80 hover:px-3 dark:text-emerald-300 dark:hover:border-emerald-800/60 dark:hover:bg-emerald-950/40 cursor-default"
           >
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-            </span>
-            <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-300 ease-out group-hover:max-w-[160px] group-hover:opacity-100 group-hover:ml-2 truncate">
-              {t("Verbunden")}
-            </span>
+            <button
+              type="button"
+              aria-label={t("Verbunden")}
+              title={authStatus.user_name || t("Verbunden")}
+              onKeyDown={event => { if (event.key === 'Escape') event.currentTarget.blur(); }}
+              className="session-status flex min-h-11 min-w-11 items-center justify-center rounded-full border border-transparent bg-transparent px-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 cursor-default"
+            >
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping motion-reduce:animate-none rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+              </span>
+              <span className="session-status-label overflow-hidden whitespace-nowrap truncate">
+                {t("Verbunden")}
+              </span>
+            </button>
           </div>
         ) : (
           <div

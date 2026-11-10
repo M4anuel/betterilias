@@ -252,6 +252,21 @@ These are Chromium emulation checks with mocked API/clipboard responses, not
 physical iOS Safari/Android Chrome or live ILIAS validation. Safari companion
 compatibility remains a separate, unfinished task.
 
+## Login-status hover on hybrid devices
+
+The header status label uses explicit hover/focus selectors rather than Tailwind's
+hover variant, which is gated by `hover: hover`. Touch-capable devices can report
+`hover: none` while a mouse is attached. The green dot keeps a 44 px button target;
+keyboard focus and tapping reveal the label too, and Escape clears focus.
+The label transition and dot animation respect reduced-motion preferences.
+
+`test_session_status_hover_browser.py` covers mouse movement with and without
+touch capability, keyboard focus/Escape and tapping in German/English and both
+themes at 320/390/430/768/1280 px and 844 x 390. These checks use Chromium
+emulation with mocked API data, not physical-device or live ILIAS validation.
+Phone and desktop screenshots were inspected for readable status text, spacing
+and clipping alongside the logo and settings button.
+
 ## Custom Confirmation & Navigation Dialog System
 
 Browser-native window.confirm and window.alert dialogs have been entirely replaced across student and TA workflows with a responsive custom dialog system (ConfirmModal.tsx and dialog.ts):
