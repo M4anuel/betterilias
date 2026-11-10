@@ -26,6 +26,7 @@ import {
 } from './types';
 import { api } from './lib/api';
 import { cache, MATERIALS_CACHE_PREFIX } from './lib/cache';
+import { CourseAssignmentTarget, upsertCourseTreeContainer } from './lib/courseTree';
 import { useMobileViewport } from './lib/useMobileViewport';
 import { theme } from './lib/theme';
 import { navigationGuard } from './lib/navigationGuard';
@@ -153,6 +154,7 @@ export const App: React.FC = () => {
   const initialViewParam = initialParams.get('view');
   const isExplicitLanding = initialViewParam === 'about' || initialViewParam === 'landing';
   const hasSpecificView = Boolean(
+    initialParams.has('semester') ||
     initialParams.get('course') ||
     initialParams.get('repository') ||
     initialParams.get('folder') ||
@@ -389,6 +391,15 @@ export const App: React.FC = () => {
         // Always cache fresh result so subsequent loads are instant
         cache.setCachedMaterials(refId, fresh);
         if (isCourseRoot) {
+          upsertCourseTreeContainer({
+            courseRefId: refId,
+            courseTitle: fresh.title || refId,
+            materials: fresh,
+            parentRefId: null,
+            depth: 0,
+            path: [fresh.title || refId],
+            pathRefIds: [refId],
+          });
           const cachedCal = cache.getCachedCalendar('ALL');
           const existingCalCourse = cachedCal?.courses?.find((c) => c.course_ref_id === refId);
           const isChecked =
@@ -528,6 +539,42 @@ export const App: React.FC = () => {
   );
 
   // --- Course Selection Handler ---
+  const handleSelectCourseAssignment = useCallback(
+    async (courseRefId: string, target: CourseAssignmentTarget) => {
+      if (!await navigationGuard.confirmNavigation()) return;
+      const containerId = target.kind === 'exercise' ? target.containerRefId || courseRefId : target.folderRefId;
+      const exerciseId = target.kind === 'exercise' ? target.exerciseRefId : null;
+      if (
+        !isLandingOpen &&
+        courseRefId === selectedCourseId &&
+        currentContainerId === containerId &&
+        activeExerciseRefId === exerciseId
+      ) {
+        return;
+      }
+      setIsLandingOpen(false);
+      setMyCourses(false);
+      setRepositoryId(null);
+      setIsCalendarOpen(false);
+      setSelectedCourseId(courseRefId);
+      setCurrentContainerId(containerId);
+      setActiveExerciseRefId(exerciseId);
+      setActiveExerciseTab(null);
+      activeContainerRef.current = containerId;
+      loadCourseMaterials(containerId, containerId === courseRefId);
+
+      const nextState: NavigationState = {
+        semester: selectedSemester,
+        courseId: courseRefId,
+        containerId,
+        exerciseId,
+        exerciseTab: null,
+      };
+      pushAppHistory(nextState, '', stateToUrl(nextState));
+      setMobileNavigationOpen(false);
+    },
+    [isLandingOpen, selectedCourseId, currentContainerId, activeExerciseRefId, selectedSemester, loadCourseMaterials]
+  );
   const handleSelectCourse = useCallback(
     async (courseRefId: string) => {
       if (!await navigationGuard.confirmNavigation()) return;
@@ -1044,6 +1091,7 @@ export const App: React.FC = () => {
     courses={allCourses}
     selectedCourseId={selectedCourseId}
     onSelectCourse={refId => { handleSelectCourse(refId); setMobileNavigationOpen(false); }}
+    onSelectCourseAssignment={(courseRefId, target) => { handleSelectCourseAssignment(courseRefId, target); }}
     onSelectSemesterOverview={() => { handleNavigateHome(); setMobileNavigationOpen(false); }}
     onSelectRepository={() => { handleNavigateRepository('1'); setMobileNavigationOpen(false); }}
     onSelectMyCourses={() => { handleNavigateMyCourses(); setMobileNavigationOpen(false); }}
@@ -1172,6 +1220,7 @@ export const App: React.FC = () => {
               selectedSemester={selectedSemester}
               onSelectSemester={handleSelectSemester}
               onSelectCourse={handleSelectCourse}
+              onSelectCourseAssignment={handleSelectCourseAssignment}
               coursesList={allCourses}
               isLoading={isLoadingSemester}
               onManualRefresh={() => loadSemesters(selectedSemester, true)}

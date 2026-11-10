@@ -2066,5 +2066,19 @@
   "admin.reason.storage_busy": "Database busy or locked",
   "admin.reason.storage_full": "Storage capacity exhausted",
   "admin.reason.file_missing": "Required file missing",
-  "admin.reason.filesystem_error": "Filesystem operation failed"
+  "admin.reason.filesystem_error": "Filesystem operation failed",
+  "folder_stats.folders_many": "Folders",
+  "folder_stats.exercise_one": "Assignment",
+  "folder_stats.forum_one": "Forum",
+  "folder_stats.forum_many": "Forums",
+  "folder_stats.podcast_one": "Recording",
+  "folder_stats.test_one": "Test",
+  "folder_stats.test_many": "Tests",
+  "folder_stats.voting_many": "Live Votings",
+  "folder_stats.link_one": "Link",
+  "folder_stats.link_many": "Links",
+  "folder_stats.session_one": "Session",
+  "folder_stats.session_many": "Sessions",
+  "course.quick_assignments_aria": "Open assignments for {course}: {target}",
+  "course.quick_assignments_title": "Open assignments: {target}"
 }

@@ -1,8 +1,9 @@
 import { t, useLanguage } from '../lib/i18n';
 import React, { useMemo } from 'react';
-import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library, Users, Calendar } from 'lucide-react';
+import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library, Users, Calendar, Layers } from 'lucide-react';
 import { CourseItem } from '../types';
 import { cache } from '../lib/cache';
+import { CourseAssignmentTarget, useCourseAssignmentTargets } from '../lib/courseTree';
 import { CourseIcon } from './CourseIcon';
 
 interface SidebarProps {
@@ -11,6 +12,7 @@ interface SidebarProps {
   courses: CourseItem[];
   selectedCourseId: string | null;
   onSelectCourse: (refId: string) => void;
+  onSelectCourseAssignment?: (courseRefId: string, target: CourseAssignmentTarget) => void;
   onSelectSemesterOverview: () => void;
   onSelectRepository: () => void;
   isRepositorySelected: boolean;
@@ -30,6 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   courses,
   selectedCourseId,
   onSelectCourse,
+  onSelectCourseAssignment,
   onSelectSemesterOverview,
   onSelectRepository,
   isRepositorySelected,
@@ -43,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   nicknamesVersion,
 }) => {
   const language = useLanguage();
+  const assignmentTargets = useCourseAssignmentTargets(courses);
 
   // Check if a custom user ordering exists
   const customOrder = useMemo(() => {
@@ -67,7 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Every row keeps its geometry and inherits one foreground colour. Wrapping
   // icons also avoids the global SVG-only button centering rule during collapse.
-  const rowClass = (selected: boolean) => `group flex h-11 min-h-11 w-full min-w-0 items-center gap-3 overflow-hidden rounded-xl px-4 py-2 text-left text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)] cursor-pointer ${
+  const rowClass = (selected: boolean) => `group flex h-11 min-h-11 w-full min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-xl px-4 py-2 text-left text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)] cursor-pointer ${
     selected ? '' : 'text-slate-700 hover:bg-slate-100/80 hover:text-[var(--accent)] dark:text-slate-200 dark:hover:bg-slate-800/80'
   }`;
   const selectedStyle = { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' };
@@ -82,17 +86,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const renderCourseButton = (course: CourseItem) => {
     const displayName = cache.getDisplayName(course.ref_id, course.title);
     const isSelected = selectedCourseId === course.ref_id;
-    return <button key={course.ref_id} type="button" onClick={() => onSelectCourse(course.ref_id)}
-      className={rowClass(isSelected)} style={isSelected ? selectedStyle : undefined}
-      aria-label={displayName} aria-current={isSelected ? 'page' : undefined} title={course.title}>
-      {icon(<CourseIcon iconName={cache.getCourseIcon(course.ref_id, course)} className="h-4 w-4" />)}
-      {!isCollapsed && <span className="min-w-0 flex-1 overflow-hidden text-left">
-        <span className="block truncate whitespace-nowrap text-xs font-semibold leading-tight">{displayName}</span>
-        {displayName !== course.title && <span className={`block truncate whitespace-nowrap text-[10px] leading-tight ${isSelected ? 'opacity-75' : 'text-slate-400 dark:text-slate-400'}`}>
-          {course.title.split(':')[0]}
-        </span>}
-      </span>}
-    </button>;
+    const assignmentTarget = assignmentTargets[course.ref_id];
+    const quickLinkLabel = assignmentTarget
+      ? t('course.quick_assignments_aria', { course: displayName, target: assignmentTarget.title })
+      : '';
+    const quickLinkTitle = assignmentTarget
+      ? t('course.quick_assignments_title', { target: assignmentTarget.title })
+      : '';
+
+    return (
+      <div key={course.ref_id} className="flex min-w-0 items-center gap-1">
+        <button type="button" onClick={() => onSelectCourse(course.ref_id)}
+          className={rowClass(isSelected)} style={isSelected ? selectedStyle : undefined}
+          aria-label={displayName} aria-current={isSelected ? 'page' : undefined} title={course.title}>
+          {icon(<CourseIcon iconName={cache.getCourseIcon(course.ref_id, course)} className="h-4 w-4" />)}
+          {!isCollapsed && <span className="min-w-0 flex-1 overflow-hidden text-left">
+            <span className="block truncate whitespace-nowrap text-xs font-semibold leading-tight">{displayName}</span>
+            {displayName !== course.title && <span className={`block truncate whitespace-nowrap text-[10px] leading-tight ${isSelected ? 'opacity-75' : 'text-slate-400 dark:text-slate-400'}`}>
+              {course.title.split(':')[0]}
+            </span>}
+          </span>}
+        </button>
+        {!isCollapsed && assignmentTarget && onSelectCourseAssignment && (
+          <button
+            type="button"
+            data-sidebar-assignment-link={course.ref_id}
+            onClick={() => onSelectCourseAssignment(course.ref_id, assignmentTarget)}
+            aria-label={quickLinkLabel}
+            title={quickLinkTitle}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-indigo-600 transition-colors hover:bg-indigo-50 hover:text-indigo-700 focus-visible:outline-2 focus-visible:outline-[var(--accent)] cursor-pointer dark:text-indigo-400 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300"
+          >
+            <Layers className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    );
   };
   const renderDivider = (key: string, title: string, custom: boolean) => (
     <div key={key} title={title} className={`flex shrink-0 items-center overflow-hidden px-4 ${custom ? 'h-8' : 'h-7'}`}>
@@ -111,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="flex h-14 shrink-0 items-center justify-between gap-2 overflow-hidden border-b border-slate-100 px-3 dark:border-slate-800">
       {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">{t('Meine Vorlesungen')}</span>}
       <button type="button" onClick={onToggleCollapse}
-        className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 cursor-pointer dark:hover:bg-slate-800 dark:hover:text-slate-200"
         aria-label={isMobile ? t('Schliessen') : isCollapsed ? t('Seitenleiste ausklappen') : t('Seitenleiste einklappen')}
         title={isMobile ? t('Schliessen') : isCollapsed ? t('Seitenleiste ausklappen') : t('Seitenleiste einklappen')}>
         {isMobile ? <X className="h-5 w-5" /> : isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -141,7 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </nav>
     <div className="flex h-16 shrink-0 items-center justify-center border-t border-slate-100 px-2 dark:border-slate-800">
       <button type="button" onClick={onOpenNicknameModal} aria-label={t('Vorlesungen anpassen')} title={t('Vorlesungen anpassen')}
-        className="flex h-11 w-full min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">
+        className="flex h-11 w-full min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 cursor-pointer dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">
         {icon(<Edit3 className="h-4 w-4" />)}
         {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap">{t('Vorlesungen anpassen')}</span>}
       </button>

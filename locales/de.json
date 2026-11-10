@@ -2066,5 +2066,19 @@
   "admin.reason.storage_busy": "Datenbank ausgelastet oder gesperrt",
   "admin.reason.storage_full": "Speicherkapazität erschöpft",
   "admin.reason.file_missing": "Erforderliche Datei fehlt",
-  "admin.reason.filesystem_error": "Dateisystemvorgang fehlgeschlagen"
+  "admin.reason.filesystem_error": "Dateisystemvorgang fehlgeschlagen",
+  "folder_stats.folders_many": "Ordner",
+  "folder_stats.exercise_one": "Übung",
+  "folder_stats.forum_one": "Forum",
+  "folder_stats.forum_many": "Foren",
+  "folder_stats.podcast_one": "Aufzeichnung",
+  "folder_stats.test_one": "Test",
+  "folder_stats.test_many": "Tests",
+  "folder_stats.voting_many": "Live-Abstimmungen",
+  "folder_stats.link_one": "Weblink",
+  "folder_stats.link_many": "Weblinks",
+  "folder_stats.session_one": "Sitzung",
+  "folder_stats.session_many": "Sitzungen",
+  "course.quick_assignments_aria": "Übungen öffnen für {course}: {target}",
+  "course.quick_assignments_title": "Übungen öffnen: {target}"
 }

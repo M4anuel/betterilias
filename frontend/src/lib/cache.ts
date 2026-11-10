@@ -119,7 +119,7 @@ export const cache = {
       const prefixes = ['ilias_materials_cache_', 'ilias_semester_cache_', 'ilias_podcast_cache_', CACHE_TS_PREFIX,
         EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX, EXERCISE_INFO_PREFIX, STUDENT_ASSIGNMENT_PREFIX, 'ilias_repository_', MANAGEMENT_CACHE_PREFIX, TA_ASSIGNMENTS_CACHE_PREFIX,
         TEAM_CANDIDATES_CACHE_PREFIX, TA_ASSIGNMENT_DETAIL_CACHE_PREFIX, MEMBERSHIP_FORM_CACHE_PREFIX, DELETE_REVIEW_CACHE_PREFIX, 'ilias_calendar_',
-        'ilias_my_courses_cache_', 'betterilias_my_courses_', 'betterilias_cal_memberships_'];
+        'ilias_my_courses_cache_', 'betterilias_my_courses_', 'betterilias_cal_memberships_', 'ilias_course_tree_'];
       for (const key of Object.keys(localStorage)) {
         if (prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
       }

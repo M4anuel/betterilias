@@ -58,6 +58,21 @@
     border-color: var(--color-slate-800);
   }
 
+  button:not(:disabled),
+  [role="button"]:not(:disabled):not([aria-disabled="true"]),
+  a[href],
+  summary,
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"]:disabled,
+  [role="button"][aria-disabled="true"],
+  select:disabled {
+    cursor: not-allowed;
+  }
+
   html.dark {
     color-scheme: dark;
   }

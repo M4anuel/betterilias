@@ -45,6 +45,14 @@ import { MaterialDownloadButton } from './DownloadButtons';
 import { downloadManager } from '../lib/downloadManager';
 import { api } from '../lib/api';
 import { cache, CourseBlocksCustomization } from '../lib/cache';
+import {
+  FolderStats,
+  countFolderItems as computeFolderStats,
+  extractAllMaterialItems,
+  formatFolderStats,
+  getFoldersFromMaterials,
+  upsertCourseTreeContainer,
+} from '../lib/courseTree';
 
 export interface CourseSearchResult {
   item: MaterialItem;
@@ -277,7 +285,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
     Record<string, { materials: CourseMaterialsResponse; path: string[] }>
   >({});
   const [folderStats, setFolderStats] = useState<
-    Record<string, { total: number; files: number; folders: number; isMapped: boolean; isEmpty: boolean }>
+    Record<string, FolderStats & { isMapped: boolean; isEmpty: boolean }>
   >({});
   const [isScanningTree, setIsScanningTree] = useState(false);
   const [sessionSyncs, setSessionSyncs] = useState<Record<string, boolean>>({});
@@ -414,56 +422,11 @@ export const CourseView: React.FC<CourseViewProps> = ({
   };
 
   const getFoldersFromRes = (res: CourseMaterialsResponse): MaterialItem[] => {
-    const list: MaterialItem[] = [];
-    for (const item of res.items || []) {
-      if (item.item_type === 'fold' && !list.some((x) => x.ref_id === item.ref_id)) {
-        list.push(item);
-      }
-    }
-    for (const sec of res.sections || []) {
-      for (const grp of sec.groups || []) {
-        for (const item of grp.items || []) {
-          if (item.item_type === 'fold' && !list.some((x) => x.ref_id === item.ref_id)) {
-            list.push(item);
-          }
-        }
-      }
-    }
-    return list;
+    return getFoldersFromMaterials(res);
   };
 
-  const countFolderItems = (res: CourseMaterialsResponse) => {
-    const seen = new Set<string>();
-    let files = 0;
-    let folders = 0;
-
-    const processItem = (item: MaterialItem) => {
-      const id = item?.ref_id || item?.url || item?.title;
-      if (!id || seen.has(id)) return;
-      seen.add(id);
-      if (item.item_type === 'fold') {
-        folders++;
-      } else {
-        files++;
-      }
-    };
-
-    for (const item of res.items || []) {
-      processItem(item);
-    }
-    for (const sec of res.sections || []) {
-      for (const grp of sec.groups || []) {
-        for (const item of grp.items || []) {
-          processItem(item);
-        }
-      }
-      for (const item of sec.items || []) {
-        processItem(item);
-      }
-    }
-
-    const total = files + folders;
-    return { files, folders, total };
+  const countFolderItems = (res: CourseMaterialsResponse): FolderStats => {
+    return computeFolderStats(res);
   };
 
   // Trigger MathJax typesetting whenever materialsData changes
@@ -525,7 +488,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
     const discovered: Record<string, { materials: CourseMaterialsResponse; path: string[] }> = {};
     const stats: Record<
       string,
-      { total: number; files: number; folders: number; isMapped: boolean; isEmpty: boolean }
+      FolderStats & { isMapped: boolean; isEmpty: boolean }
     > = {};
     const visited = new Set<string>();
 
@@ -534,14 +497,68 @@ export const CourseView: React.FC<CourseViewProps> = ({
         ? materialsData
         : cache.getCachedMaterials(courseRefId) || materialsData;
 
+    const rootTitle =
+      (rootMaterials.container_ref_id === courseRefId ? rootMaterials.title : undefined) ||
+      courseNickname ||
+      courseRefId;
+
+    if (rootMaterials.container_ref_id === courseRefId) {
+      upsertCourseTreeContainer({
+        courseRefId,
+        courseTitle: rootTitle,
+        materials: rootMaterials,
+        parentRefId: null,
+        depth: 0,
+        path: [rootTitle],
+        pathRefIds: [courseRefId],
+      });
+    }
+
+    if (materialsData.container_ref_id !== courseRefId) {
+      const crumbRefs = (materialsData.breadcrumbs || [])
+        .map((b) => b.ref_id)
+        .filter((id): id is string => Boolean(id));
+      const courseIdx = crumbRefs.indexOf(courseRefId);
+      const relRefs =
+        courseIdx >= 0
+          ? crumbRefs.slice(courseIdx)
+          : [courseRefId, materialsData.container_ref_id];
+      if (relRefs[relRefs.length - 1] !== materialsData.container_ref_id) {
+        relRefs.push(materialsData.container_ref_id);
+      }
+      const parentId = relRefs.length >= 2 ? relRefs[relRefs.length - 2] : courseRefId;
+      upsertCourseTreeContainer({
+        courseRefId,
+        courseTitle: rootTitle,
+        materials: materialsData,
+        parentRefId: parentId,
+        depth: Math.max(1, relRefs.length - 1),
+        path: [rootTitle, materialsData.title || ''],
+        pathRefIds: relRefs,
+      });
+    }
+
     const crawlTree = async () => {
       const topFolders = getFoldersFromRes(rootMaterials);
-      const queue: { folder: MaterialItem; path: string[]; depth: number }[] = [];
+      const queue: {
+        folder: MaterialItem;
+        parentRefId: string;
+        path: string[];
+        pathRefIds: string[];
+        depth: number;
+      }[] = [];
 
+      const baseContainerId = rootMaterials.container_ref_id || courseRefId;
       for (const f of topFolders) {
         if (!visited.has(f.ref_id)) {
           visited.add(f.ref_id);
-          queue.push({ folder: f, path: [f.title], depth: 1 });
+          queue.push({
+            folder: f,
+            parentRefId: baseContainerId,
+            path: [f.title],
+            pathRefIds: [courseRefId, f.ref_id],
+            depth: 1,
+          });
         }
       }
 
@@ -550,39 +567,64 @@ export const CourseView: React.FC<CourseViewProps> = ({
         for (const f of currentFolders) {
           if (!visited.has(f.ref_id)) {
             visited.add(f.ref_id);
-            queue.push({ folder: f, path: [f.title], depth: 1 });
+            queue.push({
+              folder: f,
+              parentRefId: materialsData.container_ref_id,
+              path: [f.title],
+              pathRefIds: [courseRefId, materialsData.container_ref_id, f.ref_id],
+              depth: 2,
+            });
           }
         }
       }
 
-      const uncachedQueue: { folder: MaterialItem; path: string[]; depth: number }[] = [];
+      const uncachedQueue: {
+        folder: MaterialItem;
+        parentRefId: string;
+        path: string[];
+        pathRefIds: string[];
+        depth: number;
+      }[] = [];
 
       // 1. Immediately map all cached folders from localStorage in 0ms
       while (queue.length > 0) {
-        const { folder, path, depth } = queue.shift()!;
+        const { folder, parentRefId, path, pathRefIds, depth } = queue.shift()!;
         const cached = cache.getCachedMaterials(folder.ref_id);
         if (cached) {
           discovered[folder.ref_id] = { materials: cached, path };
           const c = countFolderItems(cached);
           stats[folder.ref_id] = {
-            total: c.total,
-            files: c.files,
-            folders: c.folders,
+            ...c,
             isMapped: true,
             isEmpty: c.total === 0,
           };
+          upsertCourseTreeContainer({
+            courseRefId,
+            courseTitle: rootTitle,
+            materials: cached,
+            parentRefId,
+            depth,
+            path: [rootTitle, ...path],
+            pathRefIds,
+          });
 
           if (depth < 6) {
             const childFolders = getFoldersFromRes(cached);
             for (const cf of childFolders) {
               if (!visited.has(cf.ref_id)) {
                 visited.add(cf.ref_id);
-                queue.push({ folder: cf, path: [...path, cf.title], depth: depth + 1 });
+                queue.push({
+                  folder: cf,
+                  parentRefId: folder.ref_id,
+                  path: [...path, cf.title],
+                  pathRefIds: [...pathRefIds, cf.ref_id],
+                  depth: depth + 1,
+                });
               }
             }
           }
         } else {
-          uncachedQueue.push({ folder, path, depth });
+          uncachedQueue.push({ folder, parentRefId, path, pathRefIds, depth });
         }
       }
 
@@ -598,7 +640,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
         const maxFetch = 40;
 
         while (uncachedQueue.length > 0 && fetchedCount < maxFetch && isMounted) {
-          const { folder, path, depth } = uncachedQueue.shift()!;
+          const { folder, parentRefId, path, pathRefIds, depth } = uncachedQueue.shift()!;
           fetchedCount++;
 
           try {
@@ -610,12 +652,19 @@ export const CourseView: React.FC<CourseViewProps> = ({
             discovered[folder.ref_id] = { materials: fresh, path };
             const c = countFolderItems(fresh);
             stats[folder.ref_id] = {
-              total: c.total,
-              files: c.files,
-              folders: c.folders,
+              ...c,
               isMapped: true,
               isEmpty: c.total === 0,
             };
+            upsertCourseTreeContainer({
+              courseRefId,
+              courseTitle: rootTitle,
+              materials: fresh,
+              parentRefId,
+              depth,
+              path: [rootTitle, ...path],
+              pathRefIds,
+            });
 
             // Recursively discover nested folders inside this fresh folder!
             if (depth < 6) {
@@ -623,19 +672,34 @@ export const CourseView: React.FC<CourseViewProps> = ({
               for (const cf of childFolders) {
                 if (!visited.has(cf.ref_id)) {
                   visited.add(cf.ref_id);
+                  const childPath = [...path, cf.title];
+                  const childPathRefIds = [...pathRefIds, cf.ref_id];
                   const childCached = cache.getCachedMaterials(cf.ref_id);
                   if (childCached) {
-                    discovered[cf.ref_id] = { materials: childCached, path: [...path, cf.title] };
+                    discovered[cf.ref_id] = { materials: childCached, path: childPath };
                     const cc = countFolderItems(childCached);
                     stats[cf.ref_id] = {
-                      total: cc.total,
-                      files: cc.files,
-                      folders: cc.folders,
+                      ...cc,
                       isMapped: true,
                       isEmpty: cc.total === 0,
                     };
+                    upsertCourseTreeContainer({
+                      courseRefId,
+                      courseTitle: rootTitle,
+                      materials: childCached,
+                      parentRefId: folder.ref_id,
+                      depth: depth + 1,
+                      path: [rootTitle, ...childPath],
+                      pathRefIds: childPathRefIds,
+                    });
                   } else {
-                    uncachedQueue.push({ folder: cf, path: [...path, cf.title], depth: depth + 1 });
+                    uncachedQueue.push({
+                      folder: cf,
+                      parentRefId: folder.ref_id,
+                      path: childPath,
+                      pathRefIds: childPathRefIds,
+                      depth: depth + 1,
+                    });
                   }
                 }
               }
@@ -650,9 +714,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
             console.warn(`Could not preload subfolder ${folder.ref_id}`, e);
             if (isMounted) {
               stats[folder.ref_id] = {
-                total: 0,
-                files: 0,
-                folders: 0,
+                ...computeFolderStats(null),
+                loaded: false,
                 isMapped: false,
                 isEmpty: false,
               };
@@ -897,7 +960,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
     const currentTitle = materialsData.title || courseNickname || t("Hauptordner");
 
     // 1. Items in current container
-    for (const item of materialsData.items) {
+    for (const item of extractAllMaterialItems(materialsData)) {
       if (itemMatches(item) && !seenItemRefIds.has(item.ref_id)) {
         seenItemRefIds.add(item.ref_id);
         searchResults.push({
@@ -933,7 +996,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
       if (folderId === materialsData.container_ref_id) continue;
       const folderTitle = entry.materials.title || entry.path[entry.path.length - 1] || t("Unterordner");
 
-      for (const item of entry.materials.items || []) {
+      for (const item of extractAllMaterialItems(entry.materials)) {
         if (itemMatches(item) && !seenItemRefIds.has(item.ref_id)) {
           seenItemRefIds.add(item.ref_id);
           searchResults.push({
@@ -998,7 +1061,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
       aria-label={item.title} data-mobile-folder className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-2xs dark:border-slate-800 dark:bg-slate-900">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"><Folder size={20} /></span>
       <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{item.title}</span>
-        {stat?.isMapped && <span className="block text-[10px] text-slate-500 dark:text-slate-400">{stat.files} {stat.files === 1 ? t('Datei') : t('Dateien')}{stat.folders > 0 ? ` / ${stat.folders} ${t('Ordner')}` : ''}</span>}
+        {stat?.isMapped && <span className="block truncate text-[10px] text-slate-500 dark:text-slate-400">{formatFolderStats(stat, t)}</span>}
       </span>
       <ArrowRight size={16} className="shrink-0 self-end text-slate-400" aria-hidden="true" />
     </button>;
@@ -1276,17 +1339,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             <div className="flex items-center gap-1.5 truncate">
               {getItemIcon(item)}
               {isFolder && stat?.isMapped ? (
-                stat.isEmpty ? (
-                  <span>{t("Leer")}</span>
-                ) : (
-                  <span>
-                    {stat.files > 0 && stat.folders > 0
-                      ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}, ${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`
-                      : stat.files > 0
-                      ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}`
-                      : `${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`}
-                  </span>
-                )
+                <span className="truncate">{formatFolderStats(stat, t)}</span>
               ) : item.file_size ? (
                 <span className="font-mono">{item.file_size}</span>
               ) : (
@@ -1367,11 +1420,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                   </span>
                 ) : (
                   <span className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
-                    {stat.files > 0 && stat.folders > 0
-                      ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}, ${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`
-                      : stat.files > 0
-                      ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}`
-                      : `${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`}
+                    {formatFolderStats(stat, t)}
                   </span>
                 )
               ) : null
@@ -1828,12 +1877,8 @@ export const CourseView: React.FC<CourseViewProps> = ({
                             {t("Leer")}
                           </span>
                         ) : (
-                          <span className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 font-semibold text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
-                            {stat.files > 0 && stat.folders > 0
-                              ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}, ${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`
-                              : stat.files > 0
-                              ? `${stat.files} ${stat.files === 1 ? t("Datei") : t("Dateien")}`
-                              : `${stat.folders} ${stat.folders === 1 ? t("Ordner") : t("Ordner")}`}
+                          <span className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 font-semibold text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50 truncate">
+                            {formatFolderStats(stat, t)}
                           </span>
                         )
                       ) : (

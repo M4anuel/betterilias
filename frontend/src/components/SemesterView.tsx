@@ -13,9 +13,11 @@ import {
   LayoutGrid,
   List,
   SlidersHorizontal,
+  Layers,
 } from 'lucide-react';
 import { SemesterScreenResponse, CourseItem } from '../types';
 import { cache } from '../lib/cache';
+import { CourseAssignmentTarget, useCourseAssignmentTargets } from '../lib/courseTree';
 import { CourseIcon } from './CourseIcon';
 import {
   getCurrentSemester,
@@ -36,6 +38,7 @@ interface SemesterViewProps {
   selectedSemester: string;
   onSelectSemester: (semId: string) => void;
   onSelectCourse: (refId: string) => void;
+  onSelectCourseAssignment?: (courseRefId: string, target: CourseAssignmentTarget) => void;
   lastOpenedCourseId?: string | null;
   coursesList: CourseItem[];
   isLoading: boolean;
@@ -48,6 +51,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
   selectedSemester,
   onSelectSemester,
   onSelectCourse,
+  onSelectCourseAssignment,
   lastOpenedCourseId = null,
   coursesList,
   isLoading,
@@ -57,6 +61,13 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
   useLanguage();
   // Find last opened course object if available
   const lastOpenedCourse = coursesList.find((c) => c.ref_id === lastOpenedCourseId);
+  const allKnownCourses = useMemo(() => {
+    const map = new Map<string, CourseItem>();
+    for (const c of coursesList) map.set(c.ref_id, c);
+    for (const c of semesterData?.courses || []) map.set(c.ref_id, c);
+    return Array.from(map.values());
+  }, [coursesList, semesterData?.courses]);
+  const assignmentTargets = useCourseAssignmentTargets(allKnownCourses);
 
   // View mode: 'cards' or 'list'
   const [viewMode, setViewMode] = useState<'cards' | 'list'>(() => cache.getSemesterViewMode());
@@ -100,6 +111,10 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
     return allSemesters.find((s) => s.id === selectedSemester) || getSemesterOption(selectedSemester);
   }, [allSemesters, selectedSemester]);
 
+  const lastOpenedAssignmentTarget = lastOpenedCourse
+    ? assignmentTargets[lastOpenedCourse.ref_id]
+    : undefined;
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-200">
       {/* Hero Welcome & Last Opened Course banner */}
@@ -137,14 +152,32 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={() => onSelectCourse(lastOpenedCourse.ref_id)}
-            style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
-            className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:opacity-90 transition shrink-0 cursor-pointer"
-          >
-            <span>{t("Weiterlernen")}</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {lastOpenedAssignmentTarget && onSelectCourseAssignment && (
+              <button
+                type="button"
+                data-overview-assignment-link={`last-${lastOpenedCourse.ref_id}`}
+                onClick={() => onSelectCourseAssignment(lastOpenedCourse.ref_id, lastOpenedAssignmentTarget)}
+                aria-label={t('course.quick_assignments_aria', {
+                  course: cache.getDisplayName(lastOpenedCourse.ref_id, lastOpenedCourse.title),
+                  target: lastOpenedAssignmentTarget.title,
+                })}
+                title={t('course.quick_assignments_title', { target: lastOpenedAssignmentTarget.title })}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-200/80 bg-indigo-50/80 text-indigo-600 shadow-2xs transition hover:bg-indigo-100 hover:text-indigo-700 cursor-pointer dark:border-indigo-800/60 dark:bg-indigo-950/50 dark:text-indigo-400 dark:hover:bg-indigo-900/60"
+              >
+                <Layers className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onSelectCourse(lastOpenedCourse.ref_id)}
+              style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
+              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:opacity-90 transition shrink-0 cursor-pointer"
+            >
+              <span>{t("Weiterlernen")}</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -313,6 +346,7 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                     {courses.map((course) => {
                       const displayName = cache.getDisplayName(course.ref_id, course.title);
                       const iconName = cache.getCourseIcon(course.ref_id, course);
+                      const assignmentTarget = assignmentTargets[course.ref_id];
 
                       return (
                         <div
@@ -325,9 +359,29 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200 group-hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-slate-700 dark:group-hover:text-slate-100 transition">
                                 <CourseIcon iconName={iconName} className="h-5 w-5" />
                               </div>
-                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                                {course.ref_id}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                  {course.ref_id}
+                                </span>
+                                {assignmentTarget && onSelectCourseAssignment && (
+                                  <button
+                                    type="button"
+                                    data-overview-assignment-link={course.ref_id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onSelectCourseAssignment(course.ref_id, assignmentTarget);
+                                    }}
+                                    aria-label={t('course.quick_assignments_aria', {
+                                      course: displayName,
+                                      target: assignmentTarget.title,
+                                    })}
+                                    title={t('course.quick_assignments_title', { target: assignmentTarget.title })}
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-indigo-200/80 bg-indigo-50/80 text-indigo-600 transition hover:bg-indigo-100 hover:text-indigo-700 cursor-pointer dark:border-indigo-800/60 dark:bg-indigo-950/50 dark:text-indigo-400 dark:hover:bg-indigo-900/60"
+                                  >
+                                    <Layers className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
                             <h4 className="mt-3.5 text-base font-bold text-slate-900 group-hover:text-[var(--accent)] dark:text-slate-100 dark:group-hover:text-[var(--accent)] transition leading-snug">
@@ -363,45 +417,67 @@ export const SemesterView: React.FC<SemesterViewProps> = ({
                     {courses.map((course) => {
                       const displayName = cache.getDisplayName(course.ref_id, course.title);
                       const iconName = cache.getCourseIcon(course.ref_id, course);
+                      const assignmentTarget = assignmentTargets[course.ref_id];
 
                       return (
-                        <button type="button"
-                          aria-label={displayName}
+                        <div
                           key={course.ref_id}
-                          onClick={() => onSelectCourse(course.ref_id)}
-                          className="semester-course-row group flex w-full text-left items-center justify-between p-3.5 hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition cursor-pointer gap-4"
+                          className="flex items-center hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition"
                         >
-                          <div className="flex flex-1 items-center gap-3.5 min-w-0">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200 group-hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-slate-700 dark:group-hover:text-slate-100 transition">
-                              <CourseIcon iconName={iconName} className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex min-w-0 items-center gap-2">
-                                <h4 className="semester-course-title min-w-0 text-sm font-bold text-slate-900 group-hover:text-[var(--accent)] dark:text-slate-100 transition truncate">
-                                  {displayName}
-                                </h4>
-                                <span className="desktop-only rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400 shrink-0">
-                                  {course.ref_id}
-                                </span>
+                          <button
+                            type="button"
+                            aria-label={displayName}
+                            onClick={() => onSelectCourse(course.ref_id)}
+                            className="semester-course-row group flex flex-1 min-w-0 text-left items-center justify-between p-3.5 cursor-pointer gap-4"
+                          >
+                            <div className="flex flex-1 items-center gap-3.5 min-w-0">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200 group-hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-slate-700 dark:group-hover:text-slate-100 transition">
+                                <CourseIcon iconName={iconName} className="h-4 w-4" />
                               </div>
-                              {displayName !== course.title && (
-                                <p className="desktop-only text-xs text-slate-400 dark:text-slate-500 truncate max-w-xl">{course.title}</p>
-                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <h4 className="semester-course-title min-w-0 text-sm font-bold text-slate-900 group-hover:text-[var(--accent)] dark:text-slate-100 transition truncate">
+                                    {displayName}
+                                  </h4>
+                                  <span className="desktop-only rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400 shrink-0">
+                                    {course.ref_id}
+                                  </span>
+                                </div>
+                                {displayName !== course.title && (
+                                  <p className="desktop-only text-xs text-slate-400 dark:text-slate-500 truncate max-w-xl">{course.title}</p>
+                                )}
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-center gap-4 shrink-0 text-xs text-slate-500 dark:text-slate-400">
-                            {course.description && (
-                              <span className="hidden sm:inline-block max-w-xs truncate text-slate-400 dark:text-slate-500 text-[11px]">
-                                {course.description.replace('Contact: ', '')}
+                            <div className="flex items-center gap-4 shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                              {course.description && (
+                                <span className="hidden sm:inline-block max-w-xs truncate text-slate-400 dark:text-slate-500 text-[11px]">
+                                  {course.description.replace('Contact: ', '')}
+                                </span>
+                              )}
+                              <span className="inline-flex items-center gap-1 font-semibold text-slate-700 group-hover:text-[var(--accent)] dark:text-slate-300 transition text-xs">
+                                <span className="desktop-only">{t("Öffnen")}</span>
+                                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition" />
                               </span>
-                            )}
-                            <span className="inline-flex items-center gap-1 font-semibold text-slate-700 group-hover:text-[var(--accent)] dark:text-slate-300 transition text-xs">
-                              <span className="desktop-only">{t("Öffnen")}</span>
-                              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition" />
-                            </span>
-                          </div>
-                        </button>
+                            </div>
+                          </button>
+
+                          {assignmentTarget && onSelectCourseAssignment && (
+                            <button
+                              type="button"
+                              data-overview-assignment-link={course.ref_id}
+                              onClick={() => onSelectCourseAssignment(course.ref_id, assignmentTarget)}
+                              aria-label={t('course.quick_assignments_aria', {
+                                course: displayName,
+                                target: assignmentTarget.title,
+                              })}
+                              title={t('course.quick_assignments_title', { target: assignmentTarget.title })}
+                              className="mr-3.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-200/80 bg-indigo-50/80 text-indigo-600 transition hover:bg-indigo-100 hover:text-indigo-700 cursor-pointer dark:border-indigo-800/60 dark:bg-indigo-950/50 dark:text-indigo-400 dark:hover:bg-indigo-900/60"
+                            >
+                              <Layers className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
