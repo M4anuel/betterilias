@@ -31,6 +31,10 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
         assert 'https://app.example.com' in (root / 'content.js').read_text()
         with zipfile.ZipFile(output / f'betterilias-{browser}.zip') as archive:
             assert 'manifest.json' in archive.namelist()
+    firefox_manifest = json.loads((output / 'firefox/manifest.json').read_text())
+    assert firefox_manifest['browser_specific_settings']['gecko']['data_collection_permissions'] == {
+        'required': ['authenticationInfo']
+    }
     firefox = (output / 'firefox/content.js').read_text()
     assert 'wrappedJSObject' in firefox and 'cloneInto' in firefox
     assert 'BETTERILIAS_SESSION_SYNCED' in firefox
