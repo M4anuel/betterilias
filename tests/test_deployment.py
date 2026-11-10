@@ -36,3 +36,15 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
     assert 'BETTERILIAS_SESSION_SYNCED' in firefox
     with pytest.raises(ValueError):
         HELPERS['package']('https://other.example.com', output)
+
+
+def test_caddyfile_and_deploy_env_configure_betterilias_ch_and_www_redirect():
+    root = Path(__file__).resolve().parents[1]
+    caddyfile = (root / 'deploy' / 'Caddyfile').read_text(encoding='utf-8')
+    assert 'www.{$APP_DOMAIN}' in caddyfile
+    assert 'redir https://{$APP_DOMAIN}{uri} permanent' in caddyfile
+
+    deploy_env = (root / 'deploy' / 'deploy.env.example').read_text(encoding='utf-8')
+    assert 'APP_DOMAIN=betterilias.ch' in deploy_env
+    assert 'ACME_EMAIL=manuel@betterilias.ch' in deploy_env
+

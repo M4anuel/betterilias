@@ -60,14 +60,16 @@ registrar** to the pair Cloudflare assigns. Registering/transferring the domain
 to Cloudflare Registrar is optional. Caddy is a program on the VPS, not a DNS
 provider to which you delegate nameservers.
 
-1. Choose the domain and application hostname, for example `app.example.com`.
+1. Choose the domain and application hostname, for example `betterilias.ch`.
 2. Add the domain to Cloudflare and check the imported records. Preserve existing
    MX/TXT mail records, SPF/DKIM/DMARC and unrelated services.
 3. Follow Cloudflare's DNSSEC migration instructions before replacing nameservers;
    an old registrar DS record can make the new zone fail validation.
 4. Set the assigned nameservers at the registrar and wait until the zone activates.
-5. Create an `A` record for the app hostname pointing to the VPS's public IPv4.
-   Add `AAAA` only if the VPS actually serves that hostname over public IPv6.
+5. Create `A` records for `@` (`betterilias.ch`) and `www` (`www.betterilias.ch`)
+   pointing to the VPS's public IPv4 (`www` permanently redirects to the canonical
+   `https://betterilias.ch` origin). Add `AAAA` only if the VPS actually serves
+   those hostnames over public IPv6.
 6. Select **DNS only** (grey cloud) initially. Application HTTPS traffic goes
    directly to Caddy; Cloudflare provides DNS without proxying the app.
 
@@ -151,7 +153,7 @@ cd /opt/betterilias
 docker compose --env-file deploy.env -f compose.yaml config --quiet
 docker compose --env-file deploy.env -f compose.yaml pull
 docker compose --env-file deploy.env -f compose.yaml up -d --wait
-curl -f https://app.example.com/health
+curl -f https://betterilias.ch/health
 ```
 
 DNS must already reach this VPS for public certificates. Caddy persists its
@@ -212,7 +214,7 @@ The development companions authorise localhost. Generate matching packages for
 the real domain before asking friends to sign in:
 
 ```sh
-python scripts/package_companions.py --app-origin https://app.example.com --output scratch/production-companions
+python scripts/package_companions.py --app-origin https://betterilias.ch --output scratch/production-companions
 ```
 
 Both manifests gain only the chosen app host; development host permissions are

@@ -9,6 +9,14 @@
 	}
 }
 
+www.{$APP_DOMAIN} {
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+	redir https://{$APP_DOMAIN}{uri} permanent
+}
+
 {$APP_DOMAIN} {
 	header {
 		X-Content-Type-Options nosniff
