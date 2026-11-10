@@ -17,6 +17,7 @@ student and teaching-assistant workflows.
 | Synchronized playback, controls, preferences and limitations | [Podcast player](docs/PODCAST_PLAYER_PLAN.md), [controls and verification](docs/PLAYER_CONTROLS_REFINEMENT.md) |
 | TA allocations, submission bundles and reviewed feedback return | [TA workflow and original design](docs/TA_WORK_DISTRIBUTION_PLAN.md) |
 | Production mode, session isolation and shared-worker constraints | [Deployment security](docs/DEPLOYMENT_SECURITY.md) |
+| Docker images, GitHub registry, Caddy, DNS and first-VPS setup | [Container hosting](docs/CONTAINER_HOSTING.md) |
 | Responsive navigation, sidebar layouts and loading conventions | [UI refinement](docs/MOBILE_UI_REFINEMENT.md) |
 | Contribution, branching and publishing rules | [AGENTS.md](AGENTS.md) |
 

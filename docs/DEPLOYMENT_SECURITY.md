@@ -1,5 +1,8 @@
 # Session isolation and first-VPS coordination
 
+For production images, the Caddy/Compose configuration and the operator setup
+checklist, see [container hosting](CONTAINER_HOSTING.md).
+
 ## Runtime modes
 
 `APP_ENV` accepts `production`, `development`, or `test`. It defaults to

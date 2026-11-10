@@ -1,0 +1,9 @@
+[Unit]
+Description=Prune BetterIlias private diagnostics
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/betterilias
+ExecStart=/usr/bin/docker compose --env-file deploy.env -f compose.yaml run --rm --no-deps maintenance once

@@ -1367,7 +1367,10 @@ def parse_native_file_upload_form(
     # Live HTML contains the dynamic token input; browser-saved pages can have an
     # empty <template>. ILIAS DynamicInputsNameSource defines its fallback name.
     if info.input_name:
-        tokens = [inp for inp in field.select('input[type="hidden"][name]')
+        # CSS selection treats template contents as inert with newer libxml2
+        # builds. Traverse descendants explicitly: ILIAS keeps the token's
+        # dynamic field name inside that template, before any files are added.
+        tokens = [inp for inp in field.find_all('input', attrs={'type': 'hidden', 'name': True})
                   if inp['name'].startswith(info.input_name + '[')]
         info.token_input_name = tokens[-1]['name'] if tokens else f'{info.input_name}[input_0][]'
 

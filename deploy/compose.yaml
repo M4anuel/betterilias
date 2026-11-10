@@ -1,0 +1,99 @@
+name: betterilias
+
+x-backend: &backend
+  image: ${IMAGE_PREFIX:?Set IMAGE_PREFIX}-backend:${IMAGE_TAG:?Set IMAGE_TAG}
+  env_file:
+    - ${BACKEND_ENV_FILE:-./backend.env}
+  environment:
+    APP_ENV: production
+    CAPTURE_FAILED_HTML: "false"
+    CORS_ORIGINS: '["https://${APP_DOMAIN:?Set APP_DOMAIN}"]'
+    COORDINATION_DIR: /data/.coordination
+    SESSIONS_DIR: /data/.sessions
+    SESSION_COOKIE_FILE: /data/session_cookies.json
+    OBSERVABILITY_DIR: /data/.observability
+    DIAGNOSTIC_REPORTS_DIR: /data/.diagnostic_reports
+    LOGS_DIR: /data/logs
+    LOG_CONSOLE_LEVEL: "OFF"
+    TMPDIR: /data/.tmp
+  volumes:
+    - app_data:/data
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  # Private events live in the bounded SQLite store, not a second unexpired
+  # Docker stdout log. Inspect them through /admin/ or the private CLI.
+  logging:
+    driver: none
+
+services:
+  backend:
+    <<: *backend
+    networks: [backend]
+    stop_grace_period: 60s
+
+  maintenance:
+    <<: *backend
+    command: [maintain]
+    network_mode: none
+    healthcheck:
+      disable: true
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  frontend:
+    image: ${IMAGE_PREFIX:?Set IMAGE_PREFIX}-frontend:${IMAGE_TAG:?Set IMAGE_TAG}
+    networks: [frontend]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    logging:
+      driver: none
+
+  caddy:
+    image: caddy:2.11-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL}
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${HTTP_PORT:-80}:80"
+      - "${BIND_ADDRESS:-0.0.0.0}:${HTTPS_PORT:-443}:443"
+      - "${BIND_ADDRESS:-0.0.0.0}:${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [backend, frontend]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    logging:
+      driver: local
+      options:
+        max-size: 5m
+        max-file: "2"
+networks:
+  backend: {}
+  frontend:
+    internal: true
+
+volumes:
+  app_data:
+  caddy_data:
+  caddy_config:

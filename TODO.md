@@ -92,8 +92,14 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 - [ ] Before multi-VPS scaling, migrate persistent data and coordination to
   networked database/object storage and a coordinator such as Redis. Current
   shared local filesystem locks support multiple containers on one VPS only.
-- [ ] Configure production extension hostname permissions, same-origin HTTPS
-  proxying, persistent volumes, backups, and deployment smoke checks.
+- [x] Prepare pinned frontend/backend container images, tested same-origin Caddy
+  routing, private persistent volumes, retention maintenance, GitHub Actions/GHCR
+  publication and exact-host Chrome/Firefox packaging. See
+  [container hosting](docs/CONTAINER_HOSTING.md).
+- [ ] Select the VPS/domain, configure DNS and registry access, review the public
+  privacy/imprint text, establish encrypted backups and test restoration. Validate
+  production companions and real ILIAS workflows on the chosen public HTTPS host;
+  publish the browser packages/store listings and update installation links.
 
 ## Teaching-assistant work distribution
 
