@@ -216,13 +216,14 @@ class OutboundBudget:
                     return .025, 1
                 token = chosen[0]
                 slot, lock = available
+                granted_at = max(now, time.time())
                 db.execute('INSERT INTO outbound_slots VALUES (?,?,?)', (slot, token, chosen[1]))
                 db.execute('DELETE FROM outbound_queue WHERE token=?', (token,))
                 db.execute('UPDATE outbound_tenants SET served=?,seen=? WHERE tenant=?',
-                           (grants + 1, now, chosen[1]))
+                           (grants + 1, granted_at, chosen[1]))
                 db.execute('UPDATE outbound_state SET next_start=?, grants=grants+1, '
                            'wait_seconds=wait_seconds+? WHERE id=1',
-                           (now + 1 / self.policy.rate, max(0, now - chosen[2])))
+                           (granted_at + 1 / self.policy.rate, max(0, granted_at - chosen[2])))
             permit = Permit(self, token, lock)
             available = None
             return permit
