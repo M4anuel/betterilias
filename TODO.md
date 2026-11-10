@@ -4,6 +4,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Remember Assignments/Info/Submissions & Grades per lecture and signed-in
+  account; honour explicit links/history and fall back safely without TA permission.
 - [x] Open deletion review immediately; keep Cancel available during inspection,
   disable confirmation with a spinner until ready, and show deletion progress until completion.
 - [x] Unify management creation/upload/delete/order feedback in dismissible banners;

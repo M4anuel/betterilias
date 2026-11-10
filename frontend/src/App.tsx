@@ -63,7 +63,7 @@ export function stateToUrl(state: NavigationState): string {
     }
     if (state.exerciseId) {
       params.set('exercise', state.exerciseId);
-      if (state.exerciseTab && state.exerciseTab !== 'assignments') {
+      if (state.exerciseTab) {
         params.set('tab', state.exerciseTab);
       }
     }
@@ -867,7 +867,7 @@ export const App: React.FC = () => {
         courseId: selectedCourseId,
         containerId: currentContainerId,
         exerciseId: activeExerciseRefId,
-        exerciseTab: tab === 'assignments' ? null : tab,
+        exerciseTab: tab,
       };
       pushAppHistory(nextState, '', stateToUrl(nextState));
     },

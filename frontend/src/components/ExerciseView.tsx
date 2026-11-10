@@ -44,6 +44,7 @@ import {
   TAQuickFilter,
 } from '../types';
 import { api } from '../lib/api';
+import { rememberedExerciseTab, rememberExerciseTab } from '../lib/exercisePreferences';
 import { navigationGuard, useNavigationGuard } from '../lib/navigationGuard';
 import { confirmDialog, alertDialog } from '../lib/dialog';
 import { cache, EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX } from '../lib/cache';
@@ -95,8 +96,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   // Top Navigation Tab: 'assignments' | 'info' | 'ta_grading'
   const [activeTab, setActiveTab] = useState<'assignments' | 'info' | 'ta_grading'>(() => {
-    if (activeTabProp === 'info') return 'info';
-    if (activeTabProp === 'submissions') return 'ta_grading';
+    const tab = activeTabProp || rememberedExerciseTab(courseRefId);
+    if (tab === 'info') return 'info';
+    if (tab === 'submissions') return 'ta_grading';
     return 'assignments';
   });
   const [taManagementMode, setTaManagementMode] = useState<'none' | 'list' | 'editor'>(() => {
@@ -107,29 +109,32 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   // Sync state when activeTabProp changes (from URL / popstate / Mouse 4/5)
   useEffect(() => {
-    if (!activeTabProp || activeTabProp === 'assignments') {
+    const tab = activeTabProp || rememberedExerciseTab(courseRefId);
+    if (activeTabProp) rememberExerciseTab(courseRefId, activeTabProp);
+    if (tab === 'assignments') {
       setActiveTab('assignments');
       setTaManagementMode('none');
-    } else if (activeTabProp === 'info') {
+    } else if (tab === 'info') {
       setActiveTab('info');
       setTaManagementMode('none');
-    } else if (activeTabProp === 'submissions') {
+    } else if (tab === 'submissions') {
       setActiveTab('ta_grading');
       setTaManagementMode('none');
-    } else if (activeTabProp === 'manage') {
+    } else if (tab === 'manage') {
       setActiveTab('assignments');
       setTaManagementMode('list');
-    } else if (activeTabProp === 'manage-edit') {
+    } else if (tab === 'manage-edit') {
       setActiveTab('assignments');
       setTaManagementMode('editor');
     }
-  }, [activeTabProp]);
+  }, [activeTabProp, courseRefId]);
 
   const switchTab = useCallback(
     async (tab: ExerciseTab) => {
       if (tab !== activeTabProp && !await navigationGuard.confirmNavigation()) {
         return;
       }
+      rememberExerciseTab(courseRefId, tab);
       if (tab === 'assignments') {
         setActiveTab('assignments');
         setTaManagementMode('none');
@@ -150,7 +155,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         onTabChange(tab);
       }
     },
-    [onTabChange]
+    [onTabChange, activeTabProp, courseRefId]
   );
   const [editingTaAssId, setEditingTaAssId] = useState<string | null>(null);
   const [editingTaTypeId, setEditingTaTypeId] = useState<number>(1);
@@ -160,6 +165,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const [overviewData, setOverviewData] = useState<ExerciseOverviewResponse | null>(() => {
     return cache.getCachedExerciseOverview(exerciseRefId);
   });
+  useEffect(() => {
+    if (activeTab === 'ta_grading' && overviewData && !overviewData.has_ta_access) {
+      setActiveTab('assignments');
+      rememberExerciseTab(courseRefId, 'assignments');
+      if (activeTabProp === 'submissions') onTabChange?.('assignments');
+    }
+  }, [activeTab, overviewData, courseRefId, activeTabProp, onTabChange]);
   const [isLoadingOverview, setIsLoadingOverview] = useState<boolean>(() => {
     return !cache.getCachedExerciseOverview(exerciseRefId);
   });

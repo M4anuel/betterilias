@@ -332,6 +332,22 @@ animation respects reduced motion, and native Cancel autofocus/focus return is r
 The same emulated viewport/language/theme matrix covers delayed reviews/deletions,
 cancelled requests, failed inspection/retry and cached previews, with screenshots.
 
+## Lecture-specific exercise tabs
+
+The exercise view remembers Assignments, Info or Submissions & Grades per lecture
+and session account in browser storage, including across reloads and different
+exercise containers in the same lecture. Explicit tab links override the preference;
+Assignments is explicit in browser history so Back/Forward cannot accidentally
+restore a different remembered tab. Management/editor modes are not saved. A user
+without TA access falls back from remembered grading to Assignments. Storage failures
+leave the default navigation usable.
+
+The browser regression uses the existing phone selector and desktop navigation
+buttons across 320/390/430/768/1280 px and 844 x 390, German/English and light/dark.
+It exercises independent lectures, another exercise in the same lecture, explicit
+links, Back/Forward, reload, account isolation and lost TA access. Screenshots use
+mocked Chromium emulation; physical-device and live ILIAS validation are not claimed.
+
 ## Custom Confirmation & Navigation Dialog System
 
 Browser-native window.confirm and window.alert dialogs have been entirely replaced across student and TA workflows with a responsive custom dialog system (ConfirmModal.tsx and dialog.ts):
