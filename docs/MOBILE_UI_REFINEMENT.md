@@ -301,6 +301,26 @@ emulation with mocked API data, not physical-device or live ILIAS validation.
 Phone and desktop screenshots were inspected for readable status text, spacing
 and clipping alongside the logo and settings button.
 
+## Course-management feedback and uploads
+
+Creation, uploads, deletion and saved ordering share one dismissible inline banner.
+Its close control has a 44 px target and returns keyboard focus to the management
+heading. A confirmed save followed by a failed refresh uses one warning explaining
+that the write completed and should not be repeated. Confirmed created objects stay
+visible while their management permissions await a successful refresh. Invalid or
+empty successful HTTP responses cannot produce an upload-success message; an empty
+upload queue cannot submit. Successful uploads trigger one refresh.
+
+On phones, item actions occupy a separate row so the name retains readable width;
+tablet and desktop layouts keep compact inline controls. The feedback regression
+exercises creation, four unconfirmed upload responses, a confirmed upload with a
+failed refresh, deletion and keyboard dismissal in German/English and both themes,
+at 320/390/430/768/1280 px and 844 x 390. Screenshots are inspected for wrapping,
+alignment and clipping. These are mocked Chromium emulation checks, not physical
+iOS Safari/Android Chrome or live ILIAS validation. Native upload tests also cover
+an initially empty widget whose metadata controls exist only inside a template.
+The reported production failure still needs a live retry after deployment.
+
 ## Custom Confirmation & Navigation Dialog System
 
 Browser-native window.confirm and window.alert dialogs have been entirely replaced across student and TA workflows with a responsive custom dialog system (ConfirmModal.tsx and dialog.ts):

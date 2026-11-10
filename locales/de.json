@@ -1004,6 +1004,7 @@
   "management.panel": "Seitenverwaltung",
   "management.intro": "Materialien hinzufügen, ihre gemeinsame Reihenfolge festlegen oder veraltete Inhalte in diesem Ordner prüfen und löschen.",
   "management.load_failed": "Die Verwaltungsoptionen konnten nicht geladen werden.",
+  "management.saved_refresh_failed": "{result} Die aktualisierte Liste konnte nicht geladen werden. Lade sie erneut, um den aktuellen Inhalt zu prüfen; wiederhole die bereits abgeschlossene Aktion nicht.",
   "management.not_allowed": "Du hast keine Berechtigung, diesen Bereich zu verwalten.",
   "management.form_changed": "Das native Verwaltungsformular hat sich geändert. Es wurden keine Änderungen vorgenommen. Bitte den Inhalt in ILIAS prüfen.",
   "management.confirmation_changed": "Die native Löschbestätigung stimmt nicht mit deiner Auswahl überein. Es wurde nichts gelöscht.",

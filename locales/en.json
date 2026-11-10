@@ -1004,6 +1004,7 @@
   "management.panel": "Page management",
   "management.intro": "Add materials, arrange their shared order, or review and delete outdated content in this folder.",
   "management.load_failed": "Management options could not be loaded.",
+  "management.saved_refresh_failed": "{result} The updated list could not be loaded. Reload it to check the current contents; do not repeat the completed action.",
   "management.not_allowed": "You do not have permission to manage this container.",
   "management.form_changed": "The native management form has changed. No changes were made. Open ILIAS to review the content.",
   "management.confirmation_changed": "The native deletion confirmation does not match your selection. Nothing was deleted.",

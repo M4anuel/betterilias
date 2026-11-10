@@ -105,9 +105,9 @@ def test_unified_management_order_review_delete_and_empty_parent(local_site, lan
 
         panel.get_by_role('button', name=tr('management.move_down').replace('{name}', 'Lecture notes'), exact=True).click()
         playwright.expect(panel.get_by_text(tr('management.order_draft'), exact=True)).to_be_visible()
-        page.once('dialog', lambda event: event.dismiss())
         if viewport[0] < 768: page.get_by_label(tr('mobile.actions'), exact=True).click()
         page.get_by_role('button', name=tr('management.done'), exact=True).click()
+        page.locator('.confirmation-dialog[open]').get_by_role('button', name=tr('Auf Seite bleiben'), exact=True).click()
         playwright.expect(panel).to_be_visible()
         panel.get_by_role('button', name=tr('management.save_order'), exact=True).click()
         playwright.expect(panel.get_by_text(tr('management.order_saved'), exact=True)).to_be_visible()

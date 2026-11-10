@@ -4,6 +4,13 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Unify management creation/upload/delete/order feedback in dismissible banners;
+  prevent unconfirmed upload success and distinguish saved writes from refresh failures.
+- [x] Discover course-upload metadata inside empty native HTML templates across
+  parser versions; verify handler upload, metadata save and the newly created object.
+- [ ] Confirm the reported production course-upload failure with a live retry
+  after deployment; the affected user's request/response is not yet available.
+
 - [x] Refine narrow/collapsed sidebar geometry, quiet pin actions, exclusive active
   destinations and confirmed sidebar unpinning; keep content pin toggles instant.
 

@@ -92,6 +92,16 @@ export async function sessionFetch(input: string, init?: RequestInit & { trackPe
 
 const inFlightManagement = new Map<string, Promise<ManagementResponse>>();
 
+function confirmedCreation(value: unknown, kind: 'fold' | 'file'): AuthoringResult {
+  const result = value as Partial<AuthoringResult> | null;
+  if (!result || result.success !== true || !Array.isArray(result.items) || result.items.length !== 1 ||
+      !result.items.every(item => item && typeof item.ref_id === 'string' && /^\d+$/.test(item.ref_id) &&
+        item.item_type === kind && typeof item.title === 'string')) {
+    throw new Error(t('authoring.uncertain'));
+  }
+  return result as AuthoringResult;
+}
+
 export const api = {
   async getVideoCaptions(url: string, track: number, signal?: AbortSignal): Promise<string> {
     const res = await sessionFetch(`${API_BASE}/courses/video-captions?url=${encodeURIComponent(url)}&track=${track}`, { cache: 'no-store', signal });
@@ -158,7 +168,7 @@ export const api = {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values),
     });
     if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('authoring.uncertain'));
-    return res.json();
+    return confirmedCreation(await res.json().catch(() => null), 'fold');
   },
   uploadCourseFile(refId: string, file: File, license: string, onProgress: (progress: number) => void): Promise<AuthoringResult> {
     navigationGuard.incrementPending();
@@ -179,8 +189,11 @@ export const api = {
         try { data = JSON.parse(xhr.responseText); } catch { reject(new Error(t('authoring.uncertain'))); return; }
         if (xhr.status === 401) window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
         if (xhr.status >= 200 && xhr.status < 300) {
-          window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
-          resolve(data);
+          try {
+            const result = confirmedCreation(data, 'file');
+            window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
+            resolve(result);
+          } catch (error) { reject(error); }
         } else reject(new Error(apiError(data) || t('authoring.uncertain')));
       };
       const body = new FormData();
