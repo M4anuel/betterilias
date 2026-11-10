@@ -252,6 +252,13 @@ These are Chromium emulation checks with mocked API/clipboard responses, not
 physical iOS Safari/Android Chrome or live ILIAS validation. Safari companion
 compatibility remains a separate, unfinished task.
 
+## Resizable navigation and course pins
+
+See [sidebar navigation](SIDEBAR_NAVIGATION.md) for the refined implementation
+brief, width/collapse limits, workspace container queries, account-scoped pins
+and browser coverage. The mobile drawer uses the full visible viewport and safe
+areas; desktop resizing preserves mounted editors and adapts the content pane.
+
 ## Work-distribution dialog scrolling
 
 The native dialog is the flex container for its fixed header/footer and shrinking,

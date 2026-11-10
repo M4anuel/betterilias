@@ -1,7 +1,7 @@
 import { SyncIndicator } from './SyncIndicator';
 import { SyncRefreshControl } from './SyncRefreshControl';
 import { t, useLanguage, generatedTitle } from '../lib/i18n';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Folder,
   FileText,
@@ -30,7 +30,9 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { CourseMaterialsResponse, MaterialItem, CourseContentBlock, CourseMembership, MembershipAction, ExerciseTab } from '../types';
-import { useMediaQuery } from '../lib/useMediaQuery';
+import { useCompactWorkspace } from '../lib/workspaceWidth';
+import { materialPin, courseHref } from '../lib/sidebarPins';
+import { SidebarPinButton } from './SidebarPinButton';
 import { MobilePageHeader } from './MobilePageHeader';
 import { CourseIcon } from './CourseIcon';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
@@ -252,7 +254,22 @@ export const CourseView: React.FC<CourseViewProps> = ({
   onExerciseTabChange,
 }) => {
   const language = useLanguage();
-  const compact = useMediaQuery('(max-width: 767px)');
+  const compact = useCompactWorkspace();
+  const lastAnchor = useRef('');
+  useEffect(() => {
+    if (!location.hash) { lastAnchor.current = ''; return; }
+    if (!materialsData) return;
+    const target = `${materialsData.container_ref_id}:${location.hash}`;
+    if (lastAnchor.current === target) return;
+    const frame = requestAnimationFrame(() => {
+      try {
+        const element = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+        if (element) { element.scrollIntoView({ block: 'start' }); lastAnchor.current = target; }
+      }
+      catch { /* Ignore malformed anchors. */ }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [materialsData, controlledExerciseRefId, location.hash]);
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedDrawers, setCollapsedDrawers] = useState<Record<string, boolean>>(() =>
     cache.getCourseDrawersState(courseRefId)
@@ -992,7 +1009,14 @@ export const CourseView: React.FC<CourseViewProps> = ({
       r.item.url.toLowerCase().includes('/go/exc/')
   ).length;
 
-  const renderMobileFolder = (item: MaterialItem) => {
+  const renderPinnedItem = (item: MaterialItem, content: React.ReactNode, containerId = materialsData?.container_ref_id || courseRefId) => {
+    const pin = materialPin(courseRefId, courseNickname, containerId, item);
+    return pin ? <div key={item.ref_id} className="flex min-w-0 items-start gap-1"><div className="min-w-0 flex-1">{content}</div><SidebarPinButton pin={pin} /></div> : content;
+  };
+  const renderMobileFolder = (item: MaterialItem) => renderPinnedItem(item, renderMobileFolderContent(item));
+  const renderTileItemCard = (item: MaterialItem): React.ReactNode => compact && item.item_type === 'fold' ? renderMobileFolder(item) : compact && item.item_type === 'file' ? renderItemRow(item) : renderPinnedItem(item, renderTileItemContent(item));
+  const renderItemRow = (item: MaterialItem): React.ReactNode => compact && item.item_type === 'fold' ? renderMobileFolder(item) : renderPinnedItem(item, renderItemRowContent(item));
+  const renderMobileFolderContent = (item: MaterialItem) => {
     const stat = folderStats[item.ref_id];
     return <button key={item.ref_id} type="button" onClick={() => onNavigateFolder(item.ref_id)}
       aria-label={item.title} data-mobile-folder className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-2xs dark:border-slate-800 dark:bg-slate-900">
@@ -1004,7 +1028,9 @@ export const CourseView: React.FC<CourseViewProps> = ({
     </button>;
   };
 
-  const renderSearchResultRow = (result: CourseSearchResult) => {
+  const renderSearchResultRow = (result: CourseSearchResult) => compact && result.item.item_type === 'fold'
+    ? renderMobileFolder(result.item) : renderPinnedItem(result.item, renderSearchResultContent(result), result.containerRefId);
+  const renderSearchResultContent = (result: CourseSearchResult) => {
     const { item, containerRefId, breadcrumbs, isSubfolderItem } = result;
     if (compact && item.item_type === 'fold') return renderMobileFolder(item);
     const isFile = item.item_type === 'file';
@@ -1197,7 +1223,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
   };
 
   // Render a rich tile card for courses with tile layout (e.g. Programming with R)
-  const renderTileItemCard = (item: MaterialItem) => {
+  const renderTileItemContent = (item: MaterialItem) => {
     if (compact && item.item_type === 'fold') return renderMobileFolder(item);
     if (compact && item.item_type === 'file') return renderItemRow(item);
     const isFile = item.item_type === 'file';
@@ -1304,7 +1330,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
   };
 
   // Render a single material item row
-  const renderItemRow = (item: MaterialItem) => {
+  const renderItemRowContent = (item: MaterialItem) => {
     if (compact && item.item_type === 'fold') return renderMobileFolder(item);
     const isFile = item.item_type === 'file';
     const isFolder = item.item_type === 'fold';
@@ -1632,7 +1658,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
             {block.items && block.items.length > 0 && (
               block.presentation === 'tiles' || block.items.some((it) => !!it.image_url) ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+                <div className="grid grid-cols-1 @xl/workspace:grid-cols-2 @3xl/workspace:grid-cols-3 gap-3.5">
                   {block.items.map(renderTileItemCard)}
                 </div>
               ) : (
@@ -1771,7 +1797,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 @xl/workspace:grid-cols-2 @3xl/workspace:grid-cols-3 @5xl/workspace:grid-cols-4 gap-4">
             {items.map(renderTileItemCard)}
           </div>
         </div>
@@ -1794,7 +1820,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 @xl/workspace:grid-cols-2 @3xl/workspace:grid-cols-3 gap-3">
             {items.map((folder) => {
               if (compact) return renderMobileFolder(folder);
               const stat = folderStats[folder.ref_id];
@@ -1805,6 +1831,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                   className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs transition hover:border-amber-300 hover:shadow-xs cursor-pointer gap-2.5 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-amber-700/60"
                 >
                   <div className="flex items-start gap-3 truncate pr-2">
+                    <SidebarPinButton pin={materialPin(courseRefId, courseNickname, materialsData.container_ref_id, folder)} />
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shrink-0 group-hover:scale-105 transition">
                       <Folder className="h-5 w-5 fill-amber-100 dark:fill-amber-950/60" />
                     </div>
@@ -1927,10 +1954,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
     const colCount = block.columns || block.child_blocks?.length || 2;
     const gridColsClass =
       colCount === 2
-        ? 'grid-cols-1 md:grid-cols-2'
+        ? 'grid-cols-1 @2xl/workspace:grid-cols-2'
         : colCount === 3
-        ? 'grid-cols-1 md:grid-cols-3'
-        : 'grid-cols-1 md:grid-cols-2';
+        ? 'grid-cols-1 @3xl/workspace:grid-cols-3'
+        : 'grid-cols-1 @2xl/workspace:grid-cols-2';
 
     return (
       <div key={block.id} className={`grid ${gridColsClass} gap-4 items-start`}>
@@ -1944,6 +1971,20 @@ export const CourseView: React.FC<CourseViewProps> = ({
   };
 
   const renderBlock = (block: CourseContentBlock): React.ReactNode => {
+    const content = renderBlockContent(block);
+    if (!content || block.block_type === 'columns' || block.block_type === 'heading') return content;
+    const anchor = `course-block-${block.id}`;
+    return <section key={block.id} id={anchor} className="pinnable-block relative min-w-0 scroll-mt-4">
+      <div className="absolute right-0 top-0 z-10"><SidebarPinButton pin={{
+        id: `${courseRefId}:block:${materialsData.container_ref_id}:${block.id}`,
+        courseId: courseRefId, courseTitle: courseNickname,
+        title: block.title || t('sidebar.section'),
+        href: `${courseHref(courseRefId, materialsData.container_ref_id)}#${encodeURIComponent(anchor)}`,
+      }} /></div>
+      <div className="pinnable-block-content">{content}</div>
+    </section>;
+  };
+  const renderBlockContent = (block: CourseContentBlock): React.ReactNode => {
     switch (block.block_type) {
       case 'columns':
         return renderColumnsBlock(block);
@@ -1966,6 +2007,9 @@ export const CourseView: React.FC<CourseViewProps> = ({
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
       <MobilePageHeader title={isInsideSubfolder ? materialsData?.title || courseNickname : cache.getDisplayName(courseRefId, materialsData?.title || courseNickname)}
+        trailing={isInsideSubfolder ? <SidebarPinButton pin={materialPin(courseRefId, courseNickname, materialsData.container_ref_id, {
+          ref_id: materialsData.container_ref_id, title: materialsData.title || courseNickname, item_type: 'fold', url: '', properties: {},
+        })} /> : undefined}
         onBack={() => {
           if (!isInsideSubfolder) { onNavigateHome(); return; }
           const crumbs = materialsData?.breadcrumbs || [];
@@ -1993,7 +2037,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
         />
 
         {/* Sync / Refresh status */}
-        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+          {isInsideSubfolder && <SidebarPinButton pin={materialPin(courseRefId, courseNickname, materialsData.container_ref_id, {
+            ref_id: materialsData.container_ref_id, title: materialsData.title || courseNickname, item_type: 'fold', url: '', properties: {},
+          })} />}
           {materialsData?.authoring && (materialsData.authoring.can_create || materialsData.authoring.can_manage || materialsData.authoring.can_edit_page) &&
             <button
               aria-pressed={isManaging}

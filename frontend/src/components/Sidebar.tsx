@@ -4,8 +4,12 @@ import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library, Users, Calend
 import { CourseItem } from '../types';
 import { cache } from '../lib/cache';
 import { CourseIcon } from './CourseIcon';
+import { SidebarPin, useSidebarPins } from '../lib/sidebarPins';
+import { SidebarPinButton } from './SidebarPinButton';
 
 interface SidebarProps {
+  width?: number;
+  onSelectPin: (pin: SidebarPin) => void;
   isMobile?: boolean;
   semester: string;
   courses: CourseItem[];
@@ -25,6 +29,8 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  width = 256,
+  onSelectPin,
   isMobile,
   semester,
   courses,
@@ -43,6 +49,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   nicknamesVersion,
 }) => {
   const language = useLanguage();
+  const { pins } = useSidebarPins();
+  const visibleCourses = [...courses];
+  for (const pin of pins) {
+    if (!visibleCourses.some(course => course.ref_id === pin.courseId)) {
+      visibleCourses.push({ ref_id: pin.courseId, title: pin.courseTitle, url: '', item_type: 'crs' });
+    }
+  }
 
   // Check if a custom user ordering exists
   const customOrder = useMemo(() => {
@@ -54,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const groupedBySubject = useMemo(() => {
     const map = new Map<string, CourseItem[]>();
     const positions = new Map((customOrder || []).filter(item => item.type === 'course').map((item, index) => [item.id, index]));
-    const ordered = [...courses].sort((a, b) => (positions.get(a.ref_id) ?? Infinity) - (positions.get(b.ref_id) ?? Infinity));
+    const ordered = [...visibleCourses].sort((a, b) => (positions.get(a.ref_id) ?? Infinity) - (positions.get(b.ref_id) ?? Infinity));
     for (const course of ordered) {
       const subject = (course.subject && course.subject.trim()) || t('Sonstige');
       if (!map.has(subject)) {
@@ -63,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       map.get(subject)!.push(course);
     }
     return map;
-  }, [courses, language, customOrder]);
+  }, [courses, pins, language, customOrder]);
 
   // Every row keeps its geometry and inherits one foreground colour. Wrapping
   // icons also avoids the global SVG-only button centering rule during collapse.
@@ -82,7 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const renderCourseButton = (course: CourseItem) => {
     const displayName = cache.getDisplayName(course.ref_id, course.title);
     const isSelected = selectedCourseId === course.ref_id;
-    return <button key={course.ref_id} type="button" onClick={() => onSelectCourse(course.ref_id)}
+    return <div key={course.ref_id}><button type="button" onClick={() => onSelectCourse(course.ref_id)}
       className={rowClass(isSelected)} style={isSelected ? selectedStyle : undefined}
       aria-label={displayName} aria-current={isSelected ? 'page' : undefined} title={course.title}>
       {icon(<CourseIcon iconName={cache.getCourseIcon(course.ref_id, course)} className="h-4 w-4" />)}
@@ -92,7 +105,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {course.title.split(':')[0]}
         </span>}
       </span>}
-    </button>;
+    </button>
+      {!isCollapsed && pins.filter(pin => pin.courseId === course.ref_id).map(pin => {
+        const active = `${window.location.search}${window.location.hash}` === pin.href;
+        const external = new URL(pin.href, location.href).origin !== location.origin;
+        return <div key={pin.id} className="ml-5 flex min-w-0 items-center border-l border-slate-200 pl-1 dark:border-slate-700">
+          <a href={pin.href} title={pin.title} aria-current={active ? 'page' : undefined}
+            target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined}
+            style={active ? selectedStyle : undefined}
+            className="flex min-h-11 min-w-0 flex-1 items-center rounded-lg px-2 text-xs text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            onClick={event => {
+              if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+              if (new URL(pin.href, location.href).origin !== location.origin) return;
+              event.preventDefault(); onSelectPin(pin);
+            }}><span className="truncate">{pin.title}</span></a>
+          <SidebarPinButton pin={pin} />
+        </div>;
+      })}
+    </div>;
   };
   const renderDivider = (key: string, title: string, custom: boolean) => (
     <div key={key} title={title} className={`flex shrink-0 items-center overflow-hidden px-4 ${custom ? 'h-8' : 'h-7'}`}>
@@ -107,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const customSections = customOrder?.some(item => item.type === 'section');
   const placed = new Set<string>();
 
-  return <aside data-sidebar-collapsed={isCollapsed} className={`relative flex h-full min-h-0 shrink-0 select-none flex-col overflow-hidden border-r border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 transition-[width] duration-200 ease-in-out motion-reduce:transition-none ${isCollapsed ? 'w-16' : 'w-64'}`}>
+  return <aside data-sidebar-collapsed={isCollapsed} style={{ width: isMobile ? '100%' : isCollapsed ? 64 : width }} className="relative flex h-full min-h-0 shrink-0 select-none flex-col overflow-hidden border-r border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
     <div className="flex h-14 shrink-0 items-center justify-between gap-2 overflow-hidden border-b border-slate-100 px-3 dark:border-slate-800">
       {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">{t('Meine Vorlesungen')}</span>}
       <button type="button" onClick={onToggleCollapse}
@@ -126,12 +156,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {customSections ? <div className="space-y-1">
         {customOrder?.map(item => {
           if (item.type === 'section') return renderDivider(item.id, item.title || t('Abschnittsname'), true);
-          const course = courses.find(candidate => candidate.ref_id === item.id);
+          const course = visibleCourses.find(candidate => candidate.ref_id === item.id);
           if (!course || placed.has(course.ref_id)) return null;
           placed.add(course.ref_id);
           return renderCourseButton(course);
         })}
-        {courses.filter(course => !placed.has(course.ref_id)).map(renderCourseButton)}
+        {visibleCourses.filter(course => !placed.has(course.ref_id)).map(renderCourseButton)}
       </div> : <div className="space-y-2">
         {Array.from(groupedBySubject.entries()).map(([subject, subjectCourses]) => <div key={subject} className="space-y-1">
           {renderDivider(subject, subject, false)}

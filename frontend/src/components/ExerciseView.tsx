@@ -1,3 +1,5 @@
+import { SidebarPinButton } from './SidebarPinButton';
+import { courseHref } from '../lib/sidebarPins';
 import { SyncIndicator } from './SyncIndicator';
 import { SyncRefreshControl } from './SyncRefreshControl';
 import { t, useLanguage, assignmentStatusText } from '../lib/i18n';
@@ -1594,6 +1596,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
 
 
+  const exercisePin = courseRefId && overviewData ? {
+    id: `${courseRefId}:item:${exerciseRefId}`, courseId: courseRefId, courseTitle: courseNickname,
+    title: overviewData.title || t('Übungsübersicht'),
+    href: courseHref(courseRefId, courseBreadcrumbs?.at(-1)?.ref_id || courseRefId, exerciseRefId),
+  } : null;
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-150">
       <MobilePageHeader title={overviewData?.title || t("Übungsübersicht")}
@@ -1608,7 +1615,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           {taManagementMode === 'editor' && <option value="manage-edit">{t('mobile.edit_assignment')}</option>}
           </select>
           <ChevronDown aria-hidden="true" size={18} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
-        </span>} />
+        </span>}><SidebarPinButton pin={exercisePin} /></MobilePageHeader>
       {/* Top Header with Breadcrumbs & Sync Status */}
       <div className="desktop-only flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <CompactBreadcrumbs
@@ -1633,6 +1640,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
         {/* Sync / Refresh status */}
         <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          <SidebarPinButton pin={exercisePin} />
           <SyncRefreshControl
             isSyncing={isPageSyncing}
             onRefresh={handleRefresh}
@@ -1849,7 +1857,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               <p className="text-[11px] text-slate-400 dark:text-slate-500">{t("Keine Einträge für die gewählte Filterung vorhanden.")}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 @2xl/workspace:grid-cols-2 gap-4">
               {filteredAssignments.map((assignment, idx) => {
                 const isOngoing = assignment.is_ongoing;
                 const isEnded = assignment.is_ended;
@@ -1985,7 +1993,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-2">
                     {sec.title}
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="grid grid-cols-1 @xl/workspace:grid-cols-2 gap-3 text-xs">
                     {Object.entries(sec.properties).map(([k, v]) => (
                       <div key={k} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-0.5">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">

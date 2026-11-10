@@ -4,6 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Add a resizable desktop sidebar, width-aware course layouts and account-scoped
+  course pins with parent/current-page controls and full-screen mobile navigation.
+
 - [x] Remove the redundant outer scrollbar from the work-distribution dialog;
   keep its heading/actions visible and allow the body and assignment preview to scroll.
 

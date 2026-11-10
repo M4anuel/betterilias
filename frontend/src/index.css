@@ -679,13 +679,38 @@ main { overflow-wrap: anywhere; }
   position: fixed;
   inset: var(--visible-top, 0px) auto auto 0;
   margin: 0;
-  width: min(20rem, calc(100vw - 2.75rem));
+  width: 100vw;
   max-width: none;
   height: var(--visible-height, 100dvh);
   max-height: none;
   padding-bottom: env(safe-area-inset-bottom);
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 .mobile-navigation aside { width: 100%; }
+.sidebar-resizer::after { content: ''; position: absolute; inset: 0 6px; background: transparent; }
+.sidebar-resizer:hover::after, .sidebar-resizer:focus-visible::after,
+.sidebar-resizer.is-resizing::after { background: var(--accent); }
+.pinnable-block-content > div > :first-child { padding-right: 3rem; min-height: 2.75rem; }
+.workspace-compact .desktop-only { display: none; }
+.workspace-compact .phone-only { display: block; }
+.workspace-compact .phone-page-header { display: flex; }
+.workspace-compact .grading-search { flex-direction: column; align-items: stretch; width: 100%; }
+.workspace-compact .grading-search > div:first-child { min-width: 0; width: 100%; }
+.workspace-compact .course-title-row { flex-direction: column; align-items: stretch; }
+.workspace-compact .course-search-actions { flex-wrap: wrap; }
+.workspace-compact .course-search-actions > .relative { flex: 1; min-width: 0; }
+.workspace-compact .semester-select-controls { flex: 1 1 100%; }
+.workspace-compact .semester-select-controls select { max-width: 100%; }
+.workspace-compact .phone-page-header:has(.exercise-view-control) {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: .5rem .25rem;
+}
+.workspace-compact .phone-page-header:has(.exercise-view-control) > button { grid-column: 1; grid-row: 1; }
+.workspace-compact .phone-page-header:has(.exercise-view-control) > h1 { grid-column: 2; grid-row: 1; }
+.workspace-compact .phone-page-header:has(.exercise-view-control) > details { grid-column: 3; grid-row: 1; }
+.workspace-compact .phone-page-header .exercise-view-control { grid-column: 1 / -1; grid-row: 2; width: 100%; max-width: none; min-height: 48px; }
+.workspace-compact .exercise-view-select { min-height: 48px; }
 .app-overlay {
   top: var(--visible-top, 0px);
   bottom: auto;

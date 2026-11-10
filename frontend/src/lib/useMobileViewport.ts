@@ -12,6 +12,7 @@ export function useMobileViewport() {
       document.documentElement.style.setProperty('--visible-top', `${viewport?.offsetTop ?? 0}px`);
     };
     media.addEventListener('change', updateMedia);
+    updateMedia();
     window.addEventListener('resize', updateViewport);
     window.visualViewport?.addEventListener('resize', updateViewport);
     window.visualViewport?.addEventListener('scroll', updateViewport);

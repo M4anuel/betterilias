@@ -2066,5 +2066,11 @@
   "admin.reason.storage_busy": "Database busy or locked",
   "admin.reason.storage_full": "Storage capacity exhausted",
   "admin.reason.file_missing": "Required file missing",
-  "admin.reason.filesystem_error": "Filesystem operation failed"
+  "admin.reason.filesystem_error": "Filesystem operation failed",
+  "sidebar.resize": "Resize sidebar",
+  "sidebar.resize_hint": "Drag to resize. Arrow keys adjust width; Home collapses, End uses half the screen. Double-click resets.",
+  "sidebar.pin": "Pin {title} to sidebar",
+  "sidebar.unpin": "Unpin {title} from sidebar",
+  "sidebar.section": "Course section",
+  "sidebar.save_error": "Could not save this pin. Allow local storage and try again."
 }
