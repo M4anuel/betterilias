@@ -1263,6 +1263,7 @@ def parse_course_materials(html_content: str, container_ref_id: str) -> CourseMa
 
     from backend.scrapers.authoring import parse_authoring_context
     return CourseMaterialsResponse(
+        container_type='frm' if soup.select_one('#tab_forums_threads, #ilFrmPostList') else None,
         authoring=parse_authoring_context(html_content, container_ref_id),
         container_ref_id=container_ref_id,
         title=container_title,

@@ -48,7 +48,9 @@ export function instructionMarkup(html: string): string {
   return doc.body.innerHTML;
 }
 
-export function InstructionEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
+export function InstructionEditor({ value, onChange, label, sanitize = instructionMarkup, disabled = false }: {
+  value: string; onChange: (html: string) => void; label?: string; sanitize?: (html: string) => string; disabled?: boolean;
+}) {
   const editor = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const selection = useRef<Range | null>(null);
@@ -60,8 +62,8 @@ export function InstructionEditor({ value, onChange }: { value: string; onChange
   const [linkError, setLinkError] = useState('');
 
   useEffect(() => {
-    if (editor.current && instructionMarkup(editor.current.innerHTML) !== instructionMarkup(value)) {
-      editor.current.innerHTML = instructionMarkup(value);
+    if (editor.current && sanitize(editor.current.innerHTML) !== sanitize(value)) {
+      editor.current.innerHTML = sanitize(value);
     }
   }, [value, source]);
 
@@ -91,7 +93,7 @@ export function InstructionEditor({ value, onChange }: { value: string; onChange
     }
   };
   const sync = () => {
-    onChange(instructionMarkup(editor.current?.innerHTML || ''));
+    onChange(sanitize(editor.current?.innerHTML || ''));
     updateSelection();
   };
   const command = (name: string) => {
@@ -141,17 +143,17 @@ export function InstructionEditor({ value, onChange }: { value: string; onChange
   ];
   const fieldStyle = 'w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-2 text-slate-900 dark:text-slate-100';
   return <>
-    <div role="toolbar" aria-label={t('Arbeitsanweisungen')} className="flex flex-wrap gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1.5">
+    <div role="toolbar" aria-label={label || t('Arbeitsanweisungen')} className="flex flex-wrap gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1.5">
       {tools.map(({ name, label, Icon }) => <button key={name} type="button" title={label} aria-label={label}
         aria-pressed={!source && !!active[name]} disabled={source} onMouseDown={event => event.preventDefault()} onClick={() => command(name)}
         className={`p-2 rounded-lg disabled:opacity-40 ${!source && active[name] ? 'bg-teal-200 text-teal-950 dark:bg-teal-800 dark:text-teal-50 ring-1 ring-teal-500' : 'text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700'}`}><Icon className="h-4 w-4" /></button>)}
       <button type="button" disabled={source} aria-label={t('Link einfügen')} title={t('Link einfügen')} onMouseDown={event => event.preventDefault()} onClick={openLink} className="p-2 rounded-lg text-slate-700 dark:text-slate-200 disabled:opacity-40"><Link className="h-4 w-4" /></button>
       <button type="button" disabled={source} aria-label={t('Formatierung entfernen')} title={t('Formatierung entfernen')} onMouseDown={event => event.preventDefault()} onClick={() => command('removeFormat')} className="p-2 rounded-lg text-slate-700 dark:text-slate-200 disabled:opacity-40"><RotateCcw className="h-4 w-4" /></button>
-      <button type="button" aria-pressed={source} onClick={() => { if (source) onChange(instructionMarkup(value)); setSource(!source); }} className="ml-auto rounded-lg px-3 text-xs font-semibold text-teal-800 dark:text-teal-200">{source ? t('editor.formatted_view') : t('editor.html_view')}</button>
+      <button type="button" aria-pressed={source} onClick={() => { if (source) onChange(sanitize(value)); setSource(!source); }} className="ml-auto rounded-lg px-3 text-xs font-semibold text-teal-800 dark:text-teal-200">{source ? t('editor.formatted_view') : t('editor.html_view')}</button>
     </div>
     {source ? <textarea aria-label={t('editor.html_source')} value={value} onChange={event => onChange(event.target.value)} className={`${fieldStyle} min-h-48 font-mono text-sm`} /> :
-      <div ref={editor} contentEditable suppressContentEditableWarning onInput={sync} onKeyUp={updateSelection} onMouseUp={updateSelection}
-        role="textbox" aria-multiline="true" aria-label={t('Arbeitsanweisungen formatierter Text')}
+      <div ref={editor} contentEditable={!disabled} aria-disabled={disabled} suppressContentEditableWarning onInput={sync} onKeyUp={updateSelection} onMouseUp={updateSelection}
+        role="textbox" aria-multiline="true" aria-label={label || t('Arbeitsanweisungen formatierter Text')}
         className="min-h-48 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4 text-sm text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-teal-500 [&_p]:mb-2 [&_strong]:font-bold [&_em]:italic [&_u]:underline [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_a]:underline [&_a]:text-teal-600 dark:[&_a]:text-teal-300" />}
     <dialog ref={dialog} aria-labelledby="instruction-link-title" onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); insertLink(); } }}
       className="m-auto w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 text-slate-900 dark:text-slate-100 shadow-xl backdrop:bg-black/50">

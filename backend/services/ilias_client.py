@@ -1,4 +1,6 @@
 from backend.services import assignment_creation
+from backend.services.forum import ForumMixin
+from backend.services.forum_page import ForumPageMixin
 from backend.observability import audit
 from backend.outbound_budget import OutboundUnavailable
 from backend.outbound_targets import OutboundTargetRejected, TargetPolicy, RESOURCE_READ
@@ -109,7 +111,7 @@ class StudentUploadError(Exception):
         self.status_code = status_code
 
 
-class IliasClient(AuthoringMixin, ManagementMixin):
+class IliasClient(ForumPageMixin, ForumMixin, AuthoringMixin, ManagementMixin):
     """High-level async client for interacting with Uni Bern ILIAS."""
 
     # Native exc_mem filter/offset storage is shared across exercises in a session.
@@ -317,6 +319,8 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             self._check_response_for_session_loss(resp, url)
             html_content = resp.text
             parsed = parse_course_materials(html_content, container_ref_id=ref_id)
+            if parsed.container_type == 'frm':
+                return parsed
             # Opportunistically extract and cache the course's calendar from the same page fetch
             # if this is a course/group root page (not a subfolder inside a course).
             is_subfolder = any(

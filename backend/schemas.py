@@ -288,6 +288,7 @@ class AuthoringResult(BaseModel):
 
 class CourseMaterialsResponse(BaseModel):
     container_ref_id: str
+    container_type: str | None = None
     authoring: Optional[AuthoringContext] = None
     title: Optional[str] = None
     is_enrolled: Optional[bool] = None

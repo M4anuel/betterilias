@@ -207,6 +207,7 @@ export interface DeleteReview {
 export interface CourseMaterialsResponse {
   authoring?: AuthoringContext;
   container_ref_id: string;
+  container_type?: string | null;
   is_enrolled?: boolean;
   membership?: CourseMembership;
   title?: string;
