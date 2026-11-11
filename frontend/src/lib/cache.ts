@@ -133,7 +133,7 @@ export const cache = {
       const prefixes = ['ilias_materials_cache_', 'ilias_semester_cache_', 'ilias_podcast_cache_', CACHE_TS_PREFIX,
         EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX, EXERCISE_INFO_PREFIX, STUDENT_ASSIGNMENT_PREFIX, 'ilias_repository_', MANAGEMENT_CACHE_PREFIX, TA_ASSIGNMENTS_CACHE_PREFIX,
         TEAM_CANDIDATES_CACHE_PREFIX, TA_ASSIGNMENT_DETAIL_CACHE_PREFIX, MEMBERSHIP_FORM_CACHE_PREFIX, DELETE_REVIEW_CACHE_PREFIX, 'ilias_calendar_',
-        'ilias_my_courses_cache_', 'betterilias_my_courses_', 'betterilias_cal_memberships_', 'ilias_course_tree_'];
+        'ilias_my_courses_cache_', 'betterilias_my_courses_', 'betterilias_cal_memberships_', 'ilias_course_tree_', 'ilias_forum_'];
       for (const key of Object.keys(localStorage)) {
         if (prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
       }
@@ -204,6 +204,41 @@ export const cache = {
     if (!ts) return false;
     const ttlMs = this.getIliasSaverTtl() * 60 * 1000;
     return Date.now() - ts < ttlMs;
+  },
+
+  // --- Account-scoped forum reads ---
+  forumCacheKey(refId: string, view: string): string | null {
+    const session = this.getSessionId();
+    return session ? `ilias_forum_${encodeURIComponent(session)}_${refId}_${view}` : null;
+  },
+  getCachedForum<T>(refId: string, view: string): T | null {
+    try {
+      const key = this.forumCacheKey(refId, view);
+      const parsed = key ? JSON.parse(localStorage.getItem(key) || 'null') : null;
+      if (!parsed || typeof parsed !== 'object' || parsed.ref_id !== refId) return null;
+      const valid = view.startsWith('overview:') ? Array.isArray(parsed.threads) :
+        view.startsWith('thread:') ? Array.isArray(parsed.posts) : view === 'page' && Array.isArray(parsed.blocks) && Array.isArray(parsed.elements);
+      return valid ? parsed : null;
+    } catch { return null; }
+  },
+  setCachedForum<T>(refId: string, view: string, data: T) {
+    try {
+      const key = this.forumCacheKey(refId, view);
+      if (key) { localStorage.setItem(key, JSON.stringify(data)); this.setCacheTimestamp(key); }
+    } catch { /* Keep the loaded forum usable when browser storage is full. */ }
+  },
+  isForumSaverFresh(refId: string, view: string): boolean {
+    const key = this.forumCacheKey(refId, view);
+    return Boolean(key && this.isIliasSaverFresh(key));
+  },
+  invalidateForum(refId: string) {
+    try {
+      const prefix = this.forumCacheKey(refId, '');
+      if (!prefix) return;
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith(prefix)) { localStorage.removeItem(key); localStorage.removeItem(`${CACHE_TS_PREFIX}${key}`); }
+      }
+    } catch { /* Storage can be disabled. */ }
   },
 
   // --- Nicknames ---

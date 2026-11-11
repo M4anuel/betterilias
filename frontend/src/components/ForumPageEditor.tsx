@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, MessageSquare, Pencil, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react';
+import { Check, MessageSquare, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { cache } from '../lib/cache';
 import { forumApi, forumMarkup, forumOperationId, type ForumPage, type ForumPageWrite, type ForumTextBlock } from '../lib/forum';
 import { t, useLanguage } from '../lib/i18n';
 import { useNavigationGuard, navigationGuard } from '../lib/navigationGuard';
@@ -10,9 +11,12 @@ import { InstructionEditor } from './InstructionEditor';
 const button='inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-teal-500 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200';
 type Draft={ id: string | null; content: string; baseline: string };
 
-export function ForumPageEditor({ refId, onSaved }: { refId: string; onSaved: () => void }) {
+export function ForumPageEditor({ refId, onSaved, refreshToken = 0, onSyncingChange }: {
+  refId: string; onSaved: () => void; refreshToken?: number; onSyncingChange?: (syncing: boolean) => void;
+}) {
   useLanguage();
-  const [page,setPage]=useState<ForumPage | null>(null);
+  const [page,setPage]=useState<ForumPage | null>(()=>cache.getCachedForum(refId,'page'));
+  const [refreshing,setRefreshing]=useState(false);
   const [draft,setDraft]=useState<Draft | null>(null);
   const [error,setError]=useState('');
   const [saved,setSaved]=useState(false);
@@ -25,16 +29,29 @@ export function ForumPageEditor({ refId, onSaved }: { refId: string; onSaved: ()
   useNavigationGuard({ isDirty:dirty,isPending:busy,onDiscard:()=>{setDraft(null);setUncertain(false);pending.current=null;} });
   useEffect(()=>{
     const own=++generation.current;
-    void forumApi.page(refId).then(data=>{if(own===generation.current)setPage(data);}).catch(e=>{if(own===generation.current)setError(e.message);});
+    const scope=cache.getRequestScope().key;
+    const cached=cache.getCachedForum<ForumPage>(refId,'page');
+    if(cached)setPage(cached);
+    if(!refreshToken&&cached&&cache.isForumSaverFresh(refId,'page'))return()=>{++generation.current;};
+    setRefreshing(true);setError('');
+    void forumApi.page(refId).then(data=>{if(own===generation.current&&scope===cache.getRequestScope().key){
+      cache.setCachedForum(refId,'page',data);setPage(data);
+      setDraft(current=>current?.id&&!data.blocks.some(block=>block.id===current.id)?{...current,id:null,baseline:''}:current);
+    }}).catch(e=>{if(own===generation.current)setError(e.message);}).finally(()=>{if(own===generation.current)setRefreshing(false);});
     return ()=>{++generation.current;};
-  },[refId]);
+  },[refId,refreshToken]);
+  useEffect(()=>{onSyncingChange?.(refreshing||busy);return()=>onSyncingChange?.(false);},[refreshing,busy,onSyncingChange]);
   async function reload() {
+    const own=generation.current;const scope=cache.getRequestScope().key;
     setError('');
     try {
-      const data=await forumApi.page(refId);setPage(data);
+      setRefreshing(true);const data=await forumApi.page(refId);
+      if(own!==generation.current||scope!==cache.getRequestScope().key)return;
+      cache.setCachedForum(refId,'page',data);setPage(data);
       setDraft(current=>current?.id&&!data.blocks.some(block=>block.id===current.id)?{...current,id:null,baseline:''}:current);
     }
-    catch(e:any){setError(e.message||t('forum.load_failed'));}
+    catch(e:any){if(own===generation.current&&scope===cache.getRequestScope().key)setError(e.message||t('forum.load_failed'));}
+    finally{if(own===generation.current)setRefreshing(false);}
   }
   async function begin(block?:ForumTextBlock) {
     if(busy || !await navigationGuard.confirmNavigation())return;
@@ -47,16 +64,17 @@ export function ForumPageEditor({ refId, onSaved }: { refId: string; onSaved: ()
     if(!request&&!pending.current&&draft?.id&&page.blocks.find(block=>block.id===draft.id)?.content!==draft.baseline) {
       if(!await confirmDialog({title:t('forum.page_changed_title'),message:t('forum.replace_changed_block'),variant:'warning'}))return;
     }
-    const own=generation.current;
+    const own=generation.current;const scope=cache.getRequestScope().key;
     const payload=request || pending.current || {operation_id:forumOperationId(),revision:page.revision,
       action:draft?.id?'update':'insert',block_id:draft?.id||undefined,after_id:page.append_after_id,content:draft?.content||''} as ForumPageWrite;
     pending.current=payload;setBusy(true);setError('');setSaved(false);
     try {
       const data=await forumApi.writePage(refId,payload);
-      if(own!==generation.current)return;
+      if(own!==generation.current||scope!==cache.getRequestScope().key)return;
+      cache.invalidateForum(refId);cache.setCachedForum(refId,'page',data);
       setPage(data);setDraft(null);setUncertain(false);pending.current=null;setSaved(true);onSaved();
     } catch(e:any) {
-      if(own!==generation.current)return;
+      if(own!==generation.current||scope!==cache.getRequestScope().key)return;
       const unknown=e.status===undefined || e.status>=500 || e.status===409;
       setUncertain(unknown);setError(unknown?t('forum.write_uncertain'):e.message);
       if(!unknown)pending.current=null;
@@ -73,7 +91,7 @@ export function ForumPageEditor({ refId, onSaved }: { refId: string; onSaved: ()
     <div className="flex justify-end"><button type="button" className={button} disabled={busy||!draft?.content.replace(/<[^>]*>/g,'').trim()} onClick={()=>void save()}><Save className="h-4 w-4" />{t(busy?'forum.sending':uncertain?'forum.check_result':'forum.save_block')}</button></div>
   </div>;
   return <div className="space-y-4">
-    <div className="flex flex-wrap items-start gap-3"><div className="min-w-0 flex-1"><h2 className="font-bold text-slate-900 dark:text-slate-100">{t('forum.custom_content')}</h2><p className="mt-1 max-w-[68ch] text-sm text-slate-600 dark:text-slate-300">{t('forum.native_edit_hint')}</p></div><button type="button" className={button} disabled={busy||uncertain} onClick={()=>void reload()} aria-label={t('forum.refresh')}><RefreshCw className="h-4 w-4" /></button></div>
+    <div><h2 className="font-bold text-slate-900 dark:text-slate-100">{t('forum.custom_content')}</h2><p className="mt-1 max-w-[68ch] text-sm text-slate-600 dark:text-slate-300">{t('forum.native_edit_hint')}</p></div>
     {error&&<ErrorNotice message={error} retryDisabled={busy} onRetry={uncertain?()=>void save():()=>void reload()} onDismiss={()=>setError('')} />}
     {saved&&<p role="status" className="flex items-center gap-2 text-sm text-teal-800 dark:text-teal-200"><Check className="h-4 w-4" />{t('forum.saved')}</p>}
     {!page&&!error&&<p role="status" className="text-sm text-slate-500">{t('forum.loading')}</p>}
