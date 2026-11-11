@@ -4,6 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Align native forums with shared caching, sync, breadcrumbs and management;
+  fix invisible-content posts, post anchors and contained reply/file-drop layout.
+
 - [x] Add native forum threads, conversation reading/writing, permission-aware
   moderation and responsive introduction editing/preview from the supplied dumps.
   Native text-block editing and implementation locations: `docs/NATIVE_FORUM.md`.

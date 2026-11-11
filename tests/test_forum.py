@@ -247,3 +247,14 @@ def test_supplied_forum_dumps(filename,kind):
         if kind=='closed': assert any(t.closed for t in parsed.data.threads)
     elif kind=='posts': assert len(parse_forum_conversation(html,'3782761','120057').data.posts)==2
     else: assert parse_forum_form(html,'3782761','120057' if kind=='reply' else None).file_fields==['userfile[0]']
+
+
+def test_supplied_selected_post_dump_preserves_its_changed_subject_and_invisible_body():
+    root=Path(r'C:\Users\manue\OneDrive\Dokumente\_Uni\IliasAlternative\htmlfromilias\Forum')
+    path=next(root.glob('*PAGENOTWORKING*.html'),None)
+    if not path:pytest.skip('Private source dump not available')
+    parsed=parse_forum_conversation(path.read_text(encoding='utf8'),'3782761','118933')
+    assert len(parsed.data.posts)==1
+    post=parsed.data.posts[0]
+    assert post.subject and post.subject!=parsed.data.title
+    assert '\u200e' in post.html and post.can_reply
