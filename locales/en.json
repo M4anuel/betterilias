@@ -2116,5 +2116,13 @@
   "connection.phone_hint": "On your phone: open BetterIlias on your computer and connect your phone using the QR code in Settings.",
   "errors.forbidden": "You do not have permission to view this content.",
   "errors.not_found": "This content could not be found. It may have been moved or removed.",
-  "errors.rate_limited": "Too many requests. Please wait a moment and try again."
+  "errors.rate_limited": "Too many requests. Please wait a moment and try again.",
+  "connection.changed": "The connection changed. Please reload this view.",
+  "editor.creation_uncertain": "Creation started but has not been confirmed. Check the result again; a second assignment will not be created. If you changed the draft, first check the assignment list in ILIAS.",
+  "editor.check_creation": "Check creation",
+  "feedback.retry_changed": "The import or existing files changed. Please inspect the archive again.",
+  "feedback.replacement_unconfirmed": "The new file could not be confirmed. The original is retained; retrying checks the result first.",
+  "feedback.overwrite_unconfirmed": "The new file was saved, but removal of the original could not be confirmed. Please check the result again.",
+  "feedback.retry_failed": "Recheck failed files",
+  "editor.reload_for_creation": "Please reload BetterIlias before creating a new assignment."
 }

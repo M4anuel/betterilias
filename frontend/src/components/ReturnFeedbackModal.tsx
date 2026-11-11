@@ -651,11 +651,11 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
           {step === 'completed' && commitResult && (
             <div className="space-y-4 py-4">
               <div className="flex flex-col items-center text-center space-y-2">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-                  <CheckCircle2 className="h-6 w-6" />
+                <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${commitResult.failed_count ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'}`}>
+                  {commitResult.failed_count ? <AlertTriangle className="h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />}
                 </span>
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                  {t("Feedback-Dateien erfolgreich zurückgegeben!")}
+                  {t(commitResult.failed_count ? "Feedback-Import fehlgeschlagen" : "Feedback-Dateien erfolgreich zurückgegeben!")}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
                   {commitResult.message}
@@ -718,14 +718,15 @@ export const ReturnFeedbackModal: React.FC<ReturnFeedbackModalProps> = ({
             </>
           )}
 
-          {step === 'completed' && (
+          {step === 'completed' && (<div className="flex flex-wrap gap-2">
+            {Boolean(commitResult?.failed_count) && <button type="button" onClick={() => setStep('preview')} className="min-h-11 rounded-xl border border-teal-500 px-4 text-sm font-semibold text-teal-800 dark:text-teal-200">{t('feedback.retry_failed')}</button>}
             <button
               type="button"
               onClick={onClose}
               className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition shadow-2xs cursor-pointer"
             >
               {t("Fertig")}
-            </button>
+            </button></div>
           )}
         </div>
       </div>

@@ -1,5 +1,5 @@
 from backend.observability import audit
-from backend.coordination import coordinated
+from backend.coordination import coordinated, atomic_json
 import asyncio
 import hashlib
 import io
@@ -27,7 +27,7 @@ from backend.schemas import (
     FeedbackUnitImportPreview,
     SubmissionItem,
 )
-from backend.services.ilias_client import IliasClient
+from backend.services.ilias_client import IliasClient, StudentUploadError
 
 logger = logging.getLogger(__name__)
 
@@ -541,6 +541,62 @@ async def commit_feedback_import(
     units_data = meta.get("units", [])
     sem = asyncio.Semaphore(4)
 
+    async def publish_file(member_id, filename, file_bytes, feedback_url, action, existing_file_id, receipt):
+        if "action" in receipt and receipt["action"] != action:
+            raise ValueError(t('feedback.retry_changed'))
+        if receipt.get("complete"):
+            return
+        receipt["action"] = action
+        current = await client.get_submission_feedback_files(
+            exercise_ref_id=exercise_ref_id, member_id=member_id, ass_id=ass_id, feedback_url=feedback_url)
+        current_ids = {str(item.id) for item in current.files}
+        replacement = receipt.get("uploaded_id")
+        if not replacement and receipt.get("upload_dispatched"):
+            candidates = [str(item.id) for item in current.files
+                          if item.title == filename and str(item.id) not in receipt["before_ids"]]
+            if len(candidates) != 1:
+                raise ValueError(t('feedback.replacement_unconfirmed'))
+            replacement = candidates[0]
+            receipt["uploaded_id"] = replacement
+            atomic_json(meta_path, meta)
+        if not replacement:
+            if action == "overwrite" and existing_file_id and str(existing_file_id) not in current_ids:
+                raise ValueError(t('feedback.retry_changed'))
+            receipt.update(upload_dispatched=True, before_ids=sorted(current_ids), existing_file_id=existing_file_id)
+            atomic_json(meta_path, meta)
+            try:
+                uploaded = await client.upload_submission_feedback_file(
+                    exercise_ref_id=exercise_ref_id, member_id=member_id, filename=filename,
+                    file_bytes=file_bytes, ass_id=ass_id, feedback_url=feedback_url)
+            except Exception as exc:
+                if isinstance(exc, StudentUploadError) and exc.status_code < 500:
+                    receipt["upload_dispatched"] = False
+                    atomic_json(meta_path, meta)
+                    raise
+                raise ValueError(t('feedback.replacement_unconfirmed')) from exc
+            candidates = [str(item.id) for item in uploaded.files
+                          if item.title == filename and str(item.id) not in current_ids]
+            if len(candidates) != 1:
+                raise ValueError(t('feedback.replacement_unconfirmed'))
+            replacement = candidates[0]
+            receipt["uploaded_id"] = replacement
+            # Preserve a confirmed upload before attempting the separate deletion.
+            atomic_json(meta_path, meta)
+        elif replacement not in current_ids:
+            raise ValueError(t('feedback.replacement_unconfirmed'))
+        if action == "overwrite" and existing_file_id and str(existing_file_id) in current_ids:
+            try:
+                remaining = await client.delete_submission_feedback_file(
+                    exercise_ref_id=exercise_ref_id, member_id=member_id, file_id=existing_file_id,
+                    ass_id=ass_id, feedback_url=feedback_url)
+            except Exception as exc:
+                raise ValueError(t('feedback.overwrite_unconfirmed')) from exc
+            remaining_ids = {str(item.id) for item in remaining.files}
+            if str(existing_file_id) in remaining_ids or replacement not in remaining_ids:
+                raise ValueError(t('feedback.overwrite_unconfirmed'))
+        receipt["complete"] = True
+        atomic_json(meta_path, meta)
+
     async def upload_file_item(unit: Dict[str, Any], f_item: Dict[str, Any]):
         nonlocal uploaded_count, skipped_count, failed_count
         uid = unit["unit_id"]
@@ -586,28 +642,8 @@ async def commit_feedback_import(
 
         async with sem:
             try:
-                # If overwrite and existing file ID is present, delete existing file first
-                if action == "overwrite" and existing_file_id:
-                    try:
-                        await client.delete_submission_feedback_file(
-                            exercise_ref_id=exercise_ref_id,
-                            member_id=member_id,
-                            file_id=existing_file_id,
-                            ass_id=ass_id,
-                            feedback_url=feedback_url,
-                        )
-                    except Exception as del_err:
-                        logger.warning(f"Could not delete existing file {existing_file_id}: {del_err}")
-
-                # Upload feedback file to ILIAS
-                await client.upload_submission_feedback_file(
-                    exercise_ref_id=exercise_ref_id,
-                    member_id=member_id,
-                    filename=filename,
-                    file_bytes=file_bytes,
-                    ass_id=ass_id,
-                    feedback_url=feedback_url,
-                )
+                receipt = f_item.setdefault("receipt", {})
+                await publish_file(member_id, filename, file_bytes, feedback_url, action, existing_file_id, receipt)
                 uploaded_count += 1
                 results.append(
                     FeedbackImportCommitResultItem(
@@ -715,43 +751,20 @@ async def commit_feedback_import(
 
         async with sem:
             try:
-                # If overwrite chosen but file ID not in staging cache, check ILIAS on demand
-                if action == "overwrite" and not existing_file_id and feedback_url:
-                    try:
-                        fb_resp = await client.get_submission_feedback_files(
-                            exercise_ref_id=exercise_ref_id,
-                            member_id=sub.member_id,
-                            ass_id=ass_id,
-                            feedback_url=feedback_url,
-                        )
-                        for ef in fb_resp.files:
-                            if ef.title == filename:
-                                existing_file_id = ef.id
-                                break
-                    except Exception as chk_err:
-                        logger.warning(f"Could not inspect feedback files for {target_unit_id} before overwrite: {chk_err}")
-
-                if action == "overwrite" and existing_file_id:
-                    try:
-                        await client.delete_submission_feedback_file(
-                            exercise_ref_id=exercise_ref_id,
-                            member_id=sub.member_id,
-                            file_id=existing_file_id,
-                            ass_id=ass_id,
-                            feedback_url=feedback_url,
-                        )
-                    except Exception as del_err:
-                        logger.warning(f"Could not delete existing feedback file {existing_file_id} for {target_unit_id}: {del_err}")
-
-                # Upload feedback file to ILIAS
-                await client.upload_submission_feedback_file(
-                    exercise_ref_id=exercise_ref_id,
-                    member_id=sub.member_id,
-                    filename=filename,
-                    file_bytes=file_bytes,
-                    ass_id=ass_id,
-                    feedback_url=feedback_url,
-                )
+                receipt = meta.setdefault("manual_receipts", {}).setdefault(source_path, {})
+                if receipt.get("target_unit_id", target_unit_id) != target_unit_id:
+                    raise ValueError(t('feedback.retry_changed'))
+                receipt["target_unit_id"] = target_unit_id
+                if "existing_file_id" in receipt:
+                    existing_file_id = receipt["existing_file_id"]
+                elif action == "overwrite" and not existing_file_id and not receipt.get("complete"):
+                    current = await client.get_submission_feedback_files(
+                        exercise_ref_id=exercise_ref_id, member_id=sub.member_id, ass_id=ass_id, feedback_url=feedback_url)
+                    matches = [item for item in current.files if item.title == filename and str(item.id) != receipt.get("uploaded_id")]
+                    if len(matches) > 1:
+                        raise ValueError(t('feedback.retry_changed'))
+                    existing_file_id = matches[0].id if matches else None
+                await publish_file(sub.member_id, filename, file_bytes, feedback_url, action, existing_file_id, receipt)
                 uploaded_count += 1
                 results.append(
                     FeedbackImportCommitResultItem(
@@ -780,9 +793,10 @@ async def commit_feedback_import(
     if manual_tasks:
         await asyncio.gather(*manual_tasks)
 
-    # Clean up staging directory
+    # Retain failed items and upload receipts so retries never repeat completed writes.
     try:
-        shutil.rmtree(stage_dir, ignore_errors=True)
+        if failed_count == 0:
+            shutil.rmtree(stage_dir, ignore_errors=True)
     except Exception as e:
         logger.warning(f"Failed to remove staging directory {stage_dir}: {e}")
 
