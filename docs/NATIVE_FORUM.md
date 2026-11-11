@@ -8,7 +8,8 @@ The workspace shows threads on the left and the selected conversation on the
 right. On phones it shows one pane at a time, with a Back to threads control.
 Posts use the existing 68ch prose limit, with a 72ch outer message bubble. Wide
 code/tables get labelled, keyboard-focusable scrolling regions. Live native
-profile photos use authenticated resource downloads; missing photos use initials.
+profile photos use authenticated resource downloads; missing photos use a neutral
+person icon.
 Names, lecturer content and dates are preserved; known relative date labels are
 localized. Thread search filters the current native listing page.
 
@@ -20,14 +21,37 @@ editing text blocks. Failed background reads retain the cached content. Successf
 writes invalidate the forum's other cached views; logout/account changes clear
 the forum cache with the other private page caches.
 
-The header uses `CompactBreadcrumbs` and the normal page-management toggle.
-There is no separate Conversations tab. The reply composer stays inside the
-viewport-sized forum workspace, with reachable cancel/publish actions and a
-compact editor; on phones it replaces the message list while composing. File
+The header uses `CompactBreadcrumbs` and the normal page-management toggle,
+without a duplicate course Back button or Forum eyebrow. Search and the compact
+New thread button share a row; focused search expands across that row without
+removing the keyboard-accessible creation button. Thread metadata separates post
+counts, the native latest-post timestamp and visits with dividers; visits use an
+eye icon and a localized accessible label. Missing visit counts are not invented.
+
+The reply composer stays inside the viewport-sized workspace. Its header and
+publish row are ordinary, non-overlapping flex regions around one scrolling form
+body. On phones it replaces the message list while composing. File
 selection/drop handling is shared with course uploads in `FileDropzone.tsx`.
 Post subjects remain visible even when a body contains only invisible Unicode
-format characters. Clicking a subject or native `selectPost`/post link highlights
-the post locally instead of navigating to ILIAS.
+format characters, as bold headings rather than coloured/underlined links.
+Native `selectPost`/post links highlight the post locally instead of navigating
+to ILIAS.
+
+Editing replaces the message body with `InstructionEditor` at the same width.
+Its formatting toolbar sits directly above the textbox; the subject can be
+expanded for editing. Cached text is editable immediately while the native edit
+form is inspected. Save waits for that inspection, and late form responses only
+reconcile untouched fields. Preparation errors can be retried without discarding
+typing; cancellation/account changes invalidate pending preparation results.
+
+ILIAS 9 profile pictures can use an opaque signed FileDelivery URL rather than
+a `.jpg` resource. The proxy admits only the exact native
+`/src/FileDelivery/deliver.php/<base64url-token>` endpoint without query parameters,
+in addition to existing static image resources. The format follows the upstream
+[avatar resolver](https://github.com/ILIAS-eLearning/ILIAS/blob/release_9/Services/User/classes/Avatar/class.ilUserAvatarResolver.php)
+and [FileDelivery service](https://github.com/ILIAS-eLearning/ILIAS/blob/release_9/src/FileDelivery/Services.php).
+Saved-browser `_files/file` paths do not reveal their original signed URL and are
+not treated as live resources or copied into public application assets.
 
 ## Implemented interactions
 
@@ -126,14 +150,17 @@ No live ILIAS write, physical iOS/Android test or end-to-end screen-reader audit
 was performed. Production compatibility still needs a live user exercise of the
 forum and text-block workflows after deployment.
 
-Verification results for the caching/layout follow-up: full Python suite 696
-passed; a combined 97-case forum/authoring/page-sync/sidebar browser run passed.
-The final forum and shared-upload browser run passed 57 cases (55 forum cases).
-The production build, 2,208-key locale validation, six localization runtime
-tests and launcher syntax check passed. Screenshots remain in ignored
+Verification results for the inline-editing/density follow-up: full Python suite
+698 passed; a combined forum/authoring/page-sync browser run passed 107 cases,
+including 71 forum cases. The production build, 2,210-key locale validation,
+six localization runtime tests and launcher syntax check passed. After merging
+upstream navigation changes, the final forum/sidebar browser run passed 78 cases.
+Screenshots remain in ignored
 `scratch/forum-checks`.
 
-The follow-up checks cover forced refresh, Saver TTL,
+The forum checks cover immediate editing with delayed/failed preparation,
+subject/text preservation, cancellation, reply-body scroll boundaries, photo
+rendering and visit counts, as well as forced refresh, Saver TTL,
 cached reads during background failure, cross-account/logout isolation,
 invalidation, post highlighting, drag-and-drop, shared navigation and responsive
 scroll containment. The new private dump's invisible body/changed subject is

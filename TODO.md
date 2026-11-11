@@ -4,6 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Refine forum density, inline post editing, contained reply forms, profile
+  photo delivery and thread view counts; verify responsive drafts and slow edits.
+
 - [x] Align native forums with shared caching, sync, breadcrumbs and management;
   fix invisible-content posts, post anchors and contained reply/file-drop layout.
 
