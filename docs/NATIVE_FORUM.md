@@ -12,6 +12,23 @@ profile photos use authenticated resource downloads; missing photos use initials
 Names, lecturer content and dates are preserved; known relative date labels are
 localized. Thread search filters the current native listing page.
 
+Forum listings, each thread/page and page-editor models use the shared browser
+cache, keyed by account, forum and native page. Cached data renders immediately;
+background reads refresh it without replacing drafts. ILIAS Saver respects its
+shared TTL. The standard `SyncRefreshControl` bypasses that TTL, including while
+editing text blocks. Failed background reads retain the cached content. Successful
+writes invalidate the forum's other cached views; logout/account changes clear
+the forum cache with the other private page caches.
+
+The header uses `CompactBreadcrumbs` and the normal page-management toggle.
+There is no separate Conversations tab. The reply composer stays inside the
+viewport-sized forum workspace, with reachable cancel/publish actions and a
+compact editor; on phones it replaces the message list while composing. File
+selection/drop handling is shared with course uploads in `FileDropzone.tsx`.
+Post subjects remain visible even when a body contains only invisible Unicode
+format characters. Clicking a subject or native `selectPost`/post link highlights
+the post locally instead of navigating to ILIAS.
+
 ## Implemented interactions
 
 - Read thread lists/posts, unread/pinned/closed indicators and native pagination.
@@ -19,7 +36,7 @@ localized. Thread search filters the current native listing page.
   choose reply notifications, upload attachments and download post attachments.
 - Close/reopen, pin/unpin and delete a thread when ILIAS exposes that action.
   Deletion uses a fresh native confirmation and verifies the exact selected ID.
-- The Edit page tab adds, edits and deletes individual native text blocks.
+- The page-management view adds, edits and deletes individual native text blocks.
   Other page elements remain in place and appear as read-only previews. The
   thread area is represented by a placeholder below the custom page elements.
 - Drafts survive responsive resizing and background reads. Leaving a dirty
@@ -77,6 +94,8 @@ of 80 characters; this does not claim full WCAG conformance.
 | `frontend/src/components/ForumPageEditor.tsx` | Native text-block editing and thread-area placeholder |
 | `frontend/src/components/InstructionEditor.tsx` | Shared rich-text controls, configurable labels/sanitizer and disabled state |
 | `frontend/src/lib/forum.ts` | Typed client, rich-content sanitization, date labels and operation IDs |
+| `frontend/src/lib/cache.ts` | Account/forum/page caches, Saver freshness and mutation invalidation |
+| `frontend/src/components/FileDropzone.tsx` | Shared drag-and-drop/native file selection for forum and course uploads |
 | `frontend/src/components/CourseView.tsx` | Forum cards and native forum-container selection |
 | `frontend/src/lib/sidebarPins.ts` | Native forum pin destinations |
 | `frontend/src/index.css` | Forum layout and readable/scrollable rich content |
@@ -107,10 +126,15 @@ No live ILIAS write, physical iOS/Android test or end-to-end screen-reader audit
 was performed. Production compatibility still needs a live user exercise of the
 forum and text-block workflows after deployment.
 
-Verification results: full Python suite 695 passed / 598 skipped; 43 new forum
-browser cases passed, including native page editing and production-build course
-navigation. Existing state-machine, TA editor, authoring, course-tree and
-repository browser regressions were also exercised; obsolete upload/repository
-error assertions now target the shared recovery UI. The production build,
-2,203-key locale validation, six localization runtime tests and launcher syntax
-check passed. Screenshots remain in ignored `scratch/forum-checks`.
+Verification results for the caching/layout follow-up: full Python suite 696
+passed; a combined 97-case forum/authoring/page-sync/sidebar browser run passed.
+The final forum and shared-upload browser run passed 57 cases (55 forum cases).
+The production build, 2,208-key locale validation, six localization runtime
+tests and launcher syntax check passed. Screenshots remain in ignored
+`scratch/forum-checks`.
+
+The follow-up checks cover forced refresh, Saver TTL,
+cached reads during background failure, cross-account/logout isolation,
+invalidation, post highlighting, drag-and-drop, shared navigation and responsive
+scroll containment. The new private dump's invisible body/changed subject is
+covered without copying student content into repository fixtures.

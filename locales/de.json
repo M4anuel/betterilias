@@ -2205,5 +2205,6 @@
   "forum.today": "Heute",
   "forum.yesterday": "Gestern",
   "forum.tomorrow": "Morgen",
-  "forum.by": "von"
+  "forum.by": "von",
+  "forum.empty_post": "Dieser Beitrag enthält keinen Nachrichtentext."
 }

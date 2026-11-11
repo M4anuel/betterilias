@@ -2205,5 +2205,6 @@
   "forum.today": "Today",
   "forum.yesterday": "Yesterday",
   "forum.tomorrow": "Tomorrow",
-  "forum.by": "by"
+  "forum.by": "by",
+  "forum.empty_post": "This post contains no message text."
 }

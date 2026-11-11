@@ -904,7 +904,10 @@ export const CourseView: React.FC<CourseViewProps> = ({
   if (materialsData?.container_type === 'frm') {
     const parent = materialsData.breadcrumbs.filter(crumb => crumb.ref_id && crumb.ref_id !== materialsData.container_ref_id).at(-1)?.ref_id || courseRefId;
     return <ForumView key={materialsData.container_ref_id} refId={materialsData.container_ref_id}
-      title={materialsData.title || t('forum.title')} courseTitle={courseNickname} onBack={() => onNavigateFolder(parent)} />;
+      title={materialsData.title || t('forum.title')} courseTitle={courseNickname} onBack={() => onNavigateFolder(parent)}
+      courseRefId={courseRefId} breadcrumbs={materialsData.breadcrumbs} onNavigateHome={onNavigateHome}
+      onNavigateCourse={onNavigateCourseRoot} onNavigateFolder={onNavigateFolder} onNavigateRepository={onNavigateRepository}
+      onNavigateSemester={onNavigateSemester} managementMode={isManaging} onManagementModeChange={setIsManaging} />;
   }
 
   if (activeExerciseRefId) {

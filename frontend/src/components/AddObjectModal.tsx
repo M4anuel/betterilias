@@ -1,6 +1,7 @@
 import { ErrorNotice } from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
-import { Check, CircleAlert, FileText, FolderPlus, Layers, Plus, Upload, X } from 'lucide-react';
+import { Check, CircleAlert, FileText, FolderPlus, Layers, Plus, X } from 'lucide-react';
+import { FileDropzone } from './FileDropzone';
 import { api } from '../lib/api';
 import { t, useLanguage } from '../lib/i18n';
 import { objectCategories, supportedCreationTypes } from '../lib/iliasObjects';
@@ -35,7 +36,6 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
 }) {
   useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
   const [context, setContext] = useState<AuthoringContext | null>(null);
   const [step, setStep] = useState<'catalogue' | 'fold' | 'file'>('catalogue');
   const [search, setSearch] = useState('');
@@ -83,7 +83,7 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
       finally { setLoading(false); }
     }
   }
-  function addFiles(files: FileList | null) {
+  function addFiles(files: FileList | File[] | null) {
     if (!files || busy || uncertain) return;
     const additions = Array.from(files);
     if (queue.length + additions.length > 100 || additions.some(file => file.size >= 900_000_000)) {
@@ -195,13 +195,7 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
               {templates?.map(option => <option key={option.value} value={option.value}>{/^(default|standard)$/i.test(option.label) ? t('authoring.standard') : /^(hidden folder|versteckter ordner)$/i.test(option.label) ? t('authoring.hidden') : option.label}</option>)}
             </select></label>
           </> : <>
-            <div className="rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/40 p-6 text-center"
-              onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); addFiles(event.dataTransfer.files); }}>
-              <Upload aria-hidden="true" className="mx-auto mb-3 h-7 w-7 text-teal-700 dark:text-teal-300" />
-              <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{t('authoring.drop_files')}</p>
-              <button type="button" onClick={() => fileInput.current?.click()} className="rounded-lg border border-teal-600 dark:border-teal-400 px-4 py-2 text-sm font-semibold text-teal-800 dark:text-teal-200 hover:bg-teal-50 dark:hover:bg-teal-950/50">{t('authoring.browse_files')}</button>
-              <input ref={fileInput} type="file" multiple hidden aria-label={t('authoring.browse_files')} onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
-            </div>
+            <FileDropzone disabled={busy || uncertain} onFiles={files => addFiles(files)} />
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('authoring.select_limit')}</p>
             {queue.length > 0 && <div className="space-y-3">
               <div className="flex items-center justify-between gap-3 text-xs">

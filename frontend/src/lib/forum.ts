@@ -56,6 +56,10 @@ export const forumApi = {
 };
 export const forumOperationId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), n => n.toString(16).padStart(2, '0')).join('');
 
+export function forumPlainText(html: string) {
+  return (new DOMParser().parseFromString(html, 'text/html').body.textContent || '').replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, '').trim();
+}
+
 export function forumDate(value: string) {
   return value.replace(/^(Today|Heute|Yesterday|Gestern|Tomorrow|Morgen)(?=,|\s|$)/i, token => {
     const name = token.toLowerCase();

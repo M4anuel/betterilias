@@ -1,6 +1,22 @@
 @import "tailwindcss";
 
 .forum-workspace { height: clamp(24rem, calc(100dvh - 15rem), 58rem); }
+.forum-view[data-compact="false"] .forum-workspace { grid-template-columns: minmax(15rem,18rem) minmax(0,1fr); }
+.forum-view[data-compact="true"] .forum-workspace { grid-template-columns: minmax(0,1fr); }
+.forum-view[data-compact="true"] .forum-topbar > nav { flex-basis: 100%; }
+.forum-view[data-compact="true"] .forum-manage-label { display: none; }
+.forum-view[data-compact="true"] .forum-workspace[data-selected="true"] .forum-thread-list,
+.forum-view[data-compact="true"] .forum-workspace[data-selected="false"] .forum-thread-pane { display: none; }
+.forum-view[data-compact="true"] .forum-thread-pane > div:first-child { display: grid; grid-template-columns: auto minmax(0,1fr); }
+.forum-view[data-compact="false"] .forum-thread-back { display: none; }
+.forum-view[data-compact="true"] .forum-thread-back { display: inline-flex; }
+.forum-composer { max-height: 75%; flex-shrink: 0; }
+.forum-composer [role="textbox"], .forum-composer textarea { min-height: 6rem; max-height: 15rem; overflow-y: auto; }
+.forum-view[data-compact="true"] .forum-workspace[data-composing="true"] .forum-message-list,
+.forum-workspace[data-new-thread="true"] .forum-message-list { display: none; }
+.forum-view[data-compact="true"] .forum-composer,
+.forum-workspace[data-new-thread="true"] .forum-composer { max-height: 100%; flex: 1 1 0%; }
+.forum-post[data-highlighted="true"] { outline: 2px solid var(--accent, #0AACA5); outline-offset: 2px; background: rgb(10 172 165 / .08); }
 .forum-prose { overflow-wrap: anywhere; line-height: 1.65; }
 .forum-prose > div, .forum-prose p, .forum-prose li, .forum-prose blockquote { max-width: 68ch; }
 .forum-prose p + p { margin-top: .85em; }
