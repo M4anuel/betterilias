@@ -444,8 +444,14 @@ def test_single_stream_and_resolution_failure(local_site, single, failure):
         dialog=page.locator('dialog.podcast-player-dialog')
         if failure:
             pw.expect(dialog.get_by_role('alert')).to_be_visible()
-            pw.expect(dialog.get_by_role('button',name='Try again',exact=True)).to_be_visible()
+            # Resolution returns 401: reconnect the session instead of retrying it unchanged.
+            connect = dialog.get_by_role('button', name='Connect ILIAS', exact=True)
+            pw.expect(connect).to_be_visible()
             assert dialog.get_by_role('link').count()==0
+            connect.click()
+            pw.expect(page.get_by_role('dialog', name='BetterIlias Companion', exact=True)).to_be_visible()
+            page.keyboard.press('Escape')
+            pw.expect(connect).to_be_focused()
             page.keyboard.press('Escape')
             pw.expect(page.get_by_role('link',name='Open in ILIAS',exact=True).first).to_have_attribute('href',URL)
         else:
@@ -475,7 +481,10 @@ def test_keyboard_canvas_layout_settings_and_subtitles(local_site,width,height,l
         stream=page.get_by_role('button',name=tr('Streamen'),exact=True)
         link=stream.locator('..').get_by_role('link')
         pw.expect(link).to_have_attribute('href',URL)
-        assert link.bounding_box()['y']>=stream.bounding_box()['y']+stream.bounding_box()['height']
+        # Recording actions share a compact row, with the ILIAS link before Stream.
+        link_box, stream_box = link.bounding_box(), stream.bounding_box()
+        assert abs(link_box['y'] - stream_box['y']) < 2
+        assert link_box['x'] + link_box['width'] <= stream_box['x']
         stream.click()
         dialog=page.locator('dialog.podcast-player-dialog')
         stage=dialog.locator('[data-player-layout]')

@@ -4,6 +4,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Unify session/connection recovery in a persistent workspace status card and
+  page/modal errors in a shared notice; simplify signed-out landing navigation,
+  link Chrome Web Store installation, and cover responsive recovery without replaying writes.
+
 - [x] Remember Assignments/Info/Submissions & Grades per lecture and signed-in
   account; honour explicit links/history and fall back safely without TA permission.
 - [x] Open deletion review immediately; keep Cancel available during inspection,
