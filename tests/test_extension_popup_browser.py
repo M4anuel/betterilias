@@ -103,6 +103,6 @@ def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, sc
             # Even in the vertically constrained magnified window, login is reachable.
             evaluate("document.querySelector('#login-btn').scrollIntoView({block:'nearest'})")
             shot=send('Page.captureScreenshot')
-            (ROOT/f'.pytest_cache/native-popup-{language}-{scheme}-{scale}x.png').write_bytes(base64.b64decode(shot['data']))
+            (tmp_path/f'native-popup-{language}-{scheme}-{scale}x.png').write_bytes(base64.b64decode(shot['data']))
         finally:
             context.close()

@@ -7,6 +7,62 @@ import pytest
 
 
 @pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
+@pytest.mark.parametrize('change', ['cookies', 'disabled'])
+def test_pending_sync_discards_stale_result_and_drains_cookie_change(directory, change):
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('Node is required for the background-script harness')
+    script = r'''
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+(async()=>{
+  let cookie='old',cookieListener,messageListener,id=0;
+  const timers=new Map(),requests=[],deliveries=[],badges=[],notified=[];
+  const stored={serverUrl:'https://backend.invalid',frontendUrl:'https://frontend.invalid',autoSyncEnabled:true};
+  const noop={addListener(){}};
+  const api={storage:{local:{get:async()=>({...stored}),set:async value=>Object.assign(stored,value)}},
+    cookies:{getAll:async()=>[{name:'PHPSESSID',value:cookie}],onChanged:{addListener:fn=>cookieListener=fn}},
+    runtime:{onMessage:{addListener:fn=>messageListener=fn},onInstalled:noop,onStartup:noop},
+    tabs:{query:async()=>[{id:1,url:'https://frontend.invalid/'}],sendMessage:async(_,message)=>notified.push(message.sessionId)},
+    alarms:{create(){},onAlarm:noop}};
+  const context=vm.createContext({console,URL,Date,navigator:{userAgent:'test'},browser:api,importScripts(){},
+    setTimeout(fn,delay){timers.set(++id,{fn,delay});return id},clearTimeout:key=>timers.delete(key),
+    BetterIliasI18n:{setLanguage(){}},BetterIliasToolbar:{setStatus:async status=>badges.push(status)},
+    BetterIliasRequest:async(_,init)=>{requests.push(JSON.parse(init.body).cookies.PHPSESSID);
+      return await new Promise(resolve=>deliveries.push(resolve));}});
+  const initial=vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),context);
+  const flush=async predicate=>{for(let n=0;n<100&&!predicate();n++)await new Promise(resolve=>setImmediate(resolve));assert(predicate())};
+  await flush(()=>deliveries.length===1);
+  if(process.argv[2]==='cookies') {
+    cookie='new';cookieListener({cookie:{name:'PHPSESSID'}});
+    for(const [key,timer] of timers){timers.delete(key);timer.fn()}
+  } else {
+    messageListener({type:'SET_AUTO_SYNC_ENABLED',enabled:false},null,()=>{});
+  }
+  deliveries[0]({response:{ok:true,status:200},data:{success:true,authenticated:true,session_id:'old-session'}});
+  await initial;
+  assert.equal(stored.sessionId,undefined);assert.deepEqual(notified,[]);
+  assert.equal(timers.size,1);
+  for(const [key,timer] of timers){timers.delete(key);timer.fn()}
+  if(process.argv[2]==='cookies') {
+    await flush(()=>deliveries.length===2);
+    deliveries[1]({response:{ok:true,status:200},data:{success:true,authenticated:true,session_id:'new-session'}});
+    await flush(()=>vm.runInContext('isSyncing',context)===false);
+    assert.deepEqual(requests,['old','new']);assert.equal(stored.lastSyncSignature,'new:');
+    assert.deepEqual(notified,['new-session']);assert.equal(badges.at(-1),'synced');
+  } else {
+    await flush(()=>badges.at(-1)==='disabled');assert.equal(requests.length,1);
+    assert.equal(stored.sessionId,undefined);
+  }
+  assert.equal(timers.size,0);
+})().catch(error=>{console.error(error);process.exitCode=1});
+'''
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run([node, '-e', script, str(root / directory / 'background.js'), change],
+                            capture_output=True, text=True, encoding='utf8')
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
 def test_live_handoff_uses_page_readable_events_while_background_is_pending(directory):
     node = shutil.which('node')
     if not node:
