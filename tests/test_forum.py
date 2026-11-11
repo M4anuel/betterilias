@@ -84,6 +84,17 @@ def test_posts_preserve_content_and_proxy_profile_photos():
     assert file.title=='Example.pdf' and file.url.startswith('/api/materials/42/download?')
 
 
+def test_signed_profile_photo_and_thread_visits_are_preserved():
+    photo = '/src/FileDelivery/deliver.php/' + 'signed_profile_token' * 8
+    html = thread().replace('/data/unibe/usr_images/test.jpg', photo)
+    avatar = parse_forum_conversation(html, '42', '10').data.posts[0].avatar_url
+    assert parse_qs(avatar.split('?', 1)[1])['custom_url'] == ['https://ilias.unibe.ch' + photo]
+    for label in ('Visits', 'Aufrufe', 'Besuche'):
+        html = listing().replace('</div></li>', f'<span class="il-item-property-name">{label}</span><span class="il-item-property-value">1\u2019234</span></div></li>')
+        assert parse_forum_overview(html, '42').data.threads[0].view_count == 1234
+    assert parse_forum_overview(listing(), '42').data.threads[0].view_count is None
+
+
 def test_rich_content_is_inert_and_preserves_lecturer_blocks():
     html=clean_markup('<script>alert(1)</script><p onclick="bad()">Text <strong>bold</strong><a href="javascript:bad()">link</a></p><img src="https://evil.invalid/a.jpg"><pre>code</pre><table><tr><td>Cell</td></tr></table>','42')
     assert 'script' not in html and 'onclick' not in html and 'javascript:' not in html and 'evil.invalid' not in html

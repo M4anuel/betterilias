@@ -9,6 +9,7 @@ class ForumThread(BaseModel):
     author: str = ''
     last_post: str = ''
     post_count: int = 0
+    view_count: int | None = None
     unread: bool = False
     closed: bool = False
     sticky: bool = False

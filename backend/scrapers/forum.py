@@ -104,8 +104,11 @@ def parse_forum_overview(html, ref_id):
             title = re.sub(r'\s*\((closed|geschlossen)\)\s*$', '', title, flags=re.I)
             count = properties.get('posts', properties.get('beiträge','0'))
             number=re.match(r'\s*([\d.,]+)',count)
+            visits = properties.get('visits', properties.get('aufrufe', properties.get('besuche', '')))
+            visit_number = re.match(r'\s*([\d.,\u2019\' ]+)', visits)
             data.threads.append(ForumThread(id=tid,title=title,author=properties.get('created by',properties.get('erstellt von','')),
                 last_post=properties.get('latest post',properties.get('letzter beitrag','')),post_count=int(re.sub(r'\D','',number[1]) or '0') if number else 0,
+                view_count=int(re.sub(r'\D','',visit_number[1])) if visit_number and re.search(r'\d',visit_number[1]) else None,
                 closed=closed,sticky=sticky,unread=bool(item.select_one('.il-item-notification, [class*=unread]') or re.search(r'\b(new|neu|ungelesen|unread)\b',count,re.I)),
                 actions=[c for c in ('close','reopen','makesticky','unmakesticky') if c in actions] + (['delete'] if 'confirmdeletethreads' in actions else [])))
             parsed.thread_urls[tid] = url; parsed.actions[tid] = actions

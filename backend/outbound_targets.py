@@ -100,6 +100,12 @@ class TargetPolicy:
             raise OutboundTargetRejected('ambiguous_command')
         values = dict(lowered)
         command = values.get('cmd', '')
+        # ILIAS 9 FileDelivery serves profile photos through an opaque, signed
+        # base64url token. Keep this exception restricted to its exact endpoint;
+        # do not allow arbitrary PHP path-info or command/query parameters.
+        base_path = unquote(urlsplit(self.native_url).path).rstrip('/')
+        if (not query and re.fullmatch(re.escape(base_path) + r'/src/FileDelivery/deliver\.php/[A-Za-z0-9_-]{32,8192}', path)):
+            return str(parsed.copy_with(fragment=None))
         # Forum attachments use viewThread with an exact post/file selector.
         # No other viewThread parameters (reply/edit/mark-read/draft actions) may
         # enter the credentialed resource proxy through this read-only exception.

@@ -22,6 +22,16 @@ NATIVE = 'https://ilias.unibe.ch'
 MEDIA = 'https://dist.opencast.unibe.ch'
 
 
+def test_signed_ilias_profile_photo_delivery_is_an_exact_resource_read():
+    policy = TargetPolicy()
+    endpoint = '/src/FileDelivery/deliver.php/' + 'opaque_Signed-Token123' * 8
+    assert policy.resource_url(endpoint) == NATIVE + endpoint
+    for invalid in (endpoint + '?cmd=delete', endpoint + '/file', endpoint + '.php',
+                    '/other/deliver.php/' + 'x' * 100, '/src/FileDelivery/deliver.php/short'):
+        with pytest.raises(OutboundTargetRejected):
+            policy.resource_url(invalid)
+
+
 @pytest.fixture
 def policy():
     return TargetPolicy()
