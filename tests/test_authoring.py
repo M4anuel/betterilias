@@ -8,6 +8,7 @@ from email.parser import BytesParser
 
 import httpx
 import pytest
+from bs4 import BeautifulSoup
 from fastapi import UploadFile
 from fastapi.testclient import TestClient
 
@@ -23,6 +24,16 @@ CONTEXT = (FIXTURES / 'context.html').read_text(encoding='utf8')
 FOLDER = (FIXTURES / 'folder.html').read_text(encoding='utf8')
 FILE = (FIXTURES / 'file.html').read_text(encoding='utf8')
 CREATED_FILE = (FIXTURES / 'created_file.html').read_text(encoding='utf8')
+
+
+def empty_file_widget():
+    """Before any upload, metadata controls exist only in the inert template."""
+    soup = BeautifulSoup(FILE, 'lxml')
+    metadata = soup.select_one('.ui-input-file-metadata').extract()
+    soup.find('template').append(metadata)
+    for entry in soup.select('.ui-input-file-input'):
+        entry.decompose()
+    return str(soup)
 
 
 def material(ref_id, title, kind):
@@ -68,6 +79,13 @@ def test_saved_forms_use_real_template_labels_tokens_and_file_metadata():
     assert file.file_fields == ['form/input_0[input_1][]', 'form/input_0[input_2][]', 'form/input_0[input_3][]']
 
 
+def test_empty_upload_widget_discovers_template_fields_without_submitting_placeholders():
+    form = parse_creation_form(empty_file_widget(), '42', 'file')
+    assert form.file_fields == ['form/input_0[input_1][]', 'form/input_0[input_2][]', 'form/input_0[input_3][]']
+    assert not set(form.file_fields).intersection(form.values)
+    assert form.values['form/input_1'] == 'il_copyright_entry__0__7'
+
+
 @pytest.mark.asyncio
 async def test_folder_creation_preserves_native_defaults_and_verifies_new_ref():
     posted = []
@@ -111,7 +129,8 @@ async def test_timeout_does_not_replay_folder_creation():
 @pytest.mark.asyncio
 @pytest.mark.parametrize('upload_result', [{'status': 1, 'file_id': 'resource-123'}, {'status': 0}, {'status': 1}])
 @pytest.mark.parametrize('display_title', ['notes.pdf', 'notes'])
-async def test_file_upload_follows_handler_then_metadata_save(upload_result, display_title):
+@pytest.mark.parametrize('initial_widget', [False, True])
+async def test_file_upload_follows_handler_then_metadata_save(upload_result, display_title, initial_widget):
     posts = []
     def handler(request):
         query = parse_qs(request.url.query.decode())
@@ -126,7 +145,7 @@ async def test_file_upload_follows_handler_then_metadata_save(upload_result, dis
                                'form/input_0[input_3][]': 'resource-123', 'form/input_1': 'il_copyright_entry__0__7'}
             return httpx.Response(200, text='<div id="ilTab">Saved</div>')
         if query.get('cmd') == ['create']:
-            return httpx.Response(200, text=FILE)
+            return httpx.Response(200, text=empty_file_widget() if initial_widget else FILE)
         return httpx.Response(200, text=CONTEXT + (material('51', display_title, 'file') if len(posts) == 2 else ''))
     upload = UploadFile(filename='notes.pdf', file=BytesIO(b'PDF content'))
     if upload_result.get('file_id'):

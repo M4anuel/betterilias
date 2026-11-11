@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Check, CircleAlert, FileText, FolderPlus, Layers, Plus, Upload, X } from 'lucide-react';
 import { api } from '../lib/api';
@@ -6,29 +7,31 @@ import { objectCategories, supportedCreationTypes } from '../lib/iliasObjects';
 import { useNavigationGuard } from '../lib/navigationGuard';
 import { describeFileLicense } from '../lib/fileLicenses';
 import { FileUploadProgress, type FileUploadState } from './FileUploadProgress';
-import type { AuthoringContext, FileLicense } from '../types';
+import type { AuthoringContext, FileLicense, MaterialItem } from '../types';
 
 type QueueItem = { id: number; file: File; status: FileUploadState; progress: number; error?: string };
-type CompletionKey = 'authoring.created' | 'authoring.files_saved';
+export type CompletionKey = 'authoring.created' | 'authoring.files_saved';
 const fieldClass = 'w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-2 text-slate-900 dark:text-slate-100';
 const buttonClass = 'rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 disabled:opacity-50';
 
-export function CourseAuthoring({ context, onRefresh, editorUrl }: { context: AuthoringContext; onRefresh: () => void; editorUrl?: string }) {
+export function CourseAuthoring({ context, onRefresh, onComplete, onStart, editorUrl }: {
+  context: AuthoringContext; onRefresh: (items?: MaterialItem[]) => void;
+  onComplete: (key: CompletionKey, items: MaterialItem[]) => void; onStart: () => void; editorUrl?: string;
+}) {
   useLanguage();
   const [open, setOpen] = useState(false);
-  const [notice, setNotice] = useState<CompletionKey | ''>('');
   if (!context.can_create && !editorUrl) return null;
   return <>
-    {notice && <span role="status" className="text-xs text-emerald-700 dark:text-emerald-300">{t(notice)}</span>}
     <button className="flex items-center gap-1 rounded-lg bg-[#0AACA5] px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-teal-400"
-      onClick={() => { setNotice(''); setOpen(true); }}><Plus size={16} />{t('authoring.add')}</button>
+      onClick={() => { onStart(); setOpen(true); }}><Plus size={16} />{t('authoring.add')}</button>
     {open && <AddObjectModal refId={context.ref_id} editorUrl={editorUrl} onClose={() => setOpen(false)} onRefresh={onRefresh}
-      onComplete={key => { setNotice(key); setOpen(false); onRefresh(); }} />}
+      onComplete={(key, items) => { setOpen(false); onComplete(key, items); }} />}
   </>;
 }
 
 function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
-  refId: string; onClose: () => void; onComplete: (key: CompletionKey) => void; onRefresh: () => void; editorUrl?: string;
+  refId: string; onClose: () => void; onComplete: (key: CompletionKey, items: MaterialItem[]) => void;
+  onRefresh: (items?: MaterialItem[]) => void; editorUrl?: string;
 }) {
   useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -93,25 +96,30 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
     setQueue(previous => previous.map(item => item.id === id ? { ...item, ...values } : item));
   }
   async function save() {
-    if (busy || uncertain) return;
+    if (busy || loading || uncertain || step === 'catalogue') return;
+    if (step === 'file' && (!licenses || !license || !queue.some(item => item.status === 'pending'))) return;
+    if (step === 'fold' && (!templates || !template)) return;
     setError('');
     if (step === 'fold' && !title.trim()) { setError(t('authoring.title_required')); return; }
     setBusy(true);
     try {
       if (step === 'fold') {
-        await api.createFolder(refId, { title: title.trim(), description, template_id: template });
-        onComplete('authoring.created');
+        const result = await api.createFolder(refId, { title: title.trim(), description, template_id: template });
+        dialog.current?.close();
+        onComplete('authoring.created', result.items);
       } else {
         const pending = queue.filter(item => item.status === 'pending');
         let next = 0;
         let failed = hasFailedUploads;
+        const savedItems: MaterialItem[] = [];
         // Limit parallel uploads to avoid saturating memory/connections for big lectures.
         const worker = async () => {
           while (next < pending.length) {
             const item = pending[next++];
             update(item.id, { status: 'saving' });
             try {
-              await api.uploadCourseFile(refId, item.file, license, progress => update(item.id, { progress }));
+              const result = await api.uploadCourseFile(refId, item.file, license, progress => update(item.id, { progress }));
+              savedItems.push(...result.items);
               update(item.id, { status: 'saved', progress: 100 });
             } catch (e) {
               failed = true;
@@ -120,9 +128,13 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
           }
         };
         await Promise.all(Array.from({ length: Math.min(3, pending.length) }, worker));
-        onRefresh();
-        if (failed) setError(t('authoring.uploads_partial'));
-        else onComplete('authoring.files_saved');
+        if (failed) {
+          setError(t('authoring.uploads_partial'));
+          onRefresh(savedItems);
+        } else {
+          dialog.current?.close();
+          onComplete('authoring.files_saved', savedItems);
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : t('authoring.uncertain'));
@@ -136,7 +148,7 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
       <button disabled={busy} onClick={onClose} aria-label={t('authoring.close')} className={buttonClass}><X size={18} /></button>
     </div>
     <div className="space-y-4 p-5" aria-busy={busy || loading}>
-      {error && <div role="alert" className="rounded-lg bg-rose-50 dark:bg-rose-950/40 p-3 text-rose-800 dark:text-rose-200">{error}</div>}
+      {error && <ErrorNotice message={error} connectionInline />}
       {(uncertain || hasFailedUploads) && <a className="block text-teal-700 dark:text-teal-300 underline" target="_blank" rel="noreferrer"
         href={`https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&ref_id=${encodeURIComponent(refId)}`}>{t('authoring.open_ilias')}</a>}
       {step === 'catalogue' ? <>
@@ -231,7 +243,7 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
       <button disabled={busy} className={buttonClass} onClick={onClose}>{t('authoring.cancel')}</button>
       {step !== 'catalogue' && <span className="group relative inline-flex" tabIndex={busy || loading ? 0 : undefined}>
         <button type="submit" form="object-creation-form" className="rounded-lg bg-[#0AACA5] px-4 py-2 font-semibold text-slate-950 disabled:pointer-events-none disabled:opacity-50"
-        disabled={busy || loading || uncertain || (step === 'file' && (!license || !queue.some(item => item.status === 'pending')))}>
+        disabled={busy || loading || uncertain || (step === 'file' && (!licenses || !license || !queue.some(item => item.status === 'pending'))) || (step === 'fold' && (!templates || !template))}>
         {t(step === 'fold' ? 'authoring.create' : 'authoring.upload')}</button>
         {(busy || loading) && <span role="tooltip" className="pointer-events-none absolute bottom-full right-0 mb-2 hidden whitespace-nowrap rounded-md bg-slate-900 dark:bg-slate-100 px-3 py-2 text-xs text-white dark:text-slate-900 shadow-lg group-hover:block group-focus:block">{t('authoring.busy')}</span>}
       </span>}

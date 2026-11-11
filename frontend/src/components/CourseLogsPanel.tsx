@@ -1,3 +1,5 @@
+import { useConnectionRetry } from '../lib/connection';
+import { ErrorNotice } from './ErrorNotice';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useEffect } from 'react';
 import {
@@ -24,6 +26,7 @@ export const CourseLogsPanel: React.FC<CourseLogsPanelProps> = ({
   initialLogs,
 }) => {
   useLanguage();
+  const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<CourseLogItem[]>([]);
   const [isLoadingAll, setIsLoadingAll] = useState(false);
   const [hasFetchedAll, setHasFetchedAll] = useState(false);
@@ -34,12 +37,10 @@ export const CourseLogsPanel: React.FC<CourseLogsPanelProps> = ({
     setLogs(merged);
   }, [courseId, initialLogs]);
 
-  if (!logs || logs.length === 0) {
-    return null;
-  }
 
   const handleFetchAllLogs = async () => {
     setIsLoadingAll(true);
+    setError(null);
     try {
       const res = await api.getCourseLogs(courseId, 1);
       if (res && res.logs) {
@@ -48,11 +49,15 @@ export const CourseLogsPanel: React.FC<CourseLogsPanelProps> = ({
         setHasFetchedAll(true);
       }
     } catch (e) {
-      console.error('Failed to fetch full course logs', e);
+      setError(e instanceof Error ? e.message : t('errors.load_failed'));
     } finally {
       setIsLoadingAll(false);
     }
   };
+
+  useConnectionRetry(() => { if (error) void handleFetchAllLogs(); });
+
+  if (!logs || logs.length === 0) return null;
 
   const getLogIcon = (type: string) => {
     switch (type) {
@@ -67,6 +72,7 @@ export const CourseLogsPanel: React.FC<CourseLogsPanelProps> = ({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden dark:border-slate-800 dark:bg-slate-900 transition-colors">
+      {error && <ErrorNotice message={error} onRetry={handleFetchAllLogs} />}
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/70">
         <div className="flex items-center gap-2">

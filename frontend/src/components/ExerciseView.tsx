@@ -1,3 +1,5 @@
+import { ErrorNotice } from './ErrorNotice';
+import { useConnectionRetry } from '../lib/connection';
 import { SidebarPinButton } from './SidebarPinButton';
 import { courseHref } from '../lib/sidebarPins';
 import { SyncIndicator } from './SyncIndicator';
@@ -44,6 +46,7 @@ import {
   TAQuickFilter,
 } from '../types';
 import { api } from '../lib/api';
+import { rememberedExerciseTab, rememberExerciseTab } from '../lib/exercisePreferences';
 import { navigationGuard, useNavigationGuard } from '../lib/navigationGuard';
 import { confirmDialog, alertDialog } from '../lib/dialog';
 import { cache, EXERCISE_OVERVIEW_PREFIX, EXERCISE_SUBMISSIONS_PREFIX } from '../lib/cache';
@@ -95,8 +98,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   // Top Navigation Tab: 'assignments' | 'info' | 'ta_grading'
   const [activeTab, setActiveTab] = useState<'assignments' | 'info' | 'ta_grading'>(() => {
-    if (activeTabProp === 'info') return 'info';
-    if (activeTabProp === 'submissions') return 'ta_grading';
+    const tab = activeTabProp || rememberedExerciseTab(courseRefId);
+    if (tab === 'info') return 'info';
+    if (tab === 'submissions') return 'ta_grading';
     return 'assignments';
   });
   const [taManagementMode, setTaManagementMode] = useState<'none' | 'list' | 'editor'>(() => {
@@ -107,29 +111,32 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   // Sync state when activeTabProp changes (from URL / popstate / Mouse 4/5)
   useEffect(() => {
-    if (!activeTabProp || activeTabProp === 'assignments') {
+    const tab = activeTabProp || rememberedExerciseTab(courseRefId);
+    if (activeTabProp) rememberExerciseTab(courseRefId, activeTabProp);
+    if (tab === 'assignments') {
       setActiveTab('assignments');
       setTaManagementMode('none');
-    } else if (activeTabProp === 'info') {
+    } else if (tab === 'info') {
       setActiveTab('info');
       setTaManagementMode('none');
-    } else if (activeTabProp === 'submissions') {
+    } else if (tab === 'submissions') {
       setActiveTab('ta_grading');
       setTaManagementMode('none');
-    } else if (activeTabProp === 'manage') {
+    } else if (tab === 'manage') {
       setActiveTab('assignments');
       setTaManagementMode('list');
-    } else if (activeTabProp === 'manage-edit') {
+    } else if (tab === 'manage-edit') {
       setActiveTab('assignments');
       setTaManagementMode('editor');
     }
-  }, [activeTabProp]);
+  }, [activeTabProp, courseRefId]);
 
   const switchTab = useCallback(
     async (tab: ExerciseTab) => {
       if (tab !== activeTabProp && !await navigationGuard.confirmNavigation()) {
         return;
       }
+      rememberExerciseTab(courseRefId, tab);
       if (tab === 'assignments') {
         setActiveTab('assignments');
         setTaManagementMode('none');
@@ -150,7 +157,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         onTabChange(tab);
       }
     },
-    [onTabChange]
+    [onTabChange, activeTabProp, courseRefId]
   );
   const [editingTaAssId, setEditingTaAssId] = useState<string | null>(null);
   const [editingTaTypeId, setEditingTaTypeId] = useState<number>(1);
@@ -160,6 +167,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const [overviewData, setOverviewData] = useState<ExerciseOverviewResponse | null>(() => {
     return cache.getCachedExerciseOverview(exerciseRefId);
   });
+  useEffect(() => {
+    if (activeTab === 'ta_grading' && overviewData && !overviewData.has_ta_access) {
+      setActiveTab('assignments');
+      rememberExerciseTab(courseRefId, 'assignments');
+      if (activeTabProp === 'submissions') onTabChange?.('assignments');
+    }
+  }, [activeTab, overviewData, courseRefId, activeTabProp, onTabChange]);
   const [isLoadingOverview, setIsLoadingOverview] = useState<boolean>(() => {
     return !cache.getCachedExerciseOverview(exerciseRefId);
   });
@@ -180,6 +194,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const [infoData, setInfoData] = useState<ExerciseInfoResponse | null>(() => {
     return cache.getCachedExerciseInfo(exerciseRefId);
   });
+  const [infoError, setInfoError] = useState<string | null>(null);
   const [isLoadingInfo, setIsLoadingInfo] = useState(false);
 
   // TA Grading Tab state (Cached per exerciseRefId + assId)
@@ -582,6 +597,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       let active = true;
       const cached = cache.getCachedExerciseInfo(exerciseRefId);
       if (cached) setInfoData(cached);
+      setInfoError(null);
       setIsLoadingInfo(true);
       api
         .getExerciseInfo(exerciseRefId)
@@ -591,8 +607,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           cache.setCachedExerciseInfo(exerciseRefId, data);
           setIsLoadingInfo(false);
         })
-        .catch(() => {
-          if (active) setIsLoadingInfo(false);
+        .catch((error) => {
+          if (active) { setIsLoadingInfo(false); setInfoError(error.message || t('errors.load_failed')); }
         });
       return () => { active = false; setIsLoadingInfo(false); };
     }
@@ -1420,6 +1436,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     if (activeTab === 'ta_grading') {
       loadTaSubmissions(selectedTaAssId || undefined, false, true);
     } else if (activeTab === 'info') {
+      setInfoError(null);
       setIsLoadingInfo(true);
       api
         .getExerciseInfo(exerciseRefId)
@@ -1428,13 +1445,16 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           cache.setCachedExerciseInfo(exerciseRefId, data);
           setIsLoadingInfo(false);
         })
-        .catch(() => {
+        .catch((error) => {
+          setInfoError(error.message || t('errors.load_failed'));
           setIsLoadingInfo(false);
         });
     }
   }, [activeTab, loadOverview, loadTaSubmissions, selectedTaAssId, exerciseRefId]);
 
   // Extract distinct assigned TAs from submissions
+  useConnectionRetry(handleRefresh);
+
   const assignedTAsList = useMemo(() => {
     const map = new Map<string, string>();
     (taSubmissionsData?.submissions || []).forEach((s) => {
@@ -1845,11 +1865,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
               <p className="text-xs font-semibold">{t("Lade Übungsblätter...")}</p>
             </div>
           ) : overviewError ? (
-            <div className="rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/30 p-6 text-center space-y-2">
-              <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 mx-auto" />
-              <h3 className="text-sm font-bold text-red-900 dark:text-red-200">{t("Fehler beim Laden")}</h3>
-              <p className="text-xs text-red-600 dark:text-red-300">{overviewError}</p>
-            </div>
+            <ErrorNotice message={overviewError} onRetry={() => loadOverview(true)} />
           ) : filteredAssignments.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center text-slate-400 dark:text-slate-500 space-y-2">
               <Layers className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto" />
@@ -1982,7 +1998,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           ======================================================== */}
       {activeTab === 'info' && (
         <div className="space-y-6 max-w-4xl mx-auto">
-          {isLoadingInfo && !infoData ? (
+          {infoError && <ErrorNotice message={infoError} onRetry={handleRefresh} />}
+          {infoError && !infoData ? null : isLoadingInfo && !infoData ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
               <p className="text-xs font-semibold">{t("Lade Kriterien & Informationen...")}</p>
             </div>
@@ -2216,15 +2233,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           )}
 
           {/* Submissions List */}
-          {taSubmissionsError && (
-            <div role="alert" className="flex flex-col items-stretch gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
-              <p className="min-w-0 flex-1">{taSubmissionsError}</p>
-              <button type="button" onClick={() => loadTaSubmissions(selectedTaAssId || undefined, false, true)}
-                className="min-h-11 shrink-0 self-start rounded-xl border border-red-300 px-3 py-2 font-semibold sm:self-auto dark:border-red-800">
-                {t('Erneut versuchen')}
-              </button>
-            </div>
-          )}
+          {taSubmissionsError && <ErrorNotice message={taSubmissionsError} onRetry={handleRefresh} />}
 
           {isLoadingTaSubmissions && !currentSubmissionsData ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">

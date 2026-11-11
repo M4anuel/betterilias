@@ -301,6 +301,53 @@ emulation with mocked API data, not physical-device or live ILIAS validation.
 Phone and desktop screenshots were inspected for readable status text, spacing
 and clipping alongside the logo and settings button.
 
+## Course-management feedback and uploads
+
+Creation, uploads, deletion and saved ordering share one dismissible inline banner.
+Its close control has a 44 px target and returns keyboard focus to the management
+heading. A confirmed save followed by a failed refresh uses one warning explaining
+that the write completed and should not be repeated. Confirmed created objects stay
+visible while their management permissions await a successful refresh. Invalid or
+empty successful HTTP responses cannot produce an upload-success message; an empty
+upload queue cannot submit. Successful uploads trigger one refresh.
+
+On phones, item actions occupy a separate row so the name retains readable width;
+tablet and desktop layouts keep compact inline controls. The feedback regression
+exercises creation, four unconfirmed upload responses, a confirmed upload with a
+failed refresh, deletion and keyboard dismissal in German/English and both themes,
+at 320/390/430/768/1280 px and 844 x 390. Screenshots are inspected for wrapping,
+alignment and clipping. These are mocked Chromium emulation checks, not physical
+iOS Safari/Android Chrome or live ILIAS validation. Native upload tests also cover
+an initially empty widget whose metadata controls exist only inside a template.
+The reported production failure still needs a live retry after deployment.
+
+Deletion review now opens immediately with the selected item names. Only confirmation
+waits for a fresh backend inspection, with a spinner in that button; Cancel/Escape
+remain available during the read. Late responses after cancellation are ignored.
+Cached previews never enable confirmation before the fresh review arrives. Inspection
+errors stay in the dialog with a retry action. During the actual deletion, confirmation
+shows its spinner again, dismissal is disabled, and confirmed success closes the
+dialog and shows the shared banner. Spinner space is reserved to keep buttons stable,
+animation respects reduced motion, and native Cancel autofocus/focus return is retained.
+The same emulated viewport/language/theme matrix covers delayed reviews/deletions,
+cancelled requests, failed inspection/retry and cached previews, with screenshots.
+
+## Lecture-specific exercise tabs
+
+The exercise view remembers Assignments, Info or Submissions & Grades per lecture
+and session account in browser storage, including across reloads and different
+exercise containers in the same lecture. Explicit tab links override the preference;
+Assignments is explicit in browser history so Back/Forward cannot accidentally
+restore a different remembered tab. Management/editor modes are not saved. A user
+without TA access falls back from remembered grading to Assignments. Storage failures
+leave the default navigation usable.
+
+The browser regression uses the existing phone selector and desktop navigation
+buttons across 320/390/430/768/1280 px and 844 x 390, German/English and light/dark.
+It exercises independent lectures, another exercise in the same lecture, explicit
+links, Back/Forward, reload, account isolation and lost TA access. Screenshots use
+mocked Chromium emulation; physical-device and live ILIAS validation are not claimed.
+
 ## Custom Confirmation & Navigation Dialog System
 
 Browser-native window.confirm and window.alert dialogs have been entirely replaced across student and TA workflows with a responsive custom dialog system (ConfirmModal.tsx and dialog.ts):

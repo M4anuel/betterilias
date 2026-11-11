@@ -1,3 +1,5 @@
+import { ErrorNotice } from './ErrorNotice';
+import { useConnectionRetry } from '../lib/connection';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowRight, BookOpen, Search, SlidersHorizontal, Star, Users } from 'lucide-react';
 import { CourseItem } from '../types';
@@ -30,9 +32,10 @@ export const MyCoursesView: React.FC<{
   const pendingFocus = useRef<string | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const [revision, setRevision] = useState(0);
+  useConnectionRetry(() => setRevision(value => value + 1));
   const [loading, setLoading] = useState(() => !cache.getCachedMyCourses());
   const [isSyncing, setIsSyncing] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [storageError, setStorageError] = useState(false);
   useEffect(() => {
     let active = true;
@@ -43,14 +46,14 @@ export const MyCoursesView: React.FC<{
     }
     setLoading(!courses);
     setIsSyncing(true);
-    setError(false);
+    setError(null);
     api.getMyCourses().then(data => {
       if (active) {
         setCourses(data.courses);
         cache.setCachedMyCourses(data.courses, revision > 0);
       }
     })
-      .catch(() => { if (active) setError(true); })
+      .catch((error) => { if (active) setError(error.message || t('my_courses.load_failed')); })
       .finally(() => {
         if (active) {
           setLoading(false);
@@ -151,8 +154,7 @@ export const MyCoursesView: React.FC<{
       </div>
     </div>
     {storageError && <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">{t('my_courses.storage_error')}</p>}
-    {error && <div role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900 dark:bg-amber-950 dark:text-amber-200">{t('my_courses.load_failed')}
-      <button type="button" onClick={() => setRevision(value => value + 1)} className="ml-2 min-h-11 underline">{t('Erneut versuchen')}</button></div>}
+    {error && <ErrorNotice message={error} onRetry={() => setRevision(value => value + 1)} />}
     {loading && !courses && <p role="status" className="text-sm text-slate-500 dark:text-slate-400">{t('my_courses.loading')}</p>}
     {courses && <p role="status" className="text-sm text-slate-500 dark:text-slate-400">{t('my_courses.count', { count: visible.length, total: courses.length })}</p>}
     {renderSection(pinned, t('my_courses.favourites'))}

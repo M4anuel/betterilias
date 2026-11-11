@@ -1,6 +1,8 @@
 import { t, useLanguage } from './lib/i18n';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { AlertCircle, ExternalLink, Puzzle, X } from 'lucide-react';
+import { ConnectionNotice } from './components/ConnectionNotice';
+import { ErrorNotice } from './components/ErrorNotice';
+import { useConnectionRetry } from './lib/connection';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { SidebarResizer, SIDEBAR_MIN_WIDTH, SIDEBAR_COLLAPSE_WIDTH } from './components/SidebarResizer';
@@ -63,7 +65,7 @@ export function stateToUrl(state: NavigationState): string {
     }
     if (state.exerciseId) {
       params.set('exercise', state.exerciseId);
-      if (state.exerciseTab && state.exerciseTab !== 'assignments') {
+      if (state.exerciseTab) {
         params.set('tab', state.exerciseTab);
       }
     }
@@ -142,12 +144,6 @@ export const App: React.FC = () => {
   }, [isMobile, mobileNavigationOpen]);
   // --- Auth & Session State ---
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
-  const [isInactiveBannerDismissed, setIsInactiveBannerDismissed] = useState(false);
-  useEffect(() => {
-    if (authStatus?.authenticated) {
-      setIsInactiveBannerDismissed(false);
-    }
-  }, [authStatus?.authenticated]);
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
   const initialParamsForLegal = new URLSearchParams(window.location.search);
   const initialViewForLegal = initialParamsForLegal.get('view');
@@ -236,6 +232,7 @@ export const App: React.FC = () => {
     return containerId ? cache.getCachedMaterials(containerId) : null;
   });
   const [isRevalidatingMaterials, setIsRevalidatingMaterials] = useState(false);
+  const [semesterError, setSemesterError] = useState<string | null>(null);
   const [loadMaterialsError, setLoadMaterialsError] = useState<string | null>(null);
   const materialsRequestSeq = useRef<number>(0);
   const currentNavStateRef = useRef<NavigationState>({
@@ -287,8 +284,16 @@ export const App: React.FC = () => {
 
   // --- Sidebar & Modal State ---
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() =>
-    cache.getSidebarCollapsed()
+    isLandingOpen && !cache.getSessionId() ? true : cache.getSidebarCollapsed()
   );
+  useEffect(() => {
+    if (isLandingOpen && authStatus?.authenticated === false) setIsSidebarCollapsed(true);
+  }, [isLandingOpen, authStatus?.authenticated]);
+  useEffect(() => {
+    const connect = () => setIsExtensionModalOpen(true);
+    window.addEventListener('betterilias-connect', connect);
+    return () => window.removeEventListener('betterilias-connect', connect);
+  }, []);
   const [isNicknameModalOpen, setIsNicknameModalOpen] = useState(false);
   const [nicknamesVersion, setNicknamesVersion] = useState(0);
   const effectiveSidebarWidth = Math.min(sidebarWidth, viewportWidth / 2);
@@ -325,6 +330,7 @@ export const App: React.FC = () => {
   const loadSemesters = useCallback(async (semId: string, forceRefresh: boolean = false) => {
     const reqId = ++semesterRequestSeq.current;
     setIsLoadingSemester(true);
+    setSemesterError(null);
 
     // 1. Immediately read cache or clear stale semester data
     const cached = cache.getCachedSemester(semId);
@@ -360,7 +366,7 @@ export const App: React.FC = () => {
       }
     } catch (err) {
       if (reqId === semesterRequestSeq.current) {
-        console.error('Error fetching semester data', err);
+        setSemesterError(err instanceof Error ? err.message : t('errors.load_failed'));
         if (cached) {
           setSemesterData(cached);
         }
@@ -867,7 +873,7 @@ export const App: React.FC = () => {
         courseId: selectedCourseId,
         containerId: currentContainerId,
         exerciseId: activeExerciseRefId,
-        exerciseTab: tab === 'assignments' ? null : tab,
+        exerciseTab: tab,
       };
       pushAppHistory(nextState, '', stateToUrl(nextState));
     },
@@ -913,7 +919,7 @@ export const App: React.FC = () => {
       setAuthStatus((previous) => ({
         ...previous,
         authenticated,
-        cookies_present: authenticated,
+        cookies_present: authenticated || Boolean(previous?.cookies_present) || Boolean(cache.getSessionId()),
         user_name: authenticated ? previous?.user_name : undefined,
       }));
     };
@@ -1053,6 +1059,12 @@ export const App: React.FC = () => {
     }
   };
 
+  useConnectionRetry(() => {
+    void checkAuth();
+    void loadSemesters(selectedSemester, true);
+    if (currentContainerId) void loadCourseMaterials(currentContainerId, false, true);
+  });
+
   // --- Toggle Sidebar ---
   const handleToggleSidebar = () => {
     if (isMobile) {
@@ -1185,46 +1197,9 @@ export const App: React.FC = () => {
         </div>}
 
         {/* Center Content Area */}
+        <div className="flex min-w-0 flex-1 flex-col">
         <main ref={workspaceRef} className={`@container/workspace min-w-0 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50 ${workspaceWidth < 768 ? 'workspace-compact' : ''}`}>
           <WorkspaceWidth.Provider value={workspaceWidth}>
-          {authStatus && !authStatus.authenticated && !isInactiveBannerDismissed && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-2xs dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                <span>
-                  <strong>{t("Sitzung nicht aktiv:")}</strong> {t("Du bist aktuell nicht bei ILIAS angemeldet. Gespeicherte Inhalte werden aus dem Cache angezeigt.")}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <a
-                  href="https://ilias.unibe.ch"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 shadow-2xs hover:bg-amber-100 transition dark:border-amber-800 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-slate-800"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  <span>{t("Bei ILIAS anmelden")}</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setIsExtensionModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0AACA5] px-2.5 py-1 text-xs font-semibold text-white shadow-2xs hover:opacity-90 transition cursor-pointer"
-                >
-                  <Puzzle className="h-3.5 w-3.5" />
-                  <span>{t("Browser-Erweiterung")}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsInactiveBannerDismissed(true)}
-                  aria-label={t("Schliessen")}
-                  title={t("Schliessen")}
-                  className="rounded-lg p-1 text-amber-700 hover:bg-amber-100 hover:text-amber-900 dark:text-amber-300 dark:hover:bg-amber-900/50 dark:hover:text-amber-100 transition cursor-pointer shrink-0 ml-1"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          )}
           {isLandingOpen ? (
             <LandingView
               onOpenApp={handleOpenApp}
@@ -1270,6 +1245,8 @@ export const App: React.FC = () => {
               onSelectCourse={handleSelectCourse}
             />
           ) : (
+            <>
+            {semesterError && <div className="p-4"><ErrorNotice message={semesterError} onRetry={() => loadSemesters(selectedSemester, true)} /></div>}
             <SemesterView
               semesterData={semesterData}
               selectedSemester={selectedSemester}
@@ -1280,10 +1257,12 @@ export const App: React.FC = () => {
               isLoading={isLoadingSemester}
               onManualRefresh={() => loadSemesters(selectedSemester, true)}
               onOpenCalendar={handleNavigateCalendar}
-            />
+            /></>
           )}
           </WorkspaceWidth.Provider>
         </main>
+        <ConnectionNotice auth={authStatus} landing={isLandingOpen} onConnect={() => setIsExtensionModalOpen(true)} />
+        </div>
       </div>
 
       {/* Voluntary course membership */}

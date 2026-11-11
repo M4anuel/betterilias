@@ -1,3 +1,5 @@
+import { useConnectionRetry } from '../lib/connection';
+import { ErrorNotice } from './ErrorNotice';
 import { t, useLanguage } from '../lib/i18n';
 import { navigationGuard, useNavigationGuard } from '../lib/navigationGuard';
 import { confirmDialog } from '../lib/dialog';
@@ -6,7 +8,6 @@ import {
   ArrowLeft,
   Save,
   Loader2,
-  AlertCircle,
   Info,
   CheckCircle2,
   FileText,
@@ -490,6 +491,20 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
     }
   };
 
+  useConnectionRetry(() => {
+    if (!error) return;
+    if (assId && initialSnapshot === null) {
+      loadedAssIdRef.current = undefined;
+      void loadDetail();
+    } else if (!assId) {
+      // Refresh only the catalogue; keep every editor input and queued file.
+      void api.getTAAssignments(exerciseRefId).then(data => {
+        if (data.available_types) setAvailableTypes(data.available_types);
+        setError(null);
+      }).catch(() => {});
+    }
+  });
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -540,12 +555,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       </div>
 
       {/* Notifications */}
-      {error && (
-        <div role="alert" className="flex items-center gap-3 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-sm">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorNotice message={error} />}
 
       {successMsg && (
         <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-sm">

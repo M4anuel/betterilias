@@ -1,3 +1,5 @@
+import { ErrorNotice } from './ErrorNotice';
+import { useConnectionRetry } from '../lib/connection';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useState } from 'react';
 import { ChevronRight, Folder, Home, Lock } from 'lucide-react';
@@ -21,6 +23,7 @@ export const RepositoryView: React.FC<Props> = ({ refId, onNavigate, onOpenCours
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(true);
   const [revision, setRevision] = useState(0);
+  useConnectionRetry(() => setRevision(value => value + 1));
   useEffect(() => {
     let active = true;
     setError(null);
@@ -54,7 +57,7 @@ export const RepositoryView: React.FC<Props> = ({ refId, onNavigate, onOpenCours
         ariaLabel={t("Magazin aktualisieren")}
       />
     </div>
-    {error && <div role="alert" className="text-red-600">{error} <button type="button" onClick={() => setRevision((v) => v + 1)} className="underline">{t("Erneut versuchen")}</button></div>}
+    {error && <ErrorNotice message={error} onRetry={() => setRevision(value => value + 1)} />}
     {!data ? !error && <p role="status">{t("Inhalte werden geladen…")}</p>
       : data.items.length === 0 ? <p className="text-slate-500">{t("Keine sichtbaren Einträge vorhanden.")}</p>
       : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

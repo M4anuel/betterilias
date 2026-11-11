@@ -4,6 +4,21 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Unify session/connection recovery in a persistent workspace status card and
+  page/modal errors in a shared notice; simplify signed-out landing navigation,
+  link Chrome Web Store installation, and cover responsive recovery without replaying writes.
+
+- [x] Remember Assignments/Info/Submissions & Grades per lecture and signed-in
+  account; honour explicit links/history and fall back safely without TA permission.
+- [x] Open deletion review immediately; keep Cancel available during inspection,
+  disable confirmation with a spinner until ready, and show deletion progress until completion.
+- [x] Unify management creation/upload/delete/order feedback in dismissible banners;
+  prevent unconfirmed upload success and distinguish saved writes from refresh failures.
+- [x] Discover course-upload metadata inside empty native HTML templates across
+  parser versions; verify handler upload, metadata save and the newly created object.
+- [ ] Confirm the reported production course-upload failure with a live retry
+  after deployment; the affected user's request/response is not yet available.
+
 - [x] Refine narrow/collapsed sidebar geometry, quiet pin actions, exclusive active
   destinations and confirmed sidebar unpinning; keep content pin toggles instant.
 

@@ -126,7 +126,9 @@ def parse_creation_form(html_content: str, ref_id: str, object_type: str) -> Cre
                              'selected': r.has_attr('checked')} for r in radios]
         result.template_field = radios[0]['name'] if radios else ''
     else:
-        result.file_fields = list(dict.fromkeys(node['name'] for node in form.select('input[name], textarea[name]')
+        # Empty upload widgets keep their metadata controls inside <template>.
+        # CSS selection can omit this inert subtree on newer Linux libxml2 builds.
+        result.file_fields = list(dict.fromkeys(node['name'] for node in form.find_all(['input', 'textarea'], attrs={'name': True})
                                                 if re.fullmatch(r'form/input_\d+\[input_\d+\]\[\]', node['name'])))
         if len(result.file_fields) != 3:
             raise ValueError(t('authoring.form_changed'))

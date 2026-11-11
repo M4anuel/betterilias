@@ -49,7 +49,8 @@ def test_mobile_navigation_content_settings_and_draft(local_site, language, sche
             toggle.click()
             drawer = page.get_by_role('dialog', name=tr('Meine Vorlesungen'))
             playwright.expect(drawer).to_be_visible()
-            assert drawer.bounding_box()['width'] < width
+            # Mobile navigation intentionally fills the viewport (see .mobile-navigation).
+            assert drawer.bounding_box()['width'] == width
             drawer.get_by_role('button', name=title, exact=True).click()
             playwright.expect(drawer).to_be_hidden()
             toggle.click()

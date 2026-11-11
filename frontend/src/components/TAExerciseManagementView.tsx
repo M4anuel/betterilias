@@ -1,3 +1,5 @@
+import { useConnectionRetry } from '../lib/connection';
+import { ErrorNotice } from './ErrorNotice';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
@@ -224,6 +226,10 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
     );
   }, [assignments, searchQuery]);
 
+  useConnectionRetry(() => {
+    if (error && !hasUnsavedOrder && !isSavingOrder && !isDeleting) void loadAssignments();
+  });
+
   return (
     <div className="space-y-6">
       {/* Top Header & Actions */}
@@ -262,12 +268,7 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
       </div>
 
       {/* Notifications & Banners */}
-      {error && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-sm">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorNotice message={error} />}
 
       {(feedback || saveSuccessMsg) && (
         <div ref={feedbackRef} role="status" aria-label={t('assignment.confirmation')} aria-live="polite" aria-atomic="true" className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-sm">

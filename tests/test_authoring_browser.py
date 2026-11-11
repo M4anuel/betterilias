@@ -58,7 +58,8 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
             pending_uploads.append(route)
             # The test releases the first three after checking pending progress.
             if len(pending_uploads) > 3:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(dict(success=True, items=[])))
+                route.fulfill(status=200, content_type='application/json', body=json.dumps(dict(success=True, items=[
+                    dict(ref_id=str(60+len(pending_uploads)), title='Uploaded file', item_type='file', url='', properties={})])))
             return
         elif path.endswith('/materials'):
             body = dict(container_ref_id='42', title='Course', authoring=context, breadcrumbs=[], items=items,
@@ -148,7 +149,8 @@ def test_authoring_catalogue_folder_and_partial_file_upload(language, scheme):
             dialog.screenshot(path=f'.pytest_cache/upload-progress-{language}.png')
             for index in [2, 1, 0]:
                 pending_uploads[index].fulfill(status=502 if index == 1 else 200, content_type='application/json',
-                                              body=json.dumps({'detail': tr('authoring.uncertain')} if index == 1 else dict(success=True, items=[])))
+                                              body=json.dumps({'detail': tr('authoring.uncertain')} if index == 1 else dict(success=True, items=[
+                                                  dict(ref_id=str(60+index), title='Uploaded file', item_type='file', url='', properties={})])))
             playwright.expect(dialog.get_by_role('alert')).to_have_text(tr('authoring.uploads_partial'))
             playwright.expect(dialog.get_by_role('button', name=tr('authoring.upload'), exact=True)).to_be_disabled()
             playwright.expect(dialog.get_by_text(tr('authoring.saved'), exact=True)).to_have_count(3)

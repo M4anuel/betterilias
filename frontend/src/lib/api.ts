@@ -36,12 +36,14 @@ import {
   CalendarSubscriptionResponse,
 } from '../types';
 import { cache } from './cache';
+import { reportConnection } from './connection';
 import type { VideoStreamInfo } from '../types';
 import { navigationGuard } from './navigationGuard';
 import { considerDiagnosticResponse, clientDiagnostic } from './diagnosticReports';
 
 
 const API_BASE = '/api';
+class ResponseFailure extends Error {}
 
 export function apiError(error: { detail?: unknown }): string | undefined {
   if (typeof error.detail === 'string') return error.detail;
@@ -66,24 +68,51 @@ export async function sessionFetch(input: string, init?: RequestInit & { trackPe
     navigationGuard.incrementPending();
   }
 
+  const retryRead = async () => {
+    if (!isMutation) return sessionFetch(input, { ...init, signal: undefined });
+    // A failed write may have succeeded remotely. Check reachability without replaying it.
+    const status = await sessionFetch(`${API_BASE}/auth/status`);
+    if (status.ok) reportConnection(null, input);
+  };
+  // Bound the wait for response headers, then release the timer so large streamed
+  // downloads can finish. Keep caller cancellation active for the response body.
+  const timeout = new AbortController();
+  const deadline = !isMutation ? window.setTimeout(() => timeout.abort(new DOMException('Read timed out', 'TimeoutError')), 25000) : undefined;
+
   try {
     const response = await fetch(input, {
       ...init,
       credentials: 'same-origin',
+      signal: !isMutation ? AbortSignal.any([...(init?.signal ? [init.signal] : []), timeout.signal]) : init?.signal,
       headers,
     });
 
-    if (!input.startsWith(`${API_BASE}/diagnostics/`)) considerDiagnosticResponse(response.headers, sessionId);
+    if (!input.startsWith(`${API_BASE}/diagnostics/`)) {
+      considerDiagnosticResponse(response.headers, sessionId);
+      reportConnection([502, 503, 504].includes(response.status) ? 'unavailable' : null, input, retryRead);
+    }
     if (response.status === 401) {
       window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
-    } else if (response.ok && !input.startsWith(`${API_BASE}/auth/`)) {
+    } else if (response.ok && !input.startsWith(`${API_BASE}/auth/`) && !input.startsWith(`${API_BASE}/diagnostics/`)) {
       window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
     }
+    if (!isMutation && response.status === 401) throw new ResponseFailure(t('connection.auth'));
+    if (!isMutation && [502, 503, 504].includes(response.status)) throw new ResponseFailure(t('connection.failed'));
+    if (!isMutation && response.status === 403) throw new ResponseFailure(t('errors.forbidden'));
+    if (!isMutation && response.status === 404) throw new ResponseFailure(t('errors.not_found'));
+    if (!isMutation && response.status === 429) throw new ResponseFailure(t('errors.rate_limited'));
+    if (!isMutation && response.status >= 500) throw new ResponseFailure(t('errors.load_failed'));
     return response;
   } catch (error) {
+    if (error instanceof ResponseFailure) throw error;
     if (!(error instanceof DOMException && error.name === 'AbortError') && !input.startsWith(`${API_BASE}/diagnostics/`)) void clientDiagnostic('CLIENT_CONNECTION');
+    if (!init?.signal?.aborted && (error instanceof TypeError || (error instanceof DOMException && error.name === 'TimeoutError'))) {
+      if (!input.startsWith(`${API_BASE}/diagnostics/`)) reportConnection(navigator.onLine ? 'unavailable' : 'offline', input, retryRead);
+      if (!isMutation) throw new Error(t('connection.failed'));
+    }
     throw error;
   } finally {
+    window.clearTimeout(deadline);
     if (isMutation && init?.trackPending !== false) {
       navigationGuard.decrementPending();
     }
@@ -91,6 +120,16 @@ export async function sessionFetch(input: string, init?: RequestInit & { trackPe
 }
 
 const inFlightManagement = new Map<string, Promise<ManagementResponse>>();
+
+function confirmedCreation(value: unknown, kind: 'fold' | 'file'): AuthoringResult {
+  const result = value as Partial<AuthoringResult> | null;
+  if (!result || result.success !== true || !Array.isArray(result.items) || result.items.length !== 1 ||
+      !result.items.every(item => item && typeof item.ref_id === 'string' && /^\d+$/.test(item.ref_id) &&
+        item.item_type === kind && typeof item.title === 'string')) {
+    throw new Error(t('authoring.uncertain'));
+  }
+  return result as AuthoringResult;
+}
 
 export const api = {
   async getVideoCaptions(url: string, track: number, signal?: AbortSignal): Promise<string> {
@@ -158,7 +197,7 @@ export const api = {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values),
     });
     if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('authoring.uncertain'));
-    return res.json();
+    return confirmedCreation(await res.json().catch(() => null), 'fold');
   },
   uploadCourseFile(refId: string, file: File, license: string, onProgress: (progress: number) => void): Promise<AuthoringResult> {
     navigationGuard.incrementPending();
@@ -179,8 +218,11 @@ export const api = {
         try { data = JSON.parse(xhr.responseText); } catch { reject(new Error(t('authoring.uncertain'))); return; }
         if (xhr.status === 401) window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
         if (xhr.status >= 200 && xhr.status < 300) {
-          window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
-          resolve(data);
+          try {
+            const result = confirmedCreation(data, 'file');
+            window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
+            resolve(result);
+          } catch (error) { reject(error); }
         } else reject(new Error(apiError(data) || t('authoring.uncertain')));
       };
       const body = new FormData();
