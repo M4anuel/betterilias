@@ -47,6 +47,7 @@ EVENTS = {
 OPERATIONS = frozenset('grade allocation feedback_upload feedback_delete feedback_import '
     'submission_upload submission_delete team_create team_add team_remove team_delete '
     'assignment_save assignment_delete assignment_order instruction_upload instruction_delete '
+    'forum_post_save forum_thread_moderate forum_page_save '
     'folder_create course_upload material_delete material_order membership '
     'calendar_create calendar_update calendar_duplicate calendar_delete calendar_color '
     'calendar_ignore calendar_import calendar_token_rotate calendar_token_revoke '

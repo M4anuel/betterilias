@@ -65,6 +65,14 @@ def test_known_resource_links_and_signed_media_are_supported(policy, url):
     assert policy.resource_url(url).startswith((NATIVE, MEDIA))
 
 
+def test_forum_resource_download_is_limited_to_exact_post_attachment_selectors(policy):
+    attachment='/ilias.php?cmdClass=ilObjForumGUI&cmd=viewThread&ref_id=42&pos_pk=100&file='+'a'*32
+    assert policy.resource_url(attachment).startswith(NATIVE)
+    for extra in ['&action=showedit','&mark_read=1','&fallbackCmd=delete','&draft_id=1','&cmd=delete']:
+        with pytest.raises(OutboundTargetRejected):policy.resource_url(attachment+extra)
+    with pytest.raises(OutboundTargetRejected):policy.resource_url(attachment.replace('a'*32,'not-a-file-id'))
+
+
 @pytest.mark.parametrize('address', ['127.0.0.1', '10.0.0.1', '172.16.0.1', '192.168.1.1', '169.254.169.254',
     '100.64.0.1', '0.0.0.0', '224.0.0.1', '255.255.255.255', '::1', '::', 'fc00::1', 'fe80::1',
     '::ffff:127.0.0.1', '64:ff9b::7f00:1', '64:ff9b:1::1', '2002:7f00:1::', 'invalid'])

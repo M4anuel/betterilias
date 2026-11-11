@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 
-from backend.api.routes import auth, calendar, dashboard, exercises, materials, system
+from backend.api.routes import auth, calendar, dashboard, exercises, forums, materials, system
 from backend.config import settings
 from backend.scrapers.dumper import ScrapingParsingError
 from backend.services.ilias_client import SessionExpiredError
@@ -185,6 +185,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(materials.router, prefix="/api")
 app.include_router(exercises.router, prefix="/api")
+app.include_router(forums.router, prefix="/api")
 app.include_router(calendar.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")

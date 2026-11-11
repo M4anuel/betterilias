@@ -100,6 +100,16 @@ class TargetPolicy:
             raise OutboundTargetRejected('ambiguous_command')
         values = dict(lowered)
         command = values.get('cmd', '')
+        # Forum attachments use viewThread with an exact post/file selector.
+        # No other viewThread parameters (reply/edit/mark-read/draft actions) may
+        # enter the credentialed resource proxy through this read-only exception.
+        if (path.endswith('/ilias.php') and command == 'viewthread'
+                and values.get('cmdclass') == 'ilobjforumgui'
+                and values.get('ref_id', '').isdecimal() and values.get('pos_pk', '').isdecimal()
+                and re.fullmatch(r'[a-f0-9]{32}', values.get('file', ''))
+                and ('thr_pk' not in values or values['thr_pk'].isdecimal())
+                and set(values) <= {'baseclass', 'cmdclass', 'cmdnode', 'cmd', 'ref_id', 'thr_pk', 'pos_pk', 'page', 'file', 'rtoken', 'client_id'}):
+            return str(parsed.copy_with(fragment=None))
         reads = {'sendfile', 'download', 'downloadfile', 'downloadall', 'downloadreturned', 'sendassignedfile', 'downloadfeedbackfile'}
         if ((command and command not in reads) or
                 any(key.startswith('fallbackcmd') and value not in reads for key, value in lowered)):
