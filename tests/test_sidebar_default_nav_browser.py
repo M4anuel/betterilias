@@ -108,7 +108,7 @@ def test_hide_and_show_default_sidebar_nav_entries(local_site, language, scheme,
         if width < 1024:
             page.get_by_role('button', name=tr('Sidebar umschalten'), exact=True).click()
 
-        # All 4 are hidden, and the divider is also hidden
+        # All 4 are hidden
         pw.expect(nav.get_by_role('button', name=overview_name, exact=True)).to_have_count(0)
         pw.expect(nav.get_by_role('button', name=calendar_name, exact=True)).to_have_count(0)
         pw.expect(nav.get_by_role('button', name=my_courses_name, exact=True)).to_have_count(0)

@@ -172,7 +172,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const showCalendar = Boolean(onSelectCalendar && !hiddenNavItems.has('calendar'));
   const showMyCourses = !hiddenNavItems.has('my_courses');
   const showRepository = !hiddenNavItems.has('repository');
-  const hasAnyDefaultNav = showSemester || showCalendar || showMyCourses || showRepository;
 
   return <aside data-sidebar-collapsed={isCollapsed} style={{ width: isMobile ? '100%' : isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : width }} className="relative flex h-full min-h-0 shrink-0 select-none flex-col overflow-hidden border-r border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
     <div className={`flex ${isMobile ? 'h-14 px-3' : 'h-9 px-2.5'} shrink-0 items-center gap-2 overflow-hidden border-b border-slate-100 dark:border-slate-800 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
@@ -189,7 +188,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {showCalendar && onSelectCalendar && renderNavigation(t('calendar.sidebar_nav'), Calendar, isCalendarSelected, onSelectCalendar)}
       {showMyCourses && renderNavigation(t('my_courses.title'), Users, isMyCoursesSelected, onSelectMyCourses)}
       {showRepository && renderNavigation(t('Magazin'), Library, isRepositorySelected, onSelectRepository)}
-      {hasAnyDefaultNav && <div className="pt-2 pb-1"><div className="h-px bg-slate-100 dark:bg-slate-800" /></div>}
       {customSections ? <div className="space-y-1">
         {customOrder?.map(item => {
           if (item.type === 'section') return renderDivider(item.id, item.title || t('Abschnittsname'), true);
