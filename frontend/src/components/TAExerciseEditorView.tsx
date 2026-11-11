@@ -50,6 +50,9 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   onSaved,
 }) => {
   const language = useLanguage();
+  const [operationId] = useState(() => Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join(''));
+  const pendingCreation = useRef<{ payload: SaveTAAssignmentRequest; snapshot: string } | null>(null);
+  const [creationUncertain, setCreationUncertain] = useState(false);
   const [savedResult, setSavedResult] = useState<{ id: string; created: boolean; title: string } | null>(null);
   const [currentAssId, setCurrentAssId] = useState<string | null>(assId);
   const [isLoading, setIsLoading] = useState(false);
@@ -140,6 +143,13 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   });
 
 
+  const liveDraft = JSON.stringify({ title, typeId, mandatory, instructionHtml, startTime,
+    deadlineMode, deadline, hasGracePeriod, deadline2, maxFileEnabled, maxFile });
+  const draftState = useRef({ snapshot: liveDraft, baseline: initialSnapshot, pending: pendingFiles.length });
+  draftState.current = { snapshot: liveDraft, baseline: initialSnapshot, pending: pendingFiles.length };
+  const detailSequence = useRef(0);
+  const fileMutationVersion = useRef(0);
+
   // Track if initial load happened so typeId changes don't wipe user inputs
   const loadedAssIdRef = useRef<string | null | undefined>(undefined);
 
@@ -162,6 +172,9 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   const loadDetail = useCallback(async () => {
     if (loadedAssIdRef.current === assId) return;
     loadedAssIdRef.current = assId;
+    const sequence = ++detailSequence.current;
+    const openingDraft = draftState.current.snapshot;
+    const openingFiles = fileMutationVersion.current;
 
     if (!assId) {
       setIsLoading(false);
@@ -216,7 +229,11 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
         assId,
         typeId
       );
+      if (sequence !== detailSequence.current) return;
       cache.setCachedTAAssignmentDetail(exerciseRefId, assId, data);
+      const current = draftState.current;
+      const edited = current.baseline !== null ? current.snapshot !== current.baseline : current.snapshot !== openingDraft;
+      if (edited || current.pending > 0 || fileMutationVersion.current !== openingFiles) return;
       setTitle(data.title || '');
       setTypeId(data.type_id || initialTypeId);
       if (data.available_types && Object.keys(data.available_types).length) {
@@ -247,18 +264,20 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       }));
 
     } catch (err: any) {
+      if (sequence !== detailSequence.current) return;
       if (!cached) {
         setError(err?.message || t("Fehler beim Laden der Übungsdetails"));
       }
     } finally {
-      setIsLoading(false);
-      setIsRevalidating(false);
+      if (sequence === detailSequence.current) { setIsLoading(false); setIsRevalidating(false); }
     }
   }, [exerciseRefId, assId, typeId, initialTypeId]);
 
   useEffect(() => {
-    loadDetail();
-  }, [loadDetail]);
+    void loadDetail();
+    return () => { ++detailSequence.current; loadedAssIdRef.current = undefined; };
+    // Draft/type changes do not restart initialisation of the same editing scope.
+  }, [exerciseRefId, assId]);
 
   // Format file size helper
   const formatFileSize = (bytes: number): string => {
@@ -288,8 +307,9 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
     setError(null);
     setSuccessMsg(null);
 
-    const payload: SaveTAAssignmentRequest = {
+    const draftPayload: SaveTAAssignmentRequest = {
       ass_id: currentAssId,
+      operation_id: !currentAssId ? operationId : undefined,
       title: title.trim(),
       type_id: typeId,
       mandatory,
@@ -302,9 +322,13 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       max_file_enabled: maxFileEnabled,
       max_file: maxFileEnabled && maxFile ? maxFile : null,
     };
+    if (!currentAssId && !creationUncertain) pendingCreation.current = { payload: draftPayload, snapshot: liveDraft };
+    const payload = !currentAssId && creationUncertain && pendingCreation.current ? pendingCreation.current.payload : draftPayload;
+    const submittedSnapshot = !currentAssId && pendingCreation.current ? pendingCreation.current.snapshot : liveDraft;
 
     try {
       const res = await api.saveTAAssignment(exerciseRefId, payload);
+      setCreationUncertain(false);
       const newAssId = res.ass_id || currentAssId;
       if (newAssId) {
         setCurrentAssId(newAssId);
@@ -335,25 +359,14 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
         setInstructionFiles(res.instruction_files);
       }
 
-      setInitialSnapshot(JSON.stringify({
-        title,
-        typeId,
-        mandatory,
-        instructionHtml,
-        startTime,
-        deadlineMode,
-        deadline,
-        hasGracePeriod,
-        deadline2,
-        maxFileEnabled,
-        maxFile,
-      }));
+      setInitialSnapshot(submittedSnapshot);
       setSuccessMsg(t("Übung erfolgreich gespeichert."));
       setTimeout(() => setSuccessMsg(null), 3000);
       if (newAssId) {
-        setSavedResult({ id: newAssId, created: !assId, title: title.trim() });
+        setSavedResult({ id: newAssId, created: !assId, title: payload.title });
       }
     } catch (err: any) {
+      if (!currentAssId && (err?.status === undefined || err.status >= 500 || err.status === 409)) setCreationUncertain(true);
       setError(err?.message || t("Fehler beim Speichern der Übung"));
     } finally {
       setIsSaving(false);
@@ -363,6 +376,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
   // Upload or queue instruction files
   const handleUploadFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    ++fileMutationVersion.current;
 
     if (!currentAssId) {
       // Creation mode: queue the files locally to be uploaded as soon as the exercise is saved
@@ -413,6 +427,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
     });
     if (!ok) return;
 
+    ++fileMutationVersion.current;
     setIsDeletingFileId(fileId);
     setError(null);
     try {
@@ -549,7 +564,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
             ) : (
               <Save className="h-4 w-4" />
             )}
-            <span>{currentAssId ? t("Änderungen speichern") : t("Übung erstellen")}</span>
+            <span>{currentAssId ? t("Änderungen speichern") : t(creationUncertain ? "editor.check_creation" : "Übung erstellen")}</span>
           </button>
         </div>
       </div>
@@ -954,7 +969,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              <span>{currentAssId ? t("Änderungen speichern") : t("Übung erstellen")}</span>
+              <span>{currentAssId ? t("Änderungen speichern") : t(creationUncertain ? "editor.check_creation" : "Übung erstellen")}</span>
             </button>
           </div>
         </form>

@@ -100,6 +100,7 @@ def test_api_save_ta_assignment_handles_error(tmp_path, monkeypatch):
     with patch("backend.api.routes.exercises.IliasClient.save_ta_assignment", new_callable=AsyncMock) as m:
         m.side_effect = ValueError("ILIAS Fehler: Invalid deadline")
         resp = client.post("/api/exercises/2978156/ta/assignment-detail", json={
+            "operation_id": "editor-test-operation-123",
             "title": "Exercise 1",
             "type_id": 1,
             "mandatory": True,

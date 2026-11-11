@@ -30,6 +30,7 @@ from backend.schemas import (
     FeedbackImportCommitResponse,
 )
 from backend.services.ilias_client import IliasClient, StudentUploadError, SessionExpiredError, AssignmentDeletionError
+from backend.services.assignment_creation import AssignmentCreationUncertain
 from backend.services.ta_allocation import (
     AllocationPreviewResponse,
     ApplyAllocationRequest,
@@ -350,10 +351,14 @@ async def save_ta_assignment(
     """
     Create or edit an assignment.
     """
+    if not req.ass_id and not req.operation_id:
+        raise HTTPException(status_code=422, detail=t('editor.reload_for_creation'))
     try:
         return await client.save_ta_assignment(ref_id=exercise_id, data=req)
     except (SessionExpiredError, ScrapingParsingError):
         raise
+    except AssignmentCreationUncertain as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         logger.error(f"Validation error saving assignment in exercise {exercise_id}: {e}")
         raise HTTPException(

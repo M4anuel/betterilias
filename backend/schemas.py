@@ -548,6 +548,7 @@ class TAAssignmentDetailResponse(BaseModel):
 
 class SaveTAAssignmentRequest(BaseModel):
     ass_id: Optional[str] = None
+    operation_id: Optional[str] = Field(default=None, pattern=r'^[a-zA-Z0-9_-]{16,128}$')
     title: str
     type_id: int = 1
     mandatory: bool = True

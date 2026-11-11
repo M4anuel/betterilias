@@ -483,6 +483,7 @@ export interface TAAssignmentDetailResponse {
 
 export interface SaveTAAssignmentRequest {
   ass_id?: string | null;
+  operation_id?: string;
   title: string;
   type_id: number;
   mandatory: boolean;

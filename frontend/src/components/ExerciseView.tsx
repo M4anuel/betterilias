@@ -1760,6 +1760,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
       {activeTab === 'assignments' && taManagementMode === 'editor' && (
         <TAExerciseEditorView
+          key={`${exerciseRefId}:${editingTaAssId || 'new'}`}
           onSyncingChange={setIsLoadingTaManagement}
           exerciseRefId={exerciseRefId}
           assId={editingTaAssId}
