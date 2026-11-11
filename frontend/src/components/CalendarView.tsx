@@ -556,9 +556,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const syncRunIdRef = useRef<number>(0);
   const syncAbortRef = useRef<AbortController | null>(null);
   const syncPollTimerRef = useRef<any>(null);
+  const pollOwner = useRef<object | null>(null);
   const hasInitialLoadedRef = useRef<boolean>(false);
 
   const stopSyncPolling = useCallback(() => {
+    pollOwner.current = null;
     if (syncPollTimerRef.current) {
       clearInterval(syncPollTimerRef.current);
       syncPollTimerRef.current = null;
@@ -567,9 +569,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const startSyncPolling = useCallback(() => {
     stopSyncPolling();
+    const owner = {}; pollOwner.current = owner;
     syncPollTimerRef.current = setInterval(async () => {
       try {
         const cal = await api.getCalendar();
+        if (pollOwner.current !== owner) return;
         if (cal) {
           setCalendarData(cal);
           cache.setCachedCalendar('ALL', cal);
@@ -582,6 +586,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               title: cal.sync_progress.current_course_title || '',
             });
           } else {
+            if (cal.sync_progress?.last_error) setErrorMsg(t('calendar.sync_failed'));
             setIsSyncing(false);
             setSyncProgress(null);
             stopSyncPolling();
@@ -596,6 +601,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   useEffect(() => {
     return () => {
       syncRunIdRef.current += 1;
+      syncAbortRef.current?.abort();
       stopSyncPolling();
     };
   }, [stopSyncPolling]);
@@ -627,6 +633,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         title: sortedQueue[0].title,
       });
       startSyncPolling();
+      let observingJob = false;
 
       try {
         const synced = await api.syncCalendar({
@@ -643,7 +650,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           setCalendarData(synced);
           cache.setCachedCalendar('ALL', synced);
           setCacheTimestamp(Date.now());
-          if (forceRefresh) {
+          if (synced.sync_progress?.is_syncing) {
+            observingJob = true;
+            setIsSyncing(true);
+            setSyncProgress({ current: synced.sync_progress.current, total: synced.sync_progress.total,
+              title: synced.sync_progress.current_course_title || '' });
+            startSyncPolling();
+          } else if (forceRefresh) {
             setStatusBanner(t('calendar.sync_completed'));
           }
         }
@@ -655,7 +668,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           setErrorMsg(err?.message || t('calendar.sync_failed'));
         }
       } finally {
-        if (syncRunIdRef.current === runId) {
+        if (syncRunIdRef.current === runId && !observingJob) {
           stopSyncPolling();
           setSyncProgress(null);
           setIsSyncing(false);

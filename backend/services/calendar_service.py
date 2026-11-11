@@ -975,6 +975,26 @@ class CalendarService:
         self._save_tenant_state(tenant_key, state)
         return True
 
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    def _commit_sync_update(self, tenant_key, progress, info=None, events=None):
+        state = self._load_tenant_state(tenant_key)
+        if info is not None:
+            cid = info.course_ref_id
+            previous = state.setdefault("courses", {}).get(cid, {})
+            info.color = state.setdefault("colors", {}).setdefault(cid, info.color)
+            info.ignored_missing_schedule = bool(state.get("ignored_missing_schedule", {}).get(
+                cid, previous.get("ignored_missing_schedule", False)))
+            preserve = info.status in ("failed", "session_expired") and state.get("imported_events", {}).get(cid)
+            if preserve:
+                previous_import = previous.get("last_imported_at")
+                info.last_imported_at = datetime.fromisoformat(previous_import) if isinstance(previous_import, str) else previous_import or info.last_imported_at
+            elif events is not None:
+                state.setdefault("imported_events", {})[cid] = [event.model_dump(mode="json") for event in events]
+            state["courses"][cid] = info.model_dump(mode="json")
+        state["sync_progress"] = progress
+        self._save_tenant_state(tenant_key, state)
+        return state
+
     @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-sync:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     async def sync_semester_calendar(
         self,
@@ -985,12 +1005,6 @@ class CalendarService:
         force_refresh: bool = False,
         base_url: str = "http://localhost:8000",
     ) -> SemesterCalendarResponse:
-        state = self._load_tenant_state(tenant_key)
-        courses_dict: Dict[str, Any] = state.get("courses", {})
-        colors_dict: Dict[str, str] = state.get("colors", {})
-        ignored_dict: Dict[str, bool] = state.get("ignored_missing_schedule", {})
-        imported_map: Dict[str, List[Dict[str, Any]]] = state.get("imported_events", {})
-
         current_sem = get_current_semester()
         target_courses = list(courses or [])
         if not target_courses and client.session_manager.has_cookies():
@@ -1017,91 +1031,35 @@ class CalendarService:
         )
 
         total_courses = len(target_courses)
-        state["sync_progress"] = {
-            "is_syncing": total_courses > 0,
-            "current": 0,
-            "total": total_courses,
-            "current_course_title": target_courses[0].title if target_courses else None,
-            "updated_at": time.time(),
-        }
-        self._save_tenant_state(tenant_key, state)
-
+        progress = {"is_syncing": total_courses > 0, "current": 0, "total": total_courses,
+                    "current_course_title": target_courses[0].title if target_courses else None, "updated_at": time.time()}
+        self._commit_sync_update(tenant_key, progress)
         try:
             for idx, course in enumerate(target_courses):
                 cid = course.ref_id
-                existing_info = courses_dict.get(cid)
-                c_color = colors_dict.get(cid) or (existing_info.get("color") if existing_info else None) or _pick_random_color(colors_dict)
-                colors_dict[cid] = c_color
-                c_sem = course.semester or (existing_info.get("semester") if existing_info else None) or (
-                    semester if (semester and semester.upper() != "ALL") else None
-                )
+                progress = {"is_syncing": True, "current": idx + 1, "total": total_courses,
+                            "current_course_title": course.title, "updated_at": time.time()}
+                state = self._commit_sync_update(tenant_key, progress)
+                existing = state.get("courses", {}).get(cid)
+                color = state.get("colors", {}).get(cid) or (existing or {}).get("color") or _pick_random_color(state.get("colors", {}))
+                course_semester = course.semester or (existing or {}).get("semester") or (
+                    semester if semester and semester.upper() != "ALL" else None)
+                if existing and not force_refresh and self._is_course_cache_fresh(existing, course_semester, current_sem):
+                    info = CourseCalendarInfo(**{**existing, "semester": course_semester,
+                                                "item_type": course.item_type or existing.get("item_type", "crs")})
+                    self._commit_sync_update(tenant_key, progress, info)
 
-                state["sync_progress"] = {
-                    "is_syncing": True,
-                    "current": idx + 1,
-                    "total": total_courses,
-                    "current_course_title": course.title,
-                    "updated_at": time.time(),
-                }
-                self._save_tenant_state(tenant_key, state)
-
-                if not force_refresh and self._is_course_cache_fresh(existing_info, c_sem, current_sem):
-                    if existing_info:
-                        if c_sem and not existing_info.get("semester"):
-                            existing_info["semester"] = c_sem
-                        if course.item_type and existing_info.get("item_type") != course.item_type:
-                            existing_info["item_type"] = course.item_type
-                        courses_dict[cid] = existing_info
-                        state["courses"] = courses_dict
-                        self._save_tenant_state(tenant_key, state)
                     continue
-
-                info, evs = await self._import_single_course(client, course)
-                info.color = c_color
-                info.semester = c_sem
-                info.item_type = course.item_type or (existing_info.get("item_type") if existing_info else "crs") or "crs"
-                info.ignored_missing_schedule = bool(ignored_dict.get(cid, existing_info.get("ignored_missing_schedule", False) if existing_info else False))
-
-                # If re-import failed or session expired, keep any previously imported events so data isn't lost
-                if info.status in ("failed", "session_expired") and cid in imported_map and imported_map[cid]:
-                    if existing_info and existing_info.get("last_imported_at"):
-                        info.last_imported_at = existing_info.get("last_imported_at")
-                else:
-                    imported_map[cid] = [e.model_dump(mode="json") for e in evs]
-
-                courses_dict[cid] = info.model_dump(mode="json")
-
-                latest_state = self._load_tenant_state(tenant_key)
-                colors_dict.update(latest_state.get("colors", {}))
-                latest_state.setdefault("courses", {}).update(courses_dict)
-                latest_state.setdefault("colors", {}).update(colors_dict)
-                latest_state.setdefault("imported_events", {}).update(imported_map)
-                latest_state["sync_progress"] = state["sync_progress"]
-                self._save_tenant_state(tenant_key, latest_state)
-
-            latest_state = self._load_tenant_state(tenant_key)
-            colors_dict.update(latest_state.get("colors", {}))
-            latest_state.setdefault("courses", {}).update(courses_dict)
-            latest_state.setdefault("colors", {}).update(colors_dict)
-            latest_state.setdefault("imported_events", {}).update(imported_map)
-            latest_state["sync_progress"] = {
-                "is_syncing": False,
-                "current": total_courses,
-                "total": total_courses,
-                "current_course_title": None,
-                "updated_at": time.time(),
-            }
-            self._save_tenant_state(tenant_key, latest_state)
-        except Exception as exc:
-            state["sync_progress"] = {
-                "is_syncing": False,
-                "current": idx if 'idx' in locals() else 0,
-                "total": total_courses,
-                "current_course_title": None,
-                "last_error": str(exc),
-                "updated_at": time.time(),
-            }
-            self._save_tenant_state(tenant_key, state)
+                info, events = await self._import_single_course(client, course)
+                info.color = color
+                info.semester = course_semester
+                info.item_type = course.item_type or (existing or {}).get("item_type") or "crs"
+                self._commit_sync_update(tenant_key, progress, info, events)
+            self._commit_sync_update(tenant_key, {"is_syncing": False, "current": total_courses,
+                "total": total_courses, "current_course_title": None, "updated_at": time.time()})
+        except BaseException as exc:
+            self._commit_sync_update(tenant_key, {"is_syncing": False, "current": progress["current"],
+                "total": total_courses, "current_course_title": None, "last_error": str(exc), "updated_at": time.time()})
             raise
 
         return self.build_semester_response(
