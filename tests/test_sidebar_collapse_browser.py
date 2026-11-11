@@ -73,7 +73,8 @@ def test_sidebar_icons_and_rows_stay_fixed_through_collapse(local_site, language
                 for axis in ['x', 'y']:
                     positions = [frame['icons'][index][axis] for frame in frames]
                     assert max(positions) - min(positions) <= 1, (index, axis, positions)
-        assert sidebar.get_by_text(tr('Meine Vorlesungen'), exact=True).evaluate('e => e.scrollHeight <= e.clientHeight + 1')
+        semester_title = 'HS 2026' if language == 'de' else 'AS 2026'
+        assert sidebar.get_by_text(semester_title, exact=True).evaluate('e => e.scrollHeight <= e.clientHeight + 1')
         artifacts = ROOT / 'scratch' / 'sidebar-collapse-checks'
         artifacts.mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(artifacts / f'{language}-{custom}-{height}-expanded.png'))
@@ -109,7 +110,7 @@ def test_sidebar_drawer_titles_and_rows_do_not_wrap(local_site, width, height):
         sidebar = page.locator('aside')
         pw.expect(sidebar).to_be_visible()
         pw.expect(sidebar.locator('nav button')).to_have_count(6)
-        assert sidebar.get_by_text('Meine Vorlesungen', exact=True).evaluate('e => e.scrollHeight <= e.clientHeight + 1')
+        assert sidebar.get_by_text('HS 2026', exact=True).evaluate('e => e.scrollHeight <= e.clientHeight + 1')
         assert sidebar.locator('nav button').evaluate_all('buttons => buttons.every(button => Math.abs(button.getBoundingClientRect().height-44)<1)')
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         artifacts = ROOT / 'scratch' / 'sidebar-collapse-checks'

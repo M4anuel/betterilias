@@ -8,6 +8,7 @@ import { CourseIcon } from './CourseIcon';
 import { SidebarPin, activeSidebarPin, useSidebarPins } from '../lib/sidebarPins';
 import { SidebarPinButton } from './SidebarPinButton';
 import { SIDEBAR_COLLAPSED_WIDTH } from './SidebarResizer';
+import { getSemesterOption } from '../lib/semesterUtils';
 
 interface SidebarProps {
   width?: number;
@@ -172,10 +173,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const showCalendar = Boolean(onSelectCalendar && !hiddenNavItems.has('calendar'));
   const showMyCourses = !hiddenNavItems.has('my_courses');
   const showRepository = !hiddenNavItems.has('repository');
+  const semesterOption = useMemo(() => (semester ? getSemesterOption(semester) : null), [semester, language]);
+  const semesterLabel = semesterOption ? semesterOption.short : semester;
+  const semesterFull = semesterOption ? semesterOption.full : semester;
 
   return <aside data-sidebar-collapsed={isCollapsed} style={{ width: isMobile ? '100%' : isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : width }} className="relative flex h-full min-h-0 shrink-0 select-none flex-col overflow-hidden border-r border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
     <div className={`flex ${isMobile ? 'h-14 px-3' : 'h-9 px-2.5'} shrink-0 items-center gap-2 overflow-hidden border-b border-slate-100 dark:border-slate-800 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-      {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">{t('Meine Vorlesungen')}</span>}
+      {!isCollapsed && <span title={semesterFull} className="min-w-0 truncate whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">{semesterLabel}</span>}
       <button type="button" onClick={onToggleCollapse}
         className={`${isCollapsed ? '' : 'ml-auto'} flex ${isMobile ? 'h-11 w-11' : 'h-7 w-7'} shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 cursor-pointer dark:hover:bg-slate-800 dark:hover:text-slate-200`}
         aria-label={isMobile ? t('Schliessen') : isCollapsed ? t('Seitenleiste ausklappen') : t('Seitenleiste einklappen')}
