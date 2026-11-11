@@ -9,6 +9,7 @@ import {
   RepositoryLocation,
   RepositoryResponse,
   SidebarOrderItem,
+  SidebarDefaultNavItem,
   ManagementResponse,
   TAAssignmentListResponse,
   TeamCandidatesResponse,
@@ -57,6 +58,7 @@ const SEMESTER_START_KEY = 'ilias_semester_start';
 const LAST_OPENED_KEY = 'ilias_last_opened_course';
 const SIDEBAR_COLLAPSED_KEY = 'ilias_sidebar_collapsed';
 const SIDEBAR_ORDER_KEY = 'ilias_sidebar_order';
+const HIDDEN_SIDEBAR_NAV_KEY = 'ilias_hidden_sidebar_nav';
 export const MATERIALS_CACHE_PREFIX = 'ilias_materials_cache_';
 export const SEMESTER_CACHE_PREFIX = 'ilias_semester_cache_';
 export const EXERCISE_OVERVIEW_PREFIX = 'ilias_exercise_overview_';
@@ -464,6 +466,35 @@ export const cache = {
       localStorage.removeItem(`${SIDEBAR_ORDER_KEY}_${semester}`);
     } catch (e) {
       console.error('Failed to clear sidebar order', e);
+    }
+  },
+
+  getHiddenSidebarNavItems(): SidebarDefaultNavItem[] {
+    try {
+      const raw = localStorage.getItem(HIDDEN_SIDEBAR_NAV_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const valid = new Set<SidebarDefaultNavItem>(['semester', 'calendar', 'my_courses', 'repository']);
+        return parsed.filter((item): item is SidebarDefaultNavItem => valid.has(item));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
+  setHiddenSidebarNavItems(items: SidebarDefaultNavItem[]) {
+    try {
+      const valid = new Set<SidebarDefaultNavItem>(['semester', 'calendar', 'my_courses', 'repository']);
+      const filtered = items.filter(item => valid.has(item));
+      if (filtered.length > 0) {
+        localStorage.setItem(HIDDEN_SIDEBAR_NAV_KEY, JSON.stringify(filtered));
+      } else {
+        localStorage.removeItem(HIDDEN_SIDEBAR_NAV_KEY);
+      }
+    } catch (e) {
+      console.error('Failed to save hidden sidebar nav items', e);
     }
   },
 

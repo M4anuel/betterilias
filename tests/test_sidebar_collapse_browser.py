@@ -67,8 +67,8 @@ def test_sidebar_icons_and_rows_stay_fixed_through_collapse(local_site, language
                 });
                 return frames;
             }''', collapsing)
-            assert abs(frames[-1]['width'] - (64 if collapsing else 256)) <= 1
-            assert all(abs(frame['header'] - 56) <= 1 for frame in frames)
+            assert abs(frames[-1]['width'] - (68 if collapsing else 256)) <= 1
+            assert all(abs(frame['header'] - 36) <= 1 for frame in frames)
             for index in range(6):
                 for axis in ['x', 'y']:
                     positions = [frame['icons'][index][axis] for frame in frames]
@@ -86,7 +86,8 @@ def test_sidebar_icons_and_rows_stay_fixed_through_collapse(local_site, language
             return {w:r.width,h:r.height,dx:(i.x+i.width/2)-(r.x+r.width/2),
                 dy:(i.y+i.height/2)-(r.y+r.height/2),rail:(r.x+r.width/2)-(aside.x+aside.width/2)};
         })''')
-        assert all(abs(r['w']-44)<=1 and abs(r['h']-44)<=1 and abs(r['dx'])<=1 and abs(r['dy'])<=1 and abs(r['rail'])<=1 for r in geometry), geometry
+        assert all(abs(r['dx'])<=1 and abs(r['dy'])<=1 and abs(r['rail'])<=1 for r in geometry), geometry
+        assert all(abs(r['w']-(28 if idx == 0 else 44))<=1 and abs(r['h']-(28 if idx == 0 else 44))<=1 for idx, r in enumerate(geometry)), geometry
         page.wait_for_timeout(250)
         page.screenshot(path=str(artifacts / f'{language}-{custom}-{height}-collapsed.png'))
         # The editor remains reachable by keyboard in the compact rail.

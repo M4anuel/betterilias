@@ -34,7 +34,7 @@ def test_sidebar_resize_pins_and_account_scope(local_site, language, scheme):
     artifacts = ROOT / 'scratch' / 'sidebar-resize-pins'
     artifacts.mkdir(parents=True, exist_ok=True)
     with pw.sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
         page = browser.new_page(viewport=dict(width=1280, height=900), color_scheme=scheme, has_touch=True)
         page.add_init_script(f"localStorage.setItem('betterilias_language','{language}'); localStorage.setItem('betterilias_theme_mode','{scheme}'); if (!localStorage.getItem('betterilias_session_id')) localStorage.setItem('betterilias_session_id','alice');")
         page.route('**/api/**', respond)
@@ -49,7 +49,7 @@ def test_sidebar_resize_pins_and_account_scope(local_site, language, scheme):
         main = page.locator('main')
         pin = lambda title: main.get_by_role('button', name=tr('sidebar.pin', title=title), exact=True).first
         unpin = lambda title: main.get_by_role('button', name=tr('sidebar.unpin', title=title), exact=True).first
-        course_button = nav.locator('[data-sidebar-course="42"] > button')
+        course_button = nav.locator('[data-sidebar-course="42"] button').first
         selected = nav.locator('[aria-current="page"]')
         confirmation = page.get_by_role('dialog', name=tr('sidebar.remove_title'), exact=True)
         sidebar_unpin = lambda title: nav.get_by_role('button', name=tr('sidebar.unpin', title=title), exact=True)
@@ -132,12 +132,12 @@ def test_sidebar_resize_pins_and_account_scope(local_site, language, scheme):
         pw.expect(aside).to_have_css('width', '640px')
         separator.focus()
         separator.press('Home')
-        pw.expect(aside).to_have_css('width', '64px')
+        pw.expect(aside).to_have_css('width', '68px')
         separator.press('ArrowRight')
         pw.expect(aside).to_have_css('width', '160px')
         page.screenshot(path=str(artifacts / f'{language}-{scheme}-narrow.png'), animations='disabled')
         separator.press('ArrowLeft')
-        pw.expect(aside).to_have_css('width', '64px')
+        pw.expect(aside).to_have_css('width', '68px')
         page.screenshot(path=str(artifacts / f'{language}-{scheme}-collapsed.png'), animations='disabled')
         separator.press('ArrowRight')
         pw.expect(aside).to_have_css('width', '160px')
@@ -149,7 +149,7 @@ def test_sidebar_resize_pins_and_account_scope(local_site, language, scheme):
         box = separator.bounding_box()
         page.mouse.move(box['x'] + box['width']/2, 350)
         page.mouse.down(); page.mouse.move(120, 350, steps=5); page.mouse.up()
-        pw.expect(aside).to_have_css('width', '64px')
+        pw.expect(aside).to_have_css('width', '68px')
         separator.press('End')
         pw.expect(aside).to_have_css('width', '640px')
         # Native anchors support deep links, browser history and opening new tabs.

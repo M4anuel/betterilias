@@ -7,6 +7,7 @@ import { CourseAssignmentTarget, useCourseAssignmentTargets } from '../lib/cours
 import { CourseIcon } from './CourseIcon';
 import { SidebarPin, activeSidebarPin, useSidebarPins } from '../lib/sidebarPins';
 import { SidebarPinButton } from './SidebarPinButton';
+import { SIDEBAR_COLLAPSED_WIDTH } from './SidebarResizer';
 
 interface SidebarProps {
   width?: number;
@@ -85,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Every row keeps its geometry and inherits one foreground colour. Wrapping
   // icons also avoids the global SVG-only button centering rule during collapse.
-  const rowClass = (selected: boolean) => `sidebar-navigation-row group flex h-11 min-h-11 min-w-0 items-center gap-3 overflow-hidden rounded-xl py-2 text-left text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)] cursor-pointer ${isCollapsed ? 'mx-auto w-11 justify-center px-0' : 'w-full flex-1 px-4'} ${
+  const rowClass = (selected: boolean) => `sidebar-navigation-row group flex h-11 min-h-11 min-w-0 items-center gap-3 overflow-hidden rounded-xl py-2 text-left text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)] cursor-pointer ${isCollapsed ? 'mx-auto w-11 justify-center px-0' : 'w-full flex-1 pl-[14px] pr-4'} ${
     selected ? '' : 'text-slate-700 hover:bg-slate-100/80 hover:text-[var(--accent)] dark:text-slate-200 dark:hover:bg-slate-800/80'
   }`;
   const selectedStyle = { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' };
@@ -155,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   };
   const renderDivider = (key: string, title: string, custom: boolean) => (
-    <div key={key} title={title} className={`flex shrink-0 items-center overflow-hidden ${isCollapsed ? 'justify-center' : 'px-4'} ${custom ? 'h-8' : 'h-7'}`}>
+    <div key={key} title={title} className={`flex shrink-0 items-center overflow-hidden ${isCollapsed ? 'justify-center' : 'px-3.5'} ${custom ? 'h-8' : 'h-7'}`}>
       {isCollapsed ? <span className={`h-px w-6 shrink-0 rounded-full ${custom ? 'bg-[var(--accent)] opacity-60' : 'bg-slate-200 dark:bg-slate-700'}`} />
         : <span className="flex min-w-0 flex-1 items-center gap-2">
           <span className={`min-w-0 truncate whitespace-nowrap text-[10px] font-bold uppercase tracking-wider ${custom ? 'text-[var(--accent)]' : 'text-slate-400 dark:text-slate-400'}`}>{title}</span>
@@ -166,23 +167,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isMyCoursesSelected && !isCalendarSelected;
   const customSections = customOrder?.some(item => item.type === 'section');
   const placed = new Set<string>();
+  const hiddenNavItems = useMemo(() => new Set(cache.getHiddenSidebarNavItems()), [nicknamesVersion]);
+  const showSemester = !hiddenNavItems.has('semester');
+  const showCalendar = Boolean(onSelectCalendar && !hiddenNavItems.has('calendar'));
+  const showMyCourses = !hiddenNavItems.has('my_courses');
+  const showRepository = !hiddenNavItems.has('repository');
+  const hasAnyDefaultNav = showSemester || showCalendar || showMyCourses || showRepository;
 
-  return <aside data-sidebar-collapsed={isCollapsed} style={{ width: isMobile ? '100%' : isCollapsed ? 64 : width }} className="relative flex h-full min-h-0 shrink-0 select-none flex-col overflow-hidden border-r border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-    <div className={`flex h-14 shrink-0 items-center gap-2 overflow-hidden border-b border-slate-100 dark:border-slate-800 ${isCollapsed ? 'justify-center px-2' : 'justify-between px-3'}`}>
-      {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">{t('Meine Vorlesungen')}</span>}
+  return <aside data-sidebar-collapsed={isCollapsed} style={{ width: isMobile ? '100%' : isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : width }} className="relative flex h-full min-h-0 shrink-0 select-none flex-col overflow-hidden border-r border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+    <div className={`flex ${isMobile ? 'h-14 px-3' : 'h-9 px-2.5'} shrink-0 items-center gap-2 overflow-hidden border-b border-slate-100 dark:border-slate-800 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+      {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">{t('Meine Vorlesungen')}</span>}
       <button type="button" onClick={onToggleCollapse}
-        className={`${isCollapsed ? '' : 'ml-auto'} flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 cursor-pointer dark:hover:bg-slate-800 dark:hover:text-slate-200`}
+        className={`${isCollapsed ? '' : 'ml-auto'} flex ${isMobile ? 'h-11 w-11' : 'h-7 w-7'} shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 cursor-pointer dark:hover:bg-slate-800 dark:hover:text-slate-200`}
         aria-label={isMobile ? t('Schliessen') : isCollapsed ? t('Seitenleiste ausklappen') : t('Seitenleiste einklappen')}
         title={isMobile ? t('Schliessen') : isCollapsed ? t('Seitenleiste ausklappen') : t('Seitenleiste einklappen')}>
-        {isMobile ? <X className="h-5 w-5" /> : isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        {isMobile ? <X className="h-5 w-5" /> : isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
       </button>
     </div>
-    <nav aria-label={t('Meine Vorlesungen')} className="min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto p-2">
-      {renderNavigation(t('Semester-Übersicht'), LayoutGrid, isSemesterSelected, onSelectSemesterOverview)}
-      {onSelectCalendar && renderNavigation(t('calendar.sidebar_nav'), Calendar, isCalendarSelected, onSelectCalendar)}
-      {renderNavigation(t('my_courses.title'), Users, isMyCoursesSelected, onSelectMyCourses)}
-      {renderNavigation(t('Magazin'), Library, isRepositorySelected, onSelectRepository)}
-      <div className="pt-2 pb-1"><div className="h-px bg-slate-100 dark:bg-slate-800" /></div>
+    <nav aria-label={t('Meine Vorlesungen')} className="min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-3 py-2">
+      {showSemester && renderNavigation(t('Semester-Übersicht'), LayoutGrid, isSemesterSelected, onSelectSemesterOverview)}
+      {showCalendar && onSelectCalendar && renderNavigation(t('calendar.sidebar_nav'), Calendar, isCalendarSelected, onSelectCalendar)}
+      {showMyCourses && renderNavigation(t('my_courses.title'), Users, isMyCoursesSelected, onSelectMyCourses)}
+      {showRepository && renderNavigation(t('Magazin'), Library, isRepositorySelected, onSelectRepository)}
+      {hasAnyDefaultNav && <div className="pt-2 pb-1"><div className="h-px bg-slate-100 dark:bg-slate-800" /></div>}
       {customSections ? <div className="space-y-1">
         {customOrder?.map(item => {
           if (item.type === 'section') return renderDivider(item.id, item.title || t('Abschnittsname'), true);

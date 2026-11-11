@@ -10,8 +10,14 @@ import {
   Plus,
   Folder,
   Trash2,
+  Eye,
+  EyeOff,
+  LayoutGrid,
+  Calendar,
+  Users,
+  Library,
 } from 'lucide-react';
-import { CourseItem, SidebarOrderItem } from '../types';
+import { CourseItem, SidebarOrderItem, SidebarDefaultNavItem } from '../types';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import { cache } from '../lib/cache';
 import { CourseIcon, AVAILABLE_COURSE_ICONS } from './CourseIcon';
@@ -23,6 +29,13 @@ interface NicknameModalProps {
   onClose: () => void;
   onNicknamesUpdated: () => void;
 }
+
+const DEFAULT_NAV_ENTRIES: { id: SidebarDefaultNavItem; getLabel: () => string; icon: typeof LayoutGrid }[] = [
+  { id: 'semester', getLabel: () => t('Semester-Übersicht'), icon: LayoutGrid },
+  { id: 'calendar', getLabel: () => t('calendar.sidebar_nav'), icon: Calendar },
+  { id: 'my_courses', getLabel: () => t('my_courses.title'), icon: Users },
+  { id: 'repository', getLabel: () => t('Magazin'), icon: Library },
+];
 
 export const NicknameModal: React.FC<NicknameModalProps> = ({
   semester,
@@ -39,6 +52,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
   const [orderItems, setOrderItems] = useState<SidebarOrderItem[]>([]);
   const [hasCustomOrder, setHasCustomOrder] = useState<boolean>(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [hiddenNavItems, setHiddenNavItems] = useState<SidebarDefaultNavItem[]>([]);
   const backdropMouseDownRef = useRef(false);
   const initialized = useRef(false);
   const initializedSemester = useRef(semester);
@@ -51,6 +65,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
       initialized.current = true;
       setNicknames(cache.getNicknames());
       setIcons(cache.getCourseIcons());
+      setHiddenNavItems(cache.getHiddenSidebarNavItems());
       setActivePickerRefId(null);
       setDraggedIndex(null);
 
@@ -111,6 +126,8 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
     } else {
       cache.clearSidebarOrder(semester);
     }
+
+    cache.setHiddenSidebarNavItems(hiddenNavItems);
 
     onNicknamesUpdated();
     onClose();
@@ -247,6 +264,76 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
 
         {/* Course Rows & Custom Section Rows */}
         <div className="max-h-[60vh] overflow-y-auto p-6 space-y-3.5">
+          {/* Default Sidebar Navigation Items */}
+          <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-4 space-y-3 transition">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {t("sidebar.default_nav_title")}
+                </h4>
+                <p className="text-[11px] text-slate-400 dark:text-slate-400">
+                  {t("sidebar.default_nav_subtitle")}
+                </p>
+              </div>
+              {hiddenNavItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setHiddenNavItems([])}
+                  className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-[var(--accent)] transition shrink-0 cursor-pointer"
+                  title={t("Alle einblenden")}
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>{t("Alle einblenden")}</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {DEFAULT_NAV_ENTRIES.map((entry) => {
+                const isHidden = hiddenNavItems.includes(entry.id);
+                const Icon = entry.icon;
+                const label = entry.getLabel();
+                return (
+                  <div
+                    key={entry.id}
+                    className={`flex items-center justify-between gap-2.5 rounded-lg border px-3 py-2 text-xs transition ${
+                      isHidden
+                        ? 'border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-500'
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-2xs'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center ${isHidden ? 'opacity-40' : 'text-[var(--accent)]'}`}>
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className={`truncate font-medium ${isHidden ? 'line-through opacity-75' : ''}`}>
+                        {label}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHiddenNavItems((prev) =>
+                          isHidden ? prev.filter((id) => id !== entry.id) : [...prev, entry.id]
+                        );
+                      }}
+                      className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 transition cursor-pointer ${
+                        isHidden
+                          ? 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
+                          : 'text-[var(--accent)] hover:bg-[var(--accent-light)]'
+                      }`}
+                      aria-label={t(isHidden ? 'sidebar.show_entry' : 'sidebar.hide_entry', { name: label })}
+                      title={t(isHidden ? 'sidebar.show_entry' : 'sidebar.hide_entry', { name: label })}
+                    >
+                      {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {orderItems.length === 0 ? (
             <div className="text-center py-8 text-xs text-slate-400">
               {t("Keine Vorlesungen zum Bearbeiten vorhanden.")}

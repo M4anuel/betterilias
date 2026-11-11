@@ -718,6 +718,22 @@ main { overflow-wrap: anywhere; }
 .sidebar-navigation-row[aria-current="page"], .sidebar-pin-link[aria-current="page"] {
   box-shadow: inset 3px 0 var(--accent-text);
 }
+aside nav {
+  scrollbar-width: thin;
+}
+aside nav::-webkit-scrollbar {
+  width: 6px;
+}
+aside nav::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: rgba(148, 163, 184, 0.4);
+}
+.dark aside nav::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.25);
+}
+aside nav::-webkit-scrollbar-track {
+  background: transparent;
+}
 @media (forced-colors: active) {
   .sidebar-navigation-row[aria-current="page"], .sidebar-pin-link[aria-current="page"] {
     outline: 2px solid Highlight; outline-offset: -2px;
