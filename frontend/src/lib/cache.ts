@@ -230,18 +230,28 @@ export const cache = {
     }
   },
 
+  getCleanCourseTitle(officialTitle: string): string {
+    if (!officialTitle) return '';
+    // Clean default title by trimming course code if helpful
+    // e.g., "2414-HS2026-0: Mensch-Maschine-Schnittstelle" -> "Mensch-Maschine-Schnittstelle"
+    const colonIdx = officialTitle.indexOf(': ');
+    if (colonIdx > 0 && colonIdx < 30) {
+      return officialTitle.slice(colonIdx + 2).trim();
+    }
+    // E.g., "48592 - Einführung..." or "48592 – Einführung..."
+    const dashMatch = officialTitle.match(/^\s*\d+[-A-Za-z0-9_]*\s*[-–]\s*(.+)$/);
+    if (dashMatch) {
+      return dashMatch[1].trim();
+    }
+    return officialTitle.trim();
+  },
+
   getDisplayName(refId: string, officialTitle: string): string {
     const nicknames = this.getNicknames();
     if (nicknames[refId]) {
       return nicknames[refId];
     }
-    // Clean default title by trimming course code if helpful
-    // e.g., "2414-HS2026-0: Mensch-Maschine-Schnittstelle" -> "Mensch-Maschine-Schnittstelle"
-    const colonIdx = officialTitle.indexOf(': ');
-    if (colonIdx > 0 && colonIdx < 25) {
-      return officialTitle.slice(colonIdx + 2).trim();
-    }
-    return officialTitle;
+    return this.getCleanCourseTitle(officialTitle);
   },
 
   // --- Course Icons ---

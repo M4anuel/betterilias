@@ -232,26 +232,45 @@ def test_custom_nav_reorder_nickname_and_icons(local_site):
         modal = page.locator('.app-overlay')
         pw.expect(modal).to_be_visible()
 
-        # 1. Rename "Semester-Übersicht" to "Meine Übersicht"
+        # 1. Check original name remains next to drag handle before and after nickname entry
         overview_card = modal.locator('[data-nav-card="semester"]')
+        pw.expect(overview_card.locator('.truncate')).to_have_text('Semester-Übersicht')
         overview_input = overview_card.locator('#nav-nickname-semester')
         pw.expect(overview_input).to_be_visible()
         overview_input.fill('Meine Übersicht')
+        # Header next to drag handle still displays the original default title
+        pw.expect(overview_card.locator('.truncate')).to_have_text('Semester-Übersicht')
 
-        # 2. Change its icon to 'Brain'
+        # 2. Check course card has cleaned original title (without "Course 0: ") next to drag handle
+        course_card = modal.locator('[data-course-card="100"]')
+        pw.expect(course_card.locator('.sidebar-course-title')).to_have_text('Computer Science')
+        course_input = course_card.locator('#course-nickname-100')
+        pw.expect(course_input).to_have_attribute('placeholder', 'Computer Science')
+        course_input.fill('CS Vorlesung')
+        # Even after filling custom nickname, header next to drag handle still displays cleaned original title
+        pw.expect(course_card.locator('.sidebar-course-title')).to_have_text('Computer Science')
+
+        # 3. Change overview icon to 'Brain'
         overview_card.get_by_role('button', name=tr('Icon auswählen')).click()
         picker = overview_card.locator('.sidebar-icon-picker')
         pw.expect(picker).to_be_visible()
         picker.get_by_role('button', name=tr('KI & Kognition')).click()
 
-        # 3. Change Course 0's icon to 'Calendar' (testing nav icon available for lectures)
-        course_card = modal.locator('[data-course-card="100"]')
+        # 4. Change Course 0's icon to 'Calendar' (testing nav icon available for lectures at the end of the list)
         course_card.get_by_role('button', name=tr('Icon auswählen')).click()
         course_picker = course_card.locator('.sidebar-icon-picker')
         pw.expect(course_picker).to_be_visible()
+
+        # Check navigation icons are positioned at the end of the picker
+        picker_buttons = course_picker.locator('button')
+        btn_count = picker_buttons.count()
+        assert picker_buttons.nth(btn_count - 3).get_attribute('title') == tr('icon.semester_overview')
+        assert picker_buttons.nth(btn_count - 2).get_attribute('title') == tr('icon.calendar')
+        assert picker_buttons.nth(btn_count - 1).get_attribute('title') == tr('icon.repository')
+
         course_picker.get_by_role('button', name=tr('icon.calendar')).click()
 
-        # 4. Move "Kalender & Stundenplan" down
+        # 5. Move "Kalender & Stundenplan" down
         calendar_card = modal.locator('[data-nav-card="calendar"]')
         calendar_down_btn = calendar_card.get_by_role('button', name=tr('Nach unten verschieben'))
         calendar_down_btn.click()
@@ -262,8 +281,9 @@ def test_custom_nav_reorder_nickname_and_icons(local_site):
         modal.get_by_role('button', name=tr('Änderungen speichern'), exact=True).click()
         pw.expect(modal).to_have_count(0)
 
-        # In sidebar: "Meine Übersicht" is visible
+        # In sidebar: "Meine Übersicht" and "CS Vorlesung" are visible
         pw.expect(nav.get_by_role('button', name='Meine Übersicht', exact=True)).to_be_visible()
+        pw.expect(nav.get_by_role('button', name='CS Vorlesung', exact=True)).to_be_visible()
 
         # Verify custom order is saved under HS2026
         saved_order = page.evaluate("localStorage.getItem('ilias_sidebar_order_HS2026')")

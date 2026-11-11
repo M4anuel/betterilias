@@ -39,9 +39,6 @@ export interface IconOption {
 
 export const AVAILABLE_COURSE_ICONS: IconOption[] = [
   { id: 'BookOpen', get label() { return t("Vorlesung / Allgemein"); }, icon: BookOpen },
-  { id: 'LayoutGrid', get label() { return t("icon.semester_overview"); }, icon: LayoutGrid },
-  { id: 'Calendar', get label() { return t("icon.calendar"); }, icon: Calendar },
-  { id: 'Library', get label() { return t("icon.repository"); }, icon: Library },
   { id: 'Code', get label() { return t("Programmieren & Software"); }, icon: Code },
   { id: 'Terminal', get label() { return t("Systeme & Unix"); }, icon: Terminal },
   { id: 'Cpu', get label() { return t("Hardware & Rechner"); }, icon: Cpu },
@@ -85,6 +82,9 @@ export const AVAILABLE_COURSE_ICONS: IconOption[] = [
   { id: 'Megaphone', get label() { return t("Kommunikation & Medien"); }, icon: Megaphone },
   { id: 'Dumbbell', get label() { return t("Sportwissenschaft"); }, icon: Dumbbell },
   { id: 'BrainCircuit', get label() { return t("Künstliche Intelligenz"); }, icon: BrainCircuit },
+  { id: 'LayoutGrid', get label() { return t("icon.semester_overview"); }, icon: LayoutGrid },
+  { id: 'Calendar', get label() { return t("icon.calendar"); }, icon: Calendar },
+  { id: 'Library', get label() { return t("icon.repository"); }, icon: Library },
 ];
 
 const ICON_MAP: Record<string, LucideIcon> = Object.fromEntries(AVAILABLE_COURSE_ICONS.map((option) => [option.id, option.icon]));

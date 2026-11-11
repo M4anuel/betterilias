@@ -485,9 +485,9 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                           </span>
                           <div
                             className={`text-sm font-semibold truncate flex-1 ${isHidden ? 'line-through opacity-75' : 'text-slate-700 dark:text-slate-300'}`}
-                            title={displayName}
+                            title={defaultTitle}
                           >
-                            {displayName}
+                            {defaultTitle}
                           </div>
                         </div>
                       </div>
@@ -664,7 +664,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                         className="text-sm font-semibold text-slate-700 dark:text-slate-300 leading-snug sidebar-course-title flex-1"
                         title={course.title}
                       >
-                        {cache.getDisplayName(course.ref_id, course.title)}
+                        {cache.getCleanCourseTitle(course.title)}
                       </div>
                     </div>
                     {!phone && orderControls}
@@ -704,7 +704,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                       spellCheck={false}
                       data-lpignore="true"
                       data-form-type="other"
-                      placeholder={t("Eigener Anzeigename (z.B. Vorlesung, Schnittstellen...)")}
+                      placeholder={cache.getCleanCourseTitle(course.title)}
                       value={currentNickname}
                       onChange={(e) =>
                         setNicknames({
