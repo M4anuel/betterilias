@@ -1,3 +1,5 @@
+import { useConnectionRetry } from '../lib/connection';
+import { ErrorNotice } from './ErrorNotice';
 import { getLocale, t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useState, useRef } from 'react';
 import {
@@ -8,7 +10,6 @@ import {
   MapPin,
   ExternalLink,
   RefreshCw,
-  AlertCircle,
   Radio,
   CheckCircle2,
   Clock,
@@ -123,6 +124,8 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
     }
     return true;
   }), sort, getLocale());
+
+  useConnectionRetry(() => { if (error) void fetchPodcasts(); });
 
   return (
     <>
@@ -260,22 +263,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
             </div>
           )}
 
-          {error && (
-            <div className="rounded-xl border border-red-200 dark:border-red-950/60 bg-red-50 dark:bg-red-950/30 p-4 text-xs text-red-700 dark:text-red-300 flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-bold">{t("Fehler beim Laden der Podcasts")}</p>
-                <p>{error}</p>
-                <button
-                  onClick={fetchPodcasts}
-                  style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
-                  className="mt-2 inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90 cursor-pointer"
-                >
-                  <RefreshCw className="h-3 w-3" /> {t("Erneut versuchen")}
-                </button>
-              </div>
-            </div>
-          )}
+          {error && <ErrorNotice message={error} onRetry={fetchPodcasts} connectionInline />}
 
           {!loading && !error && filteredEpisodes.length === 0 && (
             <div className="flex h-44 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center">

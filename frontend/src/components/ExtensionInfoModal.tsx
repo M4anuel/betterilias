@@ -35,7 +35,7 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
   }, [isOpen]);
   if (!isOpen) return null;
 
-  const chromeGithubUrl = 'https://github.com/M4anuel/betterilias/tree/main/extensions/chrome';
+  const chromeGithubUrl = 'https://chromewebstore.google.com/detail/betterilias-companion/jpofcbijmjcndakhbbcnmedcdcfefiea';
   const firefoxGithubUrl = 'https://github.com/M4anuel/betterilias/tree/main/extensions/firefox';
   const currentGithubUrl = selectedBrowser === 'firefox' ? firefoxGithubUrl : chromeGithubUrl;
 
@@ -87,6 +87,7 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
             {t("Da wir die Anmeldung direkt im Browser abwickeln (ohne Server-Passwortweitergabe), verbindet die kleine Browser-Erweiterung deine bestehende ILIAS-Sitzung sicher mit BetterIlias. Wähle deinen Browser:")}
           </p>
 
+          <p className="rounded-xl bg-teal-50 p-3 text-xs leading-relaxed text-teal-900 md:hidden dark:bg-teal-950 dark:text-teal-200">{t('connection.phone_hint')}</p>
           {/* Browser Selector Tabs */}
           <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
             <button
@@ -113,61 +114,20 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
             </button>
           </div>
 
-          <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">{t("extension.setup.internal_pages")}</p>
+          <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">{selectedBrowser === 'firefox' && t('extension.setup.internal_pages')}</p>
           <p role="status" aria-live="polite" className="break-words text-xs text-slate-600 dark:text-slate-300">
             {copyFailed ? t("extension.setup.copy_failed") : copied ? t("Kopiert!") : ''}
           </p>
           {/* Steps */}
           <div className="space-y-2.5">
             {selectedBrowser === 'chrome' ? (
-              <>
-                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0AACA5] font-bold text-white text-[11px]">
-                    1
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-900 dark:text-white">{t("Erweiterungsverwaltung öffnen")}</p>
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
-                      {t("Öffne in Chrome")} {browserAddress("chrome://extensions")} {t("(oder")} {browserAddress("edge://extensions")}{t(") und aktiviere oben rechts den")} <strong>{t("Entwicklermodus")}</strong>.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0AACA5] font-bold text-white text-[11px]">
-                    2
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-900 dark:text-white">{t("Chrome-Erweiterung von GitHub laden")}</p>
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5 mb-2">
-                      {t("Lade den Ordner")} <code className="font-mono text-[10px] rounded bg-slate-200 px-1 py-0.5 dark:bg-slate-700">{t("extensions/chrome/")}</code> {t("von GitHub herunter oder clone das Repository:")}
-                    </p>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-2.5 dark:border-slate-700 dark:bg-slate-900">
-                      <a
-                        href={chromeGithubUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex min-h-11 items-center gap-1.5 text-xs font-semibold text-[#0AACA5] hover:underline truncate"
-                        title={t("Erweiterung auf GitHub öffnen")}
-                      >
-                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{t("github.com/M4anuel/betterilias/.../extensions/chrome")}</span>
-                      </a>
-                      <button
-                        type="button"
-                        onClick={handleCopyUrl}
-                        className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition shrink-0 cursor-pointer"
-                      >
-                        {copied === currentGithubUrl ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-slate-400" />}
-                        <span>{copied === currentGithubUrl ? t("Kopiert!") : t("Link kopieren")}</span>
-                      </button>
-                    </div>
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-2">
-                      {t("Klicke anschliessend in Chrome auf")} <strong>{t("„Entpackte Erweiterung laden“")}</strong> {t("und wähle den heruntergeladenen")} <code className="font-mono text-[10px]">{t("extensions/chrome/")}</code>{t("-Ordner aus.")}
-                    </p>
-                  </div>
-                </div>
-              </>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/40">
+                <p className="font-semibold">{t('extension.store.title')}</p>
+                <p className="mt-1 text-slate-600 dark:text-slate-300">{t('extension.store.hint')}</p>
+                <a href={chromeGithubUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-teal-700 px-4 font-semibold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500">
+                  {t('extension.store.open')}<ExternalLink aria-hidden="true" className="h-4 w-4 shrink-0" />
+                </a>
+              </div>
             ) : (
               <>
                 <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
@@ -221,7 +181,7 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
 
             <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0AACA5] font-bold text-white text-[11px]">
-                3
+                {selectedBrowser === 'chrome' ? 2 : 3}
               </span>
               <div>
                 <p className="font-semibold text-slate-900 dark:text-white">{t("Bei ILIAS einloggen & synchronisieren")}</p>
@@ -246,15 +206,15 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
               <span>{t("ILIAS Login")}</span>
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
-            <a
+            {selectedBrowser === 'firefox' && (<a
               href={currentGithubUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
             >
-              <span>{t("GitHub")}</span>
+              <span>{t('GitHub')}</span>
               <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+            </a>)}
           </div>
           <button
             onClick={onClose}

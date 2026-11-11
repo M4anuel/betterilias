@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -64,7 +65,7 @@ export const MobileSessionShare: React.FC<{ isAuthenticated: boolean }> = ({ isA
         <p id="mobile-address-help" className="text-[11px] text-slate-500 dark:text-slate-400">{t("Beide Geräte müssen dieselbe BetterIlias-Installation erreichen. Bei lokaler Nutzung: Desktop im selben WLAN erreichbar halten.")}</p>
         {addressError && <p role="status" className="text-xs text-amber-700 dark:text-amber-300">{addressError}</p>}
         {loading && <p role="status" className="text-xs">{t("Verbindung wird vorbereitet…")}</p>}
-        {error && <div role="alert" className="text-xs text-red-600 dark:text-red-400">{error} <button type="button" disabled={loading} onClick={showCode} className="underline">{t("Erneut versuchen")}</button></div>}
+        {error && <ErrorNotice message={error} onRetry={showCode} retryDisabled={loading} connectionInline />}
         {shareUrl && isAuthenticated && <>
           <div className="flex justify-center rounded-xl bg-white p-2">
             <QRCodeSVG value={shareUrl} size={216} level="M" marginSize={4} title={t("QR-Code zum Verbinden mit BetterIlias")} role="img" />

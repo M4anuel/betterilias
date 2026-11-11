@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { SyncIndicator } from './SyncIndicator';
 import { SyncRefreshControl } from './SyncRefreshControl';
 import { t, useLanguage, generatedTitle } from '../lib/i18n';
@@ -886,26 +887,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
   if (!materialsData) {
     if (loadError) {
-      return (
-        <div className="flex h-96 flex-col items-center justify-center p-8 text-center animate-in fade-in duration-200">
-          <div className="rounded-2xl border border-red-200 dark:border-red-950/60 bg-white dark:bg-slate-900 p-6 shadow-xs max-w-md space-y-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 mx-auto">
-              <RefreshCw className="h-5 w-5" />
-            </div>
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">{t("Vorlesungsinhalte konnten nicht geladen werden")}</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{loadError}</p>
-            <button
-              type="button"
-              onClick={onManualRefresh}
-              style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white hover:opacity-90 transition cursor-pointer shadow-xs"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span>{t("Erneut versuchen")}</span>
-            </button>
-          </div>
-        </div>
-      );
+      return <div className="p-4 sm:p-8"><ErrorNotice message={loadError} onRetry={onManualRefresh} /></div>;
     }
 
     return (
@@ -2291,21 +2273,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
             (() => {
               // 1. Uncached error state
               if (!materialsData && loadError) {
-                return (
-                  <div className="flex h-56 flex-col items-center justify-center rounded-2xl border border-red-200 dark:border-red-950/60 bg-red-50/50 dark:bg-red-950/20 p-6 text-center">
-                    <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
-                    <p className="text-sm font-bold text-red-900 dark:text-red-300">{t("Fehler beim Abrufen der Vorlesungsinhalte")}</p>
-                    <p className="text-xs text-red-700 dark:text-red-400 mt-1 max-w-md">{loadError}</p>
-                    <button
-                      type="button"
-                      onClick={onManualRefresh}
-                      style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
-                      className="mt-4 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-xs hover:opacity-90 transition cursor-pointer"
-                    >
-                      {t("Erneut versuchen")}
-                    </button>
-                  </div>
-                );
+                return <ErrorNotice message={loadError} onRetry={onManualRefresh} />;
               }
 
               // 2. Uncached loading state (in-flight request)

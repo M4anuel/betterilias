@@ -1,3 +1,5 @@
+import { ErrorNotice } from './ErrorNotice';
+import { useConnectionRetry } from '../lib/connection';
 import { SyncIndicator } from './SyncIndicator';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useEffect, useRef } from 'react';
@@ -28,6 +30,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const [filterMode, setFilterMode] = useState<'all' | 'with_materials' | 'upcoming'>('all');
   const [loadedMaterials, setLoadedMaterials] = useState<Record<string, MaterialItem[]>>({});
+  const [sessionErrors, setSessionErrors] = useState<Record<string, string | null>>({});
   const [loadingSessions, setLoadingSessions] = useState<Record<string, boolean>>({});
   const isSyncing = Object.values(loadingSessions).some(Boolean);
   useEffect(() => {
@@ -86,59 +89,32 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
     return s.materials_count ?? 0;
   };
 
-  const toggleSession = async (session: CourseSessionItem) => {
-    const willExpand = !expandedSessions[session.ref_id];
-    setExpandedSessions((prev) => ({
-      ...prev,
-      [session.ref_id]: willExpand,
-    }));
-
-    if (willExpand) {
-      const currentMats = getMaterialsForSession(session);
-      const expectedCount = session.materials_count ?? 0;
-      if (currentMats.length === 0 && expectedCount > 0 && courseRefId) {
-        if (loadingSessions[session.ref_id]) return;
-        setLoadingSessions((prev) => ({ ...prev, [session.ref_id]: true }));
-        try {
-          const items = await api.getSessionMaterials(courseRefId, session.ref_id, session.expand_id);
-          setLoadedMaterials((prev) => ({ ...prev, [session.ref_id]: items }));
-        } catch (e) {
-          console.error('Failed to load session materials', e);
-        } finally {
-          setLoadingSessions((prev) => ({ ...prev, [session.ref_id]: false }));
-        }
-      }
+  const loadSession = async (session: CourseSessionItem) => {
+    if (!courseRefId || loadingSessions[session.ref_id]) return;
+    setLoadingSessions(prev => ({ ...prev, [session.ref_id]: true }));
+    setSessionErrors(prev => ({ ...prev, [session.ref_id]: null }));
+    try {
+      const items = await api.getSessionMaterials(courseRefId, session.ref_id, session.expand_id);
+      setLoadedMaterials(prev => ({ ...prev, [session.ref_id]: items }));
+    } catch (error) {
+      setSessionErrors(prev => ({ ...prev, [session.ref_id]: error instanceof Error ? error.message : t('errors.load_failed') }));
+    } finally {
+      setLoadingSessions(prev => ({ ...prev, [session.ref_id]: false }));
     }
   };
-
-  const toggleAll = async () => {
-    const hasAnyExpanded = sessions.some((s) => expandedSessions[s.ref_id]);
-    const next: Record<string, boolean> = {};
-    for (const s of sessions) {
-      next[s.ref_id] = !hasAnyExpanded;
-    }
-    setExpandedSessions(next);
-
-    // If expanding all, load any unloaded materials
-    if (!hasAnyExpanded && courseRefId) {
-      for (const s of sessions) {
-        const currentMats = getMaterialsForSession(s);
-        if (currentMats.length === 0 && (s.materials_count ?? 0) > 0) {
-          if (!loadingSessions[s.ref_id]) {
-            setLoadingSessions((prev) => ({ ...prev, [s.ref_id]: true }));
-            api
-              .getSessionMaterials(courseRefId, s.ref_id, s.expand_id)
-              .then((items) => {
-                setLoadedMaterials((prev) => ({ ...prev, [s.ref_id]: items }));
-              })
-              .catch(() => {})
-              .finally(() => {
-                setLoadingSessions((prev) => ({ ...prev, [s.ref_id]: false }));
-              });
-          }
-        }
-      }
-    }
+  useConnectionRetry(() => {
+    sessions.filter(session => sessionErrors[session.ref_id]).forEach(session => { void loadSession(session); });
+  });
+  const toggleSession = async (session: CourseSessionItem) => {
+    const willExpand = !expandedSessions[session.ref_id];
+    setExpandedSessions(prev => ({ ...prev, [session.ref_id]: willExpand }));
+    if (willExpand && getMaterialsForSession(session).length === 0 && (session.materials_count ?? 0) > 0) await loadSession(session);
+  };
+  const toggleAll = () => {
+    const expand = !sessions.some(session => expandedSessions[session.ref_id]);
+    setExpandedSessions(Object.fromEntries(sessions.map(session => [session.ref_id, expand])));
+    if (expand) sessions.filter(session => getMaterialsForSession(session).length === 0 && (session.materials_count ?? 0) > 0)
+      .forEach(session => { void loadSession(session); });
   };
 
   const filteredSessions = sessions.filter((s) => {
@@ -152,6 +128,7 @@ export const SessionDrawer: React.FC<SessionDrawerProps> = ({ sessions, courseRe
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs overflow-hidden transition-colors">
+      {sessions.filter(session => sessionErrors[session.ref_id]).map(session => <ErrorNotice key={session.ref_id} message={sessionErrors[session.ref_id]!} onRetry={() => { void loadSession(session); }} />)}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 px-5 py-3.5">
         <div className="flex items-center gap-3">

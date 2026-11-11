@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Check, CircleAlert, FileText, FolderPlus, Layers, Plus, Upload, X } from 'lucide-react';
 import { api } from '../lib/api';
@@ -147,7 +148,7 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
       <button disabled={busy} onClick={onClose} aria-label={t('authoring.close')} className={buttonClass}><X size={18} /></button>
     </div>
     <div className="space-y-4 p-5" aria-busy={busy || loading}>
-      {error && <div role="alert" className="rounded-lg bg-rose-50 dark:bg-rose-950/40 p-3 text-rose-800 dark:text-rose-200">{error}</div>}
+      {error && <ErrorNotice message={error} connectionInline />}
       {(uncertain || hasFailedUploads) && <a className="block text-teal-700 dark:text-teal-300 underline" target="_blank" rel="noreferrer"
         href={`https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&ref_id=${encodeURIComponent(refId)}`}>{t('authoring.open_ilias')}</a>}
       {step === 'catalogue' ? <>

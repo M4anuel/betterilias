@@ -1,3 +1,5 @@
+import { ErrorNotice } from './ErrorNotice';
+import { useConnectionRetry } from '../lib/connection';
 import { SyncIndicator } from './SyncIndicator';
 import { SyncRefreshControl } from './SyncRefreshControl';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -598,6 +600,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     },
     [startSyncPolling, stopSyncPolling]
   );
+
+  useConnectionRetry(() => { void loadGlobalCalendar(); });
 
   // Load global calendar once on mount (independent of selectedSemester)
   const loadGlobalCalendar = useCallback(async () => {
@@ -1499,22 +1503,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       )}
 
       {/* Notices & Error Banners */}
-      {errorMsg && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 flex items-center justify-between gap-3 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
-            <span>{errorMsg}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setErrorMsg(null)}
-            aria-label={t('Schliessen')}
-            className="p-1 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/40 cursor-pointer"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      {errorMsg && <ErrorNotice message={errorMsg} onDismiss={() => setErrorMsg(null)} />}
 
       {statusBanner && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800 flex items-center justify-between gap-3 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200">

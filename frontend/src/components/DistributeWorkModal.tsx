@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { X, Users, ArrowUp, ArrowDown, CheckCircle, AlertTriangle, Loader2, Download } from 'lucide-react';
 import { t } from '../lib/i18n';
@@ -313,12 +314,7 @@ const DistributeWorkEditor: React.FC<DistributeWorkModalProps & { scope: string 
             <p>{t('allocation.notice_conflicts', { count: distributionPlan.conflicts.length })}</p>
             <ul className="mt-2 space-y-1">{distributionPlan.conflicts.map(item => <li key={item.memberId} className="[overflow-wrap:anywhere]">{item.name}: {item.length}/200</li>)}</ul>
           </div>}
-          {error && (
-            <div className="flex items-center gap-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 p-3 text-xs text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
+          {error && <ErrorNotice message={error} connectionInline />}
 
           {/* Section: TA Roster & Priority */}
           <div>

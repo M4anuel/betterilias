@@ -1,3 +1,4 @@
+import { ErrorNotice } from './ErrorNotice';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
@@ -78,7 +79,7 @@ export const CourseMembershipModal: React.FC<Props> = ({ refId, title, action, o
         <button ref={closeButton} type="button" disabled={busy} onClick={onClose} aria-label={t("Schliessen")}><X className="h-5 w-5" /></button>
       </div>
       {!form && !error && <p role="status">{t("Kursaktion wird geladen…")}</p>}
-      {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <ErrorNotice message={error} connectionInline />}
       {form && <form onSubmit={submit} className="space-y-4">
         <p className="text-sm whitespace-pre-line text-slate-600 dark:text-slate-300">{form.message || (action === 'join' ? t("Möchtest du diesem Kurs beitreten?") : t("Möchtest du diesen Kurs verlassen?"))}</p>
         {form.fields.map((field) => <label key={field.name} className="block text-sm">

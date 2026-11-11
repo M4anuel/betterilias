@@ -1,3 +1,5 @@
+import { ErrorNotice } from './ErrorNotice';
+import { useConnectionRetry } from '../lib/connection';
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeftRight, Captions, Maximize, Pause, Play, Settings2, X } from 'lucide-react';
 import { api } from '../lib/api';
@@ -40,8 +42,9 @@ export function PodcastPlayer({ url, title, onClose }: { url: string; title: str
   useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
   const [data, setData] = useState<VideoStreamInfo | null>(null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  useConnectionRetry(() => { if (error) setRevision(value => value + 1); });
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const element = dialog.current;
@@ -50,10 +53,10 @@ export function PodcastPlayer({ url, title, onClose }: { url: string; title: str
   }, []);
   useEffect(() => {
     let active = true;
-    setData(null); setError(false);
+    setData(null); setError(null);
     api.getVideoStream(url).then(result => {
-      if (active) { if (result.streams?.length) setData(result); else setError(true); }
-    }).catch(() => { if (active) setError(true); });
+      if (active) { if (result.streams?.length) setData(result); else setError(t('player.resolve_failed')); }
+    }).catch(error => { if (active) setError(error.message || t('player.resolve_failed')); });
     return () => { active = false; };
   }, [url, revision]);
   return <dialog ref={dialog} aria-label={title} className="podcast-player-dialog rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/80 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
@@ -65,7 +68,7 @@ export function PodcastPlayer({ url, title, onClose }: { url: string; title: str
       <button type="button" aria-label={t('Schliessen')} onClick={onClose} className={`${buttonStyle} w-11 shrink-0 !px-0`}><X className="h-5 w-5" /></button>
     </div>
     <div className="space-y-4 p-3 sm:p-5">
-      {error ? <p role="alert">{t('player.resolve_failed')} <button type="button" className={buttonStyle} onClick={() => setRevision(value => value + 1)}>{t('Erneut versuchen')}</button></p> : !data ? <PlayerSkeleton />
+      {error ? <ErrorNotice message={error} onRetry={() => setRevision(value => value + 1)} connectionInline /> : !data ? <PlayerSkeleton />
         : <SynchronizedPlayer key={`${cache.getSessionId()}_${url}_${revision}`} data={data} sourceUrl={url} onRetry={() => setRevision(value => value + 1)} />}
     </div>
   </dialog>;
@@ -513,6 +516,6 @@ function SynchronizedPlayer({ data, sourceUrl, onRetry }: { data: VideoStreamInf
         </div>
       </div>
     </div>
-    {error && <p role="alert" className="mt-3 text-sm text-amber-700 dark:text-amber-300">{error} <button type="button" onClick={onRetry} className={buttonStyle}>{t('Erneut versuchen')}</button></p>}
+    {error && <ErrorNotice message={error} onRetry={onRetry} connectionInline />}
   </div>;
 }

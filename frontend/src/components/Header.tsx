@@ -1,3 +1,4 @@
+import { retryConnection, useConnectionIssue } from '../lib/connection';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useRef, useState } from 'react';
 import { Menu, AlertCircle } from 'lucide-react';
@@ -27,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenLegal,
 }) => {
   useLanguage();
+  const connectionIssue = useConnectionIssue();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [gearRotation, setGearRotation] = useState(0);
   const settingsTrigger = useRef<HTMLButtonElement>(null);
@@ -76,7 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Right status & settings area */}
       <div className="relative flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Auth Status Badge */}
-        {authStatus?.authenticated ? (
+        {authStatus?.authenticated && !connectionIssue ? (
           <div
             role="status"
             aria-label={t("ILIAS-Sitzung aktiv")}
@@ -98,15 +100,12 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
         ) : (
-          <div
-            role="status"
-            aria-label={t("ILIAS-Sitzung inaktiv")}
-            title={authStatus === null ? t("Prüfe Status...") : t("Nicht angemeldet")}
-            className="flex h-8 items-center gap-1.5 rounded-full bg-amber-50 px-2 sm:px-3 py-1 text-xs font-medium text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60 transition-all duration-300 animate-in fade-in"
-          >
-            <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="hidden sm:inline whitespace-nowrap">{authStatus === null ? t("Prüfe Status...") : t("Nicht angemeldet")}</span>
-          </div>
+          <button type="button" onClick={connectionIssue ? () => { void retryConnection(); } : onOpenExtensionInfo}
+            aria-label={t(connectionIssue ? `connection.${connectionIssue}.title` : authStatus === null ? 'Prüfe Status...' : 'connection.connect')}
+            className="flex min-h-11 items-center gap-2 rounded-full px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-teal-500 dark:text-slate-200 dark:hover:bg-slate-800">
+            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">{t(connectionIssue ? `connection.${connectionIssue}.title` : authStatus === null ? 'Prüfe Status...' : 'connection.connect')}</span>
+          </button>
         )}
 
         {/* Settings Menu Button */}

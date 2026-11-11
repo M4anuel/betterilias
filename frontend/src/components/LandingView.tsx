@@ -108,20 +108,20 @@ export const LandingView: React.FC<LandingViewProps> = ({
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
               <button
                 type="button"
-                onClick={onOpenApp}
+                onClick={isAuthenticated ? onOpenApp : onOpenExtensionInfo}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-[#0AACA5] hover:bg-[#088b85] text-white font-bold text-sm shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30 transition-all cursor-pointer transform hover:-translate-y-0.5"
               >
-                <span>{t("landing.cta_open_betterilias")}</span>
+                <span>{t(isAuthenticated ? "landing.cta_open_betterilias" : "connection.connect")}</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
 
               <button
                 type="button"
-                onClick={onOpenExtensionInfo}
+                onClick={isAuthenticated ? onOpenExtensionInfo : onOpenApp}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold text-sm shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
               >
                 <Puzzle className="h-4 w-4 text-[#0AACA5]" />
-                <span>{t("landing.cta_extension")}</span>
+                <span>{t(isAuthenticated ? "landing.cta_extension" : "landing.cta_open_betterilias")}</span>
               </button>
             </div>
 
