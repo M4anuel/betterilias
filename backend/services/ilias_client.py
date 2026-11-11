@@ -1,3 +1,4 @@
+from backend.services import assignment_creation
 from backend.observability import audit
 from backend.outbound_budget import OutboundUnavailable
 from backend.outbound_targets import OutboundTargetRejected, TargetPolicy, RESOURCE_READ
@@ -1939,6 +1940,7 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                     logger.debug(f"Could not load instruction files for {ass_id}: {fe}")
             return detail
 
+    @coordinated(lambda self, ref_id, *args, **kwargs: 'exercise-write:' + ref_id)
     @audit('assignment_save')
     async def save_ta_assignment(
         self, ref_id: str, data: SaveTAAssignmentRequest
@@ -1946,6 +1948,25 @@ class IliasClient(AuthoringMixin, ManagementMixin):
         """Submit a fresh native form and verify the exact created/updated object."""
         self._ensure_authenticated()
         validate_ta_assignment_request(data)
+        path = assignment_creation.receipt_path(self.session_manager, ref_id, data.operation_id) if data.operation_id and not data.ass_id else None
+        signature = assignment_creation.fingerprint(data)
+        receipt = assignment_creation.load(path) if path else None
+        if receipt and receipt['state'] != 'rejected':
+            if receipt.get('fingerprint') != signature:
+                raise assignment_creation.AssignmentCreationUncertain()
+            saved_id = receipt.get('ass_id')
+            if not saved_id:
+                listing = await self.get_ta_assignments_list(ref_id)
+                matches = [item for item in listing.assignments if item.ass_id not in receipt.get('before', [])
+                           and item.title.strip() == data.title.strip() and item.type_id == data.type_id]
+                if len(matches) != 1:
+                    raise assignment_creation.AssignmentCreationUncertain()
+                saved_id = matches[0].ass_id
+            saved = await self.get_ta_assignment_detail(ref_id, ass_id=saved_id, type_id=data.type_id)
+            if saved.title.strip() != data.title.strip() or saved.type_id != data.type_id:
+                raise assignment_creation.AssignmentCreationUncertain()
+            assignment_creation.save(path, {**receipt, 'state': 'confirmed', 'ass_id': saved_id})
+            return saved
         async with self.session_manager.get_http_client() as client:
             existing = await self.get_ta_assignment_detail(
                 ref_id, ass_id=data.ass_id, type_id=data.type_id, http_client=client)
@@ -1962,22 +1983,33 @@ class IliasClient(AuthoringMixin, ManagementMixin):
             if data.ass_id and query.get('ass_id') != [data.ass_id]:
                 raise ValueError(t('editor.invalid_target'))
 
+            if path:
+                receipt = {'state': 'dispatched', 'fingerprint': signature, 'before': existing.existing_assignment_ids}
+                # Persist before crossing the irreversible dispatch boundary.
+                assignment_creation.save(path, receipt)
             # Reproduce native empty file controls too: PHP distinguishes an
             # empty multipart upload from a missing $_FILES entry.
             # Hidden checkbox subforms still participate in native validation;
             # include their enabled file inputs just as a browser does.
-            if existing.file_inputs:
-                body, content_type = encode_assignment_form(payload, existing.file_inputs)
-                response = await client.post(action, content=body, headers={'Content-Type': content_type})
-            else:
-                response = await client.post(action, data=payload)
+            try:
+                if existing.file_inputs:
+                    body, content_type = encode_assignment_form(payload, existing.file_inputs)
+                    response = await client.post(action, content=body, headers={'Content-Type': content_type})
+                else:
+                    response = await client.post(action, data=payload)
+            except httpx.HTTPError as exc:
+                if path:
+                    raise assignment_creation.AssignmentCreationUncertain() from exc
+                raise
             self._check_response_for_session_loss(response, action)
             if not response.is_success:
                 dump_failed_html(response.text, 'ta_assignment_save', extra_info={
                     'ref_id': ref_id, 'status': response.status_code,
                     'field_names': sorted(payload), 'file_inputs': existing.file_inputs})
+                if path: raise assignment_creation.AssignmentCreationUncertain()
                 raise ValueError(t('editor.http_error', status=response.status_code))
             if error := parse_ta_assignment_error(response.text):
+                if path: assignment_creation.save(path, {**receipt, 'state': 'rejected'})
                 dump_failed_html(response.text, 'ta_assignment_save', extra_info={
                     'ref_id': ref_id, 'field_names': sorted(payload), 'file_inputs': existing.file_inputs})
                 logger.error('ILIAS rejected assignment save: %s', error)
@@ -1996,10 +2028,13 @@ class IliasClient(AuthoringMixin, ManagementMixin):
                     if len(matches) == 1:
                         saved_id = matches[0].ass_id
             if not saved_id:
+                if path: raise assignment_creation.AssignmentCreationUncertain()
                 raise ValueError(t('editor.save_unconfirmed'))
             saved = await self.get_ta_assignment_detail(ref_id, ass_id=saved_id, type_id=data.type_id, http_client=client)
             if saved.title.strip() != data.title.strip() or saved.type_id != data.type_id:
+                if path: raise assignment_creation.AssignmentCreationUncertain()
                 raise ValueError(t('editor.save_unconfirmed'))
+            if path: assignment_creation.save(path, {**receipt, 'state': 'confirmed', 'ass_id': saved_id})
             return saved
 
     @audit('assignment_delete')

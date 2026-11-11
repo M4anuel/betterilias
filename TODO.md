@@ -4,6 +4,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Fix the 14 state-machine audit findings: account request ownership, calendar
+  merges/polling, editor drafts and write certainty, feedback replacement,
+  companion resync, queued dialogs, download deduplication and notification lifetime.
+  See `docs/STATE_MACHINE_FIXES.md` for behavior, receipt semantics and validation.
+
 - [x] Unify session/connection recovery in a persistent workspace status card and
   page/modal errors in a shared notice; simplify signed-out landing navigation,
   link Chrome Web Store installation, and cover responsive recovery without replaying writes.

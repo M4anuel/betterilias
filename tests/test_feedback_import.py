@@ -22,6 +22,26 @@ from backend.services.feedback_import import (
 )
 
 
+def install_native_file_store(client, initial=None):
+    """Model the file-list responses returned by real verified uploads/deletions."""
+    files = {member: list(items) for member, items in (initial or {}).items()}
+    async def listing(**kwargs):
+        member = kwargs['member_id']
+        return FeedbackFilesResponse(member_id=member, files=list(files.get(member, [])))
+    async def upload(**kwargs):
+        member = kwargs['member_id']
+        files.setdefault(member, []).append(FeedbackFileItem(id='new_' + str(len(files[member])), title=kwargs['filename']))
+        return await listing(member_id=member)
+    async def delete(**kwargs):
+        member = kwargs['member_id']
+        files[member] = [item for item in files.get(member, []) if item.id != kwargs['file_id']]
+        return await listing(member_id=member)
+    client.get_submission_feedback_files.side_effect = listing
+    client.upload_submission_feedback_file.side_effect = upload
+    client.delete_submission_feedback_file.side_effect = delete
+    return files
+
+
 def create_test_zip(files: dict) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -116,6 +136,8 @@ async def test_preview_and_commit_feedback_import():
         member_id="101",
         files=[FeedbackFileItem(id="existing_f1", title="feedback.pdf")],
     )
+
+    install_native_file_store(mock_client, {'101': [FeedbackFileItem(id='existing_f1', title='feedback.pdf')]})
 
     # Create ZIP containing feedback for both units
     zip_content = {
@@ -236,7 +258,7 @@ async def test_manual_mapping_unmatched_file_upload():
         member_id="101",
         files=[],
     )
-    mock_client.upload_submission_feedback_file.return_value = (True, "OK", "new_f1")
+    install_native_file_store(mock_client)
 
     # ZIP with flat unmatched file
     zip_content = {
@@ -310,6 +332,8 @@ async def test_manual_mapping_overwrite_deletes_existing_file():
         member_id="102",
         files=[FeedbackFileItem(id="old_fid_99", title="RandomName_review.pdf")],
     )
+
+    install_native_file_store(mock_client, {'102': [FeedbackFileItem(id='old_fid_99', title='RandomName_review.pdf')]})
 
     zip_bytes = create_test_zip({"RandomName_review.pdf": b"new content"})
     session_id = "test_manual_overwrite_sess"

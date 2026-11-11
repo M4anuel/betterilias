@@ -8,6 +8,11 @@ let failureSeq = 0;
 const listeners = new Set<() => void>();
 const failureListeners = new Set<() => void>();
 const failures = new Map<string, { issue: Exclude<ConnectionIssue, null>; retry?: () => Promise<unknown> }>();
+window.addEventListener('betterilias-session-changed', () => {
+  failures.clear();
+  issue = null;
+  listeners.forEach(listener => listener());
+});
 export function reportConnection(next: ConnectionIssue, source: string, retry?: () => Promise<unknown>) {
   if (next) {
     failures.set(source, { issue: next, retry });

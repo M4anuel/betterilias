@@ -1,5 +1,5 @@
 import { t, useLanguage } from '../lib/i18n';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   X,
   ChevronUp,
@@ -34,28 +34,37 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [progress, setProgress] = useState(100);
   const [isPaused, setIsPaused] = useState(false);
+  const remaining = useRef(autoDismissMs);
+  const previousIds = useRef(new Set<string>());
+  const dismiss = useRef(onDismiss);
+  dismiss.current = onDismiss;
+  const visible = notifications.length > 0;
 
   useEffect(() => {
-    if (notifications.length === 0) return;
+    const ids = new Set(notifications.map(notification => notification.id));
+    if (notifications.some(notification => !previousIds.current.has(notification.id))) {
+      remaining.current = autoDismissMs;
+      setProgress(100);
+    }
+    previousIds.current = ids;
+  }, [notifications, autoDismissMs]);
 
-    const intervalTime = 100;
-    const decrement = (intervalTime / autoDismissMs) * 100;
-
+  useEffect(() => {
+    if (!visible || isPaused) return;
+    let lastTick = performance.now();
     const timer = setInterval(() => {
-      if (!isPaused) {
-        setProgress((prev) => {
-          if (prev <= 0) {
-            clearInterval(timer);
-            onDismiss();
-            return 0;
-          }
-          return prev - decrement;
-        });
+      const now = performance.now();
+      remaining.current -= now - lastTick;
+      lastTick = now;
+      setProgress(Math.max(0, remaining.current / autoDismissMs * 100));
+      if (remaining.current <= 0) {
+        clearInterval(timer);
+        dismiss.current();
       }
-    }, intervalTime);
+    }, 100);
 
     return () => clearInterval(timer);
-  }, [notifications, onDismiss, autoDismissMs, isPaused]);
+  }, [visible, autoDismissMs, isPaused]);
 
   if (!notifications || notifications.length === 0) return null;
 

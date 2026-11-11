@@ -2116,5 +2116,13 @@
   "connection.phone_hint": "Auf dem Handy: \u00d6ffne BetterIlias auf deinem Computer und verbinde dein Handy \u00fcber den QR-Code in den Einstellungen.",
   "errors.forbidden": "Du hast keine Berechtigung, diese Inhalte zu sehen.",
   "errors.not_found": "Diese Inhalte wurden nicht gefunden. Sie wurden eventuell verschoben oder entfernt.",
-  "errors.rate_limited": "Zu viele Anfragen. Bitte warte kurz und versuche es erneut."
+  "errors.rate_limited": "Zu viele Anfragen. Bitte warte kurz und versuche es erneut.",
+  "connection.changed": "Die Verbindung wurde gewechselt. Bitte lade die Ansicht erneut.",
+  "editor.creation_uncertain": "Die Erstellung wurde gestartet, aber noch nicht bestätigt. Prüfe das Ergebnis erneut; es wird keine zweite Übung erstellt. Bei geänderten Angaben prüfe zuerst die Übungsliste in ILIAS.",
+  "editor.check_creation": "Erstellung prüfen",
+  "feedback.retry_changed": "Der Import oder die vorhandenen Dateien wurden geändert. Bitte prüfe das Archiv erneut.",
+  "feedback.replacement_unconfirmed": "Die neue Datei konnte nicht bestätigt werden. Die bisherige Datei bleibt erhalten; ein erneuter Versuch prüft zuerst das Ergebnis.",
+  "feedback.overwrite_unconfirmed": "Die neue Datei wurde gespeichert, aber das Entfernen der bisherigen Datei konnte nicht bestätigt werden. Bitte prüfe das Ergebnis erneut.",
+  "feedback.retry_failed": "Fehlgeschlagene Dateien erneut prüfen",
+  "editor.reload_for_creation": "Bitte lade BetterIlias neu, bevor du eine neue Übung erstellst."
 }

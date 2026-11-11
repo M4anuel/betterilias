@@ -4,6 +4,9 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 let syncDebounceTimeout = null;
 let isSyncing = false;
+let syncGeneration = 0;
+let syncPending = false;
+let pendingForce = false;
 let lastAttemptTime = 0;
 
 function isIliasAuthCookie(name) {
@@ -101,14 +104,17 @@ function updateBadge(status) {
 }
 
 async function checkAndAutoSync(force = false) {
-  if (isSyncing) return { status: 'in_progress' };
+  if (isSyncing) { if (force) { syncPending = true; pendingForce = true; } return { status: 'in_progress' }; }
   if (!force && Date.now() - lastAttemptTime < 15000) {
     return { status: 'cooldown' };
   }
   lastAttemptTime = Date.now();
   isSyncing = true;
+  const generation = syncGeneration;
+  const superseded = () => { if (generation === syncGeneration) return false; syncPending = true; return true; };
   try {
     const settings = await getStoredSettings();
+    if (superseded()) return { status: 'superseded' };
     BetterIliasI18n.setLanguage(settings.language);
     if (!settings.autoSyncEnabled && !force) {
       updateBadge('disabled');
@@ -117,6 +123,7 @@ async function checkAndAutoSync(force = false) {
 
     updateBadge('checking');
     const cookies = await fetchCookies();
+    if (superseded()) return { status: 'superseded' };
     const hasPhp = Boolean(cookies.PHPSESSID);
     const shibEntry = Object.entries(cookies).find(([k]) => k.startsWith('_shibsession_'));
     if (!hasPhp) {
@@ -153,6 +160,7 @@ async function checkAndAutoSync(force = false) {
         user_agent: userAgent,
       }),
     }, 'Session verification timed out.');
+    if (superseded()) return { status: 'superseded' };
     if (response.ok && data.success && data.authenticated && data.session_id) {
       await browserAPI.storage.local.set({
         sessionId: data.session_id,
@@ -161,6 +169,7 @@ async function checkAndAutoSync(force = false) {
         userName: data.user_name || null,
       });
 
+      if (superseded()) return { status: 'superseded' };
       updateBadge('synced');
       await notifyTabs(settings.frontendUrl, data.session_id);
 
@@ -181,19 +190,25 @@ async function checkAndAutoSync(force = false) {
     await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
     return { status: 'failed', detail: data.detail || data.message };
   } catch (err) {
+    if (superseded()) return { status: 'superseded' };
     updateBadge('error');
     await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
     console.warn('[BetterIlias Background] Auto-sync encountered error:', err);
     return { status: 'error', error: err.message };
   } finally {
     isSyncing = false;
+    if (syncPending) {
+      const forceNext = pendingForce;
+      syncPending = false; pendingForce = false; lastAttemptTime = 0;
+      scheduleSyncDebounced(0, forceNext);
+    }
   }
 }
 
-function scheduleSyncDebounced(delay = 2500) {
+function scheduleSyncDebounced(delay = 2500, force = false) {
   if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
   syncDebounceTimeout = setTimeout(() => {
-    checkAndAutoSync(false);
+    checkAndAutoSync(force);
   }, delay);
 }
 
@@ -202,6 +217,8 @@ if (browserAPI.cookies && browserAPI.cookies.onChanged) {
   browserAPI.cookies.onChanged.addListener((changeInfo) => {
     const name = changeInfo?.cookie?.name || '';
     if (name === 'PHPSESSID' || name.startsWith('_shibsession_')) {
+      ++syncGeneration;
+      if (isSyncing) syncPending = true;
       // Cookie changes invalidate the previous successful verification immediately.
       updateBadge('checking');
       lastAttemptTime = 0;
@@ -230,6 +247,7 @@ browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'SET_AUTO_SYNC_ENABLED') {
+    ++syncGeneration;
     browserAPI.storage.local.set({ autoSyncEnabled: Boolean(message.enabled) }).then(() => {
       if (message.enabled) {
         checkAndAutoSync(true);

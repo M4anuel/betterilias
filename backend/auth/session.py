@@ -194,6 +194,8 @@ class SessionManager:
                     response = await client.get(f"{settings.ilias_base_url}/ilias.php", timeout=15.0)
                 if response.status_code in (401, 403):
                     return False, t('HTTP {p0} Nicht autorisiert', p0=response.status_code)
+                if response.status_code >= 500:
+                    raise OutboundUnavailable()
                 if response.status_code != 200:
                     return False, t('Unerwarteter Server-Status {p0}', p0=response.status_code)
 

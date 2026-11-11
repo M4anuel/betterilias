@@ -97,7 +97,8 @@ class DownloadManagerService {
   }
 
   get(idOrUrl: string): DownloadItem | undefined {
-    return this.items.get(idOrUrl) || Array.from(this.items.values()).find((i) => i.url === idOrUrl);
+    const matches = Array.from(this.items.values()).filter(item => item.url === idOrUrl);
+    return this.items.get(idOrUrl) || matches.find(item => ['preparing', 'downloading', 'saving'].includes(item.state)) || matches[0];
   }
 
   cancel(id: string) {
@@ -129,7 +130,7 @@ class DownloadManagerService {
 
   async startDownload(url: string, options?: StartDownloadOptions): Promise<void> {
     const existing = this.get(url);
-    if (existing && (existing.state === 'preparing' || existing.state === 'downloading')) {
+    if (existing && ['preparing', 'downloading', 'saving'].includes(existing.state)) {
       return; // Already in flight
     }
 

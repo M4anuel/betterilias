@@ -157,6 +157,7 @@ class CreationScenario:
         self.save_status = 200
         self.posts, self.requests = [], []
         self.manager = MagicMock()
+        self.manager.session_id = 'native-scenario-owner'
         self.manager.has_cookies.return_value = True
         self.manager.get_http_client.side_effect = lambda: httpx.AsyncClient(
             transport=httpx.MockTransport(self.handle), cookies={'PHPSESSID':'tenant'}, follow_redirects=True)
@@ -378,7 +379,7 @@ def test_expired_session_remains_a_401_instead_of_generic_500():
     client.save_ta_assignment = AsyncMock(side_effect=SessionExpiredError('Expired'))
     app.dependency_overrides[get_ilias_client] = lambda: client
     try:
-        result = TestClient(app).post('/api/exercises/2978156/ta/assignment-detail', json={'title':'Test'})
+        result = TestClient(app).post('/api/exercises/2978156/ta/assignment-detail', json={'title':'Test', 'operation_id':'test-operation-123456'})
         assert result.status_code == 401
     finally:
         app.dependency_overrides.pop(get_ilias_client, None)
