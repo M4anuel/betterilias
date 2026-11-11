@@ -1,7 +1,7 @@
 import { AlertCircle, X } from 'lucide-react';
 import { t, useLanguage } from '../lib/i18n';
-import { authFailure, retryConnection, sharedFailure } from '../lib/connection';
-import { useState } from 'react';
+import { authFailure, retryConnection, sharedFailure, useConnectionFailureSeq } from '../lib/connection';
+import { useState, useEffect } from 'react';
 
 /** Connection/auth failures have one persistent recovery action in the app shell. */
 export function ErrorNotice({ message, onRetry, onDismiss, connectionInline = false, retryDisabled = false }: {
@@ -9,6 +9,12 @@ export function ErrorNotice({ message, onRetry, onDismiss, connectionInline = fa
 }) {
   useLanguage();
   const [dismissed, setDismissed] = useState(false);
+  const failureSeq = useConnectionFailureSeq();
+
+  useEffect(() => {
+    setDismissed(false);
+  }, [message, failureSeq]);
+
   if (dismissed) return null;
   if (sharedFailure(message) && !connectionInline) return null;
 

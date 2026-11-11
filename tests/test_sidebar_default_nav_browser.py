@@ -170,7 +170,7 @@ def test_collapsed_sidebar_scrollbar_spacing(local_site):
 
 
 def test_connection_notice_has_close_button_and_dismisses(local_site):
-    """Verify that the service connection banner at the bottom has a functional close button."""
+    """Verify that the service connection banner at the bottom has a functional close button and reappears on sync."""
     pw = pytest.importorskip('playwright.sync_api')
     tr = json.loads((ROOT / 'locales' / 'de.json').read_text(encoding='utf8')).__getitem__
 
@@ -179,14 +179,16 @@ def test_connection_notice_has_close_button_and_dismisses(local_site):
         page = browser.new_page(viewport=dict(width=1280, height=800))
         page.add_init_script("localStorage.setItem('betterilias_language', 'de');")
 
-        # Mock an unavailable connection state
-        def fail_route(route):
-            if urlparse(route.request.url).path.endswith('/semesters'):
-                route.fulfill(status=503, content_type='application/json', body=json.dumps(dict(detail='Service Unavailable')))
-            else:
-                mock_api(route)
-        page.route('**/api/**', fail_route)
+        # Initially load successfully
+        setup_mock(page, make_courses(2))
         page.goto(local_site + '/?semester=HS2026')
+
+        sync_btn = page.get_by_role('button', name=tr('Übersicht aktualisieren'), exact=True)
+        pw.expect(sync_btn).to_be_visible()
+
+        # Route backend failures
+        page.route('**/api/dashboard/semesters*', lambda route: route.fulfill(status=503, content_type='application/json', body=json.dumps(dict(detail='Service Unavailable'))))
+        sync_btn.click()
 
         notice = page.locator('[data-connection-notice]')
         pw.expect(notice).to_be_visible()
@@ -201,5 +203,10 @@ def test_connection_notice_has_close_button_and_dismisses(local_site):
         # Clicking close dismisses the notice banner
         close_btn.click()
         pw.expect(notice).to_have_count(0)
+
+        # When the user reloads with the sync button and backend is still unreachable, the banner reappears
+        sync_btn.click()
+        pw.expect(notice).to_be_visible()
+        pw.expect(notice.get_by_text(tr('connection.unavailable.title'), exact=True)).to_be_visible()
 
         browser.close()

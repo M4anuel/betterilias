@@ -1,25 +1,32 @@
 import { PlugZap, WifiOff, X } from 'lucide-react';
 import { AuthStatus } from '../types';
 import { t, useLanguage } from '../lib/i18n';
-import { retryConnection, useConnectionIssue } from '../lib/connection';
+import { retryConnection, useConnectionIssue, useConnectionFailureSeq } from '../lib/connection';
 import { useState, useEffect } from 'react';
 
 export function ConnectionNotice({ auth, landing, onConnect }: { auth: AuthStatus | null; landing: boolean; onConnect: () => void }) {
   useLanguage();
   const issue = useConnectionIssue();
+  const failureSeq = useConnectionFailureSeq();
   const [retrying, setRetrying] = useState(false);
-  const [dismissedReason, setDismissedReason] = useState<string | null>(null);
+  const [dismissedAtSeq, setDismissedAtSeq] = useState<number | null>(null);
   const inactive = auth && !auth.authenticated;
   const reason = issue || (inactive ? auth.cookies_present ? 'expired' : 'signed_out' : null);
 
   useEffect(() => {
     if (!reason) {
-      setDismissedReason(null);
+      setDismissedAtSeq(null);
     }
   }, [reason]);
 
-  // Signing in is an expected first-visit action, not a landing-page warning.
-  const visible = reason && (!landing || issue) && dismissedReason !== reason;
+  // If a new connection failure occurs (failureSeq updates upon reload/sync failure), the notice reappears
+  const isDismissed = dismissedAtSeq !== null && dismissedAtSeq === failureSeq;
+  const visible = reason && (!landing || issue) && !isDismissed;
+
+  const handleDismiss = () => {
+    setDismissedAtSeq(failureSeq);
+  };
+
   return <><div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{visible ? `${t(`connection.${reason}.title`)}. ${t(`connection.${reason}.hint`)}` : ''}</div>
     {visible && <div data-connection-notice className="shrink-0 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-6">
     <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 shadow-lg shadow-slate-900/5 dark:border-slate-700 dark:bg-slate-900">
@@ -29,7 +36,7 @@ export function ConnectionNotice({ auth, landing, onConnect }: { auth: AuthStatu
       </div>
       <div className="flex items-center gap-2 shrink-0 ml-auto">
         <button type="button" disabled={retrying} onClick={issue ? async () => { setRetrying(true); try { await retryConnection(); } finally { setRetrying(false); } } : onConnect} className="min-h-11 rounded-xl px-3 text-sm font-semibold text-teal-800 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-teal-600 disabled:opacity-60 dark:text-teal-200 dark:hover:bg-teal-950">{t(retrying ? 'connection.retrying' : issue ? 'Erneut versuchen' : 'connection.connect')}</button>
-        <button type="button" onClick={() => setDismissedReason(reason)} aria-label={t('Schliessen')} title={t('Schliessen')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer focus-visible:outline-2">
+        <button type="button" onClick={handleDismiss} aria-label={t('Schliessen')} title={t('Schliessen')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer focus-visible:outline-2">
           <X aria-hidden="true" className="h-4 w-4" />
         </button>
       </div>
