@@ -210,3 +210,76 @@ def test_connection_notice_has_close_button_and_dismisses(local_site):
         pw.expect(notice.get_by_text(tr('connection.unavailable.title'), exact=True)).to_be_visible()
 
         browser.close()
+
+
+def test_custom_nav_reorder_nickname_and_icons(local_site):
+    """Verify that default nav items can be reordered per-semester, renamed, have custom icons, and lectures can use nav icons."""
+    pw = pytest.importorskip('playwright.sync_api')
+    tr = json.loads((ROOT / 'locales' / 'de.json').read_text(encoding='utf8')).__getitem__
+
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
+        page = browser.new_page(viewport=dict(width=1280, height=800))
+        page.add_init_script("localStorage.setItem('betterilias_language', 'de');")
+        setup_mock(page, make_courses(2))
+        page.goto(local_site + '/?semester=HS2026')
+
+        sidebar = page.locator('aside:visible')
+        nav = sidebar.locator('nav')
+
+        # Open customize modal
+        sidebar.get_by_role('button', name=tr('Vorlesungen anpassen'), exact=True).click()
+        modal = page.locator('.app-overlay')
+        pw.expect(modal).to_be_visible()
+
+        # 1. Rename "Semester-Übersicht" to "Meine Übersicht"
+        overview_card = modal.locator('[data-nav-card="semester"]')
+        overview_input = overview_card.locator('#nav-nickname-semester')
+        pw.expect(overview_input).to_be_visible()
+        overview_input.fill('Meine Übersicht')
+
+        # 2. Change its icon to 'Brain'
+        overview_card.get_by_role('button', name=tr('Icon auswählen')).click()
+        picker = overview_card.locator('.sidebar-icon-picker')
+        pw.expect(picker).to_be_visible()
+        picker.get_by_role('button', name=tr('KI & Kognition')).click()
+
+        # 3. Change Course 0's icon to 'Calendar' (testing nav icon available for lectures)
+        course_card = modal.locator('[data-course-card="100"]')
+        course_card.get_by_role('button', name=tr('Icon auswählen')).click()
+        course_picker = course_card.locator('.sidebar-icon-picker')
+        pw.expect(course_picker).to_be_visible()
+        course_picker.get_by_role('button', name=tr('icon.calendar')).click()
+
+        # 4. Move "Kalender & Stundenplan" down
+        calendar_card = modal.locator('[data-nav-card="calendar"]')
+        calendar_down_btn = calendar_card.get_by_role('button', name=tr('Nach unten verschieben'))
+        calendar_down_btn.click()
+        calendar_down_btn.click()
+        calendar_down_btn.click()
+
+        # Save changes
+        modal.get_by_role('button', name=tr('Änderungen speichern'), exact=True).click()
+        pw.expect(modal).to_have_count(0)
+
+        # In sidebar: "Meine Übersicht" is visible
+        pw.expect(nav.get_by_role('button', name='Meine Übersicht', exact=True)).to_be_visible()
+
+        # Verify custom order is saved under HS2026
+        saved_order = page.evaluate("localStorage.getItem('ilias_sidebar_order_HS2026')")
+        assert saved_order is not None
+        order_json = json.loads(saved_order)
+        # Verify nav items are in the order array
+        nav_items_in_order = [item['id'] for item in order_json if item.get('type') == 'nav']
+        assert 'semester' in nav_items_in_order
+        assert 'calendar' in nav_items_in_order
+
+        # Verify saved custom nickname and custom icon
+        saved_nicknames = json.loads(page.evaluate("localStorage.getItem('ilias_course_nicknames')") or '{}')
+        assert saved_nicknames.get('nav_semester') == 'Meine Übersicht'
+
+        saved_icons = json.loads(page.evaluate("localStorage.getItem('ilias_course_icons')") or '{}')
+        assert saved_icons.get('nav_semester') == 'Brain'
+        assert saved_icons.get('100') == 'Calendar'
+
+        browser.close()

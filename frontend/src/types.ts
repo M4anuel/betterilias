@@ -22,7 +22,7 @@ export interface CourseItem {
 
 export interface SidebarOrderItem {
   id: string;
-  type: 'course' | 'section';
+  type: 'course' | 'section' | 'nav';
   title?: string;
 }
 

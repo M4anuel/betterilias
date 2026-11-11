@@ -25,6 +25,9 @@ import {
   CloudSun, Earth, Scale, Landmark, Church, Languages, ScrollText, Theater,
   Building2, PawPrint, Users, Megaphone, Dumbbell, BrainCircuit,
   FlaskConical,
+  LayoutGrid,
+  Calendar,
+  Library,
   LucideIcon,
 } from 'lucide-react';
 
@@ -36,6 +39,9 @@ export interface IconOption {
 
 export const AVAILABLE_COURSE_ICONS: IconOption[] = [
   { id: 'BookOpen', get label() { return t("Vorlesung / Allgemein"); }, icon: BookOpen },
+  { id: 'LayoutGrid', get label() { return t("icon.semester_overview"); }, icon: LayoutGrid },
+  { id: 'Calendar', get label() { return t("icon.calendar"); }, icon: Calendar },
+  { id: 'Library', get label() { return t("icon.repository"); }, icon: Library },
   { id: 'Code', get label() { return t("Programmieren & Software"); }, icon: Code },
   { id: 'Terminal', get label() { return t("Systeme & Unix"); }, icon: Terminal },
   { id: 'Cpu', get label() { return t("Hardware & Rechner"); }, icon: Cpu },

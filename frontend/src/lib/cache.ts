@@ -481,9 +481,13 @@ export const cache = {
     }
   },
 
-  getHiddenSidebarNavItems(): SidebarDefaultNavItem[] {
+  getHiddenSidebarNavItems(semester?: string): SidebarDefaultNavItem[] {
     try {
-      const raw = localStorage.getItem(HIDDEN_SIDEBAR_NAV_KEY);
+      const key = semester ? `${HIDDEN_SIDEBAR_NAV_KEY}_${semester}` : HIDDEN_SIDEBAR_NAV_KEY;
+      let raw = localStorage.getItem(key);
+      if (!raw && semester) {
+        raw = localStorage.getItem(HIDDEN_SIDEBAR_NAV_KEY);
+      }
       if (!raw) return [];
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
@@ -496,18 +500,61 @@ export const cache = {
     }
   },
 
-  setHiddenSidebarNavItems(items: SidebarDefaultNavItem[]) {
+  setHiddenSidebarNavItems(items: SidebarDefaultNavItem[], semester?: string) {
     try {
       const valid = new Set<SidebarDefaultNavItem>(['semester', 'calendar', 'my_courses', 'repository']);
       const filtered = items.filter(item => valid.has(item));
+      const key = semester ? `${HIDDEN_SIDEBAR_NAV_KEY}_${semester}` : HIDDEN_SIDEBAR_NAV_KEY;
       if (filtered.length > 0) {
+        localStorage.setItem(key, JSON.stringify(filtered));
         localStorage.setItem(HIDDEN_SIDEBAR_NAV_KEY, JSON.stringify(filtered));
       } else {
+        localStorage.removeItem(key);
         localStorage.removeItem(HIDDEN_SIDEBAR_NAV_KEY);
       }
     } catch (e) {
       console.error('Failed to save hidden sidebar nav items', e);
     }
+  },
+
+  getNavNickname(id: SidebarDefaultNavItem): string {
+    return this.getNicknames()[`nav_${id}`] || '';
+  },
+
+  setNavNickname(id: SidebarDefaultNavItem, nickname: string) {
+    this.setNickname(`nav_${id}`, nickname);
+  },
+
+  getDefaultNavIcon(id: SidebarDefaultNavItem): string {
+    switch (id) {
+      case 'semester': return 'LayoutGrid';
+      case 'calendar': return 'Calendar';
+      case 'my_courses': return 'Users';
+      case 'repository': return 'Library';
+      default: return 'LayoutGrid';
+    }
+  },
+
+  getNavIcon(id: SidebarDefaultNavItem): string {
+    return this.getCourseIcons()[`nav_${id}`] || this.getDefaultNavIcon(id);
+  },
+
+  setNavIcon(id: SidebarDefaultNavItem, iconName: string) {
+    this.setCourseIcon(`nav_${id}`, iconName);
+  },
+
+  getDefaultNavTitle(id: SidebarDefaultNavItem): string {
+    switch (id) {
+      case 'semester': return t('Semester-Übersicht');
+      case 'calendar': return t('calendar.sidebar_nav');
+      case 'my_courses': return t('my_courses.title');
+      case 'repository': return t('Magazin');
+      default: return id;
+    }
+  },
+
+  getNavDisplayName(id: SidebarDefaultNavItem): string {
+    return this.getNavNickname(id) || this.getDefaultNavTitle(id);
   },
 
   // --- Semester Courses Cache ---

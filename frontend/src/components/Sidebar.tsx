@@ -1,7 +1,7 @@
 import { t, useLanguage } from '../lib/i18n';
 import React, { useMemo } from 'react';
 import { X, Edit3, ChevronLeft, ChevronRight, LayoutGrid, Library, Users, Calendar, Layers } from 'lucide-react';
-import { CourseItem } from '../types';
+import { CourseItem, SidebarDefaultNavItem } from '../types';
 import { cache } from '../lib/cache';
 import { CourseAssignmentTarget, useCourseAssignmentTargets } from '../lib/courseTree';
 import { CourseIcon } from './CourseIcon';
@@ -92,10 +92,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }`;
   const selectedStyle = { backgroundColor: 'var(--accent-light)', color: 'var(--accent)' };
   const icon = (content: React.ReactNode) => <span className="sidebar-icon flex h-4 w-4 shrink-0 items-center justify-center">{content}</span>;
-  const renderNavigation = (title: string, Icon: typeof LayoutGrid, selected: boolean, onClick: () => void) => (
-    <button key={title} type="button" onClick={onClick} title={title} aria-label={title}
+  const renderNavigation = (key: string, title: string, iconName: string, selected: boolean, onClick: () => void) => (
+    <button key={key} type="button" onClick={onClick} title={title} aria-label={title}
       aria-current={selected ? 'page' : undefined} className={rowClass(selected)} style={selected ? selectedStyle : undefined}>
-      {icon(<Icon className="h-4 w-4" />)}
+      {icon(<CourseIcon iconName={iconName} className="h-4 w-4" />)}
       {!isCollapsed && <span className="min-w-0 truncate whitespace-nowrap leading-tight">{title}</span>}
     </button>
   );
@@ -166,16 +166,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </div>
   );
   const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isMyCoursesSelected && !isCalendarSelected;
-  const customSections = customOrder?.some(item => item.type === 'section');
-  const placed = new Set<string>();
-  const hiddenNavItems = useMemo(() => new Set(cache.getHiddenSidebarNavItems()), [nicknamesVersion]);
-  const showSemester = !hiddenNavItems.has('semester');
-  const showCalendar = Boolean(onSelectCalendar && !hiddenNavItems.has('calendar'));
-  const showMyCourses = !hiddenNavItems.has('my_courses');
-  const showRepository = !hiddenNavItems.has('repository');
+  const hiddenNavItems = useMemo(() => new Set(cache.getHiddenSidebarNavItems(semester)), [nicknamesVersion, semester]);
   const semesterOption = useMemo(() => (semester ? getSemesterOption(semester) : null), [semester, language]);
   const semesterLabel = semesterOption ? semesterOption.short : semester;
   const semesterFull = semesterOption ? semesterOption.full : semester;
+
+  const renderDefaultNavItem = (id: SidebarDefaultNavItem) => {
+    if (hiddenNavItems.has(id)) return null;
+    const title = cache.getNavDisplayName(id);
+    const iconName = cache.getNavIcon(id);
+    switch (id) {
+      case 'semester':
+        return renderNavigation('nav_semester', title, iconName, isSemesterSelected, onSelectSemesterOverview);
+      case 'calendar':
+        if (!onSelectCalendar) return null;
+        return renderNavigation('nav_calendar', title, iconName, isCalendarSelected, onSelectCalendar);
+      case 'my_courses':
+        return renderNavigation('nav_my_courses', title, iconName, isMyCoursesSelected, onSelectMyCourses);
+      case 'repository':
+        return renderNavigation('nav_repository', title, iconName, isRepositorySelected, onSelectRepository);
+      default:
+        return null;
+    }
+  };
+
+  const defaultNavItems: { id: SidebarDefaultNavItem; type: 'nav' }[] = [
+    { id: 'semester', type: 'nav' },
+    { id: 'calendar', type: 'nav' },
+    { id: 'my_courses', type: 'nav' },
+    { id: 'repository', type: 'nav' },
+  ];
+  const hasCustomOrder = customOrder !== null && customOrder.length > 0;
+  const placedCourses = new Set<string>();
+  const placedNav = new Set<string>();
 
   return <aside data-sidebar-collapsed={isCollapsed} style={{ width: isMobile ? '100%' : isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : width }} className="relative flex h-full min-h-0 shrink-0 select-none flex-col overflow-hidden border-r border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
     <div className={`flex ${isMobile ? 'h-14 px-3' : 'h-9 px-2.5'} shrink-0 items-center gap-2 overflow-hidden border-b border-slate-100 dark:border-slate-800 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
@@ -188,25 +211,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </button>
     </div>
     <nav aria-label={t('Meine Vorlesungen')} className="min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-3 py-2">
-      {showSemester && renderNavigation(t('Semester-Übersicht'), LayoutGrid, isSemesterSelected, onSelectSemesterOverview)}
-      {showCalendar && onSelectCalendar && renderNavigation(t('calendar.sidebar_nav'), Calendar, isCalendarSelected, onSelectCalendar)}
-      {showMyCourses && renderNavigation(t('my_courses.title'), Users, isMyCoursesSelected, onSelectMyCourses)}
-      {showRepository && renderNavigation(t('Magazin'), Library, isRepositorySelected, onSelectRepository)}
-      {customSections ? <div className="space-y-1">
-        {customOrder?.map(item => {
-          if (item.type === 'section') return renderDivider(item.id, item.title || t('Abschnittsname'), true);
-          const course = visibleCourses.find(candidate => candidate.ref_id === item.id);
-          if (!course || placed.has(course.ref_id)) return null;
-          placed.add(course.ref_id);
-          return renderCourseButton(course);
-        })}
-        {visibleCourses.filter(course => !placed.has(course.ref_id)).map(renderCourseButton)}
-      </div> : <div className="space-y-2">
-        {Array.from(groupedBySubject.entries()).map(([subject, subjectCourses]) => <div key={subject} className="space-y-1">
-          {renderDivider(subject, subject, false)}
-          {subjectCourses.map(renderCourseButton)}
-        </div>)}
-      </div>}
+      {hasCustomOrder ? (
+        <div className="space-y-1">
+          {defaultNavItems.filter(item => !customOrder.some(c => c.type === 'nav' && c.id === item.id)).map(item => {
+            placedNav.add(item.id);
+            return renderDefaultNavItem(item.id);
+          })}
+          {customOrder.map(item => {
+            if (item.type === 'section') return renderDivider(item.id, item.title || t('Abschnittsname'), true);
+            if (item.type === 'nav') {
+              placedNav.add(item.id);
+              return renderDefaultNavItem(item.id as SidebarDefaultNavItem);
+            }
+            const course = visibleCourses.find(candidate => candidate.ref_id === item.id);
+            if (!course || placedCourses.has(course.ref_id)) return null;
+            placedCourses.add(course.ref_id);
+            return renderCourseButton(course);
+          })}
+          {visibleCourses.filter(course => !placedCourses.has(course.ref_id)).map(renderCourseButton)}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="space-y-1">
+            {defaultNavItems.map(item => renderDefaultNavItem(item.id))}
+          </div>
+          {Array.from(groupedBySubject.entries()).map(([subject, subjectCourses]) => <div key={subject} className="space-y-1">
+            {renderDivider(subject, subject, false)}
+            {subjectCourses.map(renderCourseButton)}
+          </div>)}
+        </div>
+      )}
     </nav>
     <div className="flex h-16 shrink-0 items-center justify-center border-t border-slate-100 px-2 dark:border-slate-800">
       <button type="button" onClick={onOpenNicknameModal} aria-label={t('Vorlesungen anpassen')} title={t('Vorlesungen anpassen')}

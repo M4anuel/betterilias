@@ -30,11 +30,11 @@ interface NicknameModalProps {
   onNicknamesUpdated: () => void;
 }
 
-const DEFAULT_NAV_ENTRIES: { id: SidebarDefaultNavItem; getLabel: () => string; icon: typeof LayoutGrid }[] = [
-  { id: 'semester', getLabel: () => t('Semester-Übersicht'), icon: LayoutGrid },
-  { id: 'calendar', getLabel: () => t('calendar.sidebar_nav'), icon: Calendar },
-  { id: 'my_courses', getLabel: () => t('my_courses.title'), icon: Users },
-  { id: 'repository', getLabel: () => t('Magazin'), icon: Library },
+const DEFAULT_NAV_ITEMS: { id: SidebarDefaultNavItem; type: 'nav' }[] = [
+  { id: 'semester', type: 'nav' },
+  { id: 'calendar', type: 'nav' },
+  { id: 'my_courses', type: 'nav' },
+  { id: 'repository', type: 'nav' },
 ];
 
 export const NicknameModal: React.FC<NicknameModalProps> = ({
@@ -65,35 +65,46 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
       initialized.current = true;
       setNicknames(cache.getNicknames());
       setIcons(cache.getCourseIcons());
-      setHiddenNavItems(cache.getHiddenSidebarNavItems());
+      setHiddenNavItems(cache.getHiddenSidebarNavItems(semester));
       setActivePickerRefId(null);
       setDraggedIndex(null);
 
       const existingOrder = cache.getSidebarOrder(semester);
       if (existingOrder && existingOrder.length > 0) {
         setHasCustomOrder(true);
-        // Ensure all current courses exist in orderItems
+        // Ensure all current courses and default nav items exist in orderItems
         const currentCourseIds = new Set(courses.map((c) => c.ref_id));
         const orderCourseIds = new Set(
           existingOrder.filter((i) => i.type === 'course').map((i) => i.id)
         );
-        const unplaced = courses
+        const orderNavIds = new Set(
+          existingOrder.filter((i) => i.type === 'nav').map((i) => i.id)
+        );
+
+        const unplacedNav = DEFAULT_NAV_ITEMS.filter((item) => !orderNavIds.has(item.id));
+        const unplacedCourses = courses
           .filter((c) => !orderCourseIds.has(c.ref_id))
           .map((c) => ({ id: c.ref_id, type: 'course' as const }));
 
         const validExisting = existingOrder.filter(
-          (i) => i.type === 'section' || currentCourseIds.has(i.id)
+          (i) => i.type === 'section' || i.type === 'nav' || currentCourseIds.has(i.id)
         );
-        setOrderItems([...validExisting, ...unplaced]);
+        setOrderItems([...unplacedNav, ...validExisting, ...unplacedCourses]);
       } else {
         setHasCustomOrder(false);
-        setOrderItems(courses.map((c) => ({ id: c.ref_id, type: 'course' as const })));
+        setOrderItems([
+          ...DEFAULT_NAV_ITEMS,
+          ...courses.map((c) => ({ id: c.ref_id, type: 'course' as const })),
+        ]);
       }
     } else {
       setOrderItems(previous => {
-        const placed = new Set(previous.filter(item => item.type === 'course').map(item => item.id));
-        const added = courses.filter(course => !placed.has(course.ref_id)).map(course => ({ id: course.ref_id, type: 'course' as const }));
-        return added.length ? [...previous, ...added] : previous;
+        const placedCourses = new Set(previous.filter(item => item.type === 'course').map(item => item.id));
+        const addedCourses = courses.filter(course => !placedCourses.has(course.ref_id)).map(course => ({ id: course.ref_id, type: 'course' as const }));
+        const placedNav = new Set(previous.filter(item => item.type === 'nav').map(item => item.id));
+        const addedNav = DEFAULT_NAV_ITEMS.filter(item => !placedNav.has(item.id));
+        if (addedCourses.length === 0 && addedNav.length === 0) return previous;
+        return [...addedNav, ...previous, ...addedCourses];
       });
     }
   }, [isOpen, courses, semester]);
@@ -111,13 +122,23 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
   if (!isOpen) return null;
 
   const handleSave = () => {
-    // Save nicknames & icons
+    // Save nicknames & icons for courses
     for (const course of courses) {
       const name = nicknames[course.ref_id] || '';
       cache.setNickname(course.ref_id, name);
 
       const icon = icons[course.ref_id] || '';
       cache.setCourseIcon(course.ref_id, icon);
+    }
+
+    // Save nicknames & icons for default nav entries
+    for (const entry of DEFAULT_NAV_ITEMS) {
+      const navKey = `nav_${entry.id}`;
+      const name = nicknames[navKey] || '';
+      cache.setNavNickname(entry.id, name);
+
+      const icon = icons[navKey] || '';
+      cache.setNavIcon(entry.id, icon);
     }
 
     // Save or clear custom sidebar ordering
@@ -127,7 +148,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
       cache.clearSidebarOrder(semester);
     }
 
-    cache.setHiddenSidebarNavItems(hiddenNavItems);
+    cache.setHiddenSidebarNavItems(hiddenNavItems, semester);
 
     onNicknamesUpdated();
     onClose();
@@ -157,7 +178,10 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
 
   const handleResetToDefault = () => {
     setHasCustomOrder(false);
-    setOrderItems(courses.map((c) => ({ id: c.ref_id, type: 'course' as const })));
+    setOrderItems([
+      ...DEFAULT_NAV_ITEMS,
+      ...courses.map((c) => ({ id: c.ref_id, type: 'course' as const })),
+    ]);
   };
 
   // Drag and Drop handlers
@@ -247,93 +271,39 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
               <Plus className="h-3.5 w-3.5 text-[var(--accent)]" />
               <span>{t("Abschnitt hinzufügen")}</span>
             </button>
+            {hiddenNavItems.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setHiddenNavItems([])}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer shadow-2xs"
+                title={t("Alle einblenden")}
+              >
+                <RotateCcw className="h-3 w-3 text-[var(--accent)]" />
+                <span>{t("Alle einblenden")}</span>
+              </button>
+            )}
           </div>
 
-          {hasCustomOrder && (
-            <button
-              type="button"
-              onClick={handleResetToDefault}
-              className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition cursor-pointer"
-              title={t("Auf Fachbereiche zurücksetzen")}
-            >
-              <RotateCcw className="h-3 w-3" />
-              <span>{t("Auf Fachbereiche zurücksetzen")}</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              {t("sidebar.default_nav_title")}
+            </span>
+            {hasCustomOrder && (
+              <button
+                type="button"
+                onClick={handleResetToDefault}
+                className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition cursor-pointer"
+                title={t("Auf Fachbereiche zurücksetzen")}
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>{t("Auf Fachbereiche zurücksetzen")}</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Course Rows & Custom Section Rows */}
         <div className="max-h-[60vh] overflow-y-auto p-6 space-y-3.5">
-          {/* Default Sidebar Navigation Items */}
-          <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-4 space-y-3 transition">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {t("sidebar.default_nav_title")}
-                </h4>
-                <p className="text-[11px] text-slate-400 dark:text-slate-400">
-                  {t("sidebar.default_nav_subtitle")}
-                </p>
-              </div>
-              {hiddenNavItems.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setHiddenNavItems([])}
-                  className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-[var(--accent)] transition shrink-0 cursor-pointer"
-                  title={t("Alle einblenden")}
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  <span>{t("Alle einblenden")}</span>
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {DEFAULT_NAV_ENTRIES.map((entry) => {
-                const isHidden = hiddenNavItems.includes(entry.id);
-                const Icon = entry.icon;
-                const label = entry.getLabel();
-                return (
-                  <div
-                    key={entry.id}
-                    className={`flex items-center justify-between gap-2.5 rounded-lg border px-3 py-2 text-xs transition ${
-                      isHidden
-                        ? 'border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-500'
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-2xs'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center ${isHidden ? 'opacity-40' : 'text-[var(--accent)]'}`}>
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <span className={`truncate font-medium ${isHidden ? 'line-through opacity-75' : ''}`}>
-                        {label}
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setHiddenNavItems((prev) =>
-                          isHidden ? prev.filter((id) => id !== entry.id) : [...prev, entry.id]
-                        );
-                      }}
-                      className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 transition cursor-pointer ${
-                        isHidden
-                          ? 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
-                          : 'text-[var(--accent)] hover:bg-[var(--accent-light)]'
-                      }`}
-                      aria-label={t(isHidden ? 'sidebar.show_entry' : 'sidebar.hide_entry', { name: label })}
-                      title={t(isHidden ? 'sidebar.show_entry' : 'sidebar.hide_entry', { name: label })}
-                    >
-                      {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
           {orderItems.length === 0 ? (
             <div className="text-center py-8 text-xs text-slate-400">
               {t("Keine Vorlesungen zum Bearbeiten vorhanden.")}
@@ -418,7 +388,212 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
                 );
               }
 
-              // 2. Course Item Row
+              // 2. Default Navigation Item Row
+              if (item.type === 'nav') {
+                const navId = item.id as SidebarDefaultNavItem;
+                const defaultTitle = cache.getDefaultNavTitle(navId);
+                const currentNickname = nicknames[`nav_${navId}`] || '';
+                const displayName = currentNickname || defaultTitle;
+                const currentIcon = icons[`nav_${navId}`] || cache.getDefaultNavIcon(navId);
+                const isHidden = hiddenNavItems.includes(navId);
+                const isPickerOpen = activePickerRefId === `nav_${navId}`;
+                const hasCustomizations = !!currentNickname || !!icons[`nav_${navId}`];
+
+                const orderControls = (
+                  <div className="sidebar-course-controls flex items-center justify-end gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHiddenNavItems((prev) =>
+                          isHidden ? prev.filter((id) => id !== navId) : [...prev, navId]
+                        );
+                        setHasCustomOrder(true);
+                      }}
+                      className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 transition cursor-pointer ${
+                        isHidden
+                          ? 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
+                          : 'text-[var(--accent)] hover:bg-[var(--accent-light)]'
+                      }`}
+                      aria-label={t(isHidden ? 'sidebar.show_entry' : 'sidebar.hide_entry', { name: displayName })}
+                      title={t(isHidden ? 'sidebar.show_entry' : 'sidebar.hide_entry', { name: displayName })}
+                    >
+                      {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleMoveUp(index)}
+                      disabled={index === 0}
+                      className="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                      title={t("Nach oben verschieben")}
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveDown(index)}
+                      disabled={index === orderItems.length - 1}
+                      className="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                      title={t("Nach unten verschieben")}
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </button>
+
+                    {hasCustomizations && (
+                      <button
+                        onClick={() => handleReset(`nav_${navId}`)}
+                        className="sidebar-course-reset flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-red-500 transition shrink-0 cursor-pointer ml-1"
+                        title={t("Auf Standard zurücksetzen")}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        <span>{t("Reset")}</span>
+                      </button>
+                    )}
+                  </div>
+                );
+
+                return (
+                  <div
+                    key={`nav-${navId}`}
+                    data-nav-card={navId}
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragEnd={handleDragEnd}
+                    className={`sidebar-nav-card sidebar-course-card rounded-xl border p-4 space-y-3 transition ${
+                      isHidden
+                        ? 'border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/40 text-slate-400 dark:text-slate-500'
+                        : 'border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700'
+                    } ${
+                      draggedIndex === index
+                        ? 'opacity-40 border-dashed border-[var(--accent)]'
+                        : ''
+                    }`}
+                  >
+                    <div className="sidebar-course-heading flex flex-wrap items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {/* Drag handle */}
+                        <div
+                          className="hidden md:block cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 shrink-0"
+                          title={t("Reihenfolge & Abschnitte anpassen")}
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </div>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="shrink-0 rounded-md bg-[var(--accent-light)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
+                            {t("sidebar.badge_nav")}
+                          </span>
+                          <div
+                            className={`text-sm font-semibold truncate flex-1 ${isHidden ? 'line-through opacity-75' : 'text-slate-700 dark:text-slate-300'}`}
+                            title={displayName}
+                          >
+                            {displayName}
+                          </div>
+                        </div>
+                      </div>
+                      {!phone && orderControls}
+                    </div>
+
+                    {/* Icon Button & Nickname Input */}
+                    <div className="sidebar-course-fields flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setActivePickerRefId(isPickerOpen ? null : `nav_${navId}`)
+                        }
+                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition cursor-pointer ${
+                          isPickerOpen
+                            ? 'border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent-text)] ring-2 ring-[var(--accent)]/20'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
+                        }`}
+                        title={t("Icon auswählen")}
+                      >
+                        <CourseIcon
+                          iconName={currentIcon}
+                          className="h-4 w-4"
+                          style={{ color: 'var(--accent, #0AACA5)' }}
+                        />
+                        <ChevronDown className="h-3 w-3 text-slate-400" />
+                      </button>
+
+                      <input
+                        type="text"
+                        id={`nav-nickname-${navId}`}
+                        name={`nav_nickname_field_${navId}`}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        placeholder={defaultTitle}
+                        value={currentNickname}
+                        onChange={(e) => {
+                          setNicknames({
+                            ...nicknames,
+                            [`nav_${navId}`]: e.target.value,
+                          });
+                          setHasCustomOrder(true);
+                        }}
+                        className="min-w-0 flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[var(--accent)]/30 transition"
+                      />
+                    </div>
+
+                    {phone && orderControls}
+
+                    {/* Inline Icon Picker Grid */}
+                    {isPickerOpen && (
+                      <div className="sidebar-icon-picker rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-xs animate-in fade-in slide-in-from-top-1 duration-150">
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
+                          {t("Icon auswählen")}
+                        </div>
+                        <div className="grid grid-cols-4 sm:grid-cols-10 gap-1.5">
+                          <button
+                            type="button"
+                            title={t("Auf Standard zurücksetzen")}
+                            aria-label={t("Auf Standard zurücksetzen")}
+                            onClick={() => {
+                              const next = { ...icons };
+                              delete next[`nav_${navId}`];
+                              setIcons(next);
+                              setActivePickerRefId(null);
+                            }}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </button>
+                          {AVAILABLE_COURSE_ICONS.map((opt) => {
+                            const isSelected = currentIcon === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => {
+                                  setIcons({
+                                    ...icons,
+                                    [`nav_${navId}`]: opt.id,
+                                  });
+                                  setActivePickerRefId(null);
+                                  setHasCustomOrder(true);
+                                }}
+                                style={isSelected ? { backgroundColor: 'var(--accent, #0AACA5)' } : {}}
+                                className={`flex h-9 w-9 items-center justify-center rounded-lg transition cursor-pointer ${
+                                  isSelected
+                                    ? 'text-white shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white'
+                                }`}
+                                title={opt.label}
+                              >
+                                <opt.icon className="h-4 w-4" />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // 3. Course Item Row
               const course = courses.find((c) => c.ref_id === item.id);
               if (!course) return null;
 
@@ -465,6 +640,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
               return (
                 <div
                   key={course.ref_id}
+                  data-course-card={course.ref_id}
                   draggable
                   onDragStart={() => handleDragStart(index)}
                   onDragOver={(e) => handleDragOver(e, index)}
