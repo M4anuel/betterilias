@@ -31,6 +31,7 @@ def mount(page,student=False):
       forumApi.thread=async(ref,id)=>({ref_id:ref,thread_id:id,title:id==='10'?forumData.threads[0].title:'Closed discussion',closed:id==='20',page:0,has_more:false,
         posts:[{id:'100',subject:'Questions',author:'Test Student',date:'10.11.2026, 10:00',edited:'',depth:1,avatar_url:null,can_reply:id==='10',can_edit:!student,
           html:'<p>'+('A readable post with some detailed discussion. '.repeat(35))+'</p><pre>'+('code_'.repeat(50))+'</pre>'}]});
+      forumApi.edit=async()=>({subject:'Questions',message:'<p>Original post</p>'});
       forumApi.write=async(ref,thread,payload,files)=>{forumWrites.push({ref,thread,payload,files:files.length});return {thread_id:'10',post_id:'101'};};
       forumApi.moderate=async()=>{forumData.threads[0].closed=true;return structuredClone(forumData);};
       const {ForumView}=await import('/src/components/ForumView.tsx');
@@ -230,6 +231,97 @@ def test_late_page_save_does_not_cache_under_another_account(workflow_page):
     assert page.get_by_role('textbox',name=tr['forum.text_block'],exact=True).inner_text()=='Private introduction'
 
 
+@pytest.mark.parametrize('width,height',[(320,740),(390,844),(430,844),(768,850),(1280,900),(844,390)])
+@pytest.mark.parametrize('code,scheme',[('en','light'),('de','dark')])
+def test_inline_edit_is_immediate_and_preserves_typing_during_preparation(workflow_page,width,height,code,scheme):
+    page=workflow_page;page.set_viewport_size({'width':width,'height':height});tr=language(page,code,scheme);mount(page)
+    page.get_by_role('button',name='Questions about the assignment',exact=False).click()
+    article=page.get_by_role('article');article.wait_for()
+    original=article.locator('.forum-message-content').bounding_box()
+    page.evaluate('''async()=>{const {forumApi}=await import('/src/lib/forum.ts');
+      forumApi.edit=async()=>await new Promise(resolve=>window.readyEdit=()=>resolve({subject:'Questions',message:'<p>Fresh ILIAS content</p>'}));}''')
+    article.get_by_role('button',name=tr['forum.edit_post'],exact=True).click()
+    editor=article.get_by_role('textbox',name=tr['forum.message'],exact=True)
+    assert editor.get_attribute('contenteditable')=='true'
+    current=article.locator('.forum-message-content').bounding_box()
+    assert abs(original['width']-current['width'])<=1 and abs(original['x']-current['x'])<=1
+    assert page.locator('.forum-composer').count()==0
+    assert article.get_by_role('button',name=tr['forum.save_post'],exact=True).is_disabled()
+    shot(page,f'inline-start-{width}-{height}-{code}-{scheme}')
+    editor.fill('Typed before ILIAS was ready')
+    page.evaluate('readyEdit()')
+    page.get_by_text(tr['forum.preparing_edit'],exact=True).wait_for(state='hidden')
+    assert editor.inner_text()=='Typed before ILIAS was ready'
+    shot(page,f'inline-edit-{width}-{height}-{code}-{scheme}')
+    article.get_by_role('button',name=tr['forum.save_post'],exact=True).click()
+    page.wait_for_function('forumWrites.length===1')
+    assert page.evaluate("forumWrites[0].payload.edit_post_id==='100' && forumWrites[0].payload.message.includes('Typed before ILIAS was ready')")
+
+
+def test_edit_preparation_failure_can_retry_without_losing_draft(workflow_page):
+    page=workflow_page;tr=language(page,'en','light');mount(page)
+    page.get_by_role('button',name='Questions about the assignment',exact=False).click()
+    page.get_by_role('article').wait_for()
+    page.evaluate('''async()=>{const {forumApi}=await import('/src/lib/forum.ts');window.editCalls=0;
+      forumApi.edit=async()=>{if(++editCalls===1)throw new Error('Preparation unavailable');return {subject:'Questions',message:'<p>Fresh ILIAS content</p>'};};}''')
+    page.get_by_role('button',name=tr['forum.edit_post'],exact=True).click()
+    editor=page.get_by_role('textbox',name=tr['forum.message'],exact=True);editor.fill('Keep this draft')
+    page.get_by_role('alert').get_by_role('button',name=tr['Erneut versuchen'],exact=True).click()
+    page.wait_for_function('editCalls===2')
+    assert editor.inner_text()=='Keep this draft'
+    assert page.get_by_role('button',name=tr['forum.save_post'],exact=True).is_enabled()
+
+
+def test_cancelled_inline_edit_ignores_late_preparation(workflow_page):
+    page=workflow_page;tr=language(page,'en','light');mount(page)
+    page.get_by_role('button',name='Questions about the assignment',exact=False).click()
+    page.get_by_role('article').wait_for()
+    page.evaluate('''async()=>{const {forumApi}=await import('/src/lib/forum.ts');
+      forumApi.edit=async()=>await new Promise(resolve=>window.readyEdit=()=>resolve({subject:'Late subject',message:'<p>Late content</p>'}));}''')
+    page.get_by_role('button',name=tr['forum.edit_post'],exact=True).click()
+    page.get_by_role('button',name=tr['Abbrechen'],exact=True).click()
+    page.evaluate('readyEdit()')
+    assert page.get_by_role('textbox',name=tr['forum.message'],exact=True).count()==0
+    assert page.get_by_role('article').get_by_role('heading',name='Questions',exact=True).is_visible()
+
+
+def test_inline_subject_changes_survive_preparation_and_resize(workflow_page):
+    page=workflow_page;tr=language(page,'en','light');mount(page)
+    page.get_by_role('button',name='Questions about the assignment',exact=False).click()
+    article=page.get_by_role('article');article.wait_for()
+    page.evaluate('''async()=>{const {forumApi}=await import('/src/lib/forum.ts');
+      forumApi.edit=async()=>await new Promise(resolve=>window.readyEdit=()=>resolve({subject:'Original subject',message:'<p>Native body</p>'}));}''')
+    article.get_by_role('button',name=tr['forum.edit_post'],exact=True).click()
+    article.locator('summary').click()
+    article.get_by_label(tr['forum.subject'],exact=True).fill('My changed subject')
+    page.set_viewport_size({'width':390,'height':844});page.evaluate('readyEdit()')
+    assert article.get_by_label(tr['forum.subject'],exact=True).input_value()=='My changed subject'
+    assert article.get_by_role('textbox',name=tr['forum.message'],exact=True).inner_text()=='Native body'
+
+
+def test_compact_search_metadata_and_profile_photo(workflow_page):
+    page=workflow_page;tr=language(page,'en','light')
+    page.route('**/api/materials/42/download?*',lambda route:route.fulfill(content_type='image/svg+xml',body='<svg xmlns="http://www.w3.org/2000/svg" width="75" height="75"><circle cx="37" cy="37" r="30" fill="teal"/></svg>'))
+    page.evaluate('''()=>{window.prepareForum=async api=>{
+      forumData.threads[0].view_count=6;
+      const native=api.thread;api.thread=async(...args)=>{const data=await native(...args);data.posts[0].avatar_url='/api/materials/42/download?custom_url=photo';return data;};
+    };}''')
+    mount(page)
+    assert page.get_by_role('button',name=tr['forum.back_course'],exact=True).count()==0
+    search=page.get_by_label(tr['forum.search'],exact=True)
+    new=page.get_by_role('button',name=tr['forum.new_thread'],exact=True)
+    assert abs(search.bounding_box()['y']-new.bounding_box()['y'])<=1
+    before=search.bounding_box()['width'];search.focus()
+    assert search.bounding_box()['width']>before+40
+    search.press('Tab');assert new.evaluate('e=>document.activeElement===e')
+    page.get_by_label(tr['forum.view_count'].replace('{count}','6'),exact=True).wait_for()
+    page.get_by_role('button',name='Questions about the assignment',exact=False).click()
+    photo=page.get_by_role('article').locator('img')
+    photo.wait_for();page.wait_for_function("document.querySelector('.forum-post img')?.naturalWidth>0")
+    assert photo.is_visible()
+    shot(page,'forum-density-profile-desktop')
+
+
 @pytest.mark.parametrize('width',[320,390,430,768,1280])
 def test_reply_is_contained_and_uses_shared_file_dropzone(workflow_page,width):
     page=workflow_page;page.set_viewport_size({'width':width,'height':844});tr=language(page,'de','dark');mount(page)
@@ -249,6 +341,14 @@ def test_reply_is_contained_and_uses_shared_file_dropzone(workflow_page,width):
     assert after['height']<=before['height']+4
     assert abs(after['top']-before['top'])<=4
     assert page.locator('.forum-composer').evaluate('e=>e.clientHeight<=e.parentElement.clientHeight')
+    panel=page.locator('.forum-composer')
+    header=panel.locator(':scope > div').first.bounding_box()
+    body=panel.locator(':scope > fieldset').bounding_box()
+    footer=panel.locator('.forum-compose-actions').bounding_box()
+    assert header['y']+header['height']<=body['y']+1
+    assert body['y']+body['height']<=footer['y']+1
+    assert panel.locator(':scope > div').first.evaluate('e=>getComputedStyle(e).position')!='sticky'
+
     shot(page,f'reply-contained-{width}-de-dark')
     page.get_by_role('button',name=tr['forum.send'],exact=True).click()
     page.wait_for_function('forumWrites.length===1')
@@ -263,8 +363,9 @@ def test_changed_subject_and_invisible_body_are_readable_and_selectable(workflow
     };}''')
     mount(page);page.get_by_role('button',name='Questions about the assignment',exact=False).click()
     page.get_by_text(tr['forum.empty_post'],exact=True).wait_for()
-    page.get_by_role('button',name='Nicht mehr relevant',exact=True).click()
-    assert page.get_by_role('article').get_attribute('data-highlighted')=='true'
+    heading=page.get_by_role('heading',name='Nicht mehr relevant',exact=True)
+    assert heading.is_visible()
+    assert heading.evaluate('e=>getComputedStyle(e).textDecorationLine')=='none'
 
 
 def test_native_post_link_highlights_target_without_visiting_ilias(workflow_page):

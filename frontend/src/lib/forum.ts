@@ -4,6 +4,7 @@ import { t } from './i18n';
 export type ForumAction = 'close' | 'reopen' | 'makesticky' | 'unmakesticky' | 'delete';
 export interface ForumThread {
   id: string; title: string; author: string; last_post: string; post_count: number;
+  view_count?: number | null;
   unread: boolean; closed: boolean; sticky: boolean; actions: ForumAction[];
 }
 export interface ForumOverview {

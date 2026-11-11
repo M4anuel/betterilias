@@ -2206,5 +2206,7 @@
   "forum.yesterday": "Gestern",
   "forum.tomorrow": "Morgen",
   "forum.by": "von",
-  "forum.empty_post": "Dieser Beitrag enthält keinen Nachrichtentext."
+  "forum.empty_post": "Dieser Beitrag enthält keinen Nachrichtentext.",
+  "forum.view_count": "{count} Aufrufe",
+  "forum.preparing_edit": "Du kannst bereits bearbeiten. Speichern ist m\u00f6glich, sobald ILIAS bereit ist."
 }

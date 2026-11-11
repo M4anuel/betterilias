@@ -2206,5 +2206,7 @@
   "forum.yesterday": "Yesterday",
   "forum.tomorrow": "Tomorrow",
   "forum.by": "by",
-  "forum.empty_post": "This post contains no message text."
+  "forum.empty_post": "This post contains no message text.",
+  "forum.view_count": "{count} views",
+  "forum.preparing_edit": "You can edit now. Saving will be available once ILIAS is ready."
 }
