@@ -149,12 +149,12 @@ def test_desktop_qr_transfers_session_to_mobile_without_extension():
             playwright.expect(phone.get_by_role('status', name='ILIAS-Sitzung aktiv', exact=True)).to_be_visible()
             phone.get_by_role('button', name='Design & Einstellungen', exact=True).click()
             phone.get_by_role('button', name='Abmelden', exact=True).click()
-            playwright.expect(phone.get_by_role('status', name='ILIAS-Sitzung inaktiv', exact=True)).to_be_visible()
+            playwright.expect(phone.get_by_role('banner').get_by_role('button', name='ILIAS verbinden', exact=True)).to_be_visible()
             assert phone.evaluate("localStorage.getItem('betterilias_session_id')") == key
             phone.reload()
-            playwright.expect(phone.get_by_role('status', name='ILIAS-Sitzung inaktiv', exact=True)).to_be_visible()
+            playwright.expect(phone.get_by_role('banner').get_by_role('button', name='ILIAS verbinden', exact=True)).to_be_visible()
             desktop.reload()
-            playwright.expect(desktop.get_by_role('status', name='ILIAS-Sitzung inaktiv', exact=True)).to_be_visible()
+            playwright.expect(desktop.get_by_role('banner').get_by_role('button', name='ILIAS verbinden', exact=True)).to_be_visible()
             assert not errors
             browser.close()
     finally:

@@ -16,12 +16,23 @@ type DialogListener = (state: ActiveDialogState | null) => void;
 
 let currentListener: DialogListener | null = null;
 let dialogIdSeq = 0;
+let active: ActiveDialogState | null = null;
+let queue: ActiveDialogState[] = [];
+
+function advance() {
+  if (!active) active = queue.shift() || null;
+  currentListener?.(active);
+}
 
 export function registerDialogListener(listener: DialogListener): () => void {
   currentListener = listener;
+  listener(active);
   return () => {
     if (currentListener === listener) {
       currentListener = null;
+      const abandoned = [...(active ? [active] : []), ...queue];
+      active = null; queue = [];
+      abandoned.forEach(dialog => dialog.resolve(false));
     }
   };
 }
@@ -33,11 +44,21 @@ export function confirmDialog(options: DialogOptions): Promise<boolean> {
     return Promise.resolve(window.confirm(options.message));
   }
   return new Promise<boolean>((resolve) => {
-    currentListener!({
+    const id = ++dialogIdSeq;
+    let settled = false;
+    queue.push({
       ...options,
-      id: ++dialogIdSeq,
-      resolve,
+      id,
+      resolve: value => {
+        if (settled) return;
+        settled = true;
+        if (active?.id === id) active = null;
+        queue = queue.filter(dialog => dialog.id !== id);
+        resolve(value);
+        if (currentListener) advance();
+      },
     });
+    if (!active) advance();
   });
 }
 

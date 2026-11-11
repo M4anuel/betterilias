@@ -76,6 +76,8 @@ export const ILIAS_SAVER_ENABLED_KEY = 'betterilias_saver_enabled';
 export const ILIAS_SAVER_TTL_KEY = 'betterilias_saver_ttl';
 const SESSION_ID_KEY = 'betterilias_session_id';
 let inMemorySessionId: string | null = null;
+let sessionEpoch = 0;
+let sessionRequests = new AbortController();
 
 try {
   localStorage.removeItem(LAST_OPENED_KEY);
@@ -84,6 +86,16 @@ try {
 }
 
 export const cache = {
+  // A logout invalidates outstanding work even though its revoked credential is retained.
+  getRequestScope() {
+    return { key: `${sessionEpoch}:${cache.getSessionId() || ''}`, signal: sessionRequests.signal };
+  },
+  invalidateSessionRequests() {
+    ++sessionEpoch;
+    sessionRequests.abort();
+    sessionRequests = new AbortController();
+    window.dispatchEvent(new Event('betterilias-session-changed'));
+  },
   // --- Multi-Tenant Session ID ---
   getSessionId(): string | null {
     try {
@@ -113,7 +125,7 @@ export const cache = {
     } catch (e) {
       console.error('Failed to update session ID');
     }
-    if (previousSession !== inMemorySessionId) window.dispatchEvent(new Event('betterilias-session-changed'));
+    if (previousSession !== inMemorySessionId) cache.invalidateSessionRequests();
   },
 
   clearSessionContent() {
@@ -1321,3 +1333,9 @@ export const cache = {
 
 // Clear cached content before any component renders after an extension account change.
 cache.setSessionId(cache.getSessionId());
+window.addEventListener('storage', event => {
+  if (event.key === SESSION_ID_KEY) {
+    inMemorySessionId = event.newValue?.trim() || null;
+    cache.invalidateSessionRequests();
+  }
+});

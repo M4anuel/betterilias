@@ -44,6 +44,13 @@ import { considerDiagnosticResponse, clientDiagnostic } from './diagnosticReport
 
 const API_BASE = '/api';
 class ResponseFailure extends Error {}
+let requestSequence = 0;
+let lastAuthEvidence = 0;
+function reportAuthEvidence(authenticated: boolean, sequence: number) {
+  if (sequence < lastAuthEvidence) return;
+  lastAuthEvidence = sequence;
+  window.dispatchEvent(new CustomEvent('ilias-session', { detail: authenticated }));
+}
 
 export function apiError(error: { detail?: unknown }): string | undefined {
   if (typeof error.detail === 'string') return error.detail;
@@ -54,6 +61,13 @@ export function apiError(error: { detail?: unknown }): string | undefined {
 // Protected API responses confirm the current session, including expiry.
 export async function sessionFetch(input: string, init?: RequestInit & { trackPending?: boolean }): Promise<Response> {
   const sessionId = cache.getSessionId();
+  const scope = cache.getRequestScope();
+  const sequence = ++requestSequence;
+  const assertCurrent = () => {
+    if (scope.key !== cache.getRequestScope().key || scope.signal.aborted) {
+      throw new DOMException(t('connection.changed'), 'AbortError');
+    }
+  };
   const headers = new Headers(init?.headers);
   headers.delete('X-BetterIlias-Browser-Id');
   headers.set('Accept-Language', getLanguage());
@@ -69,6 +83,7 @@ export async function sessionFetch(input: string, init?: RequestInit & { trackPe
   }
 
   const retryRead = async () => {
+    assertCurrent();
     if (!isMutation) return sessionFetch(input, { ...init, signal: undefined });
     // A failed write may have succeeded remotely. Check reachability without replaying it.
     const status = await sessionFetch(`${API_BASE}/auth/status`);
@@ -83,18 +98,27 @@ export async function sessionFetch(input: string, init?: RequestInit & { trackPe
     const response = await fetch(input, {
       ...init,
       credentials: 'same-origin',
-      signal: !isMutation ? AbortSignal.any([...(init?.signal ? [init.signal] : []), timeout.signal]) : init?.signal,
+      signal: AbortSignal.any([scope.signal, ...(init?.signal ? [init.signal] : []), ...(!isMutation ? [timeout.signal] : [])]),
       headers,
     });
+
+    assertCurrent();
+    // A credential can change after headers arrive, while the JSON body is pending.
+    const guarded = <T,>(read: () => Promise<T>) => async () => { const data = await read(); assertCurrent(); return data; };
+    response.json = guarded(response.json.bind(response));
+    response.text = guarded(response.text.bind(response));
+    response.blob = guarded(response.blob.bind(response));
+    response.arrayBuffer = guarded(response.arrayBuffer.bind(response));
+    response.formData = guarded(response.formData.bind(response));
 
     if (!input.startsWith(`${API_BASE}/diagnostics/`)) {
       considerDiagnosticResponse(response.headers, sessionId);
       reportConnection([502, 503, 504].includes(response.status) ? 'unavailable' : null, input, retryRead);
     }
     if (response.status === 401) {
-      window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
+      reportAuthEvidence(false, sequence);
     } else if (response.ok && !input.startsWith(`${API_BASE}/auth/`) && !input.startsWith(`${API_BASE}/diagnostics/`)) {
-      window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
+      reportAuthEvidence(true, sequence);
     }
     if (!isMutation && response.status === 401) throw new ResponseFailure(t('connection.auth'));
     if (!isMutation && [502, 503, 504].includes(response.status)) throw new ResponseFailure(t('connection.failed'));
@@ -104,6 +128,7 @@ export async function sessionFetch(input: string, init?: RequestInit & { trackPe
     if (!isMutation && response.status >= 500) throw new ResponseFailure(t('errors.load_failed'));
     return response;
   } catch (error) {
+    assertCurrent();
     if (error instanceof ResponseFailure) throw error;
     if (!(error instanceof DOMException && error.name === 'AbortError') && !input.startsWith(`${API_BASE}/diagnostics/`)) void clientDiagnostic('CLIENT_CONNECTION');
     if (!init?.signal?.aborted && (error instanceof TypeError || (error instanceof DOMException && error.name === 'TimeoutError'))) {
@@ -143,7 +168,8 @@ export const api = {
     return res.json();
   },
   getManagement(refId: string): Promise<ManagementResponse> {
-    const existing = inFlightManagement.get(refId);
+    const key = `${cache.getRequestScope().key}:${refId}`;
+    const existing = inFlightManagement.get(key);
     if (existing) return existing;
     const req = (async () => {
       try {
@@ -151,10 +177,10 @@ export const api = {
         if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({}))) || t('management.load_failed'));
         return await res.json();
       } finally {
-        inFlightManagement.delete(refId);
+        inFlightManagement.delete(key);
       }
     })();
-    inFlightManagement.set(refId, req);
+    inFlightManagement.set(key, req);
     return req;
   },
   async reviewDeletion(refId: string, item_ids: string[]): Promise<DeleteReview> {
@@ -200,6 +226,8 @@ export const api = {
     return confirmedCreation(await res.json().catch(() => null), 'fold');
   },
   uploadCourseFile(refId: string, file: File, license: string, onProgress: (progress: number) => void): Promise<AuthoringResult> {
+    const scope = cache.getRequestScope();
+    const sequence = ++requestSequence;
     navigationGuard.incrementPending();
     return new Promise<AuthoringResult>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -213,14 +241,17 @@ export const api = {
       xhr.onerror = () => reject(new Error(t('authoring.uncertain')));
       xhr.onabort = () => reject(new Error(t('authoring.uncertain')));
       xhr.onload = () => {
+        if (scope.key !== cache.getRequestScope().key || scope.signal.aborted) {
+          reject(new DOMException(t('connection.changed'), 'AbortError')); return;
+        }
         considerDiagnosticResponse({ get: name => xhr.getResponseHeader(name) }, sessionId);
         let data;
         try { data = JSON.parse(xhr.responseText); } catch { reject(new Error(t('authoring.uncertain'))); return; }
-        if (xhr.status === 401) window.dispatchEvent(new CustomEvent('ilias-session', { detail: false }));
+        if (xhr.status === 401) reportAuthEvidence(false, sequence);
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const result = confirmedCreation(data, 'file');
-            window.dispatchEvent(new CustomEvent('ilias-session', { detail: true }));
+            reportAuthEvidence(true, sequence);
             resolve(result);
           } catch (error) { reject(error); }
         } else reject(new Error(apiError(data) || t('authoring.uncertain')));
@@ -274,12 +305,18 @@ export const api = {
   },
 
   async logout(): Promise<void> {
+    cache.invalidateSessionRequests();
+    const scope = cache.getRequestScope();
     try {
       await sessionFetch(`${API_BASE}/auth/logout`, { method: 'POST' });
     } finally {
       // Retain the revoked key so a paired device cannot fall back to another
       // active/default desktop session on its next request.
-      cache.clearSessionContent();
+      if (scope.key === cache.getRequestScope().key) {
+        cache.invalidateSessionRequests();
+        cache.clearSessionContent();
+        reportAuthEvidence(false, ++requestSequence);
+      }
     }
   },
 
@@ -733,7 +770,7 @@ export const api = {
     });
     if (!res.ok) {
       const error = await res.json().catch(() => ({}));
-      throw new Error(apiError(error) || t("Übung konnte nicht gespeichert werden"));
+      throw Object.assign(new Error(apiError(error) || t("Übung konnte nicht gespeichert werden")), { status: res.status });
     }
     return res.json();
   },

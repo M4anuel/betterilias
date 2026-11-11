@@ -1052,10 +1052,8 @@ export const App: React.FC = () => {
   const handleLogout = async () => {
     try {
       await api.logout();
-      setAuthStatus({ authenticated: false, cookies_present: false });
     } catch (err: any) {
       console.error('Logout error', err);
-      setAuthStatus({ authenticated: false, cookies_present: false });
     }
   };
 

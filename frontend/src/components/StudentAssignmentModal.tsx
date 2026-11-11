@@ -538,8 +538,9 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        handleSafeClose();
+      if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('dialog[open]')) {
+        e.preventDefault();
+        void handleSafeClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
