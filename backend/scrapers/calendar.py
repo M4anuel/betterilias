@@ -569,7 +569,7 @@ def parse_ilias_agenda_page(html_content: str) -> ParsedIliasAgendaPage:
         checked = bool(cb and cb.has_attr("checked"))
 
         col_div = li.select_one(".ilCalColSpan")
-        color = "#F47C94"
+        color = ""
         if col_div and col_div.get("style"):
             cm = re.search(r"border-color\s*:\s*(#[0-9a-fA-F]{3,6})", col_div["style"])
             if cm:

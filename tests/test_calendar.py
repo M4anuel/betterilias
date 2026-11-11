@@ -328,6 +328,35 @@ def test_calendar_api_endpoints_and_subscription_revocation(tmp_path, monkeypatc
     assert feed_res.status_code == 200
     assert "Computergrafik Vorlesung" in feed_res.text
 
+    # 4b. Hide course 3695519 and verify it no longer appears in subscription feed or .ics export
+    hide_res = client.put(
+        "/api/calendar/hidden-courses",
+        json={"hidden_course_ids": ["3695519"]},
+        headers=headers,
+    )
+    assert hide_res.status_code == 200
+    assert hide_res.json()["hidden_course_ids"] == ["3695519"]
+
+    feed_hidden_res = client.get(f"/api/calendar/feed/{token}.ics")
+    assert feed_hidden_res.status_code == 200
+    assert "Computergrafik Vorlesung" not in feed_hidden_res.text
+
+    export_hidden_res = client.get("/api/calendar/export.ics?semester=HS2026", headers=headers)
+    assert export_hidden_res.status_code == 200
+    assert "Computergrafik Vorlesung" not in export_hidden_res.text
+
+    # Unhide course and verify it reappears in the subscription feed
+    unhide_res = client.put(
+        "/api/calendar/hidden-courses",
+        json={"hidden_course_ids": []},
+        headers=headers,
+    )
+    assert unhide_res.status_code == 200
+    assert unhide_res.json()["hidden_course_ids"] == []
+    feed_unhidden_res = client.get(f"/api/calendar/feed/{token}.ics")
+    assert feed_unhidden_res.status_code == 200
+    assert "Computergrafik Vorlesung" in feed_unhidden_res.text
+
     # 5. Revoke subscription token and verify old token returns 404
     rev_res = client.delete("/api/calendar/subscription", headers=headers)
     assert rev_res.status_code == 200
@@ -754,9 +783,110 @@ def test_calendar_tenant_state_migration_on_session_refresh(tmp_path):
 
     # Verify new tenant inherits state completely
     migrated_state = svc._load_tenant_state(new_tenant)
-    assert migrated_state["colors"]["crs-1"] == "#ff0000"
+    assert migrated_state["colors"]["crs-1"] == "#FF0000"
     assert len(migrated_state["rules"]) == 1
     assert migrated_state["rules"][0]["course_ref_id"] == "crs-1"
+
+
+@pytest.mark.anyio
+async def test_calendar_random_preset_colors_and_legacy_rose_migration(tmp_path):
+    """
+    Verify:
+    1. Courses discovered from ILIAS Agenda with default #F47C94 rose border-color start out
+       with random preset colors from COURSE_COLOR_PALETTE (never #F47C94) and keep their
+       preset color once assigned.
+    2. Legacy tenant states containing uncustomized #F47C94 rose colors are automatically
+       migrated to random preset colors, while user-customized colors are preserved.
+    """
+    from backend.services.calendar_service import CalendarService, COURSE_COLOR_PALETTE
+
+    svc = CalendarService(storage_dir=tmp_path / "cal_colors")
+    tenant = "test-random-colors-tenant"
+
+    agenda_html = """
+    <html><body>
+      <div id="block_cal_sel_0">
+        <ul class="ilCalSel">
+          <li>
+            <input type="checkbox" name="selected_cat_ids[]" value="1" checked="checked" />
+            <div class="ilCalColSpan" style="border-color: #F47C94"></div>
+            <span class="ilCalSelTitle"><a href="ilias.php?ref_id=1001">HS2026: Kurs A</a></span>
+          </li>
+          <li>
+            <input type="checkbox" name="selected_cat_ids[]" value="2" checked="checked" />
+            <div class="ilCalColSpan" style="border-color: #F47C94"></div>
+            <span class="ilCalSelTitle"><a href="ilias.php?ref_id=1002">HS2026: Kurs B</a></span>
+          </li>
+          <li>
+            <input type="checkbox" name="selected_cat_ids[]" value="3" checked="checked" />
+            <div class="ilCalColSpan" style="border-color: #F47C94"></div>
+            <span class="ilCalSelTitle"><a href="ilias.php?ref_id=1003">HS2026: Kurs C</a></span>
+          </li>
+        </ul>
+      </div>
+    </body></html>
+    """
+
+    class FakeResp:
+        status_code = 200
+        text = agenda_html
+
+    class FakeHttp:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+        async def get(self, url, **kwargs):
+            return FakeResp()
+
+    class FakeSessionManager:
+        def has_cookies(self):
+            return True
+        def get_http_client(self):
+            return FakeHttp()
+
+    class FakeClient:
+        session_manager = FakeSessionManager()
+        def _check_response_for_session_loss(self, resp, url):
+            pass
+        async def get_my_courses(self):
+            return type("Dash", (), {"courses": []})()
+
+    res1 = await svc.discover_courses_from_agenda_and_memberships(tenant, client=FakeClient())
+    colors1 = {c.course_ref_id: c.color for c in res1.courses}
+    assert set(colors1.keys()) == {"1001", "1002", "1003"}
+    for col in colors1.values():
+        assert col != "#F47C94"
+        assert col in COURSE_COLOR_PALETTE
+    # Distinct random colors chosen from palette
+    assert len(set(colors1.values())) == 3
+
+    # Subsequent calls must preserve the assigned preset colors
+    res2 = svc.build_semester_response(tenant)
+    colors2 = {c.course_ref_id: c.color for c in res2.courses}
+    assert colors2 == colors1
+
+    # Simulate legacy tenant state polluted with #F47C94 rose
+    legacy_tenant = "legacy-rose-tenant"
+    legacy_path = svc._tenant_path(legacy_tenant)
+    import json
+    legacy_path.write_text(
+        json.dumps({
+            "courses": {
+                "2001": {"course_ref_id": "2001", "course_title": "Kurs 1", "color": "#F47C94"},
+                "2002": {"course_ref_id": "2002", "course_title": "Kurs 2", "color": "#7C3AED"},
+            },
+            "colors": {"2001": "#F47C94", "2002": "#7C3AED"},
+            "imported_events": {},
+            "rules": [],
+        }),
+        encoding="utf-8",
+    )
+    loaded = svc._load_tenant_state(legacy_tenant)
+    assert loaded["colors"]["2001"] != "#F47C94"
+    assert loaded["colors"]["2001"] in COURSE_COLOR_PALETTE
+    assert loaded["courses"]["2001"]["color"] == loaded["colors"]["2001"]
+    assert loaded["colors"]["2002"] == "#7C3AED"
 from tests.test_localisation_browser import local_site, ROOT
 
 
@@ -899,6 +1029,17 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
                     c["ignored_missing_schedule"] = True
                     c["needs_manual_schedule"] = False
             body = cal_response
+        elif "/color" in path and route.request.method == "PUT":
+            payload_data = json.loads(route.request.post_data or "{}")
+            new_col = payload_data.get("color", "#0AACA5").upper()
+            for c in cal_response["courses"]:
+                if c["course_ref_id"] in path:
+                    c["color"] = new_col
+            body = cal_response
+        elif "/hidden-courses" in path and route.request.method == "PUT":
+            payload_data = json.loads(route.request.post_data or "{}")
+            cal_response["hidden_course_ids"] = payload_data.get("hidden_course_ids", [])
+            body = cal_response
         elif "/api/calendar" in path:
             body = cal_response
         else:
@@ -949,6 +1090,14 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
         playwright.expect(page.get_by_text(tr("calendar.info.synced_from_ilias"), exact=True)).to_be_visible()
         info_btn.click()
 
+        # Verify colorpicker starts at the preset color for each course and updates when edited
+        po_color_input = page.locator(f"input[type='color'][aria-label*='Personal und Organisation']")
+        cg_color_input = page.locator(f"input[type='color'][aria-label*='Computergrafik']")
+        playwright.expect(po_color_input).to_have_value("#0aaca5")
+        playwright.expect(cg_color_input).to_have_value("#2563eb")
+        po_color_input.fill("#16a34a")
+        playwright.expect(po_color_input).to_have_value("#16a34a")
+
         # Verify collapsing and expanding the Courses & ILIAS Calendar Status panel (persisted in localStorage)
         collapse_btn = page.get_by_role("button", name=tr("calendar.courses_panel.collapse"), exact=True)
         collapse_btn.click()
@@ -960,7 +1109,7 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
         assert page.evaluate("localStorage.getItem('betterilias_calendar_panel_collapsed')") == "false"
 
         # Open Manual Recheck Modal and verify checkbox list + layout
-        page.get_by_role("button", name=tr("calendar.recheck.button"), exact=True).click()
+        page.get_by_role("button", name=tr("calendar.recheck.button"), exact=True).last.click()
         recheck_dialog = page.get_by_role("dialog", name=tr("calendar.recheck.modal_title"), exact=True)
         playwright.expect(recheck_dialog).to_be_visible()
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
@@ -977,10 +1126,18 @@ def test_calendar_mobile_tablet_desktop_browser(local_site, language, scheme, wi
         playwright.expect(loc_input).to_have_value("Hörsaal B001")
         dialog.get_by_role("button", name=tr("Abbrechen"), exact=True).click()
 
-        # Open Export & Subscription modal and verify Escape key dismissal
+        # Open Export & Subscription modal, verify subscription is above download, no local hosting warning, and Escape key dismissal
         page.get_by_role("button", name=tr("calendar.export_subscribe"), exact=True).click()
         exp_dialog = page.get_by_role("dialog", name=tr("calendar.export_modal.title"), exact=True)
         playwright.expect(exp_dialog).to_be_visible()
+        playwright.expect(exp_dialog.get_by_text(tr("calendar.export_modal.local_limit_title"), exact=False)).to_be_hidden()
+        sub_heading = exp_dialog.get_by_role("heading", name=tr("calendar.export_modal.sub_title"), exact=True)
+        dl_heading = exp_dialog.get_by_role("heading", name=tr("calendar.export_modal.download_title"), exact=True)
+        playwright.expect(sub_heading).to_be_visible()
+        playwright.expect(dl_heading).to_be_visible()
+        sub_box = sub_heading.bounding_box()
+        dl_box = dl_heading.bounding_box()
+        assert sub_box and dl_box and sub_box["y"] < dl_box["y"]
         page.keyboard.press("Escape")
         playwright.expect(exp_dialog).to_be_hidden()
         browser.close()

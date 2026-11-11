@@ -56,16 +56,62 @@ interface CalendarViewProps {
 
 const COURSE_COLOR_PALETTE = [
   '#0AACA5',
-  '#033683',
   '#2563EB',
   '#7C3AED',
+  '#DB2777',
+  '#EA580C',
+  '#16A34A',
+  '#0284C7',
+  '#9333EA',
+  '#DC2626',
   '#D97706',
   '#059669',
-  '#DC2626',
-  '#DB2777',
   '#4F46E5',
-  '#0D9488',
 ];
+
+const ILIAS_DEFAULT_AGENDA_COLORS = new Set([
+  '#F47C94',
+  '#98B3CE',
+  '#ADD8E6',
+  '#AE98CE',
+  '#B4CDCD',
+  '#EEEED1',
+  '#FFEC8B',
+]);
+
+function normalizeHexColor(raw: string | undefined | null, fallback = '#0aaca5'): string {
+  const cleaned = (raw || '').trim();
+  return /^#[0-9a-fA-F]{6}$/.test(cleaned) ? cleaned.toLowerCase() : fallback;
+}
+
+function isUsableCourseColor(raw: string | undefined | null, allowIliasDefault = false): boolean {
+  const cleaned = (raw || '').trim().toUpperCase();
+  if (!/^#[0-9A-F]{6}$/.test(cleaned)) return false;
+  if (!allowIliasDefault && ILIAS_DEFAULT_AGENDA_COLORS.has(cleaned)) return false;
+  return true;
+}
+
+function pickRandomCourseColor(existingColors: Record<string, string>): string {
+  const counts = new Map<string, number>();
+  for (const c of COURSE_COLOR_PALETTE) {
+    counts.set(c.toUpperCase(), 0);
+  }
+  for (const col of Object.values(existingColors)) {
+    const upper = (col || '').toUpperCase();
+    if (counts.has(upper)) {
+      counts.set(upper, (counts.get(upper) || 0) + 1);
+    }
+  }
+  let minCount = Infinity;
+  for (const cnt of counts.values()) {
+    if (cnt < minCount) minCount = cnt;
+  }
+  const candidates = COURSE_COLOR_PALETTE.filter(
+    (c) => (counts.get(c.toUpperCase()) || 0) === minCount
+  );
+  const pool = candidates.length > 0 ? candidates : COURSE_COLOR_PALETTE;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 const TIME_SLOT_PRESETS = [
   { label: '08:15–10:00', start: '08:15', end: '10:00' },
@@ -288,6 +334,15 @@ const CourseColorPicker: React.FC<CourseColorPickerProps> = ({
   onLivePreviewRef.current = onLivePreview;
   onCommitRef.current = onCommit;
 
+  const normalizedPropColor = normalizeHexColor(color);
+  const [pickerValue, setPickerValue] = useState<string>(normalizedPropColor);
+  const latestValueRef = useRef<string>(normalizedPropColor);
+
+  useEffect(() => {
+    latestValueRef.current = normalizedPropColor;
+    setPickerValue(normalizedPropColor);
+  }, [normalizedPropColor]);
+
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -297,7 +352,9 @@ const CourseColorPicker: React.FC<CourseColorPickerProps> = ({
     // Native 'input' event fires continuously while dragging slider without network request.
     // requestAnimationFrame synchronizes updates with the monitor refresh rate for 0-lag 60-120fps.
     const handleNativeInput = (e: Event) => {
-      const val = (e.target as HTMLInputElement).value;
+      const val = normalizeHexColor((e.target as HTMLInputElement).value, latestValueRef.current);
+      latestValueRef.current = val;
+      setPickerValue(val);
       if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         onLivePreviewRef.current(courseRefId, val);
@@ -307,7 +364,9 @@ const CourseColorPicker: React.FC<CourseColorPickerProps> = ({
     // Native 'change' event fires only when user releases/drops color slider or dismisses picker
     const handleNativeChange = (e: Event) => {
       if (rafId !== null) cancelAnimationFrame(rafId);
-      const val = (e.target as HTMLInputElement).value;
+      const val = normalizeHexColor((e.target as HTMLInputElement).value, latestValueRef.current);
+      latestValueRef.current = val;
+      setPickerValue(val);
       onCommitRef.current(courseRefId, val);
     };
 
@@ -324,15 +383,19 @@ const CourseColorPicker: React.FC<CourseColorPickerProps> = ({
   return (
     <label
       className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full cursor-pointer shadow-2xs border border-white/50"
-      style={{ backgroundColor: `var(--course-color-${courseRefId}, ${color})` }}
+      style={{ backgroundColor: `var(--course-color-${courseRefId}, ${pickerValue})` }}
       title={t('calendar.change_color')}
     >
       <input
         ref={inputRef}
         type="color"
-        value={color}
-        onChange={() => {}}
-        onBlur={(e) => onCommitRef.current(courseRefId, e.target.value)}
+        value={pickerValue}
+        onChange={(e) => {
+          const val = normalizeHexColor(e.target.value, latestValueRef.current);
+          latestValueRef.current = val;
+          setPickerValue(val);
+        }}
+        onBlur={() => onCommitRef.current(courseRefId, latestValueRef.current)}
         aria-label={`${t('calendar.change_color')}: ${courseTitle}`}
         className="sr-only"
       />
@@ -379,6 +442,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // Root calendar container ref for zero-re-render 120fps CSS variable color updates
   const calendarContainerRef = useRef<HTMLDivElement>(null);
   const lastCommittedColorRef = useRef<Record<string, string>>({});
+  const presetColorsRef = useRef<Record<string, string>>({});
 
   const [hiddenCourses, setHiddenCourses] = useState<string[]>(() =>
     cache.getHiddenCalendarCourses('ALL')
@@ -638,6 +702,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         return;
       }
 
+      const localHidden = cache.getHiddenCalendarCourses('ALL');
+      const serverHidden = Array.isArray(effectiveCal.hidden_course_ids)
+        ? effectiveCal.hidden_course_ids
+        : [];
+      if (localHidden.length > 0 && serverHidden.length === 0) {
+        effectiveCal.hidden_course_ids = localHidden;
+        void api
+          .updateHiddenCalendarCourses(localHidden)
+          .then((updated) => {
+            setCalendarData(updated);
+            cache.setCachedCalendar('ALL', updated);
+          })
+          .catch(() => {});
+      } else if (serverHidden.length > 0) {
+        setHiddenCourses(serverHidden);
+        cache.setHiddenCalendarCourses('ALL', serverHidden);
+      }
+
       setCalendarData(effectiveCal);
       cache.setCachedCalendar('ALL', effectiveCal);
       setCacheTimestamp(Date.now());
@@ -737,6 +819,30 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }
   }, [loadGlobalCalendar]);
 
+  const resolveCoursePresetColor = useCallback(
+    (courseRefId: string, backendColor?: string | null): string => {
+      const userExplicit = lastCommittedColorRef.current[courseRefId];
+      if (userExplicit && isUsableCourseColor(userExplicit, true)) {
+        const norm = userExplicit.trim().toUpperCase();
+        presetColorsRef.current[courseRefId] = norm;
+        return norm;
+      }
+      if (isUsableCourseColor(backendColor, false)) {
+        const norm = (backendColor as string).trim().toUpperCase();
+        presetColorsRef.current[courseRefId] = norm;
+        return norm;
+      }
+      const existingPreset = presetColorsRef.current[courseRefId];
+      if (existingPreset && isUsableCourseColor(existingPreset, false)) {
+        return existingPreset;
+      }
+      const picked = pickRandomCourseColor(presetColorsRef.current);
+      presetColorsRef.current[courseRefId] = picked;
+      return picked;
+    },
+    []
+  );
+
   // Merge all courses across all semesters, sorted newest semester to oldest
   const mergedCourses: CourseCalendarInfo[] = useMemo(() => {
     const ignoredSet = new Set(ignoredCoursesLocal);
@@ -746,9 +852,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       const isIgnored = Boolean(c.ignored_missing_schedule || ignoredSet.has(c.course_ref_id));
       const hasLecturesOrRules =
         (c.imported_lecture_count ?? 0) > 0 || (c.custom_rule_count ?? 0) > 0;
+      const resolvedColor = resolveCoursePresetColor(c.course_ref_id, c.color);
       byId.set(c.course_ref_id, {
         ...c,
-        color: c.color,
+        color: resolvedColor,
         course_title: cache.getDisplayName(c.course_ref_id, c.course_title),
         item_type: c.item_type || 'crs',
         ignored_missing_schedule: isIgnored,
@@ -757,15 +864,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }
 
     const combinedSources: CourseItem[] = [...allMemberships, ...coursesList];
-    combinedSources.forEach((c, idx) => {
+    combinedSources.forEach((c) => {
       if (!byId.has(c.ref_id)) {
         const isIgnored = ignoredSet.has(c.ref_id);
+        const resolvedColor = resolveCoursePresetColor(c.ref_id, undefined);
         byId.set(c.ref_id, {
           course_ref_id: c.ref_id,
           course_title: cache.getDisplayName(c.ref_id, c.title),
           semester: c.semester || null,
           item_type: c.item_type || 'crs',
-          color: COURSE_COLOR_PALETTE[idx % COURSE_COLOR_PALETTE.length],
+          color: resolvedColor,
           status: 'not_imported',
           feed_status: 'not_checked',
           status_message: t('calendar.status.not_checked'),
@@ -785,7 +893,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       if (semDiff !== 0) return semDiff;
       return a.course_title.localeCompare(b.course_title);
     });
-  }, [calendarData, allMemberships, coursesList, ignoredCoursesLocal, language]);
+  }, [
+    calendarData,
+    allMemberships,
+    coursesList,
+    ignoredCoursesLocal,
+    language,
+    resolveCoursePresetColor,
+  ]);
 
   // Available semesters that contain courses in the calendar
   const availableCalendarSemesters = useMemo(() => {
@@ -876,6 +991,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         ? prev.filter((id) => id !== courseRefId)
         : [...prev, courseRefId];
       cache.setHiddenCalendarCourses('ALL', next);
+      void api
+        .updateHiddenCalendarCourses(next)
+        .then((updated) => {
+          setCalendarData(updated);
+          cache.setCachedCalendar('ALL', updated);
+        })
+        .catch(() => {});
       return next;
     });
   };
@@ -890,18 +1012,37 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   const commitColorChange = async (courseRefId: string, color: string) => {
-    const currentSavedColor = calendarData?.courses?.find(
-      (c) => c.course_ref_id === courseRefId
-    )?.color;
-    if (
-      currentSavedColor?.toLowerCase() === color.toLowerCase() ||
-      lastCommittedColorRef.current[courseRefId]?.toLowerCase() === color.toLowerCase()
-    ) {
+    const normalizedUpper = normalizeHexColor(color).toUpperCase();
+    const currentEffectiveColor =
+      lastCommittedColorRef.current[courseRefId]?.toUpperCase() ||
+      presetColorsRef.current[courseRefId]?.toUpperCase() ||
+      calendarData?.courses?.find((c) => c.course_ref_id === courseRefId)?.color?.toUpperCase();
+
+    if (currentEffectiveColor === normalizedUpper) {
+      const root =
+        calendarContainerRef.current ||
+        document.querySelector<HTMLElement>('[data-calendar-root]');
+      if (root) {
+        root.style.removeProperty(`--course-color-${courseRefId}`);
+        root.style.removeProperty(`--course-color-${courseRefId}-bg`);
+      }
       return;
     }
-    lastCommittedColorRef.current[courseRefId] = color;
+
+    lastCommittedColorRef.current[courseRefId] = normalizedUpper;
+    presetColorsRef.current[courseRefId] = normalizedUpper;
+    setCalendarData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        courses: prev.courses.map((c) =>
+          c.course_ref_id === courseRefId ? { ...c, color: normalizedUpper } : c
+        ),
+      };
+    });
+
     try {
-      const updated = await api.updateCourseColor(courseRefId, color);
+      const updated = await api.updateCourseColor(courseRefId, normalizedUpper);
       setCalendarData(updated);
       cache.setCachedCalendar('ALL', updated);
       const root = calendarContainerRef.current || document.querySelector<HTMLElement>('[data-calendar-root]');
@@ -1074,6 +1215,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const handleRotateSubscription = async () => {
     try {
+      await api.updateHiddenCalendarCourses(hiddenCourses).catch(() => {});
       const sub = await api.rotateCalendarSubscription();
       setSubscriptionInfo(sub);
       const updated = await api.getCalendar();
@@ -3096,29 +3238,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </button>
             </div>
 
-            {/* 1. Download combined .ics file */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40 space-y-2.5">
-              <div className="flex items-center gap-2">
-                <Download className="h-4 w-4 text-[#0AACA5]" />
-                <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                  {t('calendar.export_modal.download_title')}
-                </h3>
-              </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                {t('calendar.export_modal.download_desc')}
-              </p>
-              <a
-                href={api.getCalendarExportUrl('ALL')}
-                download="betterilias-calendar.ics"
-                style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
-                className="min-h-11 sm:min-h-9 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 transition"
-              >
-                <Download className="h-4 w-4" />
-                <span>{t('calendar.export_modal.download_button')}</span>
-              </a>
-            </div>
-
-            {/* 2. Private revocable subscription URL */}
+            {/* 1. Private revocable subscription URL */}
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -3170,11 +3290,28 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   </button>
                 </div>
               )}
+            </div>
 
-              <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-[11px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-                <strong>{t('calendar.export_modal.local_limit_title')}:</strong>{' '}
-                {t('calendar.export_modal.local_limit_body')}
+            {/* 2. Download combined .ics file */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Download className="h-4 w-4 text-[#0AACA5]" />
+                <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                  {t('calendar.export_modal.download_title')}
+                </h3>
               </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                {t('calendar.export_modal.download_desc')}
+              </p>
+              <a
+                href={api.getCalendarExportUrl('ALL')}
+                download="betterilias-calendar.ics"
+                style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
+                className="min-h-11 sm:min-h-9 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 transition"
+              >
+                <Download className="h-4 w-4" />
+                <span>{t('calendar.export_modal.download_button')}</span>
+              </a>
             </div>
 
             {/* 3. Manual .ics File Import for a Course */}

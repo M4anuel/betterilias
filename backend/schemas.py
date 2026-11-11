@@ -790,6 +790,7 @@ class SemesterCalendarResponse(BaseModel):
     courses: List[CourseCalendarInfo] = Field(default_factory=list)
     rules: List[CourseScheduleRule] = Field(default_factory=list)
     events: List[CalendarEvent] = Field(default_factory=list)
+    hidden_course_ids: List[str] = Field(default_factory=list)
     subscription_token: Optional[str] = None
     subscription_url: Optional[str] = None
     webcal_url: Optional[str] = None
@@ -811,6 +812,10 @@ class CourseColorUpdateRequest(BaseModel):
 
 class CourseIgnoreScheduleUpdateRequest(BaseModel):
     ignored: bool
+
+
+class CalendarHiddenCoursesUpdateRequest(BaseModel):
+    hidden_course_ids: List[str] = Field(default_factory=list)
 
 
 class CalendarIcsImportRequest(BaseModel):

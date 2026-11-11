@@ -682,6 +682,7 @@ export interface SemesterCalendarResponse {
   courses: CourseCalendarInfo[];
   rules: CourseScheduleRule[];
   events: CalendarEvent[];
+  hidden_course_ids?: string[];
   subscription_token?: string | null;
   subscription_url?: string | null;
   webcal_url?: string | null;

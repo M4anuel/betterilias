@@ -876,6 +876,20 @@ export const api = {
     return res.json();
   },
 
+  async updateHiddenCalendarCourses(hiddenCourseIds: string[], semester?: string): Promise<SemesterCalendarResponse> {
+    const qs = semester ? `?semester=${encodeURIComponent(semester)}` : '';
+    const res = await sessionFetch(`${API_BASE}/calendar/hidden-courses${qs}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hidden_course_ids: hiddenCourseIds }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(apiError(error) || t('calendar.load_failed'));
+    }
+    return res.json();
+  },
+
   async importCourseIcs(payload: {
     course_ref_id: string;
     course_title: string;

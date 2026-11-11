@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from backend.api.deps import get_ilias_client
 from backend.schemas import (
     CalendarCourseImportRequest,
+    CalendarHiddenCoursesUpdateRequest,
     CalendarIcsImportRequest,
     CalendarSubscriptionResponse,
     CourseColorUpdateRequest,
@@ -227,6 +228,24 @@ async def update_course_ignore_schedule(
         tenant_key=tenant_key,
         course_ref_id=course_ref_id,
         ignored=payload.ignored,
+        semester=semester,
+        base_url=base_url,
+    )
+
+
+@router.put("/hidden-courses", response_model=SemesterCalendarResponse)
+async def update_hidden_courses(
+    payload: CalendarHiddenCoursesUpdateRequest,
+    request: Request,
+    semester: Optional[str] = Query(None),
+    client: IliasClient = Depends(get_ilias_client),
+):
+    tenant_key = _resolve_tenant_key(request, client)
+    base_url = _resolve_base_url(request)
+    return await run_in_threadpool(
+        calendar_service.update_hidden_courses,
+        tenant_key=tenant_key,
+        hidden_course_ids=payload.hidden_course_ids,
         semester=semester,
         base_url=base_url,
     )

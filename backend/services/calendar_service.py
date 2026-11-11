@@ -7,6 +7,7 @@ import json
 import time
 import logging
 from pathlib import Path
+import random
 import re
 import secrets
 from typing import Any, Dict, List, Optional, Tuple
@@ -60,13 +61,49 @@ COURSE_COLOR_PALETTE = [
     "#4F46E5",  # Indigo
 ]
 
+# Legacy ILIAS Agenda default category colours (notably #F47C94 rose) that should be
+# replaced with random BetterIlias preset colours unless explicitly chosen by the user.
+ILIAS_DEFAULT_AGENDA_COLORS = {
+    "#F47C94",
+    "#98B3CE",
+    "#ADD8E6",
+    "#AE98CE",
+    "#B4CDCD",
+    "#EEEED1",
+    "#FFEC8B",
+}
 
-def _default_color_for_course(course_ref_id: str, index: int = 0) -> str:
-    try:
-        num = int(re.sub(r"\D", "", course_ref_id) or index)
-    except ValueError:
-        num = index
-    return COURSE_COLOR_PALETTE[(num + index) % len(COURSE_COLOR_PALETTE)]
+
+def _is_valid_course_color(color: Optional[str], allow_ilias_default: bool = False) -> bool:
+    if not color or not isinstance(color, str):
+        return False
+    cleaned = color.strip().upper()
+    if not re.match(r"^#[0-9A-F]{6}$", cleaned):
+        return False
+    if not allow_ilias_default and cleaned in ILIAS_DEFAULT_AGENDA_COLORS:
+        return False
+    return True
+
+
+def _pick_random_color(existing_colors: Optional[Dict[str, str]] = None) -> str:
+    """Pick a random preset colour from COURSE_COLOR_PALETTE, preferring least-used palette colours."""
+    if not existing_colors:
+        return random.choice(COURSE_COLOR_PALETTE)
+    counts = {c.upper(): 0 for c in COURSE_COLOR_PALETTE}
+    for col in existing_colors.values():
+        if isinstance(col, str) and col.upper() in counts:
+            counts[col.upper()] += 1
+    min_count = min(counts.values())
+    candidates = [c for c in COURSE_COLOR_PALETTE if counts[c.upper()] == min_count]
+    return random.choice(candidates or COURSE_COLOR_PALETTE)
+
+
+def _default_color_for_course(
+    course_ref_id: str,
+    index: int = 0,
+    existing_colors: Optional[Dict[str, str]] = None,
+) -> str:
+    return _pick_random_color(existing_colors)
 
 
 def _status_message_for_course(info: CourseCalendarInfo) -> str:
@@ -158,7 +195,13 @@ class CalendarService:
         path = self._tenant_path(tenant_key)
         if path.exists():
             try:
-                return json.loads(path.read_text(encoding="utf-8"))
+                state = json.loads(path.read_text(encoding="utf-8"))
+                if self._normalize_tenant_colors(state):
+                    try:
+                        atomic_json(path, state)
+                    except Exception:
+                        pass
+                return state
             except Exception as e:
                 logger.warning(f"Failed to read calendar state {path}: {e}")
         return {
@@ -166,11 +209,52 @@ class CalendarService:
             "imported_events": {},
             "rules": [],
             "colors": {},
+            "user_colors": {},
+            "hidden_courses": [],
             "ignored_missing_schedule": {},
             "subscription_token": None,
             "subscription_semester": None,
             "subscription_created_at": None,
         }
+
+    def _normalize_tenant_colors(self, state: Dict[str, Any]) -> bool:
+        """
+        Ensure every course has a valid persisted preset colour and replace uncustomised
+        legacy ILIAS Agenda defaults (such as #F47C94 rose) with random BetterIlias colours.
+        """
+        courses_dict: Dict[str, Any] = state.setdefault("courses", {})
+        colors_dict: Dict[str, str] = state.setdefault("colors", {})
+        user_colors: Dict[str, str] = state.setdefault("user_colors", {})
+        changed = False
+
+        # First collect valid existing colours so new random picks distribute evenly
+        valid_colors: Dict[str, str] = {}
+        all_cids = list(dict.fromkeys(list(courses_dict.keys()) + list(colors_dict.keys())))
+        for cid in all_cids:
+            is_user_chosen = cid in user_colors
+            col = colors_dict.get(cid) or (
+                courses_dict.get(cid, {}).get("color") if isinstance(courses_dict.get(cid), dict) else None
+            )
+            if _is_valid_course_color(col, allow_ilias_default=is_user_chosen):
+                valid_colors[cid] = col.strip().upper()  # type: ignore[union-attr]
+
+        for cid in all_cids:
+            if cid in valid_colors:
+                norm_col = valid_colors[cid]
+            else:
+                norm_col = _pick_random_color(valid_colors)
+                valid_colors[cid] = norm_col
+                changed = True
+
+            if colors_dict.get(cid) != norm_col:
+                colors_dict[cid] = norm_col
+                changed = True
+            c_obj = courses_dict.get(cid)
+            if isinstance(c_obj, dict) and c_obj.get("color") != norm_col:
+                c_obj["color"] = norm_col
+                changed = True
+
+        return changed
 
     def _save_tenant_state(self, tenant_key: str, state: Dict[str, Any]) -> None:
         self.tenants_dir.mkdir(parents=True, exist_ok=True)
@@ -226,7 +310,7 @@ class CalendarService:
         if seed_courses:
             changed = False
             for idx, sc in enumerate(seed_courses):
-                c_color = colors_dict.get(sc.ref_id) or _default_color_for_course(sc.ref_id, idx)
+                c_color = colors_dict.get(sc.ref_id) or _pick_random_color(colors_dict)
                 if sc.ref_id not in colors_dict:
                     colors_dict[sc.ref_id] = c_color
                     changed = True
@@ -285,13 +369,20 @@ class CalendarService:
         course_titles: Dict[str, str] = {}
         all_imported_events: List[CalendarEvent] = []
 
+        colors_changed = False
         for idx, (cid, cdata) in enumerate(courses_dict.items()):
             c_sem = (cdata.get("semester") or "").upper()
             if filter_by_semester and semester_course_ids and cid not in semester_course_ids and c_sem != effective_sem.upper():
                 continue
 
             info = CourseCalendarInfo(**cdata)
-            info.color = colors_dict.get(cid) or info.color or _default_color_for_course(cid, idx)
+            c_color = colors_dict.get(cid) or info.color
+            if not c_color:
+                c_color = _pick_random_color(colors_dict)
+                colors_dict[cid] = c_color
+                cdata["color"] = c_color
+                colors_changed = True
+            info.color = c_color
             info.item_type = cdata.get("item_type") or info.item_type or "crs"
             is_ignored = bool(ignored_dict.get(cid, cdata.get("ignored_missing_schedule", False)))
             info.ignored_missing_schedule = is_ignored
@@ -319,7 +410,11 @@ class CalendarService:
             if r.course_ref_id not in known_cids:
                 c_title = r.course_title or f"Course {r.course_ref_id}"
                 course_titles[r.course_ref_id] = c_title
-                c_color = colors_dict.get(r.course_ref_id) or _default_color_for_course(r.course_ref_id, len(course_infos))
+                c_color = colors_dict.get(r.course_ref_id)
+                if not c_color:
+                    c_color = _pick_random_color(colors_dict)
+                    colors_dict[r.course_ref_id] = c_color
+                    colors_changed = True
                 custom_cnt = rule_counts_by_course.get(r.course_ref_id, 0)
                 is_ignored = bool(ignored_dict.get(r.course_ref_id, False))
                 info = CourseCalendarInfo(
@@ -336,6 +431,11 @@ class CalendarService:
                 info.status_message = _status_message_for_course(info)
                 course_infos.append(info)
                 known_cids.add(r.course_ref_id)
+
+        if colors_changed:
+            state["courses"] = courses_dict
+            state["colors"] = colors_dict
+            self._save_tenant_state(tenant_key, state)
 
         # Sort courses newest semester first, then undated/groups, then alphabetically
         course_infos.sort(
@@ -376,6 +476,13 @@ class CalendarService:
                 updated_at=ts,
             )
 
+        raw_hidden = state.get("hidden_courses", [])
+        hidden_course_ids = (
+            [str(cid) for cid in raw_hidden if cid]
+            if isinstance(raw_hidden, list)
+            else []
+        )
+
         return SemesterCalendarResponse(
             semester=effective_sem,
             semester_start_date=start_d.isoformat(),
@@ -385,6 +492,7 @@ class CalendarService:
             courses=course_infos,
             rules=semester_rules,
             events=combined_events,
+            hidden_course_ids=hidden_course_ids,
             subscription_token=token,
             subscription_url=sub_url,
             webcal_url=webcal_url,
@@ -677,7 +785,7 @@ class CalendarService:
             c_sem = self._extract_semester_from_title(cat.title)
             existing = courses_dict.get(cid)
             if not existing:
-                c_color = colors_dict.get(cid) or cat.color or _default_color_for_course(cid, idx)
+                c_color = colors_dict.get(cid) or _pick_random_color(colors_dict)
                 colors_dict[cid] = c_color
                 is_ignored = bool(ignored_dict.get(cid, False))
                 info = CourseCalendarInfo(
@@ -714,7 +822,7 @@ class CalendarService:
             c_sem = mc.semester or self._extract_semester_from_title(mc.title)
             existing = courses_dict.get(cid)
             if not existing:
-                c_color = colors_dict.get(cid) or _default_color_for_course(cid, len(courses_dict) + idx)
+                c_color = colors_dict.get(cid) or _pick_random_color(colors_dict)
                 colors_dict[cid] = c_color
                 is_ignored = bool(ignored_dict.get(cid, False))
                 info = CourseCalendarInfo(
@@ -829,7 +937,7 @@ class CalendarService:
         c_color = (
             colors_dict.get(course_ref_id)
             or (existing_info.get("color") if existing_info else None)
-            or _default_color_for_course(course_ref_id, len(courses_dict))
+            or _pick_random_color(colors_dict)
         )
         colors_dict[course_ref_id] = c_color
         is_ignored = bool(
@@ -922,7 +1030,7 @@ class CalendarService:
             for idx, course in enumerate(target_courses):
                 cid = course.ref_id
                 existing_info = courses_dict.get(cid)
-                c_color = colors_dict.get(cid) or (existing_info.get("color") if existing_info else None) or _default_color_for_course(cid, idx)
+                c_color = colors_dict.get(cid) or (existing_info.get("color") if existing_info else None) or _pick_random_color(colors_dict)
                 colors_dict[cid] = c_color
                 c_sem = course.semester or (existing_info.get("semester") if existing_info else None) or (
                     semester if (semester and semester.upper() != "ALL") else None
@@ -1040,7 +1148,7 @@ class CalendarService:
         courses_dict = state.get("courses", {})
         colors_dict = state.get("colors", {})
         if rule_in.course_ref_id not in courses_dict:
-            c_color = colors_dict.get(rule_in.course_ref_id) or _default_color_for_course(rule_in.course_ref_id, len(courses_dict))
+            c_color = colors_dict.get(rule_in.course_ref_id) or _pick_random_color(colors_dict)
             colors_dict[rule_in.course_ref_id] = c_color
             courses_dict[rule_in.course_ref_id] = CourseCalendarInfo(
                 course_ref_id=rule_in.course_ref_id,
@@ -1149,13 +1257,17 @@ class CalendarService:
     ) -> SemesterCalendarResponse:
         if not re.match(r"^#[0-9a-fA-F]{6}$", (color or "").strip()):
             raise ValueError("Invalid hex color")
+        norm_color = color.strip().upper()
         state = self._load_tenant_state(tenant_key)
         colors = state.get("colors", {})
-        colors[course_ref_id] = color.upper()
+        colors[course_ref_id] = norm_color
+        user_colors = state.get("user_colors", {})
+        user_colors[course_ref_id] = norm_color
         courses = state.get("courses", {})
         if course_ref_id in courses:
-            courses[course_ref_id]["color"] = color.upper()
+            courses[course_ref_id]["color"] = norm_color
         state["colors"] = colors
+        state["user_colors"] = user_colors
         state["courses"] = courses
         self._save_tenant_state(tenant_key, state)
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
@@ -1185,6 +1297,27 @@ class CalendarService:
         return self.build_semester_response(tenant_key, semester, base_url=base_url)
 
     @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
+    @audit('calendar_update')
+    def update_hidden_courses(
+        self,
+        tenant_key: str,
+        hidden_course_ids: List[str],
+        semester: Optional[str] = None,
+        base_url: str = "http://localhost:8000",
+    ) -> SemesterCalendarResponse:
+        state = self._load_tenant_state(tenant_key)
+        cleaned: List[str] = []
+        seen = set()
+        for cid in hidden_course_ids or []:
+            s = str(cid or "").strip()
+            if s and s not in seen:
+                seen.add(s)
+                cleaned.append(s)
+        state["hidden_courses"] = cleaned
+        self._save_tenant_state(tenant_key, state)
+        return self.build_semester_response(tenant_key, semester, base_url=base_url)
+
+    @coordinated(lambda self, tenant_key, *args, **kwargs: "calendar-state:" + str(self.storage_dir.resolve()) + ":" + tenant_key)
     @audit('calendar_import')
     def import_raw_ics_for_course(
         self,
@@ -1203,7 +1336,7 @@ class CalendarService:
 
         existing_c = courses_dict.get(course_ref_id, {})
         c_title = course_title or existing_c.get("course_title") or f"Course {course_ref_id}"
-        c_color = colors_dict.get(course_ref_id) or existing_c.get("color") or _default_color_for_course(course_ref_id, len(courses_dict))
+        c_color = colors_dict.get(course_ref_id) or existing_c.get("color") or _pick_random_color(colors_dict)
         c_sem = semester or existing_c.get("semester")
         colors_dict[course_ref_id] = c_color
 
@@ -1255,6 +1388,9 @@ class CalendarService:
         if course_ids:
             allowed = set(course_ids)
             events = [e for e in events if e.course_ref_id in allowed]
+        elif cal_resp.hidden_course_ids:
+            hidden_set = set(cal_resp.hidden_course_ids)
+            events = [e for e in events if e.course_ref_id not in hidden_set]
         return generate_ics_feed(events=events, semester=semester or get_current_semester())
 
     @coordinated(lambda self, *args, **kwargs: "calendar-tokens:" + str(self.storage_dir.resolve()))
