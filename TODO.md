@@ -4,6 +4,12 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Add native forum threads, conversation reading/writing, permission-aware
+  moderation and responsive introduction editing/preview from the supplied dumps.
+  Native text-block editing and implementation locations: `docs/NATIVE_FORUM.md`.
+- [ ] Validate native forum posting, attachments, moderation and text-block writes
+  against live ILIAS after deployment (current checks use dumps and mock transport).
+
 - [x] Fix the 14 state-machine audit findings: account request ownership, calendar
   merges/polling, editor drafts and write certainty, feedback replacement,
   companion resync, queued dialogs, download deduplication and notification lifetime.
@@ -300,7 +306,9 @@ build validation, and English fallback for partial languages.
 - [ ] `lso` — **Learning Sequence** (`Lernsequenz`): Needs sequential step-by-step progress viewer.
 
 #### 4. Communication & Collaboration (`Kommunikation und Zusammenarbeit`)
-- [x] `frm` — **Forum** (`Forum`): Partially supported. Forum card representation and direct navigation to ILIAS forum threads.
+- [x] `frm` — **Forum** (`Forum`): Native thread/post workspace, posting and attachments,
+  supported thread moderation, and native page text blocks. Remaining operations
+  and validation scope are documented in `docs/NATIVE_FORUM.md`.
 - [x] `grp` — **Group** (`Gruppe`): Partially supported. Group membership parsed; needs dedicated group workspace view.
 - [ ] `blog` — **Blog** (`Blog`): Needs blog post timeline and comments feed.
 - [ ] `wiki` — **Wiki** (`Wiki`): Needs wiki page viewer, page history, and internal wiki linking.
