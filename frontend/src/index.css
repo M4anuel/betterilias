@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+.forum-workspace { height: clamp(24rem, calc(100dvh - 15rem), 58rem); }
+.forum-prose { overflow-wrap: anywhere; line-height: 1.65; }
+.forum-prose > div, .forum-prose p, .forum-prose li, .forum-prose blockquote { max-width: 68ch; }
+.forum-prose p + p { margin-top: .85em; }
+.forum-prose a { color: var(--accent, #0AACA5); text-decoration: underline; }
+.forum-prose pre { max-width: 100%; overflow-x: auto; padding: .75rem; border-radius: .5rem; background: rgb(100 116 139 / .1); }
+.forum-scroll-region { max-width: 100%; overflow-x: auto; }
+.forum-scroll-region:focus-visible { outline: 2px solid var(--accent, #0AACA5); outline-offset: 2px; }
+.forum-prose table { display: block; max-width: 100%; overflow-x: auto; }
+.forum-prose th, .forum-prose td { border: 1px solid rgb(100 116 139 / .3); padding: .5rem; }
+.forum-prose img { max-width: 100%; height: auto; border-radius: .5rem; }
+.forum-prose ul { list-style: disc; padding-left: 1.5rem; }
+.forum-prose ol { list-style: decimal; padding-left: 1.5rem; }
+.forum-prose blockquote { border-left: 3px solid var(--accent, #0AACA5); padding-left: 1rem; margin-block: .75rem; }
+.forum-view [role="textbox"] { font-size: 1rem; }
+.forum-view button, .forum-view a { touch-action: manipulation; }
+.forum-view button > svg:only-child { margin-inline: 0; }
+@media (max-width: 767px) { .forum-view .forum-thread-back { display: inline-flex; } }
+
 @custom-variant dark (&:is(.dark, .dark *));
 
 /* Hybrid devices can report hover:none even when a mouse is attached.

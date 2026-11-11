@@ -1,4 +1,5 @@
 import { ErrorNotice } from './ErrorNotice';
+import { ForumView } from './ForumView';
 import { SyncIndicator } from './SyncIndicator';
 import { SyncRefreshControl } from './SyncRefreshControl';
 import { t, useLanguage, generatedTitle } from '../lib/i18n';
@@ -900,6 +901,12 @@ export const CourseView: React.FC<CourseViewProps> = ({
     );
   }
 
+  if (materialsData?.container_type === 'frm') {
+    const parent = materialsData.breadcrumbs.filter(crumb => crumb.ref_id && crumb.ref_id !== materialsData.container_ref_id).at(-1)?.ref_id || courseRefId;
+    return <ForumView key={materialsData.container_ref_id} refId={materialsData.container_ref_id}
+      title={materialsData.title || t('forum.title')} courseTitle={courseNickname} onBack={() => onNavigateFolder(parent)} />;
+  }
+
   if (activeExerciseRefId) {
     return (
       <ExerciseView
@@ -1059,8 +1066,14 @@ export const CourseView: React.FC<CourseViewProps> = ({
     return pin ? <div key={item.ref_id} className="flex min-w-0 items-start gap-1"><div className="min-w-0 flex-1">{content}</div><SidebarPinButton pin={pin} /></div> : content;
   };
   const renderMobileFolder = (item: MaterialItem) => renderPinnedItem(item, renderMobileFolderContent(item));
-  const renderTileItemCard = (item: MaterialItem): React.ReactNode => compact && item.item_type === 'fold' ? renderMobileFolder(item) : compact && item.item_type === 'file' ? renderItemRow(item) : renderPinnedItem(item, renderTileItemContent(item));
-  const renderItemRow = (item: MaterialItem): React.ReactNode => compact && item.item_type === 'fold' ? renderMobileFolder(item) : renderPinnedItem(item, renderItemRowContent(item));
+  const renderForumItem = (item: MaterialItem) => renderPinnedItem(item, <button key={item.ref_id} type="button" onClick={() => onNavigateFolder(item.ref_id)}
+    className="flex min-h-16 w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-teal-400 focus-visible:outline-2 focus-visible:outline-teal-500 dark:border-slate-700 dark:bg-slate-900">
+    <MessageSquare aria-hidden="true" className="h-6 w-6 shrink-0 text-teal-600 dark:text-teal-400" />
+    <span className="min-w-0 flex-1"><span className="block break-words text-sm font-bold text-slate-900 dark:text-slate-100">{item.title}</span>{item.description && <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{item.description}</span>}</span>
+    <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-600" />
+  </button>);
+  const renderTileItemCard = (item: MaterialItem): React.ReactNode => item.item_type === 'frm' ? renderForumItem(item) : compact && item.item_type === 'fold' ? renderMobileFolder(item) : compact && item.item_type === 'file' ? renderItemRow(item) : renderPinnedItem(item, renderTileItemContent(item));
+  const renderItemRow = (item: MaterialItem): React.ReactNode => item.item_type === 'frm' ? renderForumItem(item) : compact && item.item_type === 'fold' ? renderMobileFolder(item) : renderPinnedItem(item, renderItemRowContent(item));
   const renderMobileFolderContent = (item: MaterialItem) => {
     const stat = folderStats[item.ref_id];
     return <button key={item.ref_id} type="button" onClick={() => onNavigateFolder(item.ref_id)}
@@ -1073,7 +1086,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
     </button>;
   };
 
-  const renderSearchResultRow = (result: CourseSearchResult) => compact && result.item.item_type === 'fold'
+  const renderSearchResultRow = (result: CourseSearchResult) => result.item.item_type === 'frm' ? renderForumItem(result.item) : compact && result.item.item_type === 'fold'
     ? renderMobileFolder(result.item) : renderPinnedItem(result.item, renderSearchResultContent(result), result.containerRefId);
   const renderSearchResultContent = (result: CourseSearchResult) => {
     const { item, containerRefId, breadcrumbs, isSubfolderItem } = result;

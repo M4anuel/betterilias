@@ -59,7 +59,7 @@ export function activeSidebarPin(pins: SidebarPin[], courseId: string | null): S
 
 export function materialPin(courseId: string, courseTitle: string, containerId: string, item: MaterialItem): SidebarPin | null {
   const exercise = item.item_type === 'exc' || /ilexercise|ilobjexercisegui|\/go\/exc\//i.test(item.url);
-  const href = item.item_type === 'fold' ? courseHref(courseId, item.ref_id)
+  const href = ['fold', 'frm'].includes(item.item_type) ? courseHref(courseId, item.ref_id)
     : exercise ? courseHref(courseId, containerId, item.ref_id) : item.url;
   if (!href || !safePinHref(href)) return null;
   return { id: `${courseId}:item:${item.ref_id}`, courseId, courseTitle, title: item.title, href };
