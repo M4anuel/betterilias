@@ -19,7 +19,7 @@ def test_production_companions_reject_ambiguous_or_overbroad_origins(origin):
 
 def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_path):
     output = HELPERS['package']('https://App.Example.com/', tmp_path / 'output')
-    for browser in ('chrome', 'firefox'):
+    for browser in ('chrome', 'firefox', 'safari'):
         root = output / browser
         manifest = json.loads((root / 'manifest.json').read_text())
         assert 'https://app.example.com/*' in manifest['host_permissions']

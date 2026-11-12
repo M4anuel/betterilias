@@ -13,7 +13,7 @@ The **BetterIlias Project** is responsible for data processing in accordance wit
 * **Source Code:** `https://github.com/M4anuel/betterilias`
 
 ### 2. Data Processed by the BetterIlias Companion Browser Extension
-The **BetterIlias Companion** extension (for Chrome and Firefox) only accesses and processes data strictly necessary to connect your authenticated University of Bern ILIAS session (`https://ilias.unibe.ch`) with BetterIlias (`https://betterilias.ch`):
+The **BetterIlias Companion** extension (for Chrome, Firefox and Safari) only accesses and processes data strictly necessary to connect your authenticated University of Bern ILIAS session (`https://ilias.unibe.ch`) with BetterIlias (`https://betterilias.ch`):
 
 * **Authentication Information (`cookies` on `https://ilias.unibe.ch`):** When you sign in to `ilias.unibe.ch` or trigger synchronization, the extension reads your active ILIAS session cookies (`PHPSESSID` and `ilClientId`) from `https://ilias.unibe.ch` and transmits them over encrypted HTTPS (TLS) to `https://betterilias.ch/api/auth/sync` so BetterIlias can retrieve your lectures, course materials, and exercises on your behalf.
 * **Local Extension Storage (`storage.local`):** The extension stores your BetterIlias session identifier (`session_id`), last synchronization timestamp, and auto-sync preference locally inside your browser.
@@ -40,7 +40,7 @@ Verantwortlich für die Datenverarbeitung im Sinne des Schweizer Datenschutzgese
 * **Quellcode:** `https://github.com/M4anuel/betterilias`
 
 ### 2. Verarbeitete Daten durch die Browser-Erweiterung (BetterIlias Companion)
-Die Browser-Erweiterung **BetterIlias Companion** (für Chrome und Firefox) verarbeitet ausschliesslich Daten, die technisch zwingend erforderlich sind, um deine aktive ILIAS-Sitzung der Universität Bern (`https://ilias.unibe.ch`) mit BetterIlias (`https://betterilias.ch`) zu verbinden:
+Die Browser-Erweiterung **BetterIlias Companion** (für Chrome, Firefox und Safari) verarbeitet ausschliesslich Daten, die technisch zwingend erforderlich sind, um deine aktive ILIAS-Sitzung der Universität Bern (`https://ilias.unibe.ch`) mit BetterIlias (`https://betterilias.ch`) zu verbinden:
 
 * **Authentifizierungsdaten (`cookies` auf `https://ilias.unibe.ch`):** Bei der Anmeldung auf `ilias.unibe.ch` oder beim Klick auf Synchronisieren liest die Erweiterung deine aktiven ILIAS-Sitzungscookies (`PHPSESSID` und `ilClientId`) von `https://ilias.unibe.ch` und überträgt diese verschlüsselt über HTTPS (TLS) an `https://betterilias.ch/api/auth/sync`, damit BetterIlias deine Vorlesungen, Materialien und Übungen in deinem Auftrag abrufen kann.
 * **Lokaler Erweiterungsspeicher (`storage.local`):** Die Erweiterung speichert deine BetterIlias-Sitzungskennung (`session_id`), den Zeitpunkt der letzten Synchronisation sowie die Einstellung zur automatischen Synchronisation lokal in deinem Browser.

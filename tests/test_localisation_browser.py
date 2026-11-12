@@ -14,7 +14,7 @@ pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
+@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox', 'extensions/safari'])
 @pytest.mark.parametrize('language,scheme', [('de', 'dark'), ('en', 'light')])
 def test_popup_recovers_tabs_without_content_scripts(local_site, directory, language, scheme):
     pw = pytest.importorskip('playwright.sync_api')
@@ -89,7 +89,7 @@ def test_popup_recovers_tabs_without_content_scripts(local_site, directory, lang
 def local_site():
     class Handler(SimpleHTTPRequestHandler):
         def translate_path(self, path):
-            if path.startswith(('/extensions/chrome/', '/extensions/firefox/')):
+            if path.startswith(('/extensions/chrome/', '/extensions/firefox/', '/extensions/safari/')):
                 return str(ROOT / path.lstrip('/'))
             return super().translate_path(path)
 
@@ -156,7 +156,7 @@ def test_language_switch_is_live_persisted_and_sent_to_backend(local_site):
         browser.close()
 
 
-@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
+@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox', 'extensions/safari'])
 def test_extension_language_selection_and_safe_sync_feedback(local_site, directory):
     playwright = pytest.importorskip('playwright.sync_api')
     with playwright.sync_playwright() as p:
@@ -258,7 +258,7 @@ def test_connection_panel_resizes_without_losing_address(local_site, language, s
         browser.close()
 
 
-@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
+@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox', 'extensions/safari'])
 @pytest.mark.parametrize('language,scheme', [('de','dark'), ('de','light'), ('en','dark'), ('en','light')])
 def test_extension_checking_invalid_recovery_and_unavailable(local_site, directory, language, scheme):
     pw=pytest.importorskip('playwright.sync_api')

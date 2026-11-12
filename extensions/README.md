@@ -2,6 +2,8 @@
 
 - [Chrome, Edge and Brave](chrome/README.md): load `extensions/chrome/`.
 - [Firefox](firefox/README.md): load `extensions/firefox/manifest.json`.
+- [Safari on Mac, iPhone and iPad](safari/README.md): package `extensions/safari/`
+  for Apple's Web Extension Packager; native device acceptance remains pending.
 
 The browser-specific folders contain complete extension packages. Locale bundles
 are generated from the shared `locales/` catalogues by
@@ -47,11 +49,13 @@ dialog provides copy buttons rather than links that cannot open them.
 See [Chrome's installation instructions](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked)
 and [Firefox's privileged URL restrictions](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs/create).
 
-## Safari feasibility
+## Safari implementation
 
 Safari supports WebExtensions on Mac, iPhone and iPad, so the existing JavaScript,
-popup and translations are a useful starting point. There is no supported Safari
-package in this repository yet. A port needs to verify the manifest/background
+popup and translations are shared with the Safari package in `extensions/safari/`.
+The port uses tab-load/activation events and best-effort alarms for automatic sync,
+because Safari does not support cookie-change events. Manual popup sync remains
+available when Safari suspends background work. Native acceptance must verify the manifest/background
 configuration, cookies and host permissions, session sync and content-script
 handoff, background refresh, toolbar rendering, and popup behavior on Apple devices.
 On iPhone/iPad, `localhost` refers to that device; connecting to a hosted BetterIlias

@@ -81,8 +81,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 - [x] Group browser companions under `extensions/chrome/` and `extensions/firefox/`;
   update setup links and provide copy controls for restricted browser-internal addresses.
-- [ ] Port and validate the companion in Safari on macOS/iOS, including cookie
-  permissions, session sync, background refresh and Apple distribution.
+- [x] Add a Safari MV3 companion and exact-origin upload ZIP, sharing the verified
+  manual flow and using tab activity/optional alarms for best-effort automatic sync.
+- [ ] Validate the Safari companion on native macOS/iPhone/iPad: website/cookie
+  permissions, automatic/manual sync, suspension/resume, popup and toolbar; complete
+  Apple packaging, TestFlight acceptance and App Store distribution.
 
 - [x] Enforce strict HTTP session isolation, remove local/manual login, gate
   maintenance endpoints by server runtime mode, replace long-lived URL session

@@ -2,10 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { translate, resolveLanguage } from '../locales/runtime.mjs';
-import { languages, catalogues, jsKeys } from './check-locales.mjs';
+await import('./sync-safari-companion.mjs');
+const { languages, catalogues, jsKeys } = await import('./check-locales.mjs');
 if (process.exitCode) process.exit(process.exitCode);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-for (const directory of ['extensions/chrome', 'extensions/firefox']) {
+for (const directory of ['extensions/chrome', 'extensions/firefox', 'extensions/safari']) {
   const popup = path.join(root, directory, 'popup.js');
   const keys = new Set(jsKeys(popup));
   for (const match of fs.readFileSync(path.join(root, directory, 'popup.html'), 'utf8').matchAll(/data-i18n="([^"]+)"/g)) keys.add(match[1]);

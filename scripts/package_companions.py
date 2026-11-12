@@ -1,4 +1,4 @@
-"""Create Chrome/Firefox packages for one exact production HTTPS origin.
+"""Create Chrome/Firefox/Safari packages for one exact production HTTPS origin.
 
 Does not modify the development extensions or publish to either browser store.
 """
@@ -43,7 +43,7 @@ def package(origin, output):
     if any(output == path or output.is_relative_to(path) for path in (ROOT / 'extensions', ROOT / 'frontend', ROOT / 'backend')):
         raise ValueError('Choose an output directory outside the source trees.')
     output.mkdir(parents=True, exist_ok=True)
-    for browser in ('chrome', 'firefox'):
+    for browser in ('chrome', 'firefox', 'safari'):
         target = output / browser
         shutil.copytree(ROOT / 'extensions' / browser, target,
                         ignore=shutil.ignore_patterns('.env*', '*.env', '__pycache__', '*.zip'))
@@ -75,7 +75,7 @@ def main():
         package(args.app_origin, args.output)
     except ValueError as exc:
         parser.error(str(exc))
-    print('Created matching Chrome/Firefox packages; store signing/publication is separate.')
+    print('Created matching Chrome/Firefox/Safari packages; store signing/publication is separate.')
 
 
 if __name__ == '__main__':

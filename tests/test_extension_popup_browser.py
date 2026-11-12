@@ -13,14 +13,15 @@ pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '
 
 @pytest.mark.parametrize('language,scheme', [('de','dark'), ('en','light')])
 @pytest.mark.parametrize('scale', [1, 2])
-def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, scale):
+@pytest.mark.parametrize('directory', ['chrome', 'safari'])
+def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, scale, directory):
     pw=pytest.importorskip('playwright.sync_api')
     # Firefox uses the exact same markup/styles; native Firefox toolbar sizing
     # still needs manual verification. Chromium cannot load its Gecko manifest.
     assert (ROOT/'extensions/chrome/popup.html').read_bytes()==(ROOT/'extensions/firefox/popup.html').read_bytes()
     with pw.sync_playwright() as p:
         context=p.chromium.launch_persistent_context(str(tmp_path/'profile'),channel='chromium',headless=True,
-            color_scheme=scheme,args=[f'--disable-extensions-except={ROOT/"extensions/chrome"}',f'--load-extension={ROOT/"extensions/chrome"}'])
+            color_scheme=scheme,args=['--disable-gpu', f'--disable-extensions-except={ROOT/"extensions"/directory}',f'--load-extension={ROOT/"extensions"/directory}'])
         try:
             worker=context.service_workers[0] if context.service_workers else context.wait_for_event('serviceworker')
             icon=worker.evaluate('''async()=>{
@@ -32,7 +33,8 @@ def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, sc
                 for(let y=0;y<16;y++) for(let x=0;x<16;x++) {
                   const i=(y*16+x)*4;
                   if([0,1,2,3].some(channel=>data[i+channel]!==base.data[i+channel])) {
-                    changed++; if(x<10||y<10) outside++;
+                        // The circle's white stroke and antialiasing reach pixel 9.
+                        changed++; if(x<9||y<9) outside++;
                   }
                 }
                 results.push({changed,outside,sizes:Object.keys(images),color:Array.from(data.slice((13*16+13)*4,(13*16+13)*4+4))});

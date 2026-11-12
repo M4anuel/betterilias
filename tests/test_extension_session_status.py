@@ -62,7 +62,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
+@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox', 'extensions/safari'])
 def test_live_handoff_uses_page_readable_events_while_background_is_pending(directory):
     node = shutil.which('node')
     if not node:
@@ -100,7 +100,7 @@ vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),context);
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
+@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox', 'extensions/safari'])
 def test_request_deadline_covers_stalled_headers_and_body(directory):
     node = shutil.which('node')
     if not node:
@@ -139,7 +139,7 @@ const source=fs.readFileSync(process.argv[1],'utf8');
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox'])
+@pytest.mark.parametrize('directory', ['extensions/chrome', 'extensions/firefox', 'extensions/safari'])
 def test_content_handoff_only_reaches_expected_origins(directory):
     node = shutil.which('node')
     if not node:

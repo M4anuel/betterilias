@@ -1,0 +1,174 @@
+const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+const { t, languages, getLanguage, setLanguage } = BetterIliasI18n;
+document.addEventListener('DOMContentLoaded', async () => {
+  const byId = id => document.getElementById(id);
+  const badge = byId('ilias-status-badge'), subtitle = byId('ilias-status-sub');
+  const autoSyncBadge = byId('auto-sync-badge');
+  const feedback = byId('feedback-box'), sync = byId('sync-btn'), language = byId('language');
+  let syncing = false, autoSyncEnabled = true;
+  let sessionState = 'checking', cookiePresent = false, sessionUser = null;
+  setSessionState('checking');
+  try {
+    const stored = await browserAPI.storage.local.get(['serverUrl', 'frontendUrl', 'language', 'autoSyncEnabled']);
+    for (const [key, id] of [['serverUrl', 'server-url'], ['frontendUrl', 'frontend-url']]) {
+      if (stored[key]) byId(id).value = stored[key];
+    }
+    if (stored.language) setLanguage(stored.language);
+    autoSyncEnabled = stored.autoSyncEnabled !== false;
+  } catch (error) { console.warn('Could not load settings:', error); }
+  const serverUrl = () => (byId('server-url').value || 'http://localhost:8000').replace(/\/+$/, '');
+  const frontendUrl = () => (byId('frontend-url').value || 'http://localhost:5173').replace(/\/+$/, '');
+  async function appConnectionUrl(sessionId, appUrl = frontendUrl()) {
+    const target = new URL(appUrl);
+    const { response, data } = await BetterIliasRequest(`${serverUrl()}/api/auth/mobile-session`, {
+      method: 'POST', headers: { 'X-Session-Id': sessionId },
+    }, t('Sitzung konnte auf ILIAS nicht verifiziert werden.'));
+    if (!response.ok || !data.handoff_token) throw new Error(t('extension.page_connection_failed'));
+    target.hash = new URLSearchParams({ connect: data.handoff_token }).toString();
+    return target.href;
+  }
+  function showFeedback(message, type = 'success') {
+    feedback.textContent = message;
+    feedback.className = `feedback visible ${type}`;
+  }
+  function render() {
+    document.documentElement.lang = getLanguage();
+    document.querySelectorAll('[data-i18n]').forEach(element => { element.textContent = t(element.dataset.i18n); });
+    language.replaceChildren();
+    for (const [code, definition] of Object.entries(languages)) {
+      const option = document.createElement('option'); option.value = code;
+      option.textContent = definition.name + (definition.support === 'partial' ? ` (${t('Partially translated')})` : '');
+      language.append(option);
+    }
+    language.value = getLanguage();
+    if (autoSyncBadge) {
+      autoSyncBadge.textContent = autoSyncEnabled ? t('Aktiv') : t('Disabled');
+      autoSyncBadge.className = 'status-badge badge-neutral';
+    }
+    sync.textContent = syncing ? t('Synchronisiere...') : t('Sitzung mit BetterIlias synchronisieren');
+    sync.disabled = syncing || !cookiePresent;
+    sync.className = `btn ${sessionState === 'invalid' ? 'btn-secondary' : 'btn-primary'}`;
+    byId('login-btn').hidden = sessionState !== 'invalid';
+    badge.textContent = sessionState === 'valid' ? t('Synchronisiert') : sessionState === 'invalid'
+      ? t('Nicht angemeldet') : sessionState === 'error' ? t('Nicht verifiziert') : t('Prüfe...');
+    badge.className = `status-badge ${sessionState === 'valid' ? 'badge-success' : sessionState === 'invalid' ? 'badge-danger' : 'badge-warning'}`;
+    subtitle.textContent = sessionState === 'valid' ? t('Angemeldet als {user}', { user: sessionUser || t('Benutzer') })
+      : sessionState === 'invalid' ? (cookiePresent ? t('Gast-Sitzung oder abgelaufen. Bitte auf ilias.unibe.ch mit SWITCH edu-ID einloggen.') : t('Keine Sitzung gefunden. Bitte logge dich zuerst auf ilias.unibe.ch ein.'))
+      : sessionState === 'error' ? t('Session verification unavailable. Check your connection and the backend, then retry.')
+      : t('Verifying your ILIAS session...');
+  }
+  function setSessionState(state) {
+    sessionState = state;
+    render();
+    void BetterIliasToolbar.setStatus(state === 'valid' ? 'synced' : state === 'invalid' ? 'unauthenticated' : state);
+  }
+  function isIliasAuthCookie(name) {
+    if (!name || typeof name !== 'string') return false;
+    if (name.includes('|') || name.includes('{') || name.includes('}') || name.includes('[') || name.includes(']')) return false;
+    return name === 'PHPSESSID' || name.startsWith('_shibsession_') || name === 'ilClientId' || name.startsWith('il_');
+  }
+  async function fetchCookies() {
+    const cookies = new Map();
+    // Host-only, domain and Firefox partitioned cookies.
+    for (const query of [{ url: 'https://ilias.unibe.ch/' }, { domain: 'ilias.unibe.ch' },
+      { domain: 'ilias.unibe.ch', firstPartyDomain: null }]) {
+      try {
+        for (const cookie of await browserAPI.cookies.getAll(query)) {
+          if (cookie.name && cookie.value && isIliasAuthCookie(cookie.name)) {
+            cookies.set(cookie.name, cookie.value);
+          }
+        }
+      } catch (_) { /* Query support differs between browsers. */ }
+    }
+    if (!cookies.has('ilClientId')) cookies.set('ilClientId', 'ilias3_unibe');
+    return Object.fromEntries(cookies);
+  }
+  language.addEventListener('change', async () => {
+    setLanguage(language.value); feedback.className = 'feedback'; setSessionState(sessionState);
+    try { await browserAPI.storage.local.set({ language: getLanguage() }); }
+    catch (_) { showFeedback(t('Could not save language preference.'), 'error'); }
+  });
+  async function verifySession(manual = false) {
+    if (syncing) return;
+    feedback.className = 'feedback'; syncing = true; setSessionState('checking');
+    try {
+      const cookies = await fetchCookies();
+      cookiePresent = Boolean(cookies.PHPSESSID);
+      if (!cookiePresent) {
+        setSessionState('invalid');
+        await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
+        return;
+      }
+      const stored = await browserAPI.storage.local.get(['sessionId']);
+      let response, data;
+      try {
+        ({ response, data } = await BetterIliasRequest(`${serverUrl()}/api/auth/sync`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': getLanguage() },
+          body: JSON.stringify({ cookies, session_id: stored.sessionId || null,
+            source: 'safari_extension', user_agent: navigator.userAgent }),
+        }, t('Session verification unavailable. Check your connection and the backend, then retry.')));
+      } catch (error) {
+        throw new Error(t('Verbindung zum Backend fehlgeschlagen ({error}). Läuft das Backend auf {url}?', { error: error.message, url: serverUrl() }));
+      }
+      if (response.status === 401 || response.status === 403 || (response.ok && data.authenticated === false)) {
+        setSessionState('invalid');
+        await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
+        if (manual) showFeedback(data.message || t('Sitzung konnte auf ILIAS nicht verifiziert werden.'), 'error');
+        return;
+      }
+      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : t('Server Fehler ({status})', { status: response.status }));
+      if (!data.success || !data.authenticated || !data.session_id) throw new Error(t('Sitzung konnte auf ILIAS nicht verifiziert werden.'));
+      const shibKey = Object.keys(cookies).find(k => k.startsWith('_shibsession_')) || '';
+      await browserAPI.storage.local.set({
+        sessionId: data.session_id,
+        lastSyncSignature: `${cookies.PHPSESSID}:${cookies[shibKey] || ''}`,
+        lastSyncTime: Date.now(),
+        userName: data.user_name || null,
+      });
+      const user = data.user_name || t('Benutzer');
+      sessionUser = user; setSessionState('valid');
+      if (manual) showFeedback(t('Erfolgreich synchronisiert als "{user}"!', { user }));
+      for (const tab of await browserAPI.tabs.query({})) {
+        if (!tab.url || !tab.id) continue;
+        let appTab = false;
+        try { appTab = new URL(tab.url).origin === new URL(frontendUrl()).origin; } catch (_) {}
+        if (!appTab) continue;
+        try {
+          const reply = await browserAPI.tabs.sendMessage(tab.id, { type: 'BETTERILIAS_SESSION_SYNCED', sessionId: data.session_id });
+          if (reply?.success) continue;
+        } catch (_) { /* Reloaded extensions may have no content script in an existing tab. */ }
+        if (manual) {
+          try {
+            // Recover without a content script: claim a separate, one-use code
+            // in each app tab, setting its own same-origin HttpOnly cookie.
+            await browserAPI.tabs.update(tab.id, { url: await appConnectionUrl(data.session_id, tab.url) });
+            // A fragment-only navigation does not rerun the app bootstrap.
+            await browserAPI.tabs.reload(tab.id);
+          } catch (_) { showFeedback(t('extension.page_connection_failed'), 'error'); }
+        } else {
+          showFeedback(t('extension.page_connection_needed'), 'error');
+        }
+      }
+    } catch (error) {
+      setSessionState('error');
+      await browserAPI.storage.local.set({ lastSyncSignature: null, lastSyncTime: 0 }).catch(() => {});
+      if (manual) showFeedback(error.message, 'error');
+    }
+    finally { syncing = false; render(); }
+  }
+  sync.addEventListener('click', () => verifySession(true));
+  byId('open-app-btn').addEventListener('click', async () => {
+    try {
+      const stored = await browserAPI.storage.local.get(['sessionId']);
+      const url = stored.sessionId ? await appConnectionUrl(stored.sessionId) : new URL(frontendUrl()).href;
+      await browserAPI.tabs.create({ url });
+    } catch (_) { showFeedback(t('extension.page_connection_failed'), 'error'); }
+  });
+  byId('save-settings-btn').addEventListener('click', async () => {
+    try {
+      await browserAPI.storage.local.set({ serverUrl: serverUrl(), frontendUrl: frontendUrl() });
+      showFeedback(t('Einstellungen gespeichert.'));
+    } catch (_) { showFeedback(t('Could not save settings.'), 'error'); }
+  });
+  render(); await verifySession();
+});

@@ -45,7 +45,7 @@ still needs the changes described in [deployment security](DEPLOYMENT_SECURITY.m
   capabilities, health checks and hourly private-data maintenance.
 - `.github/workflows/containers.yml`: backend/frontend checks and an actual local
   HTTPS container smoke test before publishing. Feature/PR builds cannot publish.
-- `scripts/package_companions.py`: exact-host production Chrome/Firefox packages.
+- `scripts/package_companions.py`: exact-host production Chrome/Firefox/Safari packages.
 
 Base-image digests and Actions commit SHAs are pinned. Dependabot proposes
 reviewable Docker/Actions/npm updates; it does not auto-merge them. Runtime Python
