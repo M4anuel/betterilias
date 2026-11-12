@@ -249,8 +249,13 @@ def test_inline_edit_is_immediate_and_preserves_typing_during_preparation(workfl
     assert article.get_by_role('button',name=tr['forum.save_post'],exact=True).is_disabled()
     shot(page,f'inline-start-{width}-{height}-{code}-{scheme}')
     editor.fill('Typed before ILIAS was ready')
+    actions=article.get_by_role('button',name=tr['forum.save_post'],exact=True)
+    before_actions=actions.bounding_box()
     page.evaluate('readyEdit()')
-    page.get_by_text(tr['forum.preparing_edit'],exact=True).wait_for(state='hidden')
+    page.wait_for_function("!document.querySelector('.forum-inline-editor .forum-submit').disabled")
+    after_actions=actions.bounding_box()
+    assert abs(before_actions['y']-after_actions['y'])<=1
+    assert abs(before_actions['x']-after_actions['x'])<=1
     assert editor.inner_text()=='Typed before ILIAS was ready'
     shot(page,f'inline-edit-{width}-{height}-{code}-{scheme}')
     article.get_by_role('button',name=tr['forum.save_post'],exact=True).click()
@@ -322,14 +327,44 @@ def test_compact_search_metadata_and_profile_photo(workflow_page):
     shot(page,'forum-density-profile-desktop')
 
 
+@pytest.mark.parametrize('code,scheme',[('en','light'),('de','dark')])
+def test_pinned_threads_remain_highlighted_and_can_be_unpinned(workflow_page,code,scheme):
+    page=workflow_page;tr=language(page,code,scheme)
+    page.evaluate('''()=>{window.prepareForum=async api=>{
+      forumData.threads.reverse();forumData.threads.find(t=>t.id==='10').actions=['unmakesticky'];
+      api.moderate=async(ref,id,action)=>{const thread=forumData.threads.find(t=>t.id===id);
+        thread.sticky=action==='makesticky';thread.actions=[thread.sticky?'unmakesticky':'makesticky'];return structuredClone(forumData);};
+    };}''')
+    mount(page)
+    rows=page.locator('.forum-thread-list ul > li > button')
+    assert rows.first.get_attribute('data-pinned')=='true'
+    assert rows.first.evaluate('e=>getComputedStyle(e).backgroundColor')!=rows.last.evaluate('e=>getComputedStyle(e).backgroundColor')
+    shot(page,f'pinned-thread-{code}-{scheme}')
+    rows.first.click()
+    page.get_by_text(tr['forum.actions'],exact=True).click()
+    page.get_by_role('button',name=tr['forum.action.unmakesticky'],exact=True).click()
+    page.get_by_role('dialog').get_by_role('button',name=tr['Bestätigen'],exact=True).click()
+    page.wait_for_function("document.querySelectorAll('[data-pinned=true]').length===0")
+    assert page.get_by_role('alert').count()==0
+    page.get_by_text(tr['forum.actions'],exact=True).click()
+    assert page.get_by_role('button',name=tr['forum.action.makesticky'],exact=True).is_visible()
+
+
 @pytest.mark.parametrize('width',[320,390,430,768,1280])
 def test_reply_is_contained_and_uses_shared_file_dropzone(workflow_page,width):
     page=workflow_page;page.set_viewport_size({'width':width,'height':844});tr=language(page,'de','dark');mount(page)
     page.get_by_role('button',name='Questions about the assignment',exact=False).click()
     page.get_by_role('article').wait_for()
+    prose_width=page.locator('.forum-message-content').bounding_box()['width']
     before=page.locator('#audit-root').evaluate('e=>({height:e.scrollHeight,top:e.scrollTop})')
     page.get_by_role('button',name=tr['forum.reply'],exact=True).click()
     page.get_by_role('textbox',name=tr['forum.message'],exact=True).fill('Draft with attachment')
+    message=page.locator('.forum-reply-message').bounding_box()
+    options=page.locator('.forum-reply-options').bounding_box()
+    if width>=1280:
+        assert message['width']<=prose_width+1
+        assert options['x']>=message['x']+message['width']
+    else: assert options['y']>=message['y']+message['height']
     send=page.get_by_role('button',name=tr['forum.send'],exact=True).bounding_box()
     workspace=page.locator('.forum-workspace').bounding_box()
     assert send and workspace and send['y']+send['height']<=workspace['y']+workspace['height']+1
@@ -398,14 +433,15 @@ def test_writes_invalidate_other_pages_in_this_forum_and_keep_other_forums(workf
     assert result=={'stale':None,'other':True}
 
 
-def test_native_forum_opens_from_course_and_returns_with_browser_back(workflow_browser):
+@pytest.mark.parametrize('width',[320,390,430,768,1280])
+def test_native_forum_opens_from_course_and_returns_with_browser_back(workflow_browser,width):
     from functools import partial
     from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
     from threading import Thread
     from urllib.parse import urlsplit
     server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(ROOT/'frontend/dist')))
     Thread(target=server.serve_forever,daemon=True).start()
-    context=workflow_browser.new_context(viewport={'width':390,'height':844},locale='en-GB',color_scheme='light')
+    context=workflow_browser.new_context(viewport={'width':width,'height':844},locale='en-GB',color_scheme='light')
     page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
     key='forum-test-account';requests=[]
     page.add_init_script("localStorage.setItem('betterilias_session_id','forum-test-account');localStorage.setItem('betterilias_language','en');")
@@ -427,12 +463,17 @@ def test_native_forum_opens_from_course_and_returns_with_browser_back(workflow_b
     page.route('**/api/**',api)
     try:
         page.goto(f'http://127.0.0.1:{server.server_port}/?course=100&semester=HS2026')
+        forum_card=page.locator('[data-forum-material]')
+        assert forum_card.bounding_box()['height']<=60
+        assert forum_card.evaluate('e=>getComputedStyle(e).borderTopColor')=='rgba(0, 0, 0, 0)'
+        shot(page,f'forum-material-row-{width}-en-light')
         page.get_by_role('button',name='Course discussion forum',exact=True).click()
         page.wait_for_url('**folder=42*')
         page.get_by_role('heading',name='Course discussion forum',exact=True).wait_for()
         page.get_by_role('button',name='Assignment questions',exact=False).click()
         page.get_by_text('The first forum post.',exact=True).wait_for()
-        page.get_by_role('button',name='Back to threads',exact=True).click()
+        back=page.get_by_role('button',name='Back to threads',exact=True)
+        if back.is_visible(): back.click()
         page.get_by_label('Search threads',exact=True).wait_for()
         page.go_back()
         page.get_by_role('button',name='Course discussion forum',exact=True).wait_for()

@@ -1070,9 +1070,9 @@ export const CourseView: React.FC<CourseViewProps> = ({
   };
   const renderMobileFolder = (item: MaterialItem) => renderPinnedItem(item, renderMobileFolderContent(item));
   const renderForumItem = (item: MaterialItem) => renderPinnedItem(item, <button key={item.ref_id} type="button" onClick={() => onNavigateFolder(item.ref_id)}
-    className="flex min-h-16 w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-teal-400 focus-visible:outline-2 focus-visible:outline-teal-500 dark:border-slate-700 dark:bg-slate-900">
-    <MessageSquare aria-hidden="true" className="h-6 w-6 shrink-0 text-teal-600 dark:text-teal-400" />
-    <span className="min-w-0 flex-1"><span className="block break-words text-sm font-bold text-slate-900 dark:text-slate-100">{item.title}</span>{item.description && <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{item.description}</span>}</span>
+    data-forum-material className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-transparent p-3 text-left hover:border-slate-200 hover:bg-slate-50/80 focus-visible:outline-2 focus-visible:outline-teal-500 dark:hover:border-slate-700 dark:hover:bg-slate-800/60">
+    <MessageSquare aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-600 dark:text-teal-400" />
+    <span className="min-w-0 flex-1"><span className="block break-words text-xs font-bold text-slate-900 dark:text-slate-100">{item.title}</span>{item.description && <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{item.description}</span>}</span>
     <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-600" />
   </button>);
   const renderTileItemCard = (item: MaterialItem): React.ReactNode => item.item_type === 'frm' ? renderForumItem(item) : compact && item.item_type === 'fold' ? renderMobileFolder(item) : compact && item.item_type === 'file' ? renderItemRow(item) : renderPinnedItem(item, renderTileItemContent(item));

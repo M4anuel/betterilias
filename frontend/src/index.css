@@ -11,6 +11,13 @@
 .forum-view[data-compact="false"] .forum-thread-back { display: none; }
 .forum-view[data-compact="true"] .forum-thread-back { display: inline-flex; }
 .forum-composer { max-height: 75%; flex-shrink: 0; }
+.forum-composer { container: forum-reply / inline-size; }
+.forum-reply-fields { display: grid; grid-template-columns: minmax(0,1fr); gap: 1rem; align-content: start; font-size: .875rem; }
+.forum-reply-message, .forum-reply-options { width: 100%; max-width: 72ch; }
+@container forum-reply (min-width: 48rem) {
+  .forum-reply-fields { grid-template-columns: minmax(0,72ch) minmax(12rem,1fr); align-items: start; }
+  .forum-reply-options { padding-left: 1rem; border-left: 1px solid rgb(100 116 139 / .25); }
+}
 .forum-search:focus-within { position: absolute; inset-inline: .75rem; z-index: 1; }
 .forum-search:focus-within + .forum-new-thread { margin-left: auto; }
 .forum-thread-meta > span + span::before { content: ''; display: inline-block; height: .8em; border-left: 1px solid currentColor; opacity: .4; margin-inline: .5rem; }
