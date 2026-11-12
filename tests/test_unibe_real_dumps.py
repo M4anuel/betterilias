@@ -227,6 +227,8 @@ def test_real_unibe_podcasts_parsing():
     assert po_series.total_episodes == 7
     assert all(ep.status == "available" for ep in po_series.episodes)
     assert all(ep.stream_url is not None for ep in po_series.episodes)
+    assert all(ep.preview_image is not None for ep in po_series.episodes)
+    assert any("elearning_podcast3" in ep.preview_image for ep in po_series.episodes if ep.preview_image)
 
     # Test MMS podcasts (multi-page with scheduled episodes and pagination buttons)
     mms_html = (FIXTURES_UNIBE / "unibe_mms_podcasts.html").read_text(encoding="utf-8", errors="replace")

@@ -99,6 +99,7 @@ export interface PodcastEpisode {
   uploaded_at?: string | null;
   presenter?: string;
   location?: string;
+  preview_image?: string | null;
   stream_url?: string;
   status: string; // 'available' | 'scheduled'
 }

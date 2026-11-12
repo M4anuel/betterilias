@@ -141,6 +141,7 @@ class PodcastEpisode(BaseModel):
     uploaded_at: Optional[str] = None
     presenter: Optional[str] = None
     location: Optional[str] = None
+    preview_image: Optional[str] = None
     stream_url: Optional[str] = None
     status: str = "available"  # "available" (recorded) or "scheduled" (future / upcoming)
 

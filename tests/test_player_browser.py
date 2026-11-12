@@ -41,7 +41,7 @@ def test_preferences_and_recording_sort(local_site,width,height,language,scheme)
         def order():
             return page.locator('[data-recording-id]').evaluate_all("es=>es.map(e=>e.dataset.recordingId)")
         def open_player(identifier):
-            page.locator(f'[data-recording-id="{identifier}"]').get_by_role('button',name=tr('Streamen'),exact=True).click()
+            page.locator(f'[data-recording-id="{identifier}"]').get_by_role('button',name=tr('recordings.play'),exact=True).click()
             page.wait_for_function("document.querySelectorAll('dialog video').length===2 && Array.from(document.querySelectorAll('dialog video')).every(v=>v.readyState>=3)")
         page.goto(local_site+'/?course=42')
         open_list()
@@ -72,10 +72,8 @@ def test_preferences_and_recording_sort(local_site,width,height,language,scheme)
         status=card.get_by_text(tr('Aufnahme bereit'),exact=True).bounding_box()
         assert heading['y']+heading['height'] <= status['y']
         if width<640:
-            link=card.get_by_role('link').bounding_box()
-            stream=card.get_by_role('button',name=tr('Streamen'),exact=True).bounding_box()
-            assert abs(link['y']-stream['y'])<2 and link['x']+link['width']<stream['x']
-            assert card.bounding_box()['height']<140
+            stream=card.get_by_role('button',name=tr('recordings.play'),exact=True).bounding_box()
+            assert stream['width']>0 and stream['height']>0
         field.scroll_into_view_if_needed()
         page.screenshot(path=f'.pytest_cache/recording-sort-{width}-{height}-{language}-{scheme}.png',animations='disabled')
         # The last recording remains reachable even in short landscape viewports.
@@ -196,7 +194,7 @@ def test_dual_stream_playback_quality_layouts_and_chapters(local_site, width, he
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(local_site+'/?course=42')
         page.get_by_text('Lecture recordings', exact=True).click()
-        stream_button = page.get_by_role('button', name=tr('Streamen'), exact=True)
+        stream_button = page.get_by_role('button', name=tr('recordings.play'), exact=True)
         pw.expect(stream_button).to_be_visible()
         assert not requests
         stream_button.click()
@@ -440,7 +438,7 @@ def test_single_stream_and_resolution_failure(local_site, single, failure):
         page.route('**/media/**',media_route)
         page.goto(local_site+'/?course=42')
         page.get_by_text('Lecture recordings',exact=True).click()
-        page.get_by_role('button', name='Stream', exact=True).click()
+        page.get_by_role('button', name='Play recording', exact=True).click()
         dialog=page.locator('dialog.podcast-player-dialog')
         if failure:
             pw.expect(dialog.get_by_role('alert')).to_be_visible()
@@ -453,7 +451,6 @@ def test_single_stream_and_resolution_failure(local_site, single, failure):
             page.keyboard.press('Escape')
             pw.expect(connect).to_be_focused()
             page.keyboard.press('Escape')
-            pw.expect(page.get_by_role('link',name='Open in ILIAS',exact=True).first).to_have_attribute('href',URL)
         else:
             pw.expect(dialog.locator('video')).to_have_count(1)
             pw.expect(dialog.get_by_role('combobox',name='Layout')).to_have_count(0)
@@ -478,13 +475,8 @@ def test_keyboard_canvas_layout_settings_and_subtitles(local_site,width,height,l
         page.on('pageerror',lambda error:errors.append(str(error)))
         page.goto(local_site+'/?course=42')
         page.get_by_text('Lecture recordings',exact=True).click()
-        stream=page.get_by_role('button',name=tr('Streamen'),exact=True)
-        link=stream.locator('..').get_by_role('link')
-        pw.expect(link).to_have_attribute('href',URL)
-        # Recording actions share a compact row, with the ILIAS link before Stream.
-        link_box, stream_box = link.bounding_box(), stream.bounding_box()
-        assert abs(link_box['y'] - stream_box['y']) < 2
-        assert link_box['x'] + link_box['width'] <= stream_box['x']
+        stream=page.get_by_role('button',name=tr('recordings.play'),exact=True)
+        pw.expect(stream).to_be_visible()
         stream.click()
         dialog=page.locator('dialog.podcast-player-dialog')
         stage=dialog.locator('[data-player-layout]')

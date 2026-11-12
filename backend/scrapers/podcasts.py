@@ -100,6 +100,14 @@ def parse_podcast_series(html_content: str, ref_id: str) -> PodcastSeriesRespons
         # Location extraction
         ep_loc = field('location', 'ort', 'standort')
 
+        # Preview image
+        img_elem = c.select_one(".c-entity__secondary-identifier img, img.img-responsive, img")
+        preview_image = (
+            urllib.parse.urljoin(settings.ilias_base_url, img_elem.get("src", ""))
+            if img_elem and img_elem.get("src")
+            else None
+        )
+
         # Stream / Player URL
         stream_elem = c.select_one("a[href*='streamVideo'], a[href*='xoctPlayerGUI'], a[href*='play']")
         stream_url = (
@@ -124,6 +132,7 @@ def parse_podcast_series(html_content: str, ref_id: str) -> PodcastSeriesRespons
                 uploaded_at=_date_iso(uploaded_date),
                 presenter=ep_pres,
                 location=ep_loc,
+                preview_image=preview_image,
                 stream_url=stream_url,
                 status=status,
             )

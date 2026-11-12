@@ -23,6 +23,7 @@ import { cache } from '../lib/cache';
 import { PodcastPlayer } from './PodcastPlayer';
 import { readRecordingSort, RecordingSort, writeRecordingSort } from '../lib/playerPreferences';
 import { sortRecordings } from '../lib/recordingSort';
+import { readVideoProgress } from '../lib/videoProgress';
 
 interface PodcastModalProps {
   refId: string;
@@ -39,6 +40,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
 }) => {
   useLanguage();
   const [activeEpisode, setActiveEpisode] = useState<PodcastEpisode | null>(null);
+  const [playbackRefreshKey, setPlaybackRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isRevalidating, setIsRevalidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,7 +131,17 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
 
   return (
     <>
-    {activeEpisode?.stream_url && <PodcastPlayer key={activeEpisode.id} url={activeEpisode.stream_url} title={activeEpisode.title} onClose={() => setActiveEpisode(null)} />}
+    {activeEpisode?.stream_url && (
+      <PodcastPlayer
+        key={activeEpisode.id}
+        url={activeEpisode.stream_url}
+        title={activeEpisode.title}
+        onClose={() => {
+          setActiveEpisode(null);
+          setPlaybackRefreshKey((prev) => prev + 1);
+        }}
+      />
+    )}
     <div
       className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
       onMouseDown={(e) => {
@@ -281,18 +293,85 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
             !error &&
             filteredEpisodes.map((ep) => {
               const isRecorded = ep.status === 'available';
+              const progress = ep.stream_url ? readVideoProgress(ep.stream_url, sortScope) : null;
+              const hasProgress = Boolean(progress && (progress.completed || (progress.duration && progress.duration > 0 && progress.position > 0)));
+              const progressPercent = progress?.completed
+                ? 100
+                : (progress && progress.duration && progress.duration > 0)
+                  ? Math.min(100, Math.max(0, Math.round((progress.position / progress.duration) * 100)))
+                  : 0;
 
               return (
                 <div
                   key={ep.id}
                   data-recording-id={ep.id}
-                  className={`rounded-xl border p-3 transition bg-white dark:bg-slate-900 shadow-2xs hover:shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                  className={`rounded-xl border p-3 transition bg-white dark:bg-slate-900 shadow-2xs hover:shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                     isRecorded
                       ? 'border-slate-200 dark:border-slate-800 hover:border-sky-300 dark:hover:border-sky-700'
                       : 'border-slate-200/80 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/40 opacity-80 hover:opacity-100'
                   }`}
                 >
-                  <div className="min-w-0 space-y-1 flex-1 sm:pr-2">
+                  {/* Left: Thumbnail preview with play button & progress bar */}
+                  <div className="relative w-full sm:w-44 md:w-48 aspect-video shrink-0 rounded-lg overflow-hidden bg-slate-800 border border-slate-200 dark:border-slate-700 group">
+                    {ep.preview_image ? (
+                      <img
+                        src={ep.preview_image}
+                        alt=""
+                        loading="lazy"
+                        className="w-full h-full object-cover transition group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 text-slate-500">
+                        <Radio className="h-8 w-8 opacity-40" />
+                      </div>
+                    )}
+
+                    {isRecorded && ep.stream_url ? (
+                      <button
+                        type="button"
+                        onClick={() => setActiveEpisode(ep)}
+                        aria-label={t('recordings.play')}
+                        title={t('recordings.play')}
+                        className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/45 focus-visible:bg-black/50 transition cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+                      >
+                        <span
+                          style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
+                          className="flex h-11 w-11 items-center justify-center rounded-full text-white shadow-lg transform group-hover:scale-110 group-active:scale-95 transition"
+                        >
+                          <Play className="h-5 w-5 fill-white translate-x-0.5" />
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                        <span className="rounded-md bg-black/60 px-2 py-1 text-[10px] font-semibold text-white/90">
+                          {t("Wird aufgezeichnet")}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Progress bar overlay at bottom of preview */}
+                    {isRecorded && hasProgress && (
+                      <div
+                        role="progressbar"
+                        aria-valuenow={progressPercent}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={progress?.completed ? t('recordings.watched') : t('recordings.progress', { percent: progressPercent })}
+                        className="absolute bottom-0 inset-x-0 h-1.5 bg-black/60 overflow-hidden"
+                      >
+                        <div
+                          className="h-full transition-all duration-200"
+                          style={{
+                            width: `${progressPercent}%`,
+                            backgroundColor: progress?.completed ? '#34d399' : 'var(--accent, #0AACA5)',
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Middle: Details & Metadata */}
+                  <div className="min-w-0 space-y-1.5 flex-1">
                     <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
                       {ep.title}
                     </h4>
@@ -316,6 +395,14 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                         </span>
                       )}
                       {ep.uploaded_date && <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('recordings.uploaded', { date: ep.uploaded_date })}</span>}
+                      {isRecorded && hasProgress && (
+                        <span
+                          style={{ color: progress?.completed ? undefined : 'var(--accent, #0AACA5)' }}
+                          className={`text-[11px] font-medium flex items-center gap-1 ${progress?.completed ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
+                        >
+                          {progress?.completed ? t('recordings.watched') : t('recordings.progress', { percent: progressPercent })}
+                        </span>
+                      )}
                     </div>
 
                     {(ep.presenter || ep.location) && (
@@ -335,28 +422,6 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
                       </div>
                     )}
                   </div>
-
-                  <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0">
-                    {isRecorded && ep.stream_url ? (
-                      <>
-                      <a href={ep.stream_url} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center gap-1 rounded-lg px-1 text-xs text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-[var(--accent)] dark:text-slate-400 dark:hover:bg-slate-800">
-                        <ExternalLink className="h-3 w-3" /><span>{t("In ILIAS \u00f6ffnen")}</span>
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => setActiveEpisode(ep)}
-                        className="flex min-h-11 items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs"
-                      >
-                        <Play className="h-3.5 w-3.5 fill-white" />
-                        <span>{t("Streamen")}</span>
-                      </button>
-                      </>
-                    ) : (
-                      <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 px-2">
-                        {t("Wird aufgezeichnet")}
-                      </span>
-                    )}
-                  </div>
                 </div>
               );
             })}
@@ -364,17 +429,7 @@ export const PodcastModal: React.FC<PodcastModalProps> = ({
 
         </div>
         {/* Modal Footer */}
-        <div className="flex shrink-0 items-center justify-between border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-3">
-          <a
-            href={`https://ilias.unibe.ch/ilias.php?baseClass=ilobjplugindispatchgui&cmdClass=xoctEventGUI&ref_id=${refId}`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition"
-          >
-            <span>{t("In ILIAS öffnen")}</span>
-            <ExternalLink className="h-3 w-3" />
-          </a>
-
+        <div className="flex shrink-0 items-center justify-end border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-3">
           <button
             onClick={onClose}
             className="rounded-lg bg-slate-100 dark:bg-slate-800 px-4 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
