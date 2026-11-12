@@ -7,7 +7,7 @@ COPY frontend ./frontend
 COPY backend ./backend
 COPY locales ./locales
 COPY extensions ./extensions
-COPY scripts/sync-extension-locales.mjs scripts/check-locales.mjs ./scripts/
+COPY scripts/sync-extension-locales.mjs scripts/sync-safari-companion.mjs scripts/check-locales.mjs ./scripts/
 RUN npm --prefix frontend run build
 
 FROM caddy:2.11-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9

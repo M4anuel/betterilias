@@ -20,12 +20,15 @@
 !frontend/public/**
 !scripts/
 !scripts/sync-extension-locales.mjs
+!scripts/sync-safari-companion.mjs
 !scripts/check-locales.mjs
 !extensions/
 !extensions/chrome/
 !extensions/chrome/**
 !extensions/firefox/
 !extensions/firefox/**
+!extensions/safari/
+!extensions/safari/**
 !deploy/
 !deploy/backend.Dockerfile
 !deploy/frontend.Dockerfile
