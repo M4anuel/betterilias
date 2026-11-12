@@ -231,6 +231,82 @@ async def test_moderation_discovers_current_permissions_and_confirms_result(acti
     else: assert data.threads
 
 
+def test_native_unpin_alias_and_readonly_sticky_property_are_recognised():
+    html = listing(sticky=True).replace('cmd=unmakesticky', 'cmd=make_topics_non_sticky')
+    parsed = parse_forum_overview(html, '42')
+    assert parsed.data.threads[0].sticky
+    assert 'unmakesticky' in parsed.data.threads[0].actions
+    assert 'cmd=make_topics_non_sticky' in parsed.actions['10']['unmakesticky']
+    readonly = listing().replace('</div></li>', '<span class="il-item-property-name">Relevance</span><span class="il-item-property-value">Sticky</span></div></li>')
+    assert parse_forum_overview(readonly, '42').data.threads[0].sticky
+
+
+def test_supplied_pinned_dump_exposes_native_unpin_command():
+    root = Path(r'C:\Users\manue\OneDrive\Dokumente\_Uni\IliasAlternative\htmlfromilias\Forum')
+    path = next(root.glob('*PINNED*.html'), None)
+    if path is None: pytest.skip('Private dump unavailable')
+    parsed = parse_forum_overview(path.read_text(encoding='utf-8'), '3114496')
+    pinned = [item for item in parsed.data.threads if item.sticky]
+    assert pinned and 'unmakesticky' in pinned[0].actions
+    assert 'make_topics_non_sticky' in parsed.actions[pinned[0].id]['unmakesticky']
+
+
+@pytest.mark.asyncio
+async def test_native_pin_and_unpin_confirm_without_repeating_actions():
+    class NativePinScenario(Scenario):
+        def handle(self, request):
+            params = dict(request.url.params)
+            if params.get('cmd') == 'make_topics_non_sticky': self.sticky = False
+            response = super().handle(request)
+            if 'text/html' in response.headers.get('content-type', '') or response.status_code == 200:
+                return httpx.Response(200, text=response.text.replace('cmd=unmakesticky', 'cmd=make_topics_non_sticky'), request=request)
+            return response
+    scenario = NativePinScenario()
+    pinned = await scenario.client.moderate_forum_thread('42', '10', 'makesticky')
+    assert pinned.threads[0].sticky and 'unmakesticky' in pinned.threads[0].actions
+    unpinned = await scenario.client.moderate_forum_thread('42', '10', 'unmakesticky')
+    assert not unpinned.threads[0].sticky
+    assert sum(request.url.params.get('cmd') == 'make_topics_non_sticky' for request in scenario.requests) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('stale_reads', [1, 10])
+async def test_post_confirmation_retries_reads_without_reposting(stale_reads):
+    class StalePostScenario(Scenario):
+        reads = 0
+        def handle(self, request):
+            response = super().handle(request)
+            if self.created and request.method == 'GET' and request.url.params.get('cmd') == 'viewThread':
+                self.reads += 1
+                if self.reads <= stale_reads:
+                    return httpx.Response(200, text=response.text.replace('<p>Hello</p>', '<p>Stale body</p>'), request=request)
+            return response
+    scenario = StalePostScenario()
+    payload = ForumWrite(operation_id='stale-read-forum-operation', subject='New topic', message='<p>Hello</p>')
+    if stale_reads == 1:
+        assert (await scenario.client.write_forum_post('42', payload)).post_id == '200'
+        assert scenario.reads == 2
+    else:
+        with pytest.raises(AuthoringError) as exc: await scenario.client.write_forum_post('42', payload)
+        assert exc.value.status_code == 409 and scenario.reads == 3
+    assert len(scenario.posts) == 1
+
+
+@pytest.mark.asyncio
+async def test_inline_formatting_normalisation_does_not_reject_saved_post():
+    scenario = Scenario()
+    payload = ForumWrite(operation_id='inline-format-forum-operation', subject='New topic', message='<p><strong>He</strong>llo</p>')
+    assert (await scenario.client.write_forum_post('42', payload)).post_id == '200'
+    assert len(scenario.posts) == 1
+
+
+def test_confirmation_text_preserves_visible_word_boundaries():
+    from backend.services.forum import text
+    assert text('Hello<div>world</div>') == text('<p>Hello<br>world</p>') == 'Hello world'
+    assert text('<p><strong>He</strong>llo</p>') == text('<p>Hello</p>') == 'Hello'
+    assert text('<p>He llo</p>') != text('<p>Hello</p>')
+
+
 def test_forum_http_endpoints_require_explicit_mutation_credentials():
     client=TestClient(app)
     assert client.get('/api/forums/42').status_code==401

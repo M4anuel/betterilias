@@ -94,13 +94,16 @@ def parse_forum_overview(html, ref_id):
             if not tid.isdecimal() or tid in parsed.thread_urls: continue
             item = node.find_parent(class_='il-item') or node.parent
             actions = {p.get('cmd','').lower(): u for _,u,p in links(item, ref_id) if p.get('thr_pk') == tid}
+            if 'make_topics_non_sticky' in actions:
+                actions['unmakesticky'] = actions['make_topics_non_sticky']
             properties = {}
             for name in item.select('.il-item-property-name'):
                 value = name.find_next_sibling(class_='il-item-property-value')
                 if value: properties[name.get_text(' ',strip=True).lower()] = value.get_text(' ',strip=True)
             title = node.get_text(' ',strip=True)
             closed = 'reopen' in actions or bool(re.search(r'\((closed|geschlossen)\)',title,re.I))
-            sticky = 'unmakesticky' in actions or 'makestickynot' in actions
+            sticky = ('unmakesticky' in actions or 'makestickynot' in actions or
+                      properties.get('relevance', properties.get('relevanz', '')).casefold() in ('sticky', 'angeheftet', 'angepinnt'))
             title = re.sub(r'\s*\((closed|geschlossen)\)\s*$', '', title, flags=re.I)
             count = properties.get('posts', properties.get('beiträge','0'))
             number=re.match(r'\s*([\d.,]+)',count)

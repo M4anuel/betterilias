@@ -1,6 +1,9 @@
 """Native forum reads and verified writes using freshly discovered forms."""
 import hashlib
 import json
+import asyncio
+import re
+import unicodedata
 
 from bs4 import BeautifulSoup
 import httpx
@@ -16,7 +19,16 @@ from backend.services.assignment_multipart import encode_assignment_form
 
 
 def text(value):
-    return ' '.join(BeautifulSoup(value,'lxml').get_text(' ',strip=True).split())
+    soup = BeautifulSoup(value, 'lxml')
+    # Inline formatting is not a word boundary. Native TinyMCE may merge or
+    # split inline nodes; paragraph and line-break boundaries remain spaces.
+    for node in soup.select('br'):
+        node.replace_with('\n')
+    for node in soup.select('p,div,li,blockquote,pre,h1,h2,h3,h4,h5,h6,tr'):
+        node.insert_before('\n')
+        node.append('\n')
+    visible = re.sub(r'[\u200b\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]', '', soup.get_text())
+    return ' '.join(unicodedata.normalize('NFC', visible).split())
 
 
 class ForumMixin:
@@ -159,19 +171,25 @@ class ForumMixin:
             elif receipt.get('state')=='rejected':
                 raise AuthoringError('forum.form_rejected',400)
             # Reconciliation is read-only. Never repeat a dispatched native POST.
-            overview = await self._forum_overview(client,ref_id)
-            overview = await self._forum_expand_overview(client,overview,thread_id)
-            if not thread_id:
-                matches = [item for item in overview.data.threads if item.id not in receipt['before'] and item.title.strip()==request.subject.strip()]
-                if len(matches)!=1: raise AuthoringError('forum.write_uncertain',409)
-                thread_id = matches[0].id
-            posts = await self._forum_all_posts(client,overview,thread_id)
-            matches = [p for p in posts if p.subject.strip()==request.subject.strip() and text(p.html)==text(request.message)
-                       and (p.id==request.edit_post_id if request.edit_post_id else p.id not in (receipt['before'] if receipt.get('thread_id') else []))]
-            if len(matches)!=1: raise AuthoringError('forum.write_uncertain',409)
-            result = ForumWriteResult(thread_id=thread_id,post_id=matches[0].id)
-            atomic_json(receipt_path,{**receipt,'state':'confirmed','result':result.model_dump()})
-            return result
+            for delay in (0, .15, .35):
+                if delay: await asyncio.sleep(delay)
+                overview = await self._forum_overview(client,ref_id)
+                overview = await self._forum_expand_overview(client,overview,thread_id)
+                candidate_id = thread_id
+                if not candidate_id:
+                    candidates = [item for item in overview.data.threads if item.id not in receipt['before'] and item.title.strip()==request.subject.strip()]
+                    if len(candidates)>1: raise AuthoringError('forum.write_uncertain',409)
+                    if not candidates: continue
+                    candidate_id = candidates[0].id
+                posts = await self._forum_all_posts(client,overview,candidate_id)
+                matches = [p for p in posts if p.subject.strip()==request.subject.strip() and text(p.html)==text(request.message)
+                           and (p.id==request.edit_post_id if request.edit_post_id else p.id not in (receipt['before'] if receipt.get('thread_id') else []))]
+                if len(matches)>1: raise AuthoringError('forum.write_uncertain',409)
+                if not matches: continue
+                result = ForumWriteResult(thread_id=candidate_id,post_id=matches[0].id)
+                atomic_json(receipt_path,{**receipt,'state':'confirmed','result':result.model_dump()})
+                return result
+            raise AuthoringError('forum.write_uncertain',409)
 
     @coordinated(lambda self, ref_id, *args, **kwargs: 'forum-write:' + ref_id)
     @audit('forum_thread_moderate')
