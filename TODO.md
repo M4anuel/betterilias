@@ -4,6 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Stabilise inline edit actions, constrain reply prose beside its options,
+  match forum material rows, and fix pinned-thread parsing/post confirmation.
+
 - [x] Refine forum density, inline post editing, contained reply forms, profile
   photo delivery and thread view counts; verify responsive drafts and slow edits.
 

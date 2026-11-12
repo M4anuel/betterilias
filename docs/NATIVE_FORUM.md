@@ -27,11 +27,18 @@ New thread button share a row; focused search expands across that row without
 removing the keyboard-accessible creation button. Thread metadata separates post
 counts, the native latest-post timestamp and visits with dividers; visits use an
 eye icon and a localized accessible label. Missing visit counts are not invented.
+Pinned threads sort above other threads and retain a teal background, border and
+pin icon even when unselected. Native `make_topics_non_sticky` actions map to the
+public `unmakesticky` action; the read-only native Relevance/Sticky property also
+identifies pinned threads. Forum material rows use the standard compact title/icon
+sizes and transparent resting border instead of a separate outlined card style.
 
 The reply composer stays inside the viewport-sized workspace. Its header and
 publish row are ordinary, non-overlapping flex regions around one scrolling form
 body. On phones it replaces the message list while composing. File
 selection/drop handling is shared with course uploads in `FileDropzone.tsx`.
+The form uses a 72ch message column beside notifications and attachments when
+the composer is at least 48rem wide; narrower panes stack the same mounted fields.
 Post subjects remain visible even when a body contains only invisible Unicode
 format characters, as bold headings rather than coloured/underlined links.
 Native `selectPost`/post links highlight the post locally instead of navigating
@@ -43,6 +50,8 @@ expanded for editing. Cached text is editable immediately while the native edit
 form is inspected. Save waits for that inspection, and late form responses only
 reconcile untouched fields. Preparation errors can be retried without discarding
 typing; cancellation/account changes invalidate pending preparation results.
+There is no disappearing preparation paragraph between the editor and its action
+row, so readiness changes do not move Save/Cancel.
 
 ILIAS 9 profile pictures can use an opaque signed FileDelivery URL rather than
 a `.jpg` resource. The proxy admits only the exact native
@@ -97,6 +106,17 @@ POST, a retry reconciles readback without dispatching it again. Dispatched
 receipts do not expire automatically; deleting them could permit a duplicate
 write. Native paginated reconciliation is bounded to 100 pages and fails closed
 if a result cannot be uniquely confirmed.
+Post confirmation makes up to three read-only checks (150/350 ms pauses between
+checks) when the freshly saved thread/post is not yet visible. A dispatched native
+POST is never repeated by these checks. Comparison preserves actual word/paragraph
+boundaries while tolerating native inline-formatting, Unicode and whitespace
+normalisation; ambiguous or persistently different posts remain uncertain.
+
+The reported post and pin failures were located in private diagnostic evidence as
+`WRITE_INCOMPLETE` after dispatch, during readback verification. The pin dump
+reproduces the missed native unpin command. Reports deliberately contain no post
+body, so the exact text difference in the original failed creation cannot be
+reconstructed from them; stale-read and formatting variants are regression-tested.
 
 The resource proxy's forum exception permits only `viewThread` with an exact
 forum/post selector and a 32-digit hexadecimal attachment identifier. Reply,
@@ -150,13 +170,13 @@ No live ILIAS write, physical iOS/Android test or end-to-end screen-reader audit
 was performed. Production compatibility still needs a live user exercise of the
 forum and text-block workflows after deployment.
 
-Verification results for the inline-editing/density follow-up: full Python suite
-698 passed; a combined forum/authoring/page-sync browser run passed 107 cases,
-including 71 forum cases. The production build, 2,210-key locale validation,
-six localization runtime tests and launcher syntax check passed. After merging
-upstream navigation changes, the final forum/sidebar browser run passed 78 cases.
-Screenshots remain in ignored
-`scratch/forum-checks`.
+Verification results for the confirmation/pin/layout follow-up: full Python suite
+705 passed; the forum/authoring browser run passed 75 cases. Production-build
+forum-card navigation/appearance also passed at 320/390/430/768/1280 px (five
+cases). The production build, 2,210-key locale validation, six localization
+runtime tests and launcher syntax check passed. Screenshots remain in ignored
+`scratch/forum-checks`. Backend cases include the supplied pinned dump, native
+pin/unpin, stale reads, inline formatting and real word-boundary mismatches.
 
 The forum checks cover immediate editing with delayed/failed preparation,
 subject/text preservation, cancellation, reply-body scroll boundaries, photo
