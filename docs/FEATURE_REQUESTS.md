@@ -10,6 +10,30 @@ can edit/delete their posts. The existing `/admin/` dashboard provides editing,
 deletion and the open/planned/in-progress/completed/declined status workflow.
 Admin authentication remains separate from student and community identities.
 
+## Managing requests
+
+Sign in at `/admin/` with the existing `ADMIN_API_KEY` (at least 43 characters),
+then select **Manage requests** to jump to the board. The public board's info
+disclosure also links to `/admin/#feature-requests`; this link grants no access.
+Open a request and use its **Status** dropdown. Each selection saves immediately,
+with success/error feedback; failed writes keep the previous status. Available
+statuses are open, planned, in progress, completed and declined. Requests can be
+reopened by selecting open. The same admin session permits editing/deletion and
+comment moderation; public visitors cannot change status.
+
+This is a temporary shared-key model, not an individual account or role system.
+It grants full dashboard access, without separate moderator permissions or
+per-person attribution. Individual sign-in, recovery/revocation and server-enforced
+administrator/moderator roles are tracked in `TODO.md`. Never put the key in the
+public board, frontend configuration or URLs; the existing dashboard exchanges
+it for a short-lived HttpOnly session cookie.
+
+The public-content/cookie notice is available from the info control beside the
+board title, including by touch and keyboard. Search and filters share one row
+when the board has enough width. Narrow layouts keep search and a Filters button
+in one row and reveal full-width selectors on demand, retaining selections when
+resizing or rotating.
+
 ## Browser ownership
 
 The server issues a random, HttpOnly, SameSite Strict cookie, Secure in
@@ -73,3 +97,10 @@ regressions exercise request/reply drafts, resizing, votes, editing and upload
 failure/retry in Chrome emulation at phone, tablet, desktop and short landscape
 sizes, in German/English and light/dark mode. These checks do not establish
 physical iOS/Android or live production validation.
+
+The compact-controls regressions also check info disclosure with Enter/Escape,
+close-button focus restoration and outside dismissal; single-row controls before
+and after resizing; filter query values and retained selections. Administrator
+checks cover every status, failed-save recovery and the built dashboard's
+key-login → Manage requests → status-save path. Backend tests verify public
+denial and status persistence using the existing admin login cookie.
