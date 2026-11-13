@@ -54,11 +54,12 @@ def test_hide_and_show_default_sidebar_nav_entries(local_site, language, scheme,
         sidebar = page.locator('aside:visible')
         nav = sidebar.locator('nav')
 
-        # Initially all 4 default navigation entries exist
+        # Initially all default navigation entries exist
         overview_name = tr('Semester-Übersicht')
         calendar_name = tr('calendar.sidebar_nav')
         my_courses_name = tr('my_courses.title')
         repository_name = tr('Magazin')
+        board_name = tr('requests.title')
 
         pw.expect(nav.get_by_role('button', name=overview_name, exact=True)).to_be_visible()
         pw.expect(nav.get_by_role('button', name=calendar_name, exact=True)).to_be_visible()
@@ -79,6 +80,7 @@ def test_hide_and_show_default_sidebar_nav_entries(local_site, language, scheme,
 
         hide_cal.click()
         hide_repo.click()
+        modal.get_by_role('button', name=tr('sidebar.hide_entry', name=board_name), exact=True).click()
 
         # Save changes
         modal.get_by_role('button', name=tr('Änderungen speichern'), exact=True).click()
@@ -95,7 +97,8 @@ def test_hide_and_show_default_sidebar_nav_entries(local_site, language, scheme,
 
         # Verify persisted in localStorage
         stored_hidden = page.evaluate("localStorage.getItem('ilias_hidden_sidebar_nav')")
-        assert 'calendar' in stored_hidden and 'repository' in stored_hidden
+        assert 'calendar' in stored_hidden and 'repository' in stored_hidden and 'feature_requests' in stored_hidden
+        pw.expect(nav.get_by_role('button', name=board_name, exact=True)).to_have_count(0)
 
         # Open customize modal again and hide all 4 entries
         sidebar.get_by_role('button', name=tr('Vorlesungen anpassen'), exact=True).click()
@@ -130,6 +133,7 @@ def test_hide_and_show_default_sidebar_nav_entries(local_site, language, scheme,
         pw.expect(nav.get_by_role('button', name=my_courses_name, exact=True)).to_be_visible()
         pw.expect(nav.get_by_role('button', name=repository_name, exact=True)).to_be_visible()
 
+        pw.expect(nav.get_by_role('button', name=board_name, exact=True)).to_be_visible()
         assert_no_overflow(page)
         browser.close()
 

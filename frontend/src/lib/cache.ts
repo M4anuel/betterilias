@@ -536,7 +536,7 @@ export const cache = {
       if (!raw) return [];
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        const valid = new Set<SidebarDefaultNavItem>(['semester', 'calendar', 'my_courses', 'repository']);
+        const valid = new Set<SidebarDefaultNavItem>(['semester', 'calendar', 'my_courses', 'repository', 'feature_requests']);
         return parsed.filter((item): item is SidebarDefaultNavItem => valid.has(item));
       }
       return [];
@@ -547,7 +547,7 @@ export const cache = {
 
   setHiddenSidebarNavItems(items: SidebarDefaultNavItem[], semester?: string) {
     try {
-      const valid = new Set<SidebarDefaultNavItem>(['semester', 'calendar', 'my_courses', 'repository']);
+      const valid = new Set<SidebarDefaultNavItem>(['semester', 'calendar', 'my_courses', 'repository', 'feature_requests']);
       const filtered = items.filter(item => valid.has(item));
       const key = semester ? `${HIDDEN_SIDEBAR_NAV_KEY}_${semester}` : HIDDEN_SIDEBAR_NAV_KEY;
       if (filtered.length > 0) {
@@ -576,6 +576,7 @@ export const cache = {
       case 'calendar': return 'Calendar';
       case 'my_courses': return 'Users';
       case 'repository': return 'Library';
+      case 'feature_requests': return 'Megaphone';
       default: return 'LayoutGrid';
     }
   },
@@ -594,6 +595,7 @@ export const cache = {
       case 'calendar': return t('calendar.sidebar_nav');
       case 'my_courses': return t('my_courses.title');
       case 'repository': return t('Magazin');
+      case 'feature_requests': return t('requests.title');
       default: return id;
     }
   },

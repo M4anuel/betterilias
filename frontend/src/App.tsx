@@ -11,6 +11,7 @@ import { WorkspaceWidth } from './lib/workspaceWidth';
 import { SemesterView } from './components/SemesterView';
 import { LandingView } from './components/LandingView';
 import { LegalModal } from './components/LegalModal';
+import { FeatureRequestsView } from './components/FeatureRequestsView';
 import { CalendarView } from './components/CalendarView';
 import { CourseView } from './components/CourseView';
 import { MyCoursesView } from './components/MyCoursesView';
@@ -46,13 +47,18 @@ export interface NavigationState {
   exerciseTab?: ExerciseTab | null;
   repositoryId?: string | null;
   isCalendarOpen?: boolean;
+  isRequestsOpen?: boolean;
+  requestId?: string | null;
   myCourses?: boolean;
   isLandingOpen?: boolean;
 }
 
 export function stateToUrl(state: NavigationState): string {
   const params = new URLSearchParams();
-  if (state.isLandingOpen) {
+  if (state.isRequestsOpen) {
+    params.set('view', 'feature-requests');
+    if (state.requestId) params.set('request', state.requestId);
+  } else if (state.isLandingOpen) {
     params.set('view', 'about');
   } else if (state.myCourses) {
     params.set('view', 'my-courses');
@@ -84,14 +90,16 @@ export function stateToUrl(state: NavigationState): string {
 export function parseStateFromUrl(defaultSemester: string): NavigationState {
   const params = new URLSearchParams(window.location.search);
   const viewParam = params.get('view');
+  const isRequestsOpen = viewParam === 'feature-requests';
+  const requestId = isRequestsOpen ? params.get('request') : null;
   const isLandingOpen = viewParam === 'about' || viewParam === 'landing';
   const myCourses = !isLandingOpen && viewParam === 'my-courses';
-  const repositoryId = isLandingOpen || myCourses ? null : params.get('repository');
+  const repositoryId = isRequestsOpen || isLandingOpen || myCourses ? null : params.get('repository');
   const isCalendarOpen = !isLandingOpen && !myCourses && !repositoryId && !params.get('course') && viewParam === 'calendar';
-  const courseId = isLandingOpen || myCourses || repositoryId ? null : params.get('course');
-  const folderId = isLandingOpen || myCourses || repositoryId ? null : params.get('folder');
-  const exerciseId = isLandingOpen || myCourses || repositoryId ? null : params.get('exercise');
-  const tabParam = isLandingOpen || myCourses || repositoryId ? null : params.get('tab');
+  const courseId = isRequestsOpen || isLandingOpen || myCourses || repositoryId ? null : params.get('course');
+  const folderId = isRequestsOpen || isLandingOpen || myCourses || repositoryId ? null : params.get('folder');
+  const exerciseId = isRequestsOpen || isLandingOpen || myCourses || repositoryId ? null : params.get('exercise');
+  const tabParam = isRequestsOpen || isLandingOpen || myCourses || repositoryId ? null : params.get('tab');
   const semester = params.get('semester') || defaultSemester;
 
   let exerciseTab: ExerciseTab | null = null;
@@ -107,6 +115,8 @@ export function parseStateFromUrl(defaultSemester: string): NavigationState {
     semester,
     repositoryId,
     isCalendarOpen,
+    isRequestsOpen,
+    requestId,
     myCourses,
     isLandingOpen,
     courseId: courseId || null,
@@ -173,7 +183,7 @@ export const App: React.FC = () => {
     initialParams.get('folder') ||
     initialParams.get('exercise') ||
     initialViewParam === 'my-courses' ||
-    initialViewParam === 'calendar'
+    initialViewParam === 'calendar' || initialViewParam === 'feature-requests'
   );
 
   const [isLandingOpen, setIsLandingOpen] = useState<boolean>(() => {
@@ -183,13 +193,16 @@ export const App: React.FC = () => {
   });
 
   const [myCourses, setMyCourses] = useState(!isLandingOpen && initialViewParam === 'my-courses');
-  const initialRepositoryParam = isLandingOpen || myCourses ? null : initialParams.get('repository');
+  const initialRepositoryParam = initialViewParam === 'feature-requests' || isLandingOpen || myCourses ? null : initialParams.get('repository');
   const [repositoryId, setRepositoryId] = useState<string | null>(initialRepositoryParam);
   const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(() => !isLandingOpen && !initialRepositoryParam && !initialParams.get('course') && initialViewParam === 'calendar');
+  const [isRequestsOpen, setIsRequestsOpen] = useState(initialViewParam === 'feature-requests');
+  const [requestSaved, setRequestSaved] = useState(false);
+  const [requestId, setRequestId] = useState<string | null>(initialParams.get('request'));
   const initialSemesterParam = initialParams.get('semester');
-  const initialCourseParam = isLandingOpen || myCourses ? null : initialParams.get('course');
-  const initialFolderParam = isLandingOpen || myCourses ? null : initialParams.get('folder');
-  const initialExerciseParam = isLandingOpen || myCourses ? null : initialParams.get('exercise');
+  const initialCourseParam = initialViewParam === 'feature-requests' || isLandingOpen || myCourses ? null : initialParams.get('course');
+  const initialFolderParam = initialViewParam === 'feature-requests' || isLandingOpen || myCourses ? null : initialParams.get('folder');
+  const initialExerciseParam = initialViewParam === 'feature-requests' || isLandingOpen || myCourses ? null : initialParams.get('exercise');
   const initialTabParam = initialParams.get('tab');
 
   // --- Semester & Courses State ---
@@ -243,6 +256,8 @@ export const App: React.FC = () => {
     exerciseTab: activeExerciseTab,
     repositoryId,
     isCalendarOpen,
+    isRequestsOpen,
+    requestId,
     myCourses,
     isLandingOpen,
   });
@@ -255,10 +270,12 @@ export const App: React.FC = () => {
       exerciseTab: activeExerciseTab,
       repositoryId,
       isCalendarOpen,
+      isRequestsOpen,
+      requestId,
       myCourses,
       isLandingOpen,
     };
-  }, [selectedSemester, selectedCourseId, currentContainerId, activeExerciseRefId, activeExerciseTab, repositoryId, isCalendarOpen, myCourses, isLandingOpen]);
+  }, [selectedSemester, selectedCourseId, currentContainerId, activeExerciseRefId, activeExerciseTab, repositoryId, isRequestsOpen, requestId, isCalendarOpen, myCourses, isLandingOpen]);
   const activeContainerRef = useRef<string | null>(
     initialFolderParam || initialCourseParam || null
   );
@@ -542,10 +559,10 @@ export const App: React.FC = () => {
   const handleSelectSemester = useCallback(
     async (semId: string) => {
       if (!await navigationGuard.confirmNavigation()) return;
-      if (!isLandingOpen && !myCourses && !repositoryId && semId === selectedSemester && selectedCourseId === null && !activeExerciseRefId) {
+      if (!isRequestsOpen && !isLandingOpen && !myCourses && !repositoryId && semId === selectedSemester && selectedCourseId === null && !activeExerciseRefId) {
         return;
       }
-      setIsLandingOpen(false);
+      setIsLandingOpen(false); setIsRequestsOpen(false);
       setMyCourses(false);
       setRepositoryId(null);
       materialsRequestSeq.current++;
@@ -570,7 +587,7 @@ export const App: React.FC = () => {
       };
       pushAppHistory(nextState, '', stateToUrl(nextState));
     },
-    [isLandingOpen, myCourses, repositoryId, isCalendarOpen, selectedSemester, selectedCourseId, activeExerciseRefId, loadSemesters]
+    [isLandingOpen, myCourses, repositoryId, isRequestsOpen, requestId, isCalendarOpen, selectedSemester, selectedCourseId, activeExerciseRefId, loadSemesters]
   );
 
   // --- Course Selection Handler ---
@@ -587,7 +604,7 @@ export const App: React.FC = () => {
       ) {
         return;
       }
-      setIsLandingOpen(false);
+      setIsLandingOpen(false); setIsRequestsOpen(false);
       setMyCourses(false);
       setRepositoryId(null);
       setIsCalendarOpen(false);
@@ -621,7 +638,7 @@ export const App: React.FC = () => {
       ) {
         return;
       }
-      setIsLandingOpen(false);
+      setIsLandingOpen(false); setIsRequestsOpen(false);
       setMyCourses(false);
       setRepositoryId(null);
       setIsCalendarOpen(false);
@@ -696,8 +713,8 @@ export const App: React.FC = () => {
   // --- Return to Semester Overview ---
   const handleNavigateHome = useCallback(async () => {
     if (!await navigationGuard.confirmNavigation()) return false;
-    if (!isLandingOpen && !myCourses && !repositoryId && !isCalendarOpen && selectedCourseId === null && !activeExerciseRefId) return true;
-    setIsLandingOpen(false);
+    if (!isRequestsOpen && !isLandingOpen && !myCourses && !repositoryId && !isCalendarOpen && selectedCourseId === null && !activeExerciseRefId) return true;
+    setIsLandingOpen(false); setIsRequestsOpen(false);
     setMyCourses(false);
     setRepositoryId(null);
     setIsCalendarOpen(false);
@@ -720,7 +737,7 @@ export const App: React.FC = () => {
     };
     pushAppHistory(nextState, '', stateToUrl(nextState));
     return true;
-  }, [isLandingOpen, myCourses, repositoryId, isCalendarOpen, selectedCourseId, activeExerciseRefId, selectedSemester]);
+  }, [isLandingOpen, myCourses, repositoryId, isRequestsOpen, requestId, isCalendarOpen, selectedCourseId, activeExerciseRefId, selectedSemester]);
 
   // --- Open App from Landing ---
   const handleOpenApp = useCallback(async () => {
@@ -729,7 +746,7 @@ export const App: React.FC = () => {
 
   const handleNavigateLanding = useCallback(async () => {
     if (!await navigationGuard.confirmNavigation()) return;
-    setIsLandingOpen(true);
+    setIsLandingOpen(true); setIsRequestsOpen(false);
     setMyCourses(false);
     setRepositoryId(null);
     setIsCalendarOpen(false);
@@ -769,7 +786,7 @@ export const App: React.FC = () => {
 
   const handleNavigateCalendar = useCallback(async () => {
     if (!await navigationGuard.confirmNavigation()) return;
-    setIsLandingOpen(false);
+    setIsLandingOpen(false); setIsRequestsOpen(false);
     if (isCalendarOpen && !myCourses && !repositoryId && selectedCourseId === null) return;
     setMyCourses(false);
     setRepositoryId(null);
@@ -795,7 +812,7 @@ export const App: React.FC = () => {
 
   const handleNavigateRepository = useCallback(async (refId: string) => {
     if (!await navigationGuard.confirmNavigation()) return;
-    setIsLandingOpen(false);
+    setIsLandingOpen(false); setIsRequestsOpen(false);
     if (repositoryId === refId) return;
     cache.rememberRepositoryPath(materialsData?.breadcrumbs || []);
     materialsRequestSeq.current++;
@@ -819,7 +836,7 @@ export const App: React.FC = () => {
 
   const handleNavigateMyCourses = useCallback(async () => {
     if (!await navigationGuard.confirmNavigation() || myCourses) return;
-    setIsLandingOpen(false);
+    setIsLandingOpen(false); setIsRequestsOpen(false);
     materialsRequestSeq.current++;
     activeContainerRef.current = null;
     setMyCourses(true);
@@ -889,6 +906,8 @@ export const App: React.FC = () => {
       repositoryId,
       myCourses,
       isCalendarOpen,
+      isRequestsOpen,
+      requestId,
       semester: selectedSemester,
       courseId: selectedCourseId,
       containerId: currentContainerId,
@@ -987,6 +1006,8 @@ export const App: React.FC = () => {
       const state: NavigationState =
         (event.state as NavigationState) || parseStateFromUrl(cache.getSelectedSemester());
 
+      setIsRequestsOpen(Boolean(state.isRequestsOpen));
+      setRequestId(state.requestId || null);
       setIsLandingOpen(Boolean(state.isLandingOpen));
       setMyCourses(Boolean(state.myCourses));
       setRepositoryId(state.repositoryId || null);
@@ -1086,7 +1107,9 @@ export const App: React.FC = () => {
 
   // --- Dynamic Document Title ---
   useEffect(() => {
-    if (isLandingOpen) {
+    if (isRequestsOpen) {
+      document.title = `BetterIlias – ${t('requests.title')}`;
+    } else if (isLandingOpen) {
       document.title = t("BetterIlias – Das moderne Lernportal");
     } else if (myCourses) {
       document.title = `BetterIlias – ${t('my_courses.title')}`;
@@ -1108,6 +1131,7 @@ export const App: React.FC = () => {
     }
   }, [
     language,
+    isRequestsOpen,
     isLandingOpen,
     myCourses,
     repositoryId,
@@ -1132,7 +1156,7 @@ export const App: React.FC = () => {
     if (!courseId) return;
     const containerId = url.searchParams.get('folder') || courseId;
     const exerciseId = url.searchParams.get('exercise');
-    setIsLandingOpen(false); setMyCourses(false); setRepositoryId(null); setIsCalendarOpen(false);
+    setIsLandingOpen(false); setIsRequestsOpen(false); setMyCourses(false); setRepositoryId(null); setIsCalendarOpen(false);
     setSelectedCourseId(courseId); setCurrentContainerId(containerId);
     setActiveExerciseRefId(exerciseId); setActiveExerciseTab(null);
     activeContainerRef.current = containerId;
@@ -1146,7 +1170,18 @@ export const App: React.FC = () => {
     });
   };
 
+  const navigateRequests = (next: string | null = null, saved = false) => {
+    setRequestSaved(saved);
+    setRequestId(next); setIsLandingOpen(false); setIsRequestsOpen(true);
+    setMyCourses(false); setRepositoryId(null); setIsCalendarOpen(false);
+    setSelectedCourseId(null); setCurrentContainerId(null); setActiveExerciseRefId(null);
+    ++materialsRequestSeq.current; activeContainerRef.current = null;
+    const state: NavigationState = { semester: selectedSemester, courseId: null, containerId: null, exerciseId: null, isRequestsOpen: true, requestId: next };
+    pushAppHistory(state, '', stateToUrl(state)); setMobileNavigationOpen(false);
+  };
   const sidebar = <Sidebar
+    onSelectRequests={() => { void navigationGuard.confirmNavigation().then(approved => { if (approved) navigateRequests(); }); }}
+    isRequestsSelected={isRequestsOpen}
     width={effectiveSidebarWidth}
     onSelectPin={navigatePin}
     semester={selectedSemester}
@@ -1198,7 +1233,7 @@ export const App: React.FC = () => {
         <div className="flex min-w-0 flex-1 flex-col">
         <main ref={workspaceRef} className={`@container/workspace min-w-0 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50 ${workspaceWidth < 768 ? 'workspace-compact' : ''}`}>
           <WorkspaceWidth.Provider value={workspaceWidth}>
-          {isLandingOpen ? (
+          {isRequestsOpen ? <FeatureRequestsView key={requestId || 'board'} initialSuccess={requestSaved} selectedId={requestId} onSelect={navigateRequests} /> : isLandingOpen ? (
             <LandingView
               onOpenApp={handleOpenApp}
               onOpenExtensionInfo={() => setIsExtensionModalOpen(true)}
@@ -1259,7 +1294,7 @@ export const App: React.FC = () => {
           )}
           </WorkspaceWidth.Provider>
         </main>
-        <ConnectionNotice auth={authStatus} landing={isLandingOpen} onConnect={() => setIsExtensionModalOpen(true)} />
+        {!isRequestsOpen && <ConnectionNotice auth={authStatus} landing={isLandingOpen} onConnect={() => setIsExtensionModalOpen(true)} />}
         </div>
       </div>
 

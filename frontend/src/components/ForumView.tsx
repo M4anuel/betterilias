@@ -9,6 +9,7 @@ import { confirmDialog } from '../lib/dialog';
 import { ErrorNotice } from './ErrorNotice';
 import { InstructionEditor } from './InstructionEditor';
 import { ForumPageEditor } from './ForumPageEditor';
+import { DiscussionComposer } from './DiscussionComposer';
 import { FileDropzone } from './FileDropzone';
 import { CompactBreadcrumbs } from './CompactBreadcrumbs';
 import { SyncRefreshControl } from './SyncRefreshControl';
@@ -313,18 +314,17 @@ export function ForumView({ refId, title, courseTitle, onBack, courseRefId, brea
           </article>)}</div>}
           {conversation && (conversation.has_more || conversation.page > 0) && <div className="my-4 flex flex-wrap gap-2"><button type="button" className={button} disabled={busy || loading || postPage === 0} onClick={() => void loadThread(conversation.thread_id, postPage - 1).catch(e => setError(e.message))}>{t('forum.previous')}</button><button type="button" className={button} disabled={busy || loading || !conversation.has_more} onClick={() => void loadThread(conversation.thread_id, postPage + 1).catch(e => setError(e.message))}>{t('forum.next')}</button></div>}
         </div>
-          {draft && !draft.payload.edit_post_id && <div ref={composer} className="forum-composer flex min-h-0 flex-col overflow-hidden border-t border-teal-300 dark:border-teal-800">
-            <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-700"><h3 className="flex-1 text-sm font-bold text-slate-900 dark:text-slate-100">{t(draft.thread === null ? 'forum.new_thread' : 'forum.reply')}{draft.thread !== null && <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">{conversation?.posts.find(post => post.id === draft.payload.parent_id)?.author}</span>}</h3><button type="button" className={button} disabled={busy} aria-label={t('forum.cancel_draft')} onClick={() => void cancelDraft()}><X className="h-4 w-4" /></button></div>
-            <fieldset disabled={busy || uncertain} className="forum-reply-fields min-h-0 min-w-0 flex-1 overflow-y-auto p-3 disabled:opacity-70"><div className="forum-reply-message min-w-0 space-y-3 text-sm"><label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">{t('forum.subject')}<input maxLength={255} value={draft.payload.subject} onChange={e => patch({ subject: e.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-transparent px-3 text-base text-slate-900 dark:border-slate-600 dark:text-white" /></label>
+          {draft && !draft.payload.edit_post_id && <DiscussionComposer containerRef={composer}
+            title={<>{t(draft.thread === null ? 'forum.new_thread' : 'forum.reply')}{draft.thread !== null && <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">{conversation?.posts.find(post => post.id === draft.payload.parent_id)?.author}</span>}</>}
+            disabled={busy || uncertain} cancelDisabled={busy} onCancel={() => void cancelDraft()} actions={saveButton}>
+            <div className="forum-reply-message min-w-0 space-y-3 text-sm"><label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">{t('forum.subject')}<input maxLength={255} value={draft.payload.subject} onChange={e => patch({ subject: e.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-transparent px-3 text-base text-slate-900 dark:border-slate-600 dark:text-white" /></label>
               <InstructionEditor value={draft.payload.message} onChange={message => patch({ message })} label={t('forum.message')} sanitize={forumMarkup} disabled={busy || uncertain} />
               </div><div className="forum-reply-options min-w-0 space-y-3">
               <label className="flex min-h-11 items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={draft.payload.notify} onChange={e => patch({ notify: e.target.checked })} className="h-5 w-5" />{t('forum.notify')}</label>
               {!draft.payload.edit_post_id && <FileDropzone compact disabled={busy || uncertain} onFiles={files => setDraft(current => current ? { ...current, files: [...current.files, ...files] } : current)} />}
               <ul className="space-y-1">{draft.files.map((file,index) => <li key={`${file.name}-${index}`} className="flex min-w-0 items-center gap-2 text-xs text-slate-600 dark:text-slate-300"><span className="min-w-0 flex-1 break-words">{file.name}</span><button type="button" className={button} aria-label={t('forum.remove_file', { name: file.name })} onClick={() => setDraft(current => current ? { ...current, files: current.files.filter((_,i) => i !== index) } : current)}><X className="h-4 w-4" /></button></li>)}</ul>
               </div>
-            </fieldset>
-            <div className="forum-compose-actions flex shrink-0 justify-end border-t border-slate-200 px-3 py-2 dark:border-slate-700">{saveButton}</div>
-          </div>}
+          </DiscussionComposer>}
       </div>
     </div>}
   </section>;
