@@ -19,12 +19,12 @@ def _write_unix_zip(source_dir, zip_path):
             rel = file_path.relative_to(source_dir).as_posix()
             if file_path.is_dir():
                 rel += '/'
-                zinfo = zipfile.ZipInfo(rel)
+                zinfo = zipfile.ZipInfo.from_file(file_path, arcname=rel)
                 zinfo.create_system = 3
                 zinfo.external_attr = 0o040755 << 16
                 zf.writestr(zinfo, b'')
             else:
-                zinfo = zipfile.ZipInfo(rel)
+                zinfo = zipfile.ZipInfo.from_file(file_path, arcname=rel)
                 zinfo.create_system = 3
                 zinfo.external_attr = 0o100644 << 16
                 zf.writestr(zinfo, file_path.read_bytes())
