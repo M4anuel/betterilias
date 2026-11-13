@@ -39,9 +39,13 @@ and [Safari lifecycle guidance](https://developer.apple.com/documentation/safari
 WebKit's runtime parser accepts `persistent: false` with Manifest V3, but Apple's
 cloud packager reported that key as unsupported in build 14 for both platforms.
 Runtime compatibility does not establish cloud-packager compatibility. The
-shipping 1.1.1 manifest therefore omits `persistent`; Manifest V3 is already
+manifests from 1.1.1 onward therefore omit `persistent`; Manifest V3 is already
 nonpersistent by default, and the validator now rejects the key. See
 [WebKit's background manifest parser](https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/Extensions/WebExtension.cpp).
+
+Apple subsequently reported that the manifest name `Better Ilias Companion`
+did not match the registered product name `BetterIlias Companion`. Version
+1.1.2 uses Apple's exact reported product name without the extra space.
 
 Safari 18.4 also changed extension-page CORS to honour per-site grants. Declaring
 a host in the manifest alone does not replace the user's website permission.

@@ -30,7 +30,7 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
         if browser == 'safari':
             assert 'https://app.example.com' in (root / 'config.js').read_text()
             assert manifest['content_scripts'][1]['matches'] == ['https://ilias.unibe.ch/*']
-            assert manifest['version'] == '1.1.1'
+            assert manifest['version'] == '1.1.2'
         else:
             assert 'https://app.example.com' in (root / 'popup.html').read_text()
             assert 'https://app.example.com' in (root / 'content.js').read_text()
@@ -66,8 +66,8 @@ def test_independent_safari_artifact_and_validation(tmp_path):
     output = HELPERS['package']('https://selfhost.example.com', tmp_path / 'safari', 'safari')
     assert not (output / 'chrome').exists() and not (output / 'firefox').exists()
     report = validate(output / 'betterilias-safari.zip')
-    assert report['version'] == '1.1.1' and report['native_apple_validation'] == 'not run'
-    assert report['name'] == 'Better Ilias Companion'
+    assert report['version'] == '1.1.2' and report['native_apple_validation'] == 'not run'
+    assert report['name'] == 'BetterIlias Companion'
     assert len(report['sha256']) == 64
     assert report == json.loads((output / 'betterilias-safari.validation.json').read_text())
     manifest = json.loads((output / 'safari/manifest.json').read_text())

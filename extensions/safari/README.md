@@ -1,4 +1,4 @@
-# Better Ilias Companion for Safari 1.1.1
+# BetterIlias Companion for Safari 1.1.2
 
 An independently authored Safari Web Extension for macOS and iPhone/iPad,
 requiring Safari/iOS 16.4 or later. The implementation uses Safari background
@@ -15,19 +15,18 @@ From the repository root, use a fresh output directory:
 
 ```powershell
 node scripts/sync-extension-locales.mjs
-python scripts/package_companions.py --browser safari --app-origin https://betterilias.ch --output scratch/safari-1.1.1-upload
-python scripts/validate_safari_package.py scratch/safari-1.1.1-upload/betterilias-safari.zip
+python scripts/package_companions.py --browser safari --app-origin https://betterilias.ch --output scratch/safari-1.1.2-upload
+python scripts/validate_safari_package.py scratch/safari-1.1.2-upload/betterilias-safari.zip
 ```
 
 Upload `betterilias-safari.zip` through App Store Connect > Users and Access >
 Xcode Cloud > Safari Web Extension Packager. Use the ZIP itself, not the containing
 output directory, a Chrome/Firefox ZIP or the validation report. Keep the existing
-`ch.betterilias.companion` app record/bundle ID. Version 1.1.1 distinguishes this
-package from build 14's 1.1.0 manifest. Apple assigns the native build number.
-The manifest name is exactly `Better Ilias Companion`, as registered by the owner.
-Keep it identical to the Apple record. This name has 20 letters and 22 characters
-including spaces; if Apple's form enforces a 20-character limit, shorten the name
-in both places rather than changing only the ZIP.
+`ch.betterilias.companion` app record/bundle ID. Version 1.1.2 corrects the product
+name and retains the omission of `persistent`. Apple assigns the native build number.
+The manifest name is exactly `BetterIlias Companion`, matching the product name
+in Apple's diagnostic. Do not insert a space between Better and Ilias. It has
+20 letters and 21 characters including the space before Companion.
 
 The ZIP includes only Safari resources, with `manifest.json` at its root. A
 separate `betterilias-safari.validation.json` records the artifact's SHA-256 and

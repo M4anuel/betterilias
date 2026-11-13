@@ -8,7 +8,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   page, isolated cookie verification, activity-based sync and validated upload ZIP.
 - [x] Remove the `persistent` key flagged by Apple's build 14 packager, preserve
   the registered extension name and reject that key during local validation.
-- [ ] Upload Safari Companion 1.1.1 to Apple's packager and verify TestFlight on
+- [x] Match Safari's manifest name to Apple's reported product name exactly:
+  `BetterIlias Companion`, with no space between Better and Ilias.
+- [ ] Upload Safari Companion 1.1.2 to Apple's packager and verify TestFlight on
   macOS and iPhone/iPad. Local WebKit/API simulations do not prove native signing,
   packaging, Safari permissions or physical-device background execution.
   See `docs/SAFARI_REBUILD_ANALYSIS.md`.
