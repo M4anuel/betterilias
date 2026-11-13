@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { translate, resolveLanguage } from '../locales/runtime.mjs';
-await import('./sync-safari-companion.mjs');
 const { languages, catalogues, jsKeys } = await import('./check-locales.mjs');
 if (process.exitCode) process.exit(process.exitCode);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
