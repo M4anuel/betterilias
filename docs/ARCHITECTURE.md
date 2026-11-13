@@ -134,7 +134,7 @@ Feedback imports (`feedback_import.py`) stage inspected files per tenant, previe
 recipient mappings/conflicts, and publish through native handlers only after
 review. Allocation markers are shared through ILIAS; persisted TA dialog defaults
 are still pending, while player/UI preferences remain local. See
-the [TA workflow](TA_WORK_DISTRIBUTION_PLAN.md) for current scope and the retained
+the [TA workflow](TA_WORK_DISTRIBUTION.md) for current scope and the retained
 research gates, including native bulk-protocol and live-validation limits.
 
 ## Localisation and visual identity
