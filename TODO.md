@@ -6,7 +6,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 - [x] Rebuild Safari Companion independently of Chrome/Firefox: Safari background
   page, isolated cookie verification, activity-based sync and validated upload ZIP.
-- [ ] Upload Safari Companion 1.1.0 to Apple's packager and verify TestFlight on
+- [x] Remove the `persistent` key flagged by Apple's build 14 packager, preserve
+  the registered extension name and reject that key during local validation.
+- [ ] Upload Safari Companion 1.1.1 to Apple's packager and verify TestFlight on
   macOS and iPhone/iPad. Local WebKit/API simulations do not prove native signing,
   packaging, Safari permissions or physical-device background execution.
   See `docs/SAFARI_REBUILD_ANALYSIS.md`.

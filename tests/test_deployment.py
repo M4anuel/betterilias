@@ -30,7 +30,7 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
         if browser == 'safari':
             assert 'https://app.example.com' in (root / 'config.js').read_text()
             assert manifest['content_scripts'][1]['matches'] == ['https://ilias.unibe.ch/*']
-            assert manifest['version'] == '1.1.0'
+            assert manifest['version'] == '1.1.1'
         else:
             assert 'https://app.example.com' in (root / 'popup.html').read_text()
             assert 'https://app.example.com' in (root / 'content.js').read_text()
@@ -46,7 +46,7 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
                 else:
                     assert (info.external_attr >> 16) & 0o777 == 0o644
     safari_manifest = json.loads((output / 'safari/manifest.json').read_text())
-    assert safari_manifest['background'] == {'scripts': ['config.js', 'core.js', 'background.js'], 'persistent': False}
+    assert safari_manifest['background'] == {'scripts': ['config.js', 'core.js', 'background.js']}
     firefox_manifest = json.loads((output / 'firefox/manifest.json').read_text())
     assert firefox_manifest['browser_specific_settings']['gecko']['id'] == 'betterilias-companion@betterilias.ch'
     assert firefox_manifest['browser_specific_settings']['gecko']['data_collection_permissions'] == {
@@ -66,12 +66,20 @@ def test_independent_safari_artifact_and_validation(tmp_path):
     output = HELPERS['package']('https://selfhost.example.com', tmp_path / 'safari', 'safari')
     assert not (output / 'chrome').exists() and not (output / 'firefox').exists()
     report = validate(output / 'betterilias-safari.zip')
-    assert report['version'] == '1.1.0' and report['native_apple_validation'] == 'not run'
+    assert report['version'] == '1.1.1' and report['native_apple_validation'] == 'not run'
+    assert report['name'] == 'Better Ilias Companion'
     assert len(report['sha256']) == 64
     assert report == json.loads((output / 'betterilias-safari.validation.json').read_text())
     manifest = json.loads((output / 'safari/manifest.json').read_text())
     assert manifest['host_permissions'] == ['https://ilias.unibe.ch/*', 'https://selfhost.example.com/*']
     assert manifest['content_scripts'][1]['matches'] == ['https://ilias.unibe.ch/*']
+    manifest_path = output / 'safari/manifest.json'
+    original = manifest_path.read_text()
+    manifest['background']['persistent'] = False
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match='persistent key'):
+        validate(output / 'safari')
+    manifest_path.write_text(original)
     (output / 'safari/core.js').unlink()
     with pytest.raises(ValueError, match='Missing or remote resource'):
         validate(output / 'safari')

@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "BetterIlias Companion for Safari",
-  "version": "1.1.0",
+  "name": "Better Ilias Companion",
+  "version": "1.1.1",
   "description": "__MSG_description__",
   "default_locale": "en",
   "permissions": ["cookies", "storage", "tabs", "alarms"],
   "host_permissions": ["https://ilias.unibe.ch/*", "https://betterilias.ch/*"],
-  "background": {"scripts": ["config.js", "core.js", "background.js"], "persistent": false},
+  "background": {"scripts": ["config.js", "core.js", "background.js"]},
   "action": {
     "default_popup": "popup.html", "default_title": "__MSG_title__",
     "default_icon": {"16": "icon16.png", "32": "icon32.png", "48": "icon48.png", "128": "icon128.png"}

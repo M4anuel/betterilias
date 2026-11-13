@@ -1,8 +1,9 @@
-# BetterIlias Companion for Safari 1.1.0
+# Better Ilias Companion for Safari 1.1.1
 
 An independently authored Safari Web Extension for macOS and iPhone/iPad,
 requiring Safari/iOS 16.4 or later. The implementation uses Safari background
-scripts with `persistent: false`, not a generated Chrome service worker.
+scripts; Manifest V3 makes this background nonpersistent automatically. The
+`persistent` key is omitted because Apple's cloud packager flags it as unsupported.
 
 See [the analysis](../../docs/SAFARI_REBUILD_ANALYSIS.md) for existing companion
 behaviour, the previous prototype's coupling and what Apple's empty errors do
@@ -14,15 +15,19 @@ From the repository root, use a fresh output directory:
 
 ```powershell
 node scripts/sync-extension-locales.mjs
-python scripts/package_companions.py --browser safari --app-origin https://betterilias.ch --output scratch/safari-1.1.0-upload
-python scripts/validate_safari_package.py scratch/safari-1.1.0-upload/betterilias-safari.zip
+python scripts/package_companions.py --browser safari --app-origin https://betterilias.ch --output scratch/safari-1.1.1-upload
+python scripts/validate_safari_package.py scratch/safari-1.1.1-upload/betterilias-safari.zip
 ```
 
 Upload `betterilias-safari.zip` through App Store Connect > Users and Access >
 Xcode Cloud > Safari Web Extension Packager. Use the ZIP itself, not the containing
 output directory, a Chrome/Firefox ZIP or the validation report. Keep the existing
-`ch.betterilias.companion` app record/bundle ID. Version 1.1.0 distinguishes this
-independent build from the 1.0.1 prototype. Apple assigns the native build number.
+`ch.betterilias.companion` app record/bundle ID. Version 1.1.1 distinguishes this
+package from build 14's 1.1.0 manifest. Apple assigns the native build number.
+The manifest name is exactly `Better Ilias Companion`, as registered by the owner.
+Keep it identical to the Apple record. This name has 20 letters and 22 characters
+including spaces; if Apple's form enforces a 20-character limit, shorten the name
+in both places rather than changing only the ZIP.
 
 The ZIP includes only Safari resources, with `manifest.json` at its root. A
 separate `betterilias-safari.validation.json` records the artifact's SHA-256 and
