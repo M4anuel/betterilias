@@ -112,6 +112,28 @@ def main():
             assert json.loads(request('/api/auth/status')[2])['authenticated'] is False
             assert 'no-store' in request('/api/auth/status')[1]['cache-control']
             print('Frontend/admin routing, production guards and anonymous isolation passed.', flush=True)
+            status, headers, _ = request('/api/feature-requests/identity', 'POST', headers={'X-Community-Request': '1'})
+            assert status == 200
+            community_cookie = headers['set-cookie']
+            assert all(flag in community_cookie for flag in ('Secure', 'HttpOnly', 'SameSite=strict', 'Path=/api/feature-requests'))
+            community = {'Cookie': community_cookie.split(';', 1)[0], 'X-Community-Request': '1', 'Content-Type': 'application/json'}
+            png = bytes.fromhex('89504e470d0a1a0a0000000d4948445200000002000000020802000000fdd49a730000001249444154789c6364686860606060620003000baa0104e42a59070000000049454e44ae426082')
+            status, _, body = request('/api/feature-requests/images', 'POST', png, community)
+            assert status == 200
+            image = json.loads(body)['id']
+            status, _, body = request('/api/feature-requests', 'POST', json.dumps({
+                'title': 'Container smoke request', 'description': 'Synthetic public board content.', 'images': [image]}), community)
+            assert status == 200
+            community_ref = json.loads(body)['id']
+            media_url = json.loads(body)['images'][0]['variants'][0]['url']
+            status, headers, image_body = request(media_url)
+            assert status == 200 and headers['content-type'] == 'image/webp' and image_body
+            assert 'max-age=3600' in headers['cache-control'] and 'no-store' not in headers['cache-control']
+            assert request(media_url, headers={'If-None-Match': headers['etag']})[0] == 304
+            status, _, body = request('/api/feature-requests/' + community_ref + '/vote', 'PUT', '{"value":1}', community)
+            assert status == 200 and json.loads(body)['score'] == 1
+            assert request('/api/feature-requests/' + community_ref, 'DELETE', headers={'X-Community-Request': '1'})[0] == 403
+            print('Public community ownership, image optimisation/cache and voting passed.', flush=True)
             status, headers, body = request('/api/admin/session', 'POST', json.dumps({'key': admin_key}),
                 {'Content-Type': 'application/json', 'X-Admin-Request': '1'})
             assert status == 200 and json.loads(body)['authenticated']
@@ -145,6 +167,8 @@ assert importlib.util.find_spec('playwright') is None
             assert json.loads(request('/api/admin/session', headers=admin)[2])['authenticated']
             assert request('/api/calendar/feed/' + token + '.ics')[0] == 200
             assert request('/api/calendar')[0] == 401
+            assert json.loads(request('/api/feature-requests/' + community_ref)[2])['score'] == 1
+            assert request(media_url)[0] == 200
             run('run', '--rm', '--no-deps', 'maintenance', 'once')
             events = run('exec', '-T', 'backend', 'python', '-m', 'backend.diagnostics', 'events', '--limit', '200').stdout
             assert token not in events and admin_key not in events

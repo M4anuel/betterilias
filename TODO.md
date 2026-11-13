@@ -4,6 +4,13 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Add the public feature request board, browser-owned voting/comments,
+  shared forum composer, administrator moderation and bounded image storage.
+- [ ] Strengthen community-board abuse protection as usage grows: authenticated
+  ownership/recovery, vote integrity, rate limits and accessible spam prevention.
+  Cookie identities intentionally allow a new vote after cookies are cleared.
+  See `docs/FEATURE_REQUESTS.md` for storage and deployment details.
+
 - [x] Resolve the Dependabot backlog: paired React updates, compiler-API
   compatibility for TypeScript 7, pinned Docker Actions and Node 26 LTS.
 - [ ] Revisit Python 3.15 with a compatible Pydantic/runtime lock and verified

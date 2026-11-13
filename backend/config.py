@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     app_env: Literal['production', 'development', 'test'] = 'production'
     coordination_dir: str = '.coordination'
+    feature_requests_dir: str = '.feature_requests'
+    feature_images_max_bytes: int = Field(default=10_000_000_000, ge=1)
     # Private diagnostics; never serve this directory as static content.
     observability_dir: str = '.observability'
     diagnostic_reports_dir: str = '.diagnostic_reports'
