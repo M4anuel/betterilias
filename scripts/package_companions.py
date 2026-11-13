@@ -8,8 +8,13 @@ from pathlib import Path
 import shutil
 from urllib.parse import urlsplit
 import zipfile
+import runpy
 
 ROOT = Path(__file__).resolve().parents[1]
+SAFARI_FILES = ('manifest.json', 'config.js', 'core.js', 'background.js', 'content.js', 'ilias.js',
+                'popup.html', 'popup.css', 'popup.js', 'i18n.js', '_locales',
+                'icon16.png', 'icon32.png', 'icon48.png', 'icon64.png', 'icon120.png', 'icon128.png',
+                'icon152.png', 'icon167.png', 'icon180.png', 'icon256.png', 'icon512.png', 'icon1024.png')
 
 
 def _write_unix_zip(source_dir, zip_path):
@@ -27,6 +32,7 @@ def _write_unix_zip(source_dir, zip_path):
                 zinfo = zipfile.ZipInfo.from_file(file_path, arcname=rel)
                 zinfo.create_system = 3
                 zinfo.external_attr = 0o100644 << 16
+                zinfo.compress_type = zipfile.ZIP_DEFLATED
                 zf.writestr(zinfo, file_path.read_bytes())
 
 
@@ -55,7 +61,7 @@ def production_origin(value):
         raise ValueError('Use one HTTPS domain origin, without a path, credentials or nonstandard port.') from None
 
 
-def package(origin, output):
+def package(origin, output, browser='all'):
     origin = production_origin(origin)
     output = Path(output).resolve()
     if output.exists() and any(output.iterdir()):
@@ -63,8 +69,34 @@ def package(origin, output):
     if any(output == path or output.is_relative_to(path) for path in (ROOT / 'extensions', ROOT / 'frontend', ROOT / 'backend')):
         raise ValueError('Choose an output directory outside the source trees.')
     output.mkdir(parents=True, exist_ok=True)
-    for browser in ('chrome', 'firefox', 'safari'):
+    if browser not in ('all', 'chrome', 'firefox', 'safari'):
+        raise ValueError('Choose all, chrome, firefox or safari.')
+    for browser in (('chrome', 'firefox', 'safari') if browser == 'all' else (browser,)):
         target = output / browser
+        if browser == 'safari':
+            if origin == 'https://ilias.unibe.ch':
+                raise ValueError('The BetterIlias server must differ from the ILIAS host.')
+            target.mkdir()
+            for name in SAFARI_FILES:
+                source = ROOT / 'extensions/safari' / name
+                if source.is_dir():
+                    shutil.copytree(source, target / name)
+                else:
+                    shutil.copyfile(source, target / name)
+            (target / 'config.js').write_text('globalThis.SafariCompanionConfig = Object.freeze(' +
+                json.dumps({'serverUrl': origin, 'frontendUrl': origin}) + ');\n', encoding='utf-8')
+            path = target / 'manifest.json'
+            manifest = json.loads(path.read_text(encoding='utf-8'))
+            manifest['host_permissions'] = ['https://ilias.unibe.ch/*', origin + '/*']
+            manifest['content_scripts'][0]['matches'] = [origin + '/*']
+            path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+            validate = runpy.run_path(str(ROOT / 'scripts/validate_safari_package.py'))['validate']
+            validate(target)
+            archive = output / 'betterilias-safari.zip'
+            _write_unix_zip(target, archive)
+            report = validate(archive)
+            (output / 'betterilias-safari.validation.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+            continue
         shutil.copytree(ROOT / 'extensions' / browser, target,
                         ignore=shutil.ignore_patterns('.env*', '*.env', '__pycache__', '*.zip', '*.md', 'icon.svg'))
         for path in target.rglob('*'):
@@ -90,12 +122,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--app-origin', required=True)
     parser.add_argument('--output', required=True)
+    parser.add_argument('--browser', choices=('all', 'chrome', 'firefox', 'safari'), default='all')
     args = parser.parse_args()
     try:
-        package(args.app_origin, args.output)
+        package(args.app_origin, args.output, args.browser)
     except ValueError as exc:
         parser.error(str(exc))
-    print('Created matching Chrome/Firefox/Safari packages; store signing/publication is separate.')
+    print(f'Created {args.browser} companion package(s); store signing/publication is separate.')
 
 
 if __name__ == '__main__':

@@ -1,8 +1,7 @@
 # BetterIlias — Lecture & Folder Management Specification
 
-For current per-object and per-page-element behavior, use the audited
-[ILIAS support inventory](ILIAS_SUPPORT_MATRIX.md). This document includes
-target-design sections that are not all implemented.
+> [!NOTE]
+> This specification is superseded by the primary management documentation in **[`UNIFIED_MANAGEMENT.md`](UNIFIED_MANAGEMENT.md)**. It is preserved for historical reference and upstream ILIAS form analysis. For current object and element support, see the **[ILIAS Support Matrix](ILIAS_SUPPORT_MATRIX.md)**.
 
 ## Implementation status and native-form corrections
 
@@ -15,7 +14,7 @@ automatically. Deleting the last item explicitly refreshes the empty cache.
 
 The updated user-goal design, refined implementation brief, protocol mapping,
 implemented scope and future page-element/move/copy adapters are in
-[`UNIFIED_MANAGEMENT_PLAN.md`](UNIFIED_MANAGEMENT_PLAN.md). That plan supersedes
+[`UNIFIED_MANAGEMENT.md`](UNIFIED_MANAGEMENT.md). That specification supersedes
 the earlier proposed controls below. In particular, `select_and_deleting.html`
 contains page-element deletion, not repository-object confirmation. Page-element
 editing currently has an explicit ILIAS editor handoff in the unified Add

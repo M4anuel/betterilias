@@ -1,5 +1,8 @@
 # Player controls refinement
 
+> [!NOTE]
+> The complete dual-stream architecture, controls reference, keyboard shortcuts, and synchronization model are consolidated in **[`PODCAST_PLAYER.md`](PODCAST_PLAYER.md)**. This document preserves the historical control refinement notes and test methodology.
+
 ## Refined implementation prompt
 
 Refine the shared podcast/embedded-video player without changing its audio roles

@@ -93,15 +93,9 @@ use Chromium emulation at 320/390/430/768/1280 px and short landscape sizes in
 German/English and dark/light modes. Native fullscreen is simulated for the
 shortcut-suppression check; real iOS/Android and live ILIAS remain manual checks.
 
-## Implementation prompt
+## Design Principles & Scope
 
-Refine the mobile UI around compact layouts, consistent controls and stable
-editing drafts. Treat the reported defects as examples of shared problems and
-audit related components rather than applying isolated cosmetic fixes. Preserve
-desktop behavior except for the explicitly requested semester simplification,
-gear animation and sidebar editor changes. Keep all actions accessible, localised
-and usable in dark mode. Verify 320-430 px widths, short landscape viewports,
-German/English, desktop regressions and form state across parent rerenders.
+The mobile UI is designed around compact layouts, touch-accessible controls, and stable editing drafts across responsive breakpoints. It addresses shared mobile constraints across components rather than applying isolated cosmetic fixes, preserving compact desktop behavior while adapting to touch viewports. All actions are accessible, localized, and fully supported in dark mode across 320–430 px phone widths, short landscape viewports, tablets, and desktop displays.
 
 ## Problems to fix
 

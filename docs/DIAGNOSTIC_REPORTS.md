@@ -1,15 +1,22 @@
-# Consented diagnostic reports
+# Consented Diagnostic Reports
 
-## Refined implementation brief
+BetterIlias provides an opt-in, privacy-preserving error reporting system for unexpected ILIAS connectivity and HTML parser failures. It allows students to submit sanitized technical reports without exposing course materials, grades, or personal student data.
 
-Offer optional technical reports for errors shown through the app, prioritising
-ILIAS connection and parsing failures. Provide **No**, **Yes, once** and **Yes,
-always**, explain recipients/content/retention, and make the preference editable
-in settings. Keep report consent separate from ordinary operational logging.
-Do not share raw ILIAS pages or other students' data. Store reports in SQLite,
-group them by error type, and support administrator review, resolution, reopening
-and export. Bound temporary captures and retained reports, support withdrawal,
-and leave a clear migration path to future user profiles.
+---
+
+## 1. Capabilities & Feature Matrix
+
+| Capability | What BetterIlias Does | Privacy & Security Guarantee |
+| :--- | :--- | :--- |
+| **User Consent Controls** | Tri-state consent model: **No** (default), **Yes, once**, or **Yes, always** (configurable in Settings). | No diagnostic report is ever transmitted without explicit student consent. Close/Escape defaults to No. |
+| **Text-Free HTML Outlines** | Captures parser error structures as stripped structural skeletons. | Text nodes, user inputs, URLs, student names, lecturer files, scripts, and sensitive attributes are completely discarded. |
+| **Strict Data Sanitization** | Capped at 1,000 DOM elements / 20,000 characters from max 262,144 raw source characters. | Retains only an allowlist of standard HTML tags, form field names, and structural layout classes. |
+| **Private SQLite Storage** | Reports are stored in an isolated, encrypted-at-rest SQLite database (`reports.sqlite3`). | Never exposed publicly. Excluded from static assets and routine exports. Staged captures expire after 10 minutes. |
+| **Admin Review Dashboard** | Accessible via `/admin/` for authenticated maintainers to inspect, group, and resolve errors. | Error reports are aggregated by error code and parser context, supporting status tracking (`open`, `resolved`, `reopened`). |
+
+---
+
+## 2. Consent and Evidence Lifecycle (How-To)
 
 ## Where reports live
 

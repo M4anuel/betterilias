@@ -4,6 +4,13 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Rebuild Safari Companion independently of Chrome/Firefox: Safari background
+  page, isolated cookie verification, activity-based sync and validated upload ZIP.
+- [ ] Upload Safari Companion 1.1.0 to Apple's packager and verify TestFlight on
+  macOS and iPhone/iPad. Local WebKit/API simulations do not prove native signing,
+  packaging, Safari permissions or physical-device background execution.
+  See `docs/SAFARI_REBUILD_ANALYSIS.md`.
+
 - [x] Add the public feature request board, browser-owned voting/comments,
   shared forum composer, administrator moderation and bounded image storage.
 - [x] Compact request search/filters, disclose public-content/browser ownership
@@ -42,7 +49,7 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 - [x] Fix the 14 state-machine audit findings: account request ownership, calendar
   merges/polling, editor drafts and write certainty, feedback replacement,
   companion resync, queued dialogs, download deduplication and notification lifetime.
-  See `docs/STATE_MACHINE_FIXES.md` for behavior, receipt semantics and validation.
+  See `docs/STATE_MACHINE_INTEGRITY.md` for behavior, receipt semantics and validation.
 
 - [x] Unify session/connection recovery in a persistent workspace status card and
   page/modal errors in a shared notice; simplify signed-out landing navigation,
@@ -365,7 +372,7 @@ build validation, and English fallback for partial languages.
 
 ### Course and Folder Management Workflows
 
-Design: [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECIFICATION.md) and [`docs/UNIFIED_MANAGEMENT_PLAN.md`](docs/UNIFIED_MANAGEMENT_PLAN.md).
+Design: [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECIFICATION.md) and [`docs/UNIFIED_MANAGEMENT.md`](docs/UNIFIED_MANAGEMENT.md).
 
 - [ ] Verify repository deletion and shared ordering against controlled live ILIAS test content; committed fixtures/mocks do not replace live acceptance.
 - [ ] Add exercise-container creation and open the existing assignment editor afterwards.
@@ -381,7 +388,7 @@ Design: [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECI
 
 ## Media & Podcast Streaming
 
-Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAST_PLAYER_PLAN.md).
+Design and retained stream findings: [`docs/PODCAST_PLAYER.md`](docs/PODCAST_PLAYER.md).
 
 - [x] Native In-App Opencast Podcast Player with Dual-Stream Support:
   - [x] Synchronized playback for presenter camera feed (with `mainAudio`) and presentation slides feed.

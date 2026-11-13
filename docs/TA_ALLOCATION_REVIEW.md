@@ -1,7 +1,7 @@
 # TA allocation defaults and note safety — review branch
 
-Accepted on 5 November 2026. The temporary feature branch/worktree is retired;
-this document records behavior, verification and remaining live acceptance checks.
+> [!NOTE]
+> The primary, production documentation for TA allocation, downloads, and mass feedback return is maintained in **[`TA_WORK_DISTRIBUTION.md`](TA_WORK_DISTRIBUTION.md)**. This document records the historical review, branch acceptance, and test criteria from 5 November 2026.
 
 Assistant names, count, remainder priority and the next stable slot ID persist
 in localStorage per BetterIlias session/course on this device. Without a course,

@@ -1,8 +1,23 @@
-# Community feature requests
+# Community Feature Requests
 
-The public board is at `/?view=feature-requests`; individual requests add
-`&request=<id>`. Its sidebar entry uses the existing per-semester custom order,
-names, icons and visibility settings. It works without an ILIAS account.
+BetterIlias features a public, lightweight community feature request board where students and developers can suggest enhancements, vote on ideas, discuss improvements, and track implementation statuses.
+
+---
+
+## 1. Capabilities & Feature Matrix
+
+| Capability | What BetterIlias Does | Privacy & Abuse Guarantee |
+| :--- | :--- | :--- |
+| **Public Board Access** | Available at `/?view=feature-requests` without requiring an ILIAS session or account creation. | Anyone can view suggestions and participate freely. |
+| **Voting & Feedback** | Upvote and downvote requests; post plain-text chronological comments. | Browser-bound HttpOnly cookies ensure votes are idempotent without tracking personal user identities. |
+| **Image Attachments** | Attach up to 5 screenshots/images per request (JPEG, PNG, WebP $\le$ 8 MB). | Images are converted to optimized WebP variants (max 640/1280/2560px) and stripped of all EXIF metadata. |
+| **Author Ownership** | Authors can edit or delete their own posts from the browser that created them. | Secured via random cryptographic cookie hashes stored in SQLite. |
+| **Lifecycle Management** | Requests track statuses: `open`, `planned`, `in_progress`, `completed`, `declined`. | Maintainers moderate and update statuses via the `/admin/` dashboard. |
+| **Storage & Eviction Cap** | 10 GB total media storage cap with automatic LRU image pruning for completed requests. | Evicts images of requests completed $\ge$ 30 days ago first; text, comments, and votes are never deleted. |
+
+---
+
+## 2. Browser Ownership and Identity (How-To)
 
 Requests have plain-text titles/descriptions, one of three categories, optional
 images, up/down votes and flat chronological plain-text comments. Browser owners
