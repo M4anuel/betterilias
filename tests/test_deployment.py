@@ -29,13 +29,25 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
         assert manifest['content_scripts'][0]['matches'] == ['https://app.example.com/*']
         assert 'https://app.example.com' in (root / 'popup.html').read_text()
         assert 'https://app.example.com' in (root / 'content.js').read_text()
+        assert manifest['version'] == '1.0.1'
         with zipfile.ZipFile(output / f'betterilias-{browser}.zip') as archive:
             assert 'manifest.json' in archive.namelist()
+            assert 'icon32.png' in archive.namelist()
+            assert 'icon1024.png' in archive.namelist()
+            for info in archive.infolist():
+                assert info.create_system == 3
+                if info.is_dir():
+                    assert (info.external_attr >> 16) & 0o777 == 0o755
+                else:
+                    assert (info.external_attr >> 16) & 0o777 == 0o644
+    safari_manifest = json.loads((output / 'safari/manifest.json').read_text())
+    assert safari_manifest['background'] == {'service_worker': 'background.js'}
     firefox_manifest = json.loads((output / 'firefox/manifest.json').read_text())
     assert firefox_manifest['browser_specific_settings']['gecko']['id'] == 'betterilias-companion@betterilias.ch'
     assert firefox_manifest['browser_specific_settings']['gecko']['data_collection_permissions'] == {
         'required': ['authenticationInfo']
     }
+    assert firefox_manifest['browser_specific_settings']['gecko_android']['strict_min_version'] == '142.0'
     firefox = (output / 'firefox/content.js').read_text()
     assert 'wrappedJSObject' in firefox and 'cloneInto' in firefox
     assert 'BETTERILIAS_SESSION_SYNCED' in firefox

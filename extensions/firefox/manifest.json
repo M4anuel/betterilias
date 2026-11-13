@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BetterIlias Companion",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "__MSG_description__",
   "browser_specific_settings": {
     "gecko": {
@@ -12,6 +12,9 @@
           "authenticationInfo"
         ]
       }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
     }
   },
   "permissions": [
@@ -35,14 +38,19 @@
   },
   "icons": {
     "16": "icon16.png",
+    "32": "icon32.png",
     "48": "icon48.png",
-    "128": "icon128.png"
+    "128": "icon128.png",
+    "256": "icon256.png",
+    "512": "icon512.png",
+    "1024": "icon1024.png"
   },
   "action": {
     "default_popup": "popup.html",
     "default_title": "__MSG_title__",
     "default_icon": {
       "16": "icon16.png",
+      "32": "icon32.png",
       "48": "icon48.png",
       "128": "icon128.png"
     }

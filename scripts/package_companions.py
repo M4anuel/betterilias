@@ -7,8 +7,28 @@ import json
 from pathlib import Path
 import shutil
 from urllib.parse import urlsplit
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _write_unix_zip(source_dir, zip_path):
+    source_dir = Path(source_dir)
+    with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+        for file_path in sorted(source_dir.rglob('*')):
+            rel = file_path.relative_to(source_dir).as_posix()
+            if file_path.is_dir():
+                rel += '/'
+                zinfo = zipfile.ZipInfo.from_file(file_path, arcname=rel)
+                zinfo.create_system = 3
+                zinfo.external_attr = 0o040755 << 16
+                zf.writestr(zinfo, b'')
+            else:
+                zinfo = zipfile.ZipInfo.from_file(file_path, arcname=rel)
+                zinfo.create_system = 3
+                zinfo.external_attr = 0o100644 << 16
+                zf.writestr(zinfo, file_path.read_bytes())
+
 
 
 def production_origin(value):
@@ -46,7 +66,7 @@ def package(origin, output):
     for browser in ('chrome', 'firefox', 'safari'):
         target = output / browser
         shutil.copytree(ROOT / 'extensions' / browser, target,
-                        ignore=shutil.ignore_patterns('.env*', '*.env', '__pycache__', '*.zip'))
+                        ignore=shutil.ignore_patterns('.env*', '*.env', '__pycache__', '*.zip', '*.md', 'icon.svg'))
         for path in target.rglob('*'):
             if path.suffix not in ('.js', '.html'):
                 continue
@@ -62,7 +82,7 @@ def package(origin, output):
         for script in manifest['content_scripts']:
             script['matches'] = [pattern]
         path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-        shutil.make_archive(str(output / ('betterilias-' + browser)), 'zip', target)
+        _write_unix_zip(target, output / f'betterilias-{browser}.zip')
     return output
 
 
