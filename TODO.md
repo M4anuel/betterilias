@@ -6,6 +6,13 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 - [x] Add the public feature request board, browser-owned voting/comments,
   shared forum composer, administrator moderation and bounded image storage.
+- [x] Compact request search/filters, disclose public-content/browser ownership
+  guidance on demand and make existing administrator status management discoverable.
+- [ ] Replace the shared administrator key with individual sign-in and server-enforced
+  roles (administrator/moderator and scoped permissions), including account recovery,
+  revocation and attributable moderation. Until then, request moderation/status
+  changes use the existing `ADMIN_API_KEY` login at `/admin/`; do not share this
+  full-administration credential with prospective moderators.
 - [ ] Strengthen community-board abuse protection as usage grows: authenticated
   ownership/recovery, vote integrity, rate limits and accessible spam prevention.
   Cookie identities intentionally allow a new vote after cookies are cleared.

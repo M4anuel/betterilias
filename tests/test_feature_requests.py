@@ -86,6 +86,26 @@ def test_comments_edit_delete_admin_and_plain_text(client):
     assert client.get(ref).status_code == 404
 
 
+def test_status_management_uses_existing_admin_login(client):
+    identify(client)
+    request = create(client)
+    public = '/api/feature-requests/' + request['id']
+    admin = '/api/admin/feature-requests/' + request['id']
+    payload = {'status': 'planned'}
+    assert client.put(admin + '/status', headers=H, json=payload).status_code == 404
+    assert client.put(public + '/status', headers=H, json=payload).status_code == 404
+    login = client.post('/api/admin/session', headers={'X-Admin-Request': '1'}, json={'key': 'a' * 48})
+    assert login.status_code == 200
+    assert client.put(admin + '/status', json=payload).status_code == 403
+    for status in ['planned', 'in_progress', 'completed', 'declined', 'open']:
+        result = client.put(admin + '/status', headers={'X-Admin-Request': '1'}, json={'status': status})
+        assert result.status_code == 200
+        assert result.json()['status'] == status
+        assert client.get(public).json()['status'] == status
+    client.delete('/api/admin/session', headers={'X-Admin-Request': '1'})
+    assert client.put(admin + '/status', headers={'X-Admin-Request': '1'}, json=payload).status_code == 404
+
+
 def test_image_optimization_private_staging_and_cache(client):
     identify(client)
     image = client.post('/api/feature-requests/images', headers=H, content=png(1500, 1000)).json()['id']
