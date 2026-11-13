@@ -33,6 +33,12 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
         with zipfile.ZipFile(output / f'betterilias-{browser}.zip') as archive:
             assert 'manifest.json' in archive.namelist()
             assert 'icon32.png' in archive.namelist()
+            for info in archive.infolist():
+                assert info.create_system == 3
+                if info.is_dir():
+                    assert (info.external_attr >> 16) & 0o777 == 0o755
+                else:
+                    assert (info.external_attr >> 16) & 0o777 == 0o644
     safari_manifest = json.loads((output / 'safari/manifest.json').read_text())
     assert safari_manifest['background']['service_worker'] == 'background.js'
     assert 'background.js' in safari_manifest['background']['scripts']
