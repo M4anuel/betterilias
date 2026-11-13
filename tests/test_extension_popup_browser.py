@@ -13,7 +13,7 @@ pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '
 
 @pytest.mark.parametrize('language,scheme', [('de','dark'), ('en','light')])
 @pytest.mark.parametrize('scale', [1, 2])
-@pytest.mark.parametrize('directory', ['chrome', 'safari'])
+@pytest.mark.parametrize('directory', ['chrome'])
 def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, scale, directory):
     pw=pytest.importorskip('playwright.sync_api')
     # Firefox uses the exact same markup/styles; native Firefox toolbar sizing

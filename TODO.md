@@ -4,6 +4,13 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Rebuild Safari Companion independently of Chrome/Firefox: Safari background
+  page, isolated cookie verification, activity-based sync and validated upload ZIP.
+- [ ] Upload Safari Companion 1.1.0 to Apple's packager and verify TestFlight on
+  macOS and iPhone/iPad. Local WebKit/API simulations do not prove native signing,
+  packaging, Safari permissions or physical-device background execution.
+  See `docs/SAFARI_REBUILD_ANALYSIS.md`.
+
 - [x] Add the public feature request board, browser-owned voting/comments,
   shared forum composer, administrator moderation and bounded image storage.
 - [x] Compact request search/filters, disclose public-content/browser ownership
