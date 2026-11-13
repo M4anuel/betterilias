@@ -51,6 +51,7 @@ dist/
 dist-ssr/
 
 .coordination/
+.feature_requests/
 .observability/
 .diagnostic_reports/
 deploy/backend.env

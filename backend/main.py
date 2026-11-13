@@ -23,6 +23,7 @@ from backend.api.routes import diagnostics
 from backend.diagnostic_reports import ReportMiddleware, problem
 from backend.diagnostic_metadata import APP_VERSION, register_routes
 from backend import activity
+from backend.api.routes import feature_requests
 
 configure_logging()
 logger = logging.getLogger("ilias.main")
@@ -54,6 +55,7 @@ app = FastAPI(
     openapi_url='/openapi.json' if settings.app_env == 'development' else None,
 )
 app.add_middleware(LanguageMiddleware)
+app.add_middleware(feature_requests.CommunityBodyLimit)
 app.add_middleware(DiagnosticMiddleware)
 app.add_middleware(ReportMiddleware)
 
@@ -190,6 +192,8 @@ app.include_router(calendar.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(diagnostics.router, prefix="/api")
+app.include_router(feature_requests.router, prefix="/api")
+app.include_router(feature_requests.admin_router, prefix="/api")
 
 
 @app.get("/health")

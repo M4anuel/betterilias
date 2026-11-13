@@ -22,6 +22,10 @@ www.{$APP_DOMAIN} {
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer
 	}
+	@community_images path /api/feature-requests/media/*
+	handle @community_images {
+		reverse_proxy backend:8000
+	}
 	@api path /api /api/* /health
 	handle @api {
 		header >Cache-Control "no-store"

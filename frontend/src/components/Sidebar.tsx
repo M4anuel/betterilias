@@ -26,6 +26,8 @@ interface SidebarProps {
   isMyCoursesSelected: boolean;
   onSelectCalendar?: () => void;
   isCalendarSelected?: boolean;
+  onSelectRequests?: () => void;
+  isRequestsSelected?: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onOpenNicknameModal: () => void;
@@ -48,6 +50,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMyCoursesSelected,
   onSelectCalendar,
   isCalendarSelected = false,
+  onSelectRequests,
+  isRequestsSelected = false,
   isCollapsed,
   onToggleCollapse,
   onOpenNicknameModal,
@@ -165,7 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </span>}
     </div>
   );
-  const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isMyCoursesSelected && !isCalendarSelected;
+  const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isMyCoursesSelected && !isCalendarSelected && !isRequestsSelected;
   const hiddenNavItems = useMemo(() => new Set(cache.getHiddenSidebarNavItems(semester)), [nicknamesVersion, semester]);
   const semesterOption = useMemo(() => (semester ? getSemesterOption(semester) : null), [semester, language]);
   const semesterLabel = semesterOption ? semesterOption.short : semester;
@@ -183,6 +187,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return renderNavigation('nav_calendar', title, iconName, isCalendarSelected, onSelectCalendar);
       case 'my_courses':
         return renderNavigation('nav_my_courses', title, iconName, isMyCoursesSelected, onSelectMyCourses);
+      case 'feature_requests':
+        return onSelectRequests ? renderNavigation('nav_feature_requests', title, iconName, isRequestsSelected, onSelectRequests) : null;
       case 'repository':
         return renderNavigation('nav_repository', title, iconName, isRepositorySelected, onSelectRepository);
       default:
@@ -195,6 +201,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'calendar', type: 'nav' },
     { id: 'my_courses', type: 'nav' },
     { id: 'repository', type: 'nav' },
+    { id: 'feature_requests', type: 'nav' },
   ];
   const hasCustomOrder = customOrder !== null && customOrder.length > 0;
   const placedCourses = new Set<string>();

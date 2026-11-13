@@ -6,6 +6,8 @@ import type { TranslationKey } from '../lib/i18n';
 import { theme } from '../lib/theme';
 import { AdminError, adminRequest } from './api';
 import type { AdminEvent, AdminSession, AdminSummary, EventPage } from './api';
+import { FeatureRequestsView } from '../components/FeatureRequestsView';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { ReportsPanel } from './Reports';
 import { Activity as ActivityPanel } from './Activity';
 
@@ -94,6 +96,8 @@ export function AdminDashboard() {
         {error && <div role="alert" className="admin-alert">{label(error)}</div>}
         <Overview onExpired={expired} expires={session.expires_at} />
         <ReportsPanel onExpired={expired} />
+        <FeatureRequestsView admin />
+        <ConfirmModal />
       </> : <section className="admin-login admin-panel" aria-labelledby="admin-login-title">
         <div className="admin-emblem"><ShieldCheck size={28} aria-hidden="true" /></div>
         <p className="admin-eyebrow">BetterIlias · {t('admin.title')}</p>

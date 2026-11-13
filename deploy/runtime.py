@@ -29,8 +29,10 @@ def main():
         print('Expected api, maintain or once.', file=sys.stderr)
         return 2
     from backend.diagnostics import main as prune
+    from backend.feature_requests import maintain
     while True:
         result = prune(['prune'])
+        maintain()
         if mode == 'once':
             return result
         if result:

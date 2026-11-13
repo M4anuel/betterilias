@@ -199,6 +199,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                   <span>{t("legal.privacy_cookies_heading")}</span>
                 </h3>
                 <p>{t("legal.privacy_cookies_desc")}</p>
+                <p>{t('requests.cookie_hint')}</p>
               </div>
 
               {/* 4. Server Location & Security */}

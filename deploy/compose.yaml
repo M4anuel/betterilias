@@ -9,6 +9,7 @@ x-backend: &backend
     CAPTURE_FAILED_HTML: "false"
     CORS_ORIGINS: '["https://${APP_DOMAIN:?Set APP_DOMAIN}"]'
     COORDINATION_DIR: /data/.coordination
+    FEATURE_REQUESTS_DIR: /data/.feature_requests
     SESSIONS_DIR: /data/.sessions
     SESSION_COOKIE_FILE: /data/session_cookies.json
     OBSERVABILITY_DIR: /data/.observability
