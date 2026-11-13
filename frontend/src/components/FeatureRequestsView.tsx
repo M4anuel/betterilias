@@ -1,11 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, Info, LoaderCircle, Plus, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, CalendarClock, Check, CircleCheck, CircleDot, CircleX, Info, LoaderCircle, Plus, SlidersHorizontal, Wrench, X } from 'lucide-react';
 import { t, useLanguage } from '../lib/i18n';
 import { confirmDialog } from '../lib/dialog';
 import { navigationGuard, useNavigationGuard } from '../lib/navigationGuard';
 import { requestApi, requestCategories, requestStatuses } from '../lib/featureRequests';
-import type { FeatureRequest, RequestCategory, RequestComment, RequestDraft, RequestPage } from '../lib/featureRequests';
+import type { FeatureRequest, RequestCategory, RequestComment, RequestDraft, RequestPage, RequestStatus } from '../lib/featureRequests';
 import { DiscussionComposer } from './DiscussionComposer';
 import { FileDropzone } from './FileDropzone';
 import { ErrorNotice } from './ErrorNotice';
@@ -14,6 +14,21 @@ const button = 'inline-flex min-h-11 min-w-11 cursor-pointer items-center justif
 const field = 'mt-1 min-h-12 w-full min-w-0 rounded-xl border border-slate-400 bg-transparent px-3 py-2 text-base text-slate-900 focus-visible:outline-2 focus-visible:outline-teal-500 dark:border-slate-500 dark:text-white';
 function nickname() { try { return localStorage.getItem('betterilias_community_nickname') || ''; } catch { return ''; } }
 function remember(value: string) { try { localStorage.setItem('betterilias_community_nickname', value); } catch { /* optional */ } }
+
+const statusAppearance = {
+  open: { icon: CircleDot, colors: 'border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200' },
+  planned: { icon: CalendarClock, colors: 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200' },
+  in_progress: { icon: Wrench, colors: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200' },
+  completed: { icon: CircleCheck, colors: 'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-200' },
+  declined: { icon: CircleX, colors: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200' },
+};
+
+function RequestStatusBadge({ status }: { status: RequestStatus }) {
+  const { icon: Icon, colors } = statusAppearance[status];
+  return <span data-request-status={status} className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold leading-5 ${colors}`}>
+    <Icon size={15} className="shrink-0" aria-hidden="true" /><span>{t(`requests.status.${status}`)}</span>
+  </span>;
+}
 
 export function FeatureRequestsView({ selectedId, onSelect, admin = false, initialSuccess = false }: { selectedId?: string | null; onSelect?: (id: string | null, saved?: boolean) => void; admin?: boolean; initialSuccess?: boolean }) {
   const language = useLanguage();
@@ -136,13 +151,21 @@ export function FeatureRequestsView({ selectedId, onSelect, admin = false, initi
         </div>
       </search>
       {!loading && !page.items.length && <p className="p-6 text-center text-slate-500 dark:text-slate-400">{t('requests.empty')}</p>}
-      <div className="space-y-3">{page.items.map(request => <article key={request.id} className="flex min-w-0 items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"><div className="shrink-0 rounded-xl bg-slate-100 px-3 py-2 text-center dark:bg-slate-800"><span className="block font-bold">{request.score}</span><span className="text-xs">{t('requests.votes')}</span></div><div className="min-w-0 flex-1"><button type="button" className="min-h-11 w-full cursor-pointer break-words text-left font-bold text-teal-800 focus-visible:outline-2 dark:text-teal-200" onClick={() => void select(request.id)}>{request.title}</button><p className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-sm text-slate-600 dark:text-slate-300">{request.description}</p><p className="mt-2 break-words text-xs text-slate-500 dark:text-slate-400">{t(`requests.status.${request.status}`)} · {t(`requests.category.${request.category}`)} · {t('requests.comment_count', { count: request.comment_count })}</p></div></article>)}</div>
+      <div className="space-y-3">{page.items.map(request => <article key={request.id} className="flex min-w-0 items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <div className="shrink-0 rounded-xl bg-slate-100 px-3 py-2 text-center dark:bg-slate-800"><span className="block font-bold">{request.score}</span><span className="text-xs">{t('requests.votes')}</span></div>
+        <div className="min-w-0 flex-1">
+          <RequestStatusBadge status={request.status} />
+          <button type="button" className="mt-1 min-h-11 w-full cursor-pointer break-words text-left font-bold text-teal-800 focus-visible:outline-2 dark:text-teal-200" onClick={() => void select(request.id)}>{request.title}</button>
+          <p className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-sm text-slate-600 dark:text-slate-300">{request.description}</p>
+          <p className="mt-2 break-words text-xs text-slate-500 dark:text-slate-400">{t(`requests.category.${request.category}`)} · {t('requests.comment_count', { count: request.comment_count })}</p>
+        </div>
+      </article>)}</div>
       <div className="flex justify-between gap-2"><button type="button" className={button} disabled={loading || filters.page === '0'} onClick={() => setFilters({ ...filters, page: String(+filters.page - 1) })}>{t('forum.previous')}</button><button type="button" className={button} disabled={loading || !page.has_more} onClick={() => setFilters({ ...filters, page: String(+filters.page + 1) })}>{t('forum.next')}</button></div>
     </>}
     {loading && <p role="status">{t('requests.loading')}</p>}
     {id && !draft && <button type="button" className={button} disabled={busy} onClick={() => void select(null)}><ArrowLeft size={18} />{t('requests.back')}</button>}
     {current && !draft && <article className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-      <header><p className="text-xs text-teal-800 dark:text-teal-200">{t(`requests.status.${current.status}`)} · {t(`requests.category.${current.category}`)}</p><h2 className="mt-2 break-words text-xl font-bold">{current.title}</h2><p className="mt-2 break-words text-xs text-slate-500 dark:text-slate-400">{author(current.nickname)} · {date(current.created)}</p></header>
+      <header><div className="flex flex-wrap items-center gap-2"><RequestStatusBadge status={current.status} /><span className="text-xs text-slate-500 dark:text-slate-400">{t(`requests.category.${current.category}`)}</span></div><h2 className="mt-2 break-words text-xl font-bold">{current.title}</h2><p className="mt-2 break-words text-xs text-slate-500 dark:text-slate-400">{author(current.nickname)} · {date(current.created)}</p></header>
       <p className="max-w-[72ch] whitespace-pre-wrap break-words text-sm leading-relaxed">{current.description}</p>
       <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{current.images.map((image, n) => { const small = image.variants[0], full = image.variants.at(-1)!; const alt = t('requests.image_alt', { number: n + 1, title: current.title }); return <button type="button" key={image.id} className="min-w-0 cursor-zoom-in rounded-xl focus-visible:outline-2" onClick={() => setEnlarged({ url: full.url, alt })}><img className="h-auto max-h-72 w-full rounded-xl object-contain" src={small.url} srcSet={image.variants.map(v => `${v.url} ${v.width}w`).join(', ')} sizes="(max-width: 640px) 90vw, 400px" width={small.width} height={small.height} loading={n === 0 ? 'eager' : 'lazy'} fetchPriority={n === 0 ? 'high' : undefined} decoding="async" alt={alt} /></button>; })}</div>
       {current.images_archived && <p className="text-sm text-slate-500 dark:text-slate-400">{t('requests.images_archived')}</p>}

@@ -8,6 +8,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   shared forum composer, administrator moderation and bounded image storage.
 - [x] Compact request search/filters, disclose public-content/browser ownership
   guidance on demand and make existing administrator status management discoverable.
+- [x] Promote request statuses to labelled icon/colour badges above card titles
+  and in detail headers, with matching light/dark styles and responsive coverage.
 - [ ] Replace the shared administrator key with individual sign-in and server-enforced
   roles (administrator/moderator and scoped permissions), including account recovery,
   revocation and attributable moderation. Until then, request moderation/status

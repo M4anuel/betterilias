@@ -21,6 +21,10 @@ statuses are open, planned, in progress, completed and declined. Requests can be
 reopened by selecting open. The same admin session permits editing/deletion and
 comment moderation; public visitors cannot change status.
 
+Public and administrator views show status as a prominent badge above each card
+title and in the request detail header. Each status has visible translated text,
+a distinct icon and matching light/dark colours; colour is not the only indicator.
+
 This is a temporary shared-key model, not an individual account or role system.
 It grants full dashboard access, without separate moderator permissions or
 per-person attribution. Individual sign-in, recovery/revocation and server-enforced
@@ -104,3 +108,6 @@ and after resizing; filter query values and retained selections. Administrator
 checks cover every status, failed-save recovery and the built dashboard's
 key-login → Manage requests → status-save path. Backend tests verify public
 denial and status persistence using the existing admin login cookie.
+Status-badge checks cover all five labels, list/detail placement and updates after
+moderation, with at least 4.5:1 text contrast in each language/theme combination
+at the same phone, tablet, desktop and short-landscape emulation sizes.
