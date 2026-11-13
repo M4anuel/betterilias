@@ -41,6 +41,10 @@ needed for the standard package.
 3. Sign in to ILIAS normally, then choose **Sync now** in the popup.
 4. Choose **Open BetterIlias**. A newly verified, single-use handoff connects it.
 
+**Sync now** also reconnects already-open app tabs. If a tab predates installation
+and has no content receiver, this explicit action uses a new handoff and reloads
+that tab. Automatic checks and Open BetterIlias do not force-reload editor tabs.
+
 Automatic mode checks relevant tab activity and page loads. Optional alarms are
 best effort; Safari may suspend background execution. Manual sync always remains
 available. The popup provides permission instructions and separate retry feedback.

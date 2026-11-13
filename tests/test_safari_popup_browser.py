@@ -78,4 +78,22 @@ def test_safari_permission_retry_and_pending_actions(safari_browser,local_site):
     page.evaluate('window.failSync=true;finishSafariSync()')
     page.get_by_text(tr['safari.status.error'],exact=True).wait_for()
     assert page.get_by_role('button',name=tr['safari.sync'],exact=True).is_enabled()
+    page.evaluate('window.stallSync=false;window.failSync=false;safariModel.pageConnectionFailed=true')
+    page.get_by_role('button',name=tr['safari.sync'],exact=True).click()
+    page.get_by_text(tr['safari.page_retry'],exact=True).wait_for()
+    page.get_by_role('button',name=tr['safari.open'],exact=True).click()
+    page.wait_for_function("safariWrites.some(m=>m.type==='SAFARI_OPEN_APP')")
+    page.close()
+
+
+def test_safari_language_selection_is_saved(safari_browser,local_site):
+    page=safari_browser.new_page(viewport={'width':390,'height':844});setup(page,local_site,'en','light')
+    page.locator('#sync:enabled').wait_for()
+    page.locator('#language').select_option('de')
+    tr=json.loads((ROOT/'locales/de.json').read_text(encoding='utf-8'))
+    page.get_by_role('button',name=tr['safari.sync'],exact=True).wait_for()
+    page.get_by_role('button',name=tr['safari.save'],exact=True).click()
+    page.get_by_text(tr['safari.saved'],exact=True).wait_for()
+    assert page.evaluate("safariWrites.some(m=>m.type==='SAFARI_PREFERENCES'&&m.language==='de')")
+    assert page.locator('html').get_attribute('lang') == 'de'
     page.close()

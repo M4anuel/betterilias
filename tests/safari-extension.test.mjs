@@ -9,7 +9,7 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
 async function until(check) { for (let n = 0; n < 150 && !check(); n++) await flush(); assert.ok(check()); }
 function event() { return { listeners: [], addListener(fn) { this.listeners.push(fn); } }; }
 function harness({ alarms = true } = {}) {
-  const h = { storage: {}, now: 1000000, cookie: 'cookie-A', posts: [], notices: [], opened: [], valid: true, fail: false, denied: false, alarmCreates: 0 };
+  const h = { storage: {}, now: 1000000, cookie: 'cookie-A', posts: [], notices: [], opened: [], recovered: [], reloads: [], valid: true, fail: false, denied: false, alarmCreates: 0 };
   const api = {
     storage: { local: { get: async () => structuredClone(h.storage), set: async values => Object.assign(h.storage, structuredClone(values)),
       remove: async keys => { for (const key of keys) delete h.storage[key]; } } },
@@ -19,7 +19,8 @@ function harness({ alarms = true } = {}) {
       { name: 'PHPSESSID', value: 'foreign-host', domain: 'evil.test' }] : []; } },
     tabs: { query: async () => [{ id: 1, url: 'https://betterilias.ch/course' }, { id: 2, url: 'https://betterilias.ch.evil.test/' }],
       get: async () => ({ url: h.activeUrl || 'https://ilias.unibe.ch/' }),
-      sendMessage: async (id, message) => h.notices.push({ id, message }), create: async value => h.opened.push(value),
+      sendMessage: async (id, message) => { h.notices.push({ id, message }); if (h.noBridge) throw Error('no receiver'); return { success: true }; },
+      create: async value => h.opened.push(value), update: async (id, value) => h.recovered.push({ id, ...value }), reload: async id => h.reloads.push(id),
       onUpdated: event(), onActivated: event() },
     runtime: { id: 'safari-test', getURL: path => 'safari-web-extension://unit/' + path,
       getManifest: () => ({ version: '1.1.0' }), onMessage: event(), onInstalled: event(), onStartup: event() },
@@ -35,6 +36,7 @@ function harness({ alarms = true } = {}) {
         assert.equal(init.redirect, 'error'); assert.equal(init.credentials, 'omit');
         if (url.endsWith('/mobile-session')) {
           assert.ok(init.headers['X-Session-Id']);
+          if (h.handoffGate) await h.handoffGate;
           return { ok: true, json: async () => ({ handoff_token: 'one-use-code' }) };
         }
         const payload = JSON.parse(init.body); h.posts.push(payload);
@@ -99,6 +101,7 @@ test('Safari activity wakes sync only for the configured app or ILIAS', async ()
   updated(1, { status: 'complete' }, { url: 'https://unrelated.test/' }); await flush(); assert.equal(h.posts.length, 0);
   updated(1, { status: 'complete' }, { url: 'https://ilias.unibe.ch/' }); await until(() => h.posts.length === 1);
   await until(() => h.storage.safariCompanion.status === 'connected');
+  await h.core.sync(false); // Join the navigation's complete delivery/lease cleanup.
   h.now += 300001; h.activeUrl = 'https://betterilias.ch/';
   await h.api.tabs.onActivated.listeners[0]({ tabId: 1 }); assert.equal(h.posts.length, 2);
 });
@@ -148,6 +151,23 @@ test('Safari opens the app with a one-use code and never puts a session ID in UR
   const h = harness(); assert.equal((await h.core.openApp()).status, 'connected');
   assert.equal(h.opened[0].url, 'https://betterilias.ch/#connect=one-use-code');
   assert.ok(!JSON.stringify(h.opened).includes('verified-cookie-A'));
+});
+
+test('Safari manual sync reconnects receiver-less tabs with distinct one-use navigation', async () => {
+  const h = harness(); h.noBridge = true;
+  assert.equal((await h.core.manualSync()).pageConnectionFailed, false);
+  assert.equal(h.recovered[0].id, 1);
+  assert.equal(h.recovered[0].url, 'https://betterilias.ch/course#connect=one-use-code');
+  assert.deepEqual(h.reloads, [1]); assert.ok(!JSON.stringify(h.recovered).includes('verified-cookie-A'));
+  h.recovered.length = 0; await h.core.sync(true); assert.equal(h.recovered.length, 0);
+});
+
+test('Safari discards a handoff if the browser login changes while it is issued', async () => {
+  const h = harness(); h.noBridge = true; let release;
+  h.handoffGate = new Promise(resolve => { release = resolve; });
+  const pending = h.core.manualSync(); await until(() => h.storage.safariCompanion?.status === 'connected');
+  h.cookie = 'cookie-B'; release(); await pending;
+  assert.equal(h.recovered.length, 0); assert.equal(h.reloads.length, 0);
 });
 
 test('Safari content scripts cannot change preferences, force sync or choose endpoints', async () => {

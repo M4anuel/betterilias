@@ -16,7 +16,7 @@
     const respond = async () => {
       try {
         if (type === 'SAFARI_GET_STATUS') return companion.publicState(await companion.state());
-        if (type === 'SAFARI_SYNC') return await companion.sync(true);
+        if (type === 'SAFARI_SYNC') return await companion.manualSync();
         if (type === 'SAFARI_CHECK') return await companion.sync(false);
         if (type === 'SAFARI_PREFERENCES') {
           const updated = await companion.preferences(message);

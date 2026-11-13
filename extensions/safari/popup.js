@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const result = await action();
       model = result?.status ? result : { status: 'error' };
       if (saved && model.status !== 'error') { byId('feedback').textContent = t('safari.saved'); byId('feedback').hidden = false; }
+      else if (model.pageConnectionFailed) { byId('feedback').textContent = t('safari.page_retry'); byId('feedback').hidden = false; }
     } catch { model = { ...model, status: 'error', userName: '' }; }
     finally { busy = false; render(); }
   }

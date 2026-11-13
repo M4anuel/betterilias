@@ -2286,6 +2286,7 @@
   "safari.language": "Sprache",
   "safari.save": "Einstellungen speichern",
   "safari.saved": "Einstellungen gespeichert.",
+  "safari.page_retry": "Deine Anmeldung wurde geprüft, aber ein bestehender App-Tab konnte nicht verbunden werden. Verbinde mit BetterIlias öffnen einen neuen Tab.",
   "safari.user": "Verbunden als {name}",
   "safari.status.unknown": "Melde dich bei ILIAS an und synchronisiere dann deine Sitzung.",
   "safari.status.checking": "Deine ILIAS-Sitzung wird geprüft…",

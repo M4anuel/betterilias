@@ -73,13 +73,35 @@ globalThis.SafariCompanion = (() => {
       ]);
     } finally { clearTimeout(timer); }
   }
-  async function notify(sessionId) {
-    let tabs; try { tabs = await api.tabs.query({}); } catch { return; }
+  async function currentCredential(sessionId) {
+    try {
+      const current = await state();
+      return current.status === 'connected' && current.sessionId === sessionId &&
+        current.fingerprint === await fingerprint(await cookies());
+    } catch { return false; }
+  }
+  async function notify(sessionId, recover = false) {
+    let tabs; try { tabs = await api.tabs.query({}); } catch { return false; }
+    let delivered = true;
     for (const tab of tabs) {
       if (tab.id == null || !origin(tab.url, config.frontendUrl)) continue;
-      try { await api.tabs.sendMessage(tab.id, { type: 'BETTERILIAS_SESSION_SYNCED', sessionId }); }
-      catch { /* Open-app action provides a one-use handoff if no bridge exists. */ }
+      if (!await currentCredential(sessionId)) return false;
+      try {
+        const reply = await api.tabs.sendMessage(tab.id, { type: 'BETTERILIAS_SESSION_SYNCED', sessionId });
+        if (reply?.success) continue;
+      } catch { /* A tab open before installation may have no content script. */ }
+      if (!recover) continue;
+      try {
+        const { response, data } = await request('/api/auth/mobile-session', undefined, { 'X-Session-Id': sessionId });
+        if (!response.ok || !data.handoff_token) throw new Error('handoff');
+        if (!await currentCredential(sessionId)) return false;
+        const target = new URL(tab.url);
+        target.hash = new URLSearchParams({ connect: data.handoff_token }).toString();
+        await api.tabs.update(tab.id, { url: target.href });
+        await api.tabs.reload(tab.id);
+      } catch { delivered = false; }
     }
+    return delivered;
   }
   async function verify(force, retry = false) {
     const before = await state();
@@ -147,13 +169,21 @@ globalThis.SafariCompanion = (() => {
     const verified = await state();
     const { response, data } = await request('/api/auth/mobile-session', undefined, { 'X-Session-Id': verified.sessionId, 'Accept-Language': verified.language });
     if (!response.ok || typeof data.handoff_token !== 'string' || !data.handoff_token) return { ...checked, status: 'error' };
+    if (!await currentCredential(verified.sessionId)) return { ...checked, status: 'unknown', userName: '' };
     const url = new URL(config.frontendUrl);
     url.hash = new URLSearchParams({ connect: data.handoff_token }).toString();
     await api.tabs.create({ url: url.href }); return checked;
+  }
+  async function manualSync() {
+    const checked = await sync(true);
+    if (checked.status !== 'connected') return checked;
+    // Reload recovery is reserved for the explicit Sync action. Opening the app
+    // or an automatic check must not reload an existing tab with an editor draft.
+    return { ...checked, pageConnectionFailed: !await notify((await state()).sessionId, true) };
   }
   async function alarm() {
     try { if (api.alarms?.get && api.alarms?.create && !await api.alarms.get(ALARM)) await api.alarms.create(ALARM, { periodInMinutes: 5 }); }
     catch { /* Activity/manual sync remain available. */ }
   }
-  return { config, ILIAS, ALARM, origin, authCookie, state, publicState, sync, preferences, openApp, alarm, request };
+  return { config, ILIAS, ALARM, origin, authCookie, state, publicState, sync, manualSync, preferences, openApp, alarm, request };
 })();

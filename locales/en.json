@@ -2286,6 +2286,7 @@
   "safari.language": "Language",
   "safari.save": "Save preferences",
   "safari.saved": "Preferences saved.",
+  "safari.page_retry": "Your login was verified, but an existing app tab could not be connected. Use Open BetterIlias to connect a new tab.",
   "safari.user": "Connected as {name}",
   "safari.status.unknown": "Sign in to ILIAS, then sync your session.",
   "safari.status.checking": "Verifying your ILIAS session…",

@@ -75,6 +75,9 @@ appropriate for the independently written Safari client. See
   never receive BetterIlias credentials.
 - Manual sync remains available when automatic work is disabled or Safari
   suspends background execution. No promise of continuous iOS background sync.
+  Explicit manual sync can reconnect an already-open app tab without a content
+  receiver, using a new handoff and reload. Automatic checks and Open BetterIlias
+  never force-reload an existing editor tab.
 - A dedicated Safari resource allowlist excludes retired helpers. The ZIP has
   its manifest at root, relative POSIX paths, Unix file modes and deflated files.
   Referenced resources, PNG icon dimensions, opaque 1024px RGB master icon,
