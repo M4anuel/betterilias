@@ -4,6 +4,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Resolve the Dependabot backlog: paired React updates, compiler-API
+  compatibility for TypeScript 7, pinned Docker Actions and Node 26 LTS.
+- [ ] Revisit Python 3.15 with a compatible Pydantic/runtime lock and verified
+  binary wheels for both container architectures. See `docs/DEPENDENCY_UPDATES.md`.
 - [x] Stabilise inline edit actions, constrain reply prose beside its options,
   match forum material rows, and fix pinned-thread parsing/post confirmation.
 

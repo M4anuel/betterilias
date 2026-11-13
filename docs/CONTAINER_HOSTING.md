@@ -35,7 +35,7 @@ still needs the changes described in [deployment security](DEPLOYMENT_SECURITY.m
 
 - `deploy/backend.Dockerfile`: Python 3.14, hashed/pinned runtime dependencies,
   unprivileged UID 10001, no test packages or Playwright/browser login.
-- `deploy/frontend.Dockerfile`: a Node 24 build stage and an unprivileged Caddy
+- `deploy/frontend.Dockerfile`: a Node 26 LTS build stage and an unprivileged Caddy
   static-server stage. Only `dist` enters the final image, including `/admin/`.
 - `.dockerignore`: an allowlist; `.env`, sessions, logs, worktrees and fixtures
   never enter either build context. Runtime secrets are not build arguments.
