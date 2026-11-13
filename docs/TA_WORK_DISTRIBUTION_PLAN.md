@@ -1,50 +1,177 @@
-# TA work distribution, downloads and feedback return — implementation and retained plan
+# TA Work Distribution, Downloads and Mass Feedback Return
 
-**Current status:** the core allocation, ZIP-download and reviewed feedback-return
-workflows are implemented. The original research/design below is retained;
-its proposed envelopes, native bulk protocols and release gates must not be read
-as a checklist of shipped behavior. Live ILIAS acceptance remains separate.
+This document describes the shipped capabilities, supported data formats, and architectural contracts for teaching assistant (TA) workflows in BetterIlias: **work allocation**, **submission downloads**, and **mass feedback return**.
 
-**Original research date:** 30 October 2026. **Research baseline:** `822c6d6`.
+> [!NOTE]
+> **Executive Reference**: Sections 1–4 document the **currently shipped capabilities and supported formats**. Sections 5+ retain the original October 2026 research, native ILIAS protocol analysis, and historical design specifications.
 
-## Current implementation and remaining differences
+---
 
-- `DistributeWorkModal` groups teams into correction units, supports native order,
-  team number, submission time and seeded random allocation, and distributes
-  remainders by an editable assistant priority. Names and counts are editable;
-  new scopes start with two TAs. Assistant names/count/priority and the next slot
-  ID persist on this device per BetterIlias session and lecture, with a separate
-  exercise fallback when no course context exists. They never publish a native
-  allocation automatically, and an open editor keeps its draft across rerenders.
-- Per-member tutor notes carry compact `[BI:<ta_id>|<ta_name>]` markers. Native
-  `saveStatusAll` batches preserve unrelated grade/status fields and support
-  fingerprint conflict checks and read-back verification. The 200-character note
-  budget now refuses oversized allocations without truncation. Only a recognized
-  terminal marker can be replaced; human text and whitespace remain unchanged.
-  The API requires the snapshot fingerprint, rejects unknown/duplicate targets,
-  and rechecks the native form before posting while echoing its fresh grades.
-- Assignment/unassigned/TA ZIP bundles have live byte-progress feedback and include
-  a `betterilias-feedback.json` manifest and `feedback/team-<id>/` or
-  `feedback/user-<id>/` recipient folders. This is a BetterIlias bundle workflow, not a claim
-  that every native selected-download/background-job protocol is implemented.
-- Folder/ZIP feedback is staged under `.staged_imports/<session_id>/<import_id>/`,
-  inspected, mapped to verified units and previewed before publication. Inspection
-  rejects unsafe paths, symlinks and oversized/over-expanded archives, and ignores
-  system metadata. Preflight queries matched recipients; additional lookups can
-  be deferred until manual mapping/overwrite.
-- Unmatched files have manual recipient mapping with a searchable selection and
-  submitted-unit prioritization. Its popover is portaled into `document.body` to
-  avoid clipping/scrolling the dialog. Conflict actions include skip, replace and
-  keep both; replace resolves current file IDs on demand before native deletion
-  and upload. Publication uses native feedback-file handlers with per-file
-  outcomes. Allocation CSV export is also available.
-- Shared-local-volume locks coordinate BetterIlias grading/allocation/import
-  writers on one VPS. They do not lock tutors' native browser edits or establish
-  multi-VPS coordination. See [deployment security](DEPLOYMENT_SECURITY.md).
+## 1. Capabilities Overview
 
-Current code: `DistributeWorkModal.tsx`, `ReturnFeedbackModal.tsx`,
-`SearchableUnitSelect.tsx`, `backend/services/{ta_allocation,exercise_bulk,feedback_import}.py`
-and the exercise routes/client. Future work and acceptance remain in [TODO](../TODO.md).
+BetterIlias provides an end-to-end assignment workflow designed for multi-tutor courses:
+
+| Capability | What BetterIlias Does | Key Guarantees |
+| :--- | :--- | :--- |
+| **Work Allocation** | Distributes eligible submissions (teams or individual students) among any number of TAs. | • Deduplicates multi-member teams into one work unit.<br>• Deterministic sorting (native ILIAS, team number, submission time, name) or seeded random.<br>• Automatic quota calculation with priority-based remainder distribution.<br>• Preview before commit. |
+| **Shared Storage via ILIAS** | Saves the allocation directly into ILIAS tutor notes (`[BI:<ta_id>|<ta_name>]`). | • No private database needed; all BetterIlias users on the course see the same allocations.<br>• Preserves existing tutor notes byte-for-byte.<br>• Fits within the native 200-character note limit.<br>• Multi-row `saveStatusAll` echoes fresh grades to prevent accidental grade resets.<br>• Snapshot fingerprinting detects concurrent edits. |
+| **Targeted Downloads** | Downloads all submissions, a specific TA's assigned slice, or unassigned work. | • Live byte-progress streaming.<br>• Pre-builds a structured round-trip package with empty `feedback/` folders and manifest.<br>• Supports both individual and team assignments. |
+| **Mass Feedback Return** | Inspects, maps, previews, and batch-uploads graded files directly to ILIAS. | • Accepts ZIP archives or native folder uploads (`webkitdirectory`).<br>• Supports 4 input layouts (BetterIlias round-trip, explicit ID folders, native ILIAS ZIPs, or manual mapping).<br>• Preflight conflict detection against existing ILIAS feedback files.<br>• Per-file conflict resolution (`replace`, `keep_both`, `skip`).<br>• Sandboxed disk staging with automatic TTL cleanup. |
+| **Roster CSV Export** | Exports the current allocation mapping as a spreadsheet. | • Includes unit IDs, team names, member logins, and assigned TAs. |
+
+---
+
+## 2. Supported Formats for Mass Feedback Return
+
+The **Return Feedback** modal ([`frontend/src/components/ReturnFeedbackModal.tsx`](../frontend/src/components/ReturnFeedbackModal.tsx)) and backend import service ([`backend/services/feedback_import.py`](../backend/services/feedback_import.py)) accept feedback via:
+1. **ZIP Archive Upload** (`.zip` file)
+2. **Directory Selection** (browser folder picker via `webkitdirectory`)
+
+Both inputs are unpacked into a sandboxed staging directory, inspected, mapped to assignment units, and previewed before any upload to ILIAS.
+
+### 2.1 The 4 Supported File & Folder Formats
+
+#### Format 1: BetterIlias Round-Trip Package (Recommended)
+This format is produced automatically when downloading submissions via BetterIlias. TAs simply place their feedback files in the matching recipient folders and re-upload the folder or ZIP.
+
+```text
+my-ta-feedback.zip (or folder)
+├── betterilias-feedback.json          ← Round-trip manifest (verified for exercise & ass_id)
+├── submissions/                       ← Original submissions (AUTOMATICALLY IGNORED / SKIPPED)
+│   └── team-42/
+│       └── student_solution.pdf
+└── feedback/                          ← Active feedback files for publication
+    ├── team-42/                       ← Team unit: "team-<team_id>"
+    │   ├── feedback_sheet.pdf
+    │   └── test_results.txt
+    └── user-12345/                    ← Individual student unit: "user-<user_id>"
+        └── correction.pdf
+```
+* **Manifest Filenames Recognized:** `betterilias-feedback.json`, `betterilias_feedback.json`, `feedback.json`, `manifest.json`.
+* **Manifest Validation:** BetterIlias validates that `exercise_ref_id` and `ass_id` inside the manifest match the active assignment. Mismatches block import to prevent uploading feedback to the wrong exercise.
+* **Safety Guard:** Any folder or file path starting with `submissions/` is **strictly ignored** so student submissions are never accidentally re-uploaded as feedback.
+
+---
+
+#### Format 2: Explicit ID Folders (Without Manifest)
+If TAs organize their corrections manually without a manifest file, BetterIlias parses folder names starting with `team-` or `user-`:
+
+```text
+corrections/ (optional outer wrapper folder — automatically stripped)
+├── team-101/                          ← Maps directly to Team ID 101
+│   └── feedback.pdf
+├── team-102/                          ← Maps directly to Team ID 102
+│   └── comments.docx
+└── user-89102/                        ← Maps directly to Student Member ID 89102
+    └── review.pdf
+```
+* Also supports nested `feedback/team-<id>/` or `feedback/user-<id>/` structures without a manifest.
+* **Single Wrapper Directory Tolerance:** If all files inside the ZIP share a single top-level folder (e.g. `My_Corrections/...` or `Assignment_1/...`), BetterIlias detects and automatically strips the wrapper prefix.
+
+---
+
+#### Format 3: Native ILIAS Multi-Feedback Structure
+Compatible with archives downloaded directly from native ILIAS:
+
+```text
+ilias-export.zip
+└── Exercise_Title/
+    └── 1048291/                       ← Directory name is the numeric ILIAS User ID
+        └── feedback_sheet.pdf
+```
+* BetterIlias parses the parent directory name of the file: if it is numeric and matches a valid participant ID in the assignment, it automatically maps the file to that student (`user:<numeric_id>`).
+
+---
+
+#### Format 4: Unmatched Files & Manual Mapping UI
+Any file that does not match an automated naming pattern (e.g. flat files like `Alice_Smith_review.pdf` or unrecognized folder names) is **not dropped or rejected**:
+* It is staged safely and surfaced in the preview under **Unmatched Files**.
+* The modal provides an interactive, searchable unit selector ([`frontend/src/components/SearchableUnitSelect.tsx`](../frontend/src/components/SearchableUnitSelect.tsx)) allowing the tutor to assign each unmatched file to any team or individual student.
+* Manual mappings are submitted alongside the commit request.
+
+---
+
+### 2.2 Archive Sanitation & Security Limits
+
+The import service enforces strict security and staging hygiene:
+- **Maximum File Count:** 1,000 files per archive.
+- **Maximum Total Size:** 500 MB uncompressed.
+- **Path Traversal Guard:** Any entry containing `..` or leading `/` is immediately rejected with a traversal error.
+- **Symlink Rejection:** Symbolic links inside ZIP archives are rejected.
+- **OS Metadata Filtering:** System metadata files are automatically skipped and logged:
+  - macOS: `__MACOSX`, `.DS_Store`
+  - Windows: `Thumbs.db`, `desktop.ini`
+  - Version control / template files: `.keep`, `instructions.txt`, `readme.txt`, `download_failures.txt`
+- **Private Staging:** Staged files are isolated under `.staged_imports/<session_id>/<import_id>/` with unpredictable tokens (`secrets.token_urlsafe(24)`).
+- **TTL Staging Cleanup:** Staging directories older than 2 hours are automatically cleaned up on every preflight.
+
+---
+
+### 2.3 Conflict Detection & Resolution
+
+During preflight inspection, BetterIlias queries the current feedback files on ILIAS for all matched units. If a file with the same title already exists on ILIAS for that student/team:
+- The file is flagged with a **Conflict** badge in the preview.
+- The tutor can choose the resolution strategy per file or in bulk:
+  1. **Replace (`replace` / `overwrite`)**: Deletes the existing file on ILIAS first, then uploads the new version.
+  2. **Keep Both (`keep_both`)**: Uploads the new file alongside the existing one (ILIAS assigns a new file ID).
+  3. **Skip (`skip`)**: Excludes the conflicting file from upload.
+- No files are modified or deleted on ILIAS until the tutor clicks **Confirm & Return Feedback**.
+
+---
+
+## 3. TA Work Distribution Protocol
+
+### 3.1 Allocation Strategies
+When opening **Distribute Work** ([`frontend/src/components/DistributeWorkModal.tsx`](../frontend/src/components/DistributeWorkModal.tsx)):
+- **Pool Scope:**
+  - *Submitted & Ungraded* (default): Only submission units without a final grade or status.
+  - *All Submitted*: Every unit that delivered files.
+- **Allocation Order:**
+  - `Native ILIAS Order`: The exact sequence returned by ILIAS.
+  - `Team Number`: Numerical team order (`Team 1`, `Team 2`, ...).
+  - `Submission Time`: Earliest or latest submission first.
+  - `Display Name`: Alphabetical by team or student name.
+  - `Seeded Random`: Reproducible pseudorandom shuffle with a recorded seed.
+
+### 3.2 Quota & Remainder Formula
+For $M$ unique submission units and $N$ teaching assistants:
+- Base quota per TA: $\lfloor M / N \rfloor$ units.
+- Remainder units: $M \pmod N$ extra units are given to the first assistants in the **priority order**.
+- Units are assigned in contiguous blocks matching the priority order, keeping consecutive team numbers together.
+- Example: 10 units, 3 TAs (`TA1`, `TA2`, `TA3`) with priority `TA2 → TA1 → TA3`:
+  - `TA2` receives 4 units
+  - `TA1` receives 3 units
+  - `TA3` receives 3 units
+
+### 3.3 Storage in ILIAS Tutor Notes & Grade Preservation
+- **Protocol Marker:** The assignment is saved by appending a compact marker to each member's tutor note in ILIAS:
+  ```text
+  Existing tutor note text [BI:ta_1|Alice]
+  ```
+- **Byte Budget:** Fits comfortably within the native 200-character note limit (`MAX_NOTICE_LENGTH = 200`). If a tutor's existing note is too long for the marker, BetterIlias flags a capacity conflict rather than silently truncating the note.
+- **Text Preservation:** Human-written notes and whitespace are preserved byte-for-byte; only the terminal `[BI:...]` marker is updated upon redistribution.
+- **Atomic Grade Echo:** When saving via native `cmd[saveStatusAll]`, BetterIlias reads the fresh native status and mark for every targeted participant and echoes them in the POST request. This prevents ILIAS from resetting grades to "not graded".
+- **Optimistic Concurrency:** Generates a `distribution_fingerprint` across targeted rows; if another tutor modifies grades or notes in ILIAS before commit, BetterIlias aborts the batch to prevent overwriting concurrent work.
+
+---
+
+## 4. Submissions Export (Download Packages)
+
+The **Download Submissions** action (`GET /api/exercises/{exercise_id}/assignments/{ass_id}/export-zip`) produces a streamed ZIP archive:
+- **Filters:**
+  - *All Submissions*: Complete assignment bundle.
+  - *TA Slice (`filter_ta=<ta_id>`)*: Only units assigned to the selected TA.
+  - *Unassigned Work (`unassigned=true`)*: Units without a TA marker.
+- **Package Contents:**
+  - `betterilias-feedback.json`: Contains assignment ID, exercise reference ID, timestamp, and unit mappings.
+  - `submissions/`: Read-only student delivered files organized by `team-<id>/` or `user-<id>/`.
+  - `feedback/`: Ready-made recipient directories (`feedback/team-<id>/` or `feedback/user-<id>/`) for TAs to add corrections for a seamless round trip.
+
+---
+
+## Retained Architectural History, Research Findings & Native ILIAS Analysis
+
+*(The sections below preserve the original October 2026 research, upstream ILIAS source analysis, and phase planning.)*
 
 ## 1. Original implementation prompt
 
