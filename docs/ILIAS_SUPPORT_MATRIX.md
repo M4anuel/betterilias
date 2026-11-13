@@ -2,7 +2,7 @@
 
 Last audited: 2026-10-27, against the current implementation. This is the record
 of **what BetterIlias actually handles**. Use [TODO](../TODO.md) for future work
-and the [unified management plan](UNIFIED_MANAGEMENT_PLAN.md) for the design.
+and the [unified management documentation](UNIFIED_MANAGEMENT.md) for the design.
 
 ## How to read this inventory
 

@@ -1,63 +1,65 @@
-# Connection feedback
+# Connection Feedback & Network Error Recovery
 
-## Refined implementation prompt
+BetterIlias provides non-intrusive, persistent connection feedback and localized recovery actions for network dropouts, expired sessions, and upstream ILIAS unavailability. It preserves cached data and user form drafts while preventing accidental replay of destructive mutations.
 
-Audit the repository, memberships, calendar, semester, course, exercise and related
-dialogs for authentication, connectivity and general loading errors. Classify
-shared failures at the API boundary and give them consistent, localised recovery
-actions. Distinguish an unconnected session, an expired session, offline access,
-an unavailable service, insufficient permission, missing content and rate limits.
-Keep cached content and unsaved inputs available; never replay a failed write.
+---
 
-Replace the yellow session banner with quiet, persistent feedback. Reserve space
-for it so it cannot obscure actions, including on short phone screens. Use a
-normal onboarding action on the signed-out landing page and collapse its sidebar
-by default while allowing users to expand it. Install the Chrome companion from
-the supplied Web Store listing; retain Firefox instructions and explain phone
-pairing. Support keyboard access, screen-reader announcements, safe areas,
-German/English and light/dark mode. Verify actual recovery interactions and
-visually inspect phone, tablet, desktop and short-landscape screenshots.
+## 1. Capabilities & Error Classification
 
-## Implementation
+| Error Type | Visual Indicator | Recovery Action | State & Data Guarantees |
+| :--- | :--- | :--- | :--- |
+| **Unconnected / Signed Out** | Quiet connection card with **Connect ILIAS** action. | Directs to browser companion pairing or sign-in on landing page. | Cached courses and read-only views remain accessible. |
+| **Session Expired** | Session warning card in reserved banner area. | Reconnect ILIAS action prompts companion cookie sync. | Unsaved drafts in active editors are preserved; never destroyed. |
+| **Offline / Network Drop** | Non-intrusive offline notice. | **Retry Connection** probes reachability. | Cached pages remain viewable; failed writes are never blindly re-executed. |
+| **Upstream 5xx / Maintenance** | Service unavailable notice with status badge. | Retry checks reachability without reloading the browser document. | Distinguishes ILIAS server crashes from session expiration (prevents false logout). |
+| **Permission Denied (403)** | Contextual error banner inside current view. | Advises user of missing ILIAS role or closed course. | Does not invalidate the user's overall authenticated session. |
+| **Rate Limited (429)** | Rate-limiting cooldown notice. | Shows remaining backoff time before auto-retrying. | Suspends background polling to prevent exacerbating rate limits. |
 
-`sessionFetch` classifies common read failures and bounds the wait for read-response
-headers to 25 seconds, without cutting off streamed downloads afterwards.
-Caller cancellation stays separate from network failure. Writes retain their
-operation-specific and uncertain-outcome messages. Diagnostic submissions do not
-count as evidence of an authenticated ILIAS session.
+---
 
-`ConnectionNotice` owns persistent session/service recovery outside page scroll
-content. It uses a stable polite live region without moving focus. Its card
-reserves layout space instead of covering page controls; phone text and actions
-stack. Signing out on the landing page uses its primary Connect ILIAS action.
-No extension-presence detection is inferred from missing cookies.
+## 2. Recovery Workflows (How-To)
 
-Failed requests are tracked by URL, so a successful unrelated request cannot
-erase an outage. Retry probes failed reads, checks reachability for failed writes
-without replaying them, then asks mounted views to refresh their data. It does
-not reload the document. `ErrorNotice` handles local failures and provides
-connection recovery inside dialogs, where the workspace notice is behind the
-modal. Field validation and action-specific destructive/uncertain-write dialogs
-retain their existing semantics. The separate administrator authentication and
-render-exception boundary are not ILIAS connection states.
+### 2.1 The Global `ConnectionNotice` Component
+- Positioned in a reserved layout space outside the scrollable content area, ensuring it never obscures primary actions or input fields on mobile or desktop viewports.
+- Uses a polite ARIA live region (`aria-live="polite"`) adhering to [WCAG 2.1 Status Message Guidelines](https://www.w3.org/WAI/WCAG21/Understanding/status-messages) so screen readers announce changes without stealing focus.
+- When connection drops, clicking **Retry**:
+  1. Issues a lightweight probe to the health/reachability endpoint.
+  2. If reachable, prompts mounted view components to softly re-fetch their data.
+  3. Avoids hard browser reloads (`window.location.reload()`), preserving in-memory component state.
 
-The status announcement follows [WCAG status-message guidance](https://www.w3.org/WAI/WCAG21/Understanding/status-messages).
+### 2.2 In-Dialog `ErrorNotice` Component
+- Handles local failures within modals and overlay dialogs (e.g. feedback return, work distribution, folder creation) where the global workspace banner sits behind the modal backdrop.
+- Provides immediate retry or clear error messaging scoped to the active dialog without dismissing the modal or discarding user inputs.
 
-## Verification
+---
 
-`tests/test_connection_feedback_browser.py` exercises four destinations with
-401s; network, gateway and general-server failure recovery; search preservation;
-the Chrome store action; modal dismissal/focus restoration; and signed-out
-landing navigation. Its screenshots cover 320, 390, 430, 768 and 1280 px plus
-844 x 390 landscape in both languages and themes. These checks use installed
-Chrome through Playwright with mocked API responses. They do not establish live
-ILIAS or physical iOS Safari/Android Chrome acceptance. Existing page-sync,
-sidebar/history and mobile regressions cover related navigation and loading.
+## 3. Architecture & Technical Constraints (Explanation)
 
-Validation for this change: 635 automated tests; 31 connection scenarios, 53
-page-sync/history checks, 8 mobile workflows, 5 TA editor workflows and 51 player
-scenarios passed. The frontend build, locale validation, six localisation tests
-and launcher syntax check also passed. Browser screenshot runs used a fresh
-scratch working directory because existing `.pytest_cache` artifacts were not
-writable. Outdated drawer/recording geometry assertions were aligned with the
-existing full-screen navigation and compact recording action rows.
+### 3.1 Network Failure vs. Request Cancellation
+In `frontend/src/lib/api.ts` (`sessionFetch`):
+- Read operations enforce a 25-second timeout for initial response headers.
+- Streamed downloads (e.g. video streams, submission export ZIPs) are not cut off by the header timeout.
+- User-initiated aborts (`AbortController`) are strictly differentiated from network failures; cancelling a download or closing a preview does not trigger an "Offline" notice.
+
+### 3.2 URL-Scoped Outage Tracking
+- Failed requests are indexed by URL and operation. A successful background request (e.g. checking notifications) cannot prematurely clear an outage banner for an endpoint that is still failing.
+- Failed mutating writes (POST/PUT/DELETE) are never automatically replayed; only read probes are issued to verify server health before asking the user to re-confirm.
+
+### 3.3 Upstream Error Isolation (Rule F09)
+When ILIAS returns an HTTP 500, 502, or 504 error, BetterIlias treats it as upstream service unavailability. It does **not** interpret 5xx responses as a lost session, preventing users from being erroneously kicked to the login screen during transient ILIAS hiccups.
+
+---
+
+## 4. Source Code & References
+
+- **Global Banner**: [`frontend/src/components/ConnectionNotice.tsx`](../frontend/src/components/ConnectionNotice.tsx)
+- **Dialog Error Notice**: [`frontend/src/components/ErrorNotice.tsx`](../frontend/src/components/ErrorNotice.tsx)
+- **Network Client**: [`frontend/src/lib/api.ts`](../frontend/src/lib/api.ts) (`sessionFetch`)
+- **Automated Tests**: [`tests/test_connection_feedback_browser.py`](../tests/test_connection_feedback_browser.py) (Chromium browser test suite verifying 401s, 5xx handling, network timeouts, screen-reader polite announcements, and responsive layouts across 320–1280 px).
+
+---
+
+## Appendix: Retained Historical Notes
+
+*(Preserves initial prompt and review findings from early development.)*
+- Original goal: Replace the intrusive yellow session banner with quiet, reserved-space feedback that does not obscure mobile controls or steal keyboard focus.

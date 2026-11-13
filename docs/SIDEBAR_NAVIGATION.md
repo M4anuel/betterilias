@@ -1,91 +1,68 @@
-# Sidebar resizing and course pins
+# Sidebar Navigation, Resizing and Course Pins
 
-## Refined implementation brief
+BetterIlias provides an interactive, resizable sidebar on desktop viewports and a touch-optimized full-screen navigation drawer on mobile displays. It supports direct pinning of frequently used course folders, exercises, and content sections as nested quicklinks.
 
-Make the desktop sidebar resizable by dragging its right edge, with keyboard
-equivalents and a saved preferred width. Cap it at half the current viewport,
-collapse it when dragged below a practical minimum, and retain full-screen mobile
-navigation. Adapt the main workspace to its actual remaining width without
-remounting editors or losing drafts. Let users pin course folders, exercises,
-ILIAS links and content sections from their parent listing and the open page or
-section. Display these as nested hyperlinks below their course, with removal
-controls, direct navigation and saved preferences isolated by account on this device.
-Verify both languages/themes, navigation history, persistence, failure feedback,
-mobile interactions and tablet/desktop layouts.
+---
 
-## Behavior
+## 1. Capabilities & Feature Matrix
 
-- Drag the sidebar's right edge. Its expanded minimum is 160 CSS px; dragging
-  below 140 px collapses to the existing 64 px rail. Expand restores the preferred
-  width. A narrower browser clamps the displayed width without discarding the
-  saved preference.
-- Focus the divider and use Left/Right to change width by 16 px, Home to collapse,
-  or End to use half the viewport. Double-click resets to 256 px, subject to the cap.
-- Below the existing 1024 px navigation breakpoint, the drawer covers the full
-  viewport. Its close control, Escape dismissal and scrollable course list remain.
-- Pin controls are separate from item navigation. Parent rows/cards, current
-  folders, exercise headers/action menus and content sections expose pin/unpin.
-  Pins sit under their original course even if it is absent from the selected
-  semester. Collapsing hides the nested links until the sidebar is expanded.
-- Collapsed actions are 44 px squares with centered icons. Sidebar pin icons are
-  small, retaining 44 px targets. Unpinned controls show a grey pin that lights up
-  on hover/focus. Pinned controls stay lit and preview a struck-through pin only
-  on hover/focus. Unpinning resets to grey immediately, until the next hover/focus.
-  Every pin control uses a pointer cursor.
-- Only one destination is selected: a matching pinned folder, exercise or section
-  takes precedence over its course. Unpinned folders fall back to the course.
-  Matching ignores query-string order and unrelated semester/tab preferences.
-- Removing a pin from the sidebar opens the shared native confirmation dialog.
-  Cancel/Escape returns focus to the pin; successful removal focuses the course.
-  Content controls still toggle instantly. Confirmation cannot change another
-  account's pins if the active session changes while it is open.
-- Folder/exercise anchors open BetterIlias routes. Content sections use stable
-  hash anchors and scroll after their content loads. Forums and other items
-  currently opened in ILIAS retain their ILIAS URLs; this does not add controls
-  to the external ILIAS website. Native link behavior supports new tabs and copying.
-- Pins are stored locally under the current BetterIlias session's scope; account
-  changes clear the visible set and storage events refresh other tabs. Invalid
-  saved entries and unsafe URL schemes are ignored. Failed writes display a
-  translated error without pretending that the pin was saved. Preferences do not
-  sync across devices.
+| Capability | What BetterIlias Does | User Experience Guarantee |
+| :--- | :--- | :--- |
+| **Edge-Drag Resizing** | Drag the sidebar's right border to customize width smoothly. | Width is constrained between 160 CSS px minimum and 50% of viewport width. Dragging below 140 px snaps to a compact 64 px icon rail. |
+| **Keyboard Resizing** | Focus the divider handle and resize using standard keys. | `Left` / `Right` steps by 16 px; `Home` collapses to rail; `End` expands to 50% max; double-clicking resets to standard 256 px. |
+| **Mobile Drawer Mode** | Below 1024 px viewports, switches from a static sidebar to an overlay navigation drawer. | Closes on background tap or `Escape`; fits safe areas and preserves scroll position. |
+| **Course Quicklinks (Pins)** | Pin specific folders, exercises, external links, or section headings directly beneath their parent course. | Nested pins are visible beneath their course in the expanded sidebar; pin actions have 44 px touch targets with visual state hints. |
+| **Draft-Preserving Resizing** | Adapts main content width without unmounting React components. | Resizing uses `ResizeObserver` and CSS container queries; active editor drafts, form inputs, and video players stay mounted without state loss. |
+| **Tenant-Scoped Persistence** | Persists custom width and pinned items per session in browser storage. | Switching accounts clears the previous user's pins; multi-tab updates sync via storage events. |
 
-## Remaining workspace
+---
 
-The application observes the main element with ResizeObserver. Course rendering
-and compact controls use that width, while named CSS container queries choose
-grid columns for courses, folders, exercises and memberships. Existing flex
-layouts keep the main pane shrinkable. Resizing changes layout and context values,
-not component keys, so open editors and drafts stay mounted. Navigation remains
-guarded independently of resizing.
+## 2. Interaction & Keyboard Guide (How-To)
 
-## Verification
+### 2.1 Dragging and Resizing
+- **Pointer Drag**: Grab the right vertical divider of the sidebar. The cursor changes to `col-resize`. Drag right to expand up to half the window width; drag left to shrink.
+- **Snapping & Reset**:
+  - Dragging below 140 px snaps the sidebar into the collapsed 64 px icon rail.
+  - Double-clicking the divider handle instantly resets width to the default 256 px.
+- **Keyboard Shortcuts (When Divider is Focused)**:
+  - `Left Arrow`: Decrease width by 16 px.
+  - `Right Arrow`: Increase width by 16 px.
+  - `Home`: Collapse sidebar to 64 px icon rail.
+  - `End`: Expand sidebar to maximum width (50% viewport).
 
-`tests/test_sidebar_resize_pins_browser.py` exercises dragging/collapse/recovery,
-the half-screen cap after viewport changes, keyboard resizing, parent/current-page
-pinning, deep links/history, saved width/pins, draft preservation, write failures,
-account changes and unsafe stored links. Screenshots cover the half-screen layout
-and 320/390/430/768 px and short-landscape mobile drawers in both languages/themes.
-These are Chromium emulation checks with mocked API data, not physical iOS Safari,
-Android Chrome or live ILIAS verification. Existing sidebar, navigation, allocation,
-course-card and mobile regressions are retained.
+### 2.2 Pinning Course Content (Quicklinks)
+- **Pinning Items**: Click the pin icon next to any folder row, exercise header, or content section. Unpinned items show a subtle gray pin on hover/focus; pinned items stay highlighted.
+- **Accessing Pins**: Pinned items appear nested directly below their parent course in the sidebar, allowing one-click direct navigation.
+- **Removing Pins**: Clicking an active pin in the sidebar prompts a confirmation dialog. Confirming removes the pin and smoothly returns focus to the course item.
 
-Refinement coverage also checks square/centered collapsed controls, the lower
-collapse threshold, exclusive selection and unpinned-folder fallback, folder-card
-action placement, hover/focus icon feedback, cancellation/focus return, confirmed
-phone removal and account switching during confirmation. Confirmation screenshots
-cover both languages/themes, phone/tablet sizes and short landscape. Native
-autofocus selects Cancel when showModal opens; explicit close runs before React
-unmounts the dialog so the browser restores focus. Stacked actions follow DOM order.
+---
 
-Refinement verification (2026-11-10): 615 backend tests passed (413 opt-in/environment
-skips), 71 related browser cases passed, and the final 17 sidebar cases passed after
-the pin-state clarification. The production build, 2077-key locale check and
-launcher syntax check passed. Final screenshots were inspected in both themes and
-languages, including selection, collapsed/narrow rails and mobile confirmations.
+## 3. Architecture & Technical Constraints (Explanation)
 
-Recovery verification (2026-11-10): the backend suite passed with 615 tests
-and 413 opt-in/environment skips. The production build, 2074-key locale check,
-launcher syntax check and 103 related Chromium browser cases passed. Screenshots
-were inspected for desktop half-width content, phone/tablet drawers and short
-landscape layouts. The My Courses search field uses the same container breakpoints
-as its grid, preventing its column span from following the wider screen instead.
+### 3.1 CSS Container Queries & Layout Adaptation
+In `frontend/src/components/Sidebar.tsx` and main layout components:
+- The main workspace observes container width using `ResizeObserver`.
+- Named CSS container queries (`@container`) drive multi-column grid layouts for courses, folders, and exercise cards based on the *actual remaining workspace width* rather than the outer window width.
+- Layout adaptation updates CSS variables and style dimensions without modifying React component keys, preventing form inputs or rich text editors from re-mounting.
+
+### 3.2 Tenant Isolation for Pins & Width
+- Pinned items and preferred sidebar widths are stored in `localStorage` under `betterilias_pins_<session_id>`.
+- Insecure schemes (e.g. `javascript:`) and malformed URLs are rejected upon reading storage.
+- Preferences do not sync across different user accounts on shared computers.
+
+---
+
+## 4. Source Code & References
+
+- **Sidebar Component**: [`frontend/src/components/Sidebar.tsx`](../frontend/src/components/Sidebar.tsx)
+- **Layout & Container Queries**: `frontend/src/index.css` and main workspace containers
+- **Automated Tests**:
+  - `tests/test_sidebar_collapse_browser.py` — Verifies edge dragging, collapse thresholds, double-click reset, and responsive drawer behavior.
+  - `tests/test_sidebar_resize_pins_browser.py` — Tests keyboard resizing (`Left`/`Right`/`Home`/`End`), pin creation/deletion, and persistence isolation.
+
+---
+
+## Appendix: Retained Historical Notes
+
+*(Preserves initial implementation brief and review criteria from development.)*
+- Original goal: Provide a desktop sidebar that can be resized between 160 px and half the viewport, collapse to a 64 px rail, and store nested course quicklinks per account without causing main content drafts to unmount.

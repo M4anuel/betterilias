@@ -13,8 +13,8 @@ student and teaching-assistant workflows.
 | Unfinished implementation and verification tasks | [TODO](TODO.md) |
 | Current architecture, sessions, cache and source map | [Architecture](docs/ARCHITECTURE.md) |
 | Tests, localisation, configuration and scraper repair | [Development guide](docs/DEVELOPMENT.md) |
-| Unified management design and future authoring adapters | [Management plan](docs/UNIFIED_MANAGEMENT_PLAN.md) |
-| Synchronized playback, controls, preferences and limitations | [Podcast player](docs/PODCAST_PLAYER_PLAN.md), [controls and verification](docs/PLAYER_CONTROLS_REFINEMENT.md) |
+| Unified management design and authoring workflows | [Management documentation](docs/UNIFIED_MANAGEMENT.md) |
+| Synchronized playback, controls, preferences and limitations | [Podcast player documentation](docs/PODCAST_PLAYER.md) |
 | TA allocations, submission bundles and reviewed feedback return | [TA workflow and documentation](docs/TA_WORK_DISTRIBUTION.md) |
 | Production mode, session isolation and shared-worker constraints | [Deployment security](docs/DEPLOYMENT_SECURITY.md) |
 | Docker images, GitHub registry, Caddy, DNS and first-VPS setup | [Container hosting](docs/CONTAINER_HOSTING.md) |

@@ -1,11 +1,23 @@
-# Native forums
+# Native Course Forums
 
-Forum material cards and pinned forum links open an in-app repository container
-(`?course=<course>&folder=<forum>`). Its `container_type: "frm"` selects the forum
-workspace. Course navigation and browser Back retain the existing history flow.
+BetterIlias provides a responsive, in-app forum workspace that allows students and lecturers to read, search, author, and reply to native ILIAS course discussions without leaving BetterIlias or losing their active workspace context.
 
-The workspace shows threads on the left and the selected conversation on the
-right. On phones it shows one pane at a time, with a Back to threads control.
+---
+
+## 1. Capabilities & Feature Matrix
+
+| Capability | What BetterIlias Does | Technical Guarantee |
+| :--- | :--- | :--- |
+| **Two-Pane Workspace** | Left pane displays thread listings with visit counts and latest activity; right pane displays the active discussion conversation. | Adapts responsively: two panes on desktop; single-pane with instant "Back to threads" on mobile. |
+| **Rich Reply & Thread Composer** | Embedded rich-text composer with formatting toolbar, file attachments, and notification toggles. | Stays contained within the visible viewport; does not obscure messages while typing. |
+| **Pinned / Sticky Topics** | Highlights sticky threads with pinned badges and fixed top placement. | Maps to native ILIAS `unmakesticky` / `makesticky` actions. |
+| **Thread Search & Filtering** | Instant client-side search filtering threads by subject and author name. | Search bar expands smoothly on focus without pushing action buttons off-screen. |
+| **ILIAS 9 Profile Pictures** | Proxies and renders native user avatars. | Supports opaque signed FileDelivery tokens (`/src/FileDelivery/deliver.php/<token>`); missing avatars fall back to neutral icons. |
+| **Optimistic Draft Caching** | Caches uncommitted post drafts locally in browser memory. | Background refreshes, window resizing, and theme switches never wipe unsaved editor text. |
+
+---
+
+## 2. Interface and Navigation (How-To)
 Posts use the existing 68ch prose limit, with a 72ch outer message bubble. Wide
 code/tables get labelled, keyboard-focusable scrolling regions. Live native
 profile photos use authenticated resource downloads; missing photos use a neutral

@@ -64,7 +64,7 @@ Sidebars/news controls are excluded from material extraction.
 
 Repository objects and page elements have different storage/lifecycle models.
 A file or exercise has a repository identity; a page element can merely display
-or refer to it. The [management plan](UNIFIED_MANAGEMENT_PLAN.md) maps that
+or refer to it. The [management documentation](UNIFIED_MANAGEMENT.md) maps that
 distinction to one authoring UI. The support inventory records the actual
 handling of all catalogued types and the saved page-editor menu.
 
@@ -122,7 +122,7 @@ Management deletion reviews direct selected files/folders, inspects supported
 nested containers and follows the native repository confirmation form. Sorting
 uses native position controls and a revision check. Neither path invents
 COPage commands or treats removing a display block as deleting its resources.
-The management plan contains the detailed safeguards and native evidence.
+The management documentation contains the detailed safeguards and native evidence.
 
 Exercise writes use separate assignment/submission/feedback adapters. Native
 file handlers, command names and multipart field conventions vary between

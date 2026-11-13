@@ -1,11 +1,23 @@
-# Administrator dashboard
+# Administrator Dashboard
 
-The independent `/admin/` page shows private operational metrics and sanitized
-events. It has a separate Vite HTML/React entry and does not initialize the
-student app, import ILIAS handoffs or alter the landing page. It shares the
-existing language/theme helpers and English/Swiss German catalogues.
+The BetterIlias administrator dashboard (`/admin/`) is an independent, security-isolated interface for operators to monitor system health, inspect sanitized operational logs, review consented diagnostic error reports, and manage community feature requests without accessing student data.
 
-## Run and sign in
+---
+
+## 1. Capabilities & Feature Matrix
+
+| Capability | What the Admin Dashboard Does | Security & Privacy Guarantee |
+| :--- | :--- | :--- |
+| **Operational Metrics** | Visualizes distinct active connections (5-min and 24-hour windows) and connection activity bar charts. | Measures connection volume, not personal identities. Multiple devices sharing one session count once. |
+| **Sanitized Event Logging** | Real-time operational event logs with request IDs, route templates, and parser failure contexts. | Sensitive URLs, parameters, cookies, student names, and exception messages are strictly redacted. |
+| **Request ID Tracing** | Filters all log events by a 32-hex request ID to trace a single request's lifecycle. | Server-side filtered; does not distort aggregate system metrics. |
+| **Diagnostic Reports Review** | Reviews and manages user-submitted diagnostic error outlines (`open`, `resolved`, `reopened`). | Outlines are text-free and stripped of all student data. |
+| **Feature Request Moderation** | Sets status of community suggestions (`planned`, `in_progress`, `completed`, `declined`), edits titles, and manages images. | Admin actions are audited and require valid administrative credentials. |
+| **Zero Student App Footprint** | Built as a standalone entry point (`frontend/dist/admin/index.html`) independent of the student app bundle. | Does not import ILIAS session handoffs; never stores the admin key in localStorage or sessionStorage. |
+
+---
+
+## 2. Authentication and Setup (How-To)
 
 Use this feature's checkout/worktree for **both backend and frontend**. Configure
 `ADMIN_API_KEY` in its private `.env` or environment with a separately generated
