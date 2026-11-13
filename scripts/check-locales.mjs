@@ -5,7 +5,8 @@ import { createRequire } from 'node:module';
 import { validateCatalogues } from '../locales/validate.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(path.join(root, 'frontend/package.json'));
-const ts = require('typescript');
+// TypeScript 7 supplies the native CLI; the compatibility package retains the AST API.
+const ts = require('@typescript/typescript6');
 const overrideIndex = process.argv.indexOf('--locales-dir');
 const localeDirectory = overrideIndex >= 0 ? path.resolve(process.argv[overrideIndex + 1]) : path.join(root, 'locales');
 export const languages = JSON.parse(fs.readFileSync(path.join(localeDirectory, 'languages.json'), 'utf8'));
