@@ -94,6 +94,7 @@ export function AdminDashboard() {
     <main id="admin-main" className="admin-main">
       {authenticated ? <>
         {error && <div role="alert" className="admin-alert">{label(error)}</div>}
+        <a className="admin-button" href="#feature-requests">{t('requests.manage')}</a>
         <Overview onExpired={expired} expires={session.expires_at} />
         <ReportsPanel onExpired={expired} />
         <FeatureRequestsView admin />

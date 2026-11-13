@@ -13,6 +13,13 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 - [x] Add the public feature request board, browser-owned voting/comments,
   shared forum composer, administrator moderation and bounded image storage.
+- [x] Compact request search/filters, disclose public-content/browser ownership
+  guidance on demand and make existing administrator status management discoverable.
+- [ ] Replace the shared administrator key with individual sign-in and server-enforced
+  roles (administrator/moderator and scoped permissions), including account recovery,
+  revocation and attributable moderation. Until then, request moderation/status
+  changes use the existing `ADMIN_API_KEY` login at `/admin/`; do not share this
+  full-administration credential with prospective moderators.
 - [ ] Strengthen community-board abuse protection as usage grows: authenticated
   ownership/recovery, vote integrity, rate limits and accessible spam prevention.
   Cookie identities intentionally allow a new vote after cookies are cleared.
@@ -163,7 +170,7 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   download URL across feedback/modal handlers; reproduce incorrect submitted
   counts and downloads with German/English ILIAS and app language combinations.
 
-- [ ] Finish the reviewed [TA work distribution, downloads and feedback-return plan](docs/TA_WORK_DISTRIBUTION_PLAN.md); core phases are implemented, with remaining plan differences below:
+- [ ] Finish the reviewed [TA work distribution, downloads and feedback-return documentation](docs/TA_WORK_DISTRIBUTION.md); core phases are implemented, with remaining plan differences below:
   - [x] Phase 0 & Phase 1: Shared allocations via [BI:<ta_id>|<ta_name>] markers and native saveStatusAll batch updates (backend/services/ta_allocation.py, DistributeWorkModal.tsx).
   - [x] Phase 2: TA and bulk submission downloads with live progress, ZIP streaming, and betterilias-feedback.json round-trip manifest templates.
   - [x] Phase 3: Reviewed feedback return with safe preflight ZIP/folder inspection, mapping preview, conflict detection/resolution, and authenticated publication (backend/services/feedback_import.py, ReturnFeedbackModal.tsx).
@@ -455,7 +462,7 @@ Design and retained stream findings: [`docs/PODCAST_PLAYER_PLAN.md`](docs/PODCAS
 - [x] Unsaved changes navigation guard lifecycle & duplicate warning fix: Added onDiscard handler to navigation guards. When a user confirms leaving a view with unsaved grading notes or form edits, 
 avigationGuard invokes onDiscard to synchronously clear dirty flags, preventing double prompts and ghost warnings when switching between tabs or navigating across courses.
 
-- [x] TA work distribution, allocation notes, and submission export (TA_WORK_DISTRIBUTION_PLAN.md):
+- [x] TA work distribution, allocation notes, and submission export (TA_WORK_DISTRIBUTION.md):
   - [x] Added DistributeWorkModal.tsx for configurable tutor quotas, priority reordering, and preview before saving.
   - [x] Implemented compact versioned tutor notice markers ([BI:<ta_id>|<ta_name>]) preserving human note text and respecting the 200-character native ILIAS limit.
   - [x] Implemented native multi-row note updates (cmd[saveStatusAll]) echoing existing status and marks for every targeted row to prevent grade degradation.

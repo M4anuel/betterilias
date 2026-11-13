@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+/* The board can live beside the app sidebar or inside the admin dashboard. */
+.request-board { container-type: inline-size; }
+.request-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; align-items: center; }
+.request-filters input, .request-filters select { margin-top: 0; }
+.request-filter-fields { display: none; grid-column: 1 / -1; gap: .75rem; }
+.request-filters[data-expanded="true"] .request-filter-fields { display: grid; }
+.request-filter-label { display: block; margin-bottom: .25rem; }
+@container (min-width: 42rem) {
+  .request-filters { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr); }
+  .request-filters .request-filter-toggle { display: none; }
+  .request-filters[data-expanded] .request-filter-fields { display: contents; }
+  .request-filter-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
 .forum-workspace { height: clamp(24rem, calc(100dvh - 15rem), 58rem); }
 .forum-view[data-compact="false"] .forum-workspace { grid-template-columns: minmax(15rem,18rem) minmax(0,1fr); }
 .forum-view[data-compact="true"] .forum-workspace { grid-template-columns: minmax(0,1fr); }

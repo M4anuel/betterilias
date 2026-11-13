@@ -18,7 +18,7 @@ KEY = 'browser-only-administrator-secret-' + 'x' * 43
 def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, height, language, scheme):
     pw = pytest.importorskip('playwright.sync_api')
     tr = json.loads((ROOT / 'locales' / f'{language}.json').read_text(encoding='utf-8')).__getitem__
-    state = {'authenticated': False, 'expired': False, 'fail': False, 'hold': False}
+    state = {'authenticated': False, 'expired': False, 'fail': False, 'hold': False, 'request_status': 'open'}
     requests, errors, held = [], [], []
     now = time.time()
     events = [
@@ -64,6 +64,16 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
                     hourly=[dict(start=now-86400+i*3600, end=now-86400+(i+1)*3600, count=i%7) for i in range(24)]))
         elif path.endswith('/reports'):
             data = dict(reports=[], counts=[], next_before=None)
+        elif path.startswith('/api/admin/feature-requests'):
+            item = dict(id='request', title='Keyboard navigation', description='Improve navigation.',
+                category='qol', status=state['request_status'], nickname='Student', created=now,
+                updated=now, owned=False, score=3, my_vote=0, comment_count=0, comments=[],
+                images=[], images_archived=False)
+            if path.endswith('/status'):
+                assert request.method == 'PUT'
+                assert request.headers['x-admin-request'] == '1'
+                state['request_status'] = item['status'] = request.post_data_json['status']
+            data = dict(items=[item], has_more=False) if path.endswith('/feature-requests') else item
         elif path.endswith('/events'):
             query = parse_qs(urlparse(request.url).query)
             if state['hold'] and query.get('category') == ['security']:
@@ -110,6 +120,15 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
         password.press('Enter')
         pw.expect(page.get_by_role('heading', name=tr('admin.overview'), exact=True)).to_be_visible()
         pw.expect(page.locator('.admin-event')).to_have_count(2)
+        page.get_by_role('link', name=tr('requests.manage'), exact=True).click()
+        board = page.locator('[data-feature-requests]')
+        pw.expect(board.get_by_role('heading', name=tr('requests.title'), exact=True)).to_be_visible()
+        board.get_by_role('button', name='Keyboard navigation', exact=True).click()
+        board.get_by_label(tr('requests.status'), exact=True).select_option('planned')
+        pw.expect(board.get_by_role('status')).to_contain_text(tr('requests.saved'))
+        assert state['request_status'] == 'planned'
+        board.get_by_role('button', name=tr('requests.back'), exact=True).click()
+        pw.expect(board.locator('article').get_by_text(tr('requests.status.planned'), exact=False)).to_be_visible()
         charts = page.locator('.activity-chart')
         pw.expect(charts).to_have_count(2)
         slider = charts.first.get_by_role('slider')
@@ -134,7 +153,7 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
         pw.expect(page.get_by_role('button', name=tr('admin.apply_filter'), exact=True)).to_be_disabled()
         page.get_by_role('button', name=tr('admin.clear_filter'), exact=True).click()
         pw.expect(page.locator('.admin-event')).to_have_count(2)
-        category = page.get_by_label(tr('admin.category'), exact=True)
+        category = page.locator('#admin-category')
         code = page.get_by_label(tr('admin.event_code'), exact=True)
         category.select_option('security')
         pw.expect(page.locator('.admin-event')).to_have_count(1)
@@ -243,6 +262,8 @@ def test_admin_loading_disabled_and_error_states(local_site, language, scheme, m
                 outbound=dict(requests=0, rejected=0, queued=0, throttles=0, cooldown_until=0, queue_wait_seconds=0))
         elif path.endswith('/reports'):
             data = dict(reports=[], counts=[], next_before=None)
+        elif path.endswith('/feature-requests'):
+            data = dict(items=[], has_more=False)
         elif path.endswith('/events'):
             data = dict(events=[], next_before=None)
         route.fulfill(status=status, content_type='application/json', body=json.dumps(data))
