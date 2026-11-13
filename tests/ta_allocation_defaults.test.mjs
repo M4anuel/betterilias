@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(new URL('../frontend/package.json', import.meta.url));
-const ts = require('typescript');
+const ts = require('@typescript/typescript6');
 const source = fs.readFileSync(new URL('../frontend/src/lib/taAllocation.ts', import.meta.url), 'utf8');
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2023 } });
 const helpers = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));

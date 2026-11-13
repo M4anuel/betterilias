@@ -182,7 +182,7 @@ def test_compact_settings_semesters_materials_and_exercises(local_site, language
 
 
 @pytest.mark.parametrize('language', ['de', 'en'])
-def test_sidebar_draft_survives_parent_refresh_and_last_section_restores_subjects(local_site, language):
+def test_sidebar_draft_survives_parent_refresh_and_explicit_reset_restores_subjects(local_site, language):
     pw = pytest.importorskip('playwright.sync_api')
     tr = json.loads((ROOT / 'locales' / f'{language}.json').read_text(encoding='utf8')).__getitem__
     with pw.sync_playwright() as p:
@@ -219,8 +219,15 @@ def test_sidebar_draft_survives_parent_refresh_and_last_section_restores_subject
         editor.get_by_role('button', name=tr('Änderungen speichern'), exact=True).click()
         toggle.click()
         drawer = page.get_by_role('dialog', name=tr('Meine Vorlesungen'))
-        pw.expect(drawer.get_by_text('Informatik', exact=True)).to_be_visible()
         pw.expect(drawer.get_by_text('Original section', exact=True)).to_have_count(0)
+        pw.expect(drawer.get_by_role('button', name='Human Computer Interaction', exact=True)).to_be_visible()
+        # Custom navigation order now survives removing the final divider. The
+        # explicit reset action restores subject grouping without losing courses.
+        drawer.get_by_role('button', name=tr('Vorlesungen anpassen'), exact=True).click()
+        editor.get_by_role('button', name=tr('Auf Fachbereiche zurücksetzen'), exact=True).click()
+        editor.get_by_role('button', name=tr('Änderungen speichern'), exact=True).click()
+        toggle.click()
+        pw.expect(drawer.get_by_text('Informatik', exact=True)).to_be_visible()
         browser.close()
 
 

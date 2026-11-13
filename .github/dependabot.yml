@@ -4,11 +4,23 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      workflow-actions:
+        patterns: ["actions/*", "docker/*"]
   - package-ecosystem: docker
     directory: /deploy
     schedule:
       interval: weekly
+    ignore:
+      # The locked pydantic-core has no CPython 3.15 wheel. Revisit with the runtime lock.
+      - dependency-name: python
+        versions: [">=3.15,<3.16"]
   - package-ecosystem: npm
     directory: /frontend
     schedule:
       interval: weekly
+    groups:
+      react-runtime:
+        patterns: ["react", "react-dom"]
+      tailwind:
+        patterns: ["tailwindcss", "@tailwindcss/*"]
