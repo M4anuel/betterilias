@@ -5,8 +5,8 @@ updates:
     schedule:
       interval: weekly
     groups:
-      docker-tooling:
-        patterns: ["docker/*"]
+      workflow-actions:
+        patterns: ["actions/*", "docker/*"]
   - package-ecosystem: docker
     directory: /deploy
     schedule:
@@ -22,3 +22,5 @@ updates:
     groups:
       react-runtime:
         patterns: ["react", "react-dom"]
+      tailwind:
+        patterns: ["tailwindcss", "@tailwindcss/*"]

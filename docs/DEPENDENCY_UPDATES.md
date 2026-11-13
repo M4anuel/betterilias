@@ -17,6 +17,19 @@ update and regenerated npm lockfile. Existing application changes are preserved.
 | #10 | TypeScript 7.0.2 | Apply with the official compiler-API compatibility package |
 | #12 | @vitejs/plugin-react 6.2.1 | Apply |
 
+After the first batch reached main, Dependabot filled its vacant PR slots with
+the remaining backlog. These updates are included as a second tested batch:
+
+| PR | Update | Decision |
+| --- | --- | --- |
+| #13 | actions/setup-python 7.1.0 | Apply pinned commit; no removed pip-install input is used |
+| #14 | actions/checkout 7.0.1 | Apply pinned commit; retain persist-credentials: false |
+| #15 | actions/setup-node 7.1.0 | Apply pinned commit |
+| #16 | Vite 8.3.7 | Supersede with current patch 8.3.8 |
+| #17, #20 | Tailwind Vite plugin / Tailwind CSS 4.3.5 | Apply together |
+| #18 | lucide-react 1.71.0 | Supersede with current minor 1.72.0 |
+| #19 | @vitejs/plugin-react 6.3.0 | Apply |
+
 ## TypeScript compatibility
 
 The failing PR called `ScriptTarget.Latest` through `require('typescript')`.
@@ -47,7 +60,9 @@ The application's frontend build and CI use Node 26, currently
 [an LTS release](https://nodejs.org/en/about/previous-releases).
 
 Future React/React DOM updates are grouped so their versions can be verified
-together. Docker Actions are grouped into one review; automatic merging is not enabled.
+together. Tailwind and its Vite plugin are also grouped. GitHub/Docker Actions are
+grouped into one review; automatic merging is not enabled. The second batch checks
+all direct npm dependencies for additional updates beyond the PR limit.
 
 Verification includes the full backend suite, native TypeScript/Vite build,
 localisation and JavaScript tests, representative mobile/navigation/management
