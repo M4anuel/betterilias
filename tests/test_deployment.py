@@ -29,8 +29,13 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
         assert manifest['content_scripts'][0]['matches'] == ['https://app.example.com/*']
         assert 'https://app.example.com' in (root / 'popup.html').read_text()
         assert 'https://app.example.com' in (root / 'content.js').read_text()
+        assert manifest['version'] == '1.0.1'
         with zipfile.ZipFile(output / f'betterilias-{browser}.zip') as archive:
             assert 'manifest.json' in archive.namelist()
+            assert 'icon32.png' in archive.namelist()
+    safari_manifest = json.loads((output / 'safari/manifest.json').read_text())
+    assert safari_manifest['background']['service_worker'] == 'background.js'
+    assert 'background.js' in safari_manifest['background']['scripts']
     firefox_manifest = json.loads((output / 'firefox/manifest.json').read_text())
     assert firefox_manifest['browser_specific_settings']['gecko']['id'] == 'betterilias-companion@betterilias.ch'
     assert firefox_manifest['browser_specific_settings']['gecko']['data_collection_permissions'] == {

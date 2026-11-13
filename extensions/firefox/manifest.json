@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BetterIlias Companion",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "__MSG_description__",
   "browser_specific_settings": {
     "gecko": {
@@ -38,6 +38,7 @@
   },
   "icons": {
     "16": "icon16.png",
+    "32": "icon32.png",
     "48": "icon48.png",
     "128": "icon128.png"
   },
@@ -46,6 +47,7 @@
     "default_title": "__MSG_title__",
     "default_icon": {
       "16": "icon16.png",
+      "32": "icon32.png",
       "48": "icon48.png",
       "128": "icon128.png"
     }

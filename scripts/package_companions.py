@@ -46,7 +46,7 @@ def package(origin, output):
     for browser in ('chrome', 'firefox', 'safari'):
         target = output / browser
         shutil.copytree(ROOT / 'extensions' / browser, target,
-                        ignore=shutil.ignore_patterns('.env*', '*.env', '__pycache__', '*.zip'))
+                        ignore=shutil.ignore_patterns('.env*', '*.env', '__pycache__', '*.zip', '*.md', 'icon.svg'))
         for path in target.rglob('*'):
             if path.suffix not in ('.js', '.html'):
                 continue
