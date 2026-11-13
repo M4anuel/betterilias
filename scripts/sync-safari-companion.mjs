@@ -18,13 +18,6 @@ fs.writeFileSync(popup, fs.readFileSync(popup, 'utf8').replace(
   "source: 'safari_extension'"));
 const manifest = JSON.parse(fs.readFileSync(path.join(source, 'manifest.json'), 'utf8'));
 manifest.background = {
-  scripts: [
-    'i18n.js',
-    'toolbar.js',
-    'request.js',
-    'background.js'
-  ],
-  persistent: false,
   service_worker: 'background.js'
 };
 fs.writeFileSync(path.join(target, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');

@@ -41,11 +41,7 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
                 else:
                     assert (info.external_attr >> 16) & 0o777 == 0o644
     safari_manifest = json.loads((output / 'safari/manifest.json').read_text())
-    assert safari_manifest['background'] == {
-        'scripts': ['i18n.js', 'toolbar.js', 'request.js', 'background.js'],
-        'persistent': False,
-        'service_worker': 'background.js',
-    }
+    assert safari_manifest['background'] == {'service_worker': 'background.js'}
     firefox_manifest = json.loads((output / 'firefox/manifest.json').read_text())
     assert firefox_manifest['browser_specific_settings']['gecko']['id'] == 'betterilias-companion@betterilias.ch'
     assert firefox_manifest['browser_specific_settings']['gecko']['data_collection_permissions'] == {

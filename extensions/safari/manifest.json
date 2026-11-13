@@ -15,13 +15,6 @@
     "http://127.0.0.1/*"
   ],
   "background": {
-    "scripts": [
-      "i18n.js",
-      "toolbar.js",
-      "request.js",
-      "background.js"
-    ],
-    "persistent": false,
     "service_worker": "background.js"
   },
   "icons": {
