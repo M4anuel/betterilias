@@ -36,6 +36,7 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
     assert firefox_manifest['browser_specific_settings']['gecko']['data_collection_permissions'] == {
         'required': ['authenticationInfo']
     }
+    assert firefox_manifest['browser_specific_settings']['gecko_android']['strict_min_version'] == '142.0'
     firefox = (output / 'firefox/content.js').read_text()
     assert 'wrappedJSObject' in firefox and 'cloneInto' in firefox
     assert 'BETTERILIAS_SESSION_SYNCED' in firefox
