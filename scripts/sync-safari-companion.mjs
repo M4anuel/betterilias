@@ -7,7 +7,7 @@ const source = path.join(root, 'extensions/chrome');
 const target = path.join(root, 'extensions/safari');
 fs.mkdirSync(target, { recursive: true });
 for (const name of ['content.js', 'popup.html', 'popup.js', 'request.js', 'toolbar.js', 'i18n.js',
-  'logo.png', 'icon.svg', 'icon16.png', 'icon32.png', 'icon48.png', 'icon128.png', 'icon256.png', 'icon512.png', 'icon1024.png', '_locales']) {
+  'logo.png', 'icon.svg', 'icon16.png', 'icon32.png', 'icon48.png', 'icon64.png', 'icon128.png', 'icon256.png', 'icon512.png', 'icon1024.png', '_locales']) {
   if (fs.existsSync(path.join(source, name))) {
     fs.cpSync(path.join(source, name), path.join(target, name), { recursive: true });
   }
