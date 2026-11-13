@@ -22,7 +22,11 @@
     "32": "icon32.png",
     "48": "icon48.png",
     "64": "icon64.png",
+    "120": "icon120.png",
     "128": "icon128.png",
+    "152": "icon152.png",
+    "167": "icon167.png",
+    "180": "icon180.png",
     "256": "icon256.png",
     "512": "icon512.png",
     "1024": "icon1024.png"
