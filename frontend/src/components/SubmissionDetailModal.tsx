@@ -1,3 +1,4 @@
+import { Badge } from './ui/Badge';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useState } from 'react';
 import {
@@ -269,39 +270,12 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
     ['submitted', 'late'].includes(submission.submission_status)
   );
 
-  // Status badge helper
-  const renderStatusBadge = () => {
-    if (status === 'passed') {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          <span>{t("Bestanden")}</span>
-        </span>
-      );
-    }
-    if (status === 'failed') {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-lg bg-red-50 dark:bg-red-950/60 px-2.5 py-1 text-xs font-bold text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
-          <AlertCircle className="h-3.5 w-3.5" />
-          <span>{t("Nicht bestanden")}</span>
-        </span>
-      );
-    }
-    if (hasSubmitted) {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 px-2.5 py-1 text-xs font-bold text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-          <Clock className="h-3.5 w-3.5" />
-          <span>{t("Abgegeben (Offen)")}</span>
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-        <HelpCircle className="h-3.5 w-3.5" />
-        <span>{t("Nicht abgegeben")}</span>
-      </span>
-    );
-  };
+  // Domain-specific submission/grade meaning stays with the grading workflow.
+  const renderStatusBadge = () => status === 'passed'
+    ? <Badge tone="success" icon={CheckCircle2}>{t('Bestanden')}</Badge>
+    : status === 'failed' ? <Badge tone="danger" icon={AlertCircle}>{t('Nicht bestanden')}</Badge>
+    : hasSubmitted ? <Badge tone="info" icon={Clock}>{t('Abgegeben (Offen)')}</Badge>
+    : <Badge icon={HelpCircle}>{t('Nicht abgegeben')}</Badge>;
 
   const members =
     submission.team_members && submission.team_members.length > 0

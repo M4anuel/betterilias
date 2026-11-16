@@ -128,6 +128,7 @@ def test_admin_login_metrics_filters_pagination_and_expiry(local_site, width, he
         pw.expect(board.get_by_role('status')).to_contain_text(tr('requests.saved'))
         assert state['request_status'] == 'planned'
         board.get_by_role('button', name=tr('requests.back'), exact=True).click()
+        pw.expect(board.get_by_role('heading', name='Keyboard navigation', exact=True)).to_have_count(0)
         pw.expect(board.locator('article').get_by_text(tr('requests.status.planned'), exact=False)).to_be_visible()
         charts = page.locator('.activity-chart')
         pw.expect(charts).to_have_count(2)

@@ -134,7 +134,7 @@ def test_consent_choices_preferences_and_withdrawal(local_site, width, height, l
         pw.expect(settings.get_by_role('button', name=tr('reports.details'), exact=True)).to_be_focused()
         page.keyboard.press('Escape')
         page.reload()
-        pw.expect(page.get_by_text('Fixture upstream error', exact=False)).to_be_visible()
+        pw.expect(page.locator('[data-connection-notice]')).to_be_visible()
         pw.expect(dialog).to_have_count(0)
         assert state['mode'] == 'never'
         assert not errors
@@ -166,6 +166,8 @@ def test_admin_report_groups_download_archive_and_reopen(local_site, width, heig
                 outbound=dict(requests=1, rejected=0, queued=0, throttles=0, cooldown_until=0, queue_wait_seconds=0))
         elif path.endswith('/events'):
             data = dict(events=[], next_before=None)
+        elif path.endswith('/feature-requests'):
+            data = dict(items=[], has_more=False)
         elif path.endswith('/reports'):
             query = parse_qs(urlparse(route.request.url).query)
             rows = [report] if query.get('state', ['open'])[0] in ('all', report['state']) and query.get('kind', ['parsing'])[0] == 'parsing' else []

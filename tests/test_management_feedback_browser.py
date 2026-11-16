@@ -113,7 +113,7 @@ def test_management_shared_feedback_and_unconfirmed_upload(local_site, language,
         dialog.locator('input[type=file]').set_input_files([
             dict(name=f'notes-{index}.pdf', mimeType='application/pdf', buffer=b'demo') for index in range(4)])
         dialog.get_by_role('button', name=tr('authoring.upload'), exact=True).click()
-        pw.expect(dialog.get_by_role('alert')).to_have_text(tr('authoring.uploads_partial'))
+        pw.expect(dialog.get_by_role('alert')).to_contain_text(tr('authoring.uploads_partial'))
         pw.expect(dialog.get_by_text(tr('authoring.uncertain'), exact=True)).to_have_count(4)
         pw.expect(page.get_by_text(tr('authoring.files_saved'), exact=True)).to_have_count(0)
         dialog.get_by_role('button', name=tr('authoring.cancel'), exact=True).click()
@@ -121,7 +121,8 @@ def test_management_shared_feedback_and_unconfirmed_upload(local_site, language,
         dialog.get_by_label(tr('authoring.title'), exact=True).fill('New folder')
         dialog.get_by_role('button', name=tr('authoring.create'), exact=True).click()
         pw.expect(dialog).to_have_count(0)
-        pw.expect(feedback.get_by_role('status')).to_have_text(tr('authoring.created'))
+        pw.expect(feedback).to_have_attribute('role', 'status')
+        pw.expect(feedback).to_have_text(tr('authoring.created'))
         pw.expect(panel.get_by_text('New folder', exact=True)).to_be_visible()
         assert panel.get_by_text('New folder', exact=True).bounding_box()['height'] <= 48
         assert feedback.bounding_box()['width'] <= width
@@ -134,7 +135,7 @@ def test_management_shared_feedback_and_unconfirmed_upload(local_site, language,
         dialog.get_by_role('button', name=tr('authoring.upload'), exact=True).click()
         pw.expect(dialog).to_have_count(0)
         pw.expect(feedback).to_have_count(1)
-        pw.expect(feedback.get_by_role('status')).to_have_text(tr('management.saved_refresh_failed', result=tr('authoring.files_saved')))
+        pw.expect(feedback).to_have_text(tr('management.saved_refresh_failed', result=tr('authoring.files_saved')))
         pw.expect(panel.get_by_text('notes.pdf', exact=True)).to_be_visible()
         assert len([call for call in calls if call[1].endswith('/management')]) - reads_before == 1
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
@@ -199,7 +200,7 @@ def test_management_shared_feedback_and_unconfirmed_upload(local_site, language,
         assert len([call for call in calls if call[1].endswith('/batch/delete')]) == 1
         request.fulfill(content_type='application/json', body=json.dumps(dict(success=True, deleted_ids=['52'])))
         pw.expect(dialog).to_have_count(0)
-        pw.expect(feedback.get_by_role('status')).to_have_text(tr('management.deleted'))
+        pw.expect(feedback).to_have_text(tr('management.deleted'))
         page.screenshot(path=str(artifacts/f'{language}-{scheme}-{width}-deleted.png'), animations='disabled')
         dismiss()
         pw.expect(panel.get_by_text('notes.pdf', exact=True)).to_have_count(0)

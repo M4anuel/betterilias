@@ -1,3 +1,5 @@
+import { DialogShell } from './ui/DialogShell';
+import { Button } from './ui/Button';
 import { ErrorNotice } from './ErrorNotice';
 import { useEffect, useRef, useState } from 'react';
 import { Check, CircleAlert, FileText, FolderPlus, Layers, Plus, X } from 'lucide-react';
@@ -13,7 +15,6 @@ import type { AuthoringContext, FileLicense, MaterialItem } from '../types';
 type QueueItem = { id: number; file: File; status: FileUploadState; progress: number; error?: string };
 export type CompletionKey = 'authoring.created' | 'authoring.files_saved';
 const fieldClass = 'w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-2 text-slate-900 dark:text-slate-100';
-const buttonClass = 'rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 disabled:opacity-50';
 
 export function CourseAuthoring({ context, onRefresh, onComplete, onStart, editorUrl }: {
   context: AuthoringContext; onRefresh: (items?: MaterialItem[]) => void;
@@ -23,8 +24,7 @@ export function CourseAuthoring({ context, onRefresh, onComplete, onStart, edito
   const [open, setOpen] = useState(false);
   if (!context.can_create && !editorUrl) return null;
   return <>
-    <button className="flex items-center gap-1 rounded-lg bg-[#0AACA5] px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-teal-400"
-      onClick={() => { onStart(); setOpen(true); }}><Plus size={16} />{t('authoring.add')}</button>
+    <Button variant="primary" onClick={() => { onStart(); setOpen(true); }}><Plus size={16} aria-hidden="true" />{t('authoring.add')}</Button>
     {open && <AddObjectModal refId={context.ref_id} editorUrl={editorUrl} onClose={() => setOpen(false)} onRefresh={onRefresh}
       onComplete={(key, items) => { setOpen(false); onComplete(key, items); }} />}
   </>;
@@ -57,7 +57,6 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
   // The whole queue remains pending between individual native file saves.
   useNavigationGuard({ isPending: busy });
   useEffect(() => {
-    dialog.current?.showModal();
     let active = true;
     api.getAuthoringContext(refId).then(value => { if (active) setContext(value); })
       .catch(() => { if (active) setError(t('authoring.load_failed')); })
@@ -141,20 +140,26 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
       setUncertain(true); onRefresh();
     } finally { setBusy(false); }
   }
-  return <dialog ref={dialog} aria-labelledby="add-object-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}
-    className="m-auto w-[min(48rem,95vw)] max-h-[90dvh] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0 text-slate-900 dark:text-slate-100 shadow-xl backdrop:bg-black/50">
-    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 p-5">
-      <h2 id="add-object-title" className="text-lg font-bold">{t(step === 'catalogue' ? 'authoring.add' : step === 'fold' ? 'authoring.create' : 'authoring.upload')}</h2>
-      <button disabled={busy} onClick={onClose} aria-label={t('authoring.close')} className={buttonClass}><X size={18} /></button>
-    </div>
-    <div className="space-y-4 p-5" aria-busy={busy || loading}>
+  return <DialogShell ref={dialog} titleId="add-object-title" size="large" closeDisabled={busy} closeLabel={t('authoring.close')} onRequestClose={onClose}
+    title={t(step === 'catalogue' ? 'authoring.add' : step === 'fold' ? 'authoring.create' : 'authoring.upload')}
+    footer={<div className="flex flex-wrap justify-end gap-2">
+      {step !== 'catalogue' && !uncertain && <Button disabled={busy || loading} onClick={() => { setStep('catalogue'); setError(''); }}>{t('authoring.change_object')}</Button>}
+      <Button disabled={busy} onClick={onClose}>{t('authoring.cancel')}</Button>
+      {step !== 'catalogue' && <span className="group relative inline-flex" tabIndex={busy || loading ? 0 : undefined}>
+        <Button variant="primary" type="submit" form="object-creation-form" className="disabled:pointer-events-none"
+        disabled={busy || loading || uncertain || (step === 'file' && (!licenses || !license || !queue.some(item => item.status === 'pending'))) || (step === 'fold' && (!templates || !template))}>
+        {t(step === 'fold' ? 'authoring.create' : 'authoring.upload')}</Button>
+        {(busy || loading) && <span role="tooltip" className="pointer-events-none absolute bottom-full right-0 mb-2 hidden whitespace-nowrap rounded-md bg-slate-900 dark:bg-slate-100 px-3 py-2 text-xs text-white dark:text-slate-900 shadow-lg group-hover:block group-focus:block">{t('authoring.busy')}</span>}
+      </span>}
+    </div>}>
+    <div className="space-y-4" aria-busy={busy || loading}>
       {error && <ErrorNotice message={error} connectionInline />}
       {(uncertain || hasFailedUploads) && <a className="block text-teal-700 dark:text-teal-300 underline" target="_blank" rel="noreferrer"
         href={`https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&ref_id=${encodeURIComponent(refId)}`}>{t('authoring.open_ilias')}</a>}
       {step === 'catalogue' ? <>
         <div className="flex flex-wrap gap-2" role="group" aria-label={t('management.content_kind')}>
-          <button className={`${buttonClass} ${category === 'materials' ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40' : ''}`} aria-pressed={category === 'materials'} onClick={() => setCategory('materials')}>{t('management.materials')}</button>
-          <button className={`${buttonClass} ${category === 'page' ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40' : ''}`} aria-pressed={category === 'page'} onClick={() => setCategory('page')}>{t('management.page_elements')}</button>
+          <Button className={`${category === 'materials' ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40' : ''}`} aria-pressed={category === 'materials'} onClick={() => setCategory('materials')}>{t('management.materials')}</Button>
+          <Button className={`${category === 'page' ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40' : ''}`} aria-pressed={category === 'page'} onClick={() => setCategory('page')}>{t('management.page_elements')}</Button>
         </div>
         {category === 'page' ? <div className="space-y-4">
           <p className="text-sm text-slate-600 dark:text-slate-300">{t('management.page_explanation')}</p>
@@ -232,15 +237,5 @@ function AddObjectModal({ refId, onClose, onComplete, onRefresh, editorUrl }: {
         </fieldset>
       </form>}
     </div>
-    <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 dark:border-slate-700 p-4">
-      {step !== 'catalogue' && !uncertain && <button disabled={busy || loading} className={buttonClass} onClick={() => { setStep('catalogue'); setError(''); }}>{t('authoring.change_object')}</button>}
-      <button disabled={busy} className={buttonClass} onClick={onClose}>{t('authoring.cancel')}</button>
-      {step !== 'catalogue' && <span className="group relative inline-flex" tabIndex={busy || loading ? 0 : undefined}>
-        <button type="submit" form="object-creation-form" className="rounded-lg bg-[#0AACA5] px-4 py-2 font-semibold text-slate-950 disabled:pointer-events-none disabled:opacity-50"
-        disabled={busy || loading || uncertain || (step === 'file' && (!licenses || !license || !queue.some(item => item.status === 'pending'))) || (step === 'fold' && (!templates || !template))}>
-        {t(step === 'fold' ? 'authoring.create' : 'authoring.upload')}</button>
-        {(busy || loading) && <span role="tooltip" className="pointer-events-none absolute bottom-full right-0 mb-2 hidden whitespace-nowrap rounded-md bg-slate-900 dark:bg-slate-100 px-3 py-2 text-xs text-white dark:text-slate-900 shadow-lg group-hover:block group-focus:block">{t('authoring.busy')}</span>}
-      </span>}
-    </div>
-  </dialog>;
+  </DialogShell>;
 }

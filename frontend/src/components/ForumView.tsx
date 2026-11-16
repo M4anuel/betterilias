@@ -1,3 +1,4 @@
+import { FeedbackBanner } from './ui/FeedbackBanner';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, Eye, Search, UserRound, Lock, MessageSquare, Paperclip, Pencil, Pin, Plus, Send, X } from 'lucide-react';
 import { forumApi, forumDate, forumMarkup, forumOperationId, type ForumAction, type ForumConversation, type ForumOverview, type ForumPost, type ForumWrite } from '../lib/forum';
@@ -267,7 +268,7 @@ export function ForumView({ refId, title, courseTitle, onBack, courseRefId, brea
     </div>
     <h1 className="mb-3 break-words text-xl font-bold text-slate-900 dark:text-white">{overview?.title || title}</h1>
     {error && <div className="mb-4"><ErrorNotice message={error} onRetry={retry} retryDisabled={busy} onDismiss={() => setError('')} /></div>}
-    {notice && <p role="status" className="mb-4 flex items-center gap-2 rounded-xl bg-teal-50 p-3 text-sm text-teal-900 dark:bg-teal-950/40 dark:text-teal-200"><Check className="h-4 w-4" />{notice}</p>}
+    {notice && <FeedbackBanner message={notice} className="mb-4" />}
     {!editPage && overview?.intro_html && <div className="forum-prose ilias-rich-content mb-4 rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-700 dark:bg-slate-900" dangerouslySetInnerHTML={{ __html: forumMarkup(overview.intro_html) }} />}
     {editPage ? <ForumPageEditor refId={refId} refreshToken={pageRefresh} onSyncingChange={setPageSyncing} onSaved={() => { void loadOverview(0, true).catch(() => setError(t('forum.saved_refresh_failed'))); }} /> : <div ref={workspace} data-composing={Boolean(draft && !draft.payload.edit_post_id)} data-new-thread={draft?.thread === null} data-selected={showConversation} className="forum-workspace grid min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 md:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)]">
       <aside className="forum-thread-list flex min-h-0 min-w-0 flex-col border-slate-200 dark:border-slate-700 md:border-r" aria-label={t('forum.threads')}>

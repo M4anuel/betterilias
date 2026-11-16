@@ -4,6 +4,14 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Consolidate feedback banners, badges, buttons/icon buttons and native dialog
+  shells across community, course management, grading, diagnostics and admin UI.
+  Preserve domain-specific authentication, write certainty and draft ownership;
+  usage and follow-up boundaries are documented in `docs/SHARED_UI.md`.
+- [ ] Continue the UI reuse audit with form fields, info/action disclosures,
+  upload/attachment rows, filter layouts and empty states when changing those
+  workflows; verify unused `ExerciseModal`/`CourseLogsPanel` before removal.
+
 - [x] Rebuild Safari Companion independently of Chrome/Firefox: Safari background
   page, isolated cookie verification, activity-based sync and validated upload ZIP.
 - [x] Remove the `persistent` key flagged by Apple's build 14 packager, preserve

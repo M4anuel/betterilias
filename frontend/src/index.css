@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+.ui-dialog { width: calc(100vw - 2rem); max-height: min(90dvh, calc(var(--visible-height, 100dvh) - 2rem)); }
+.ui-dialog > header { min-height: 0; padding: 1rem; }
+.ui-dialog:modal { overscroll-behavior: contain; }
+.ui-dialog::backdrop { overflow: hidden; overscroll-behavior: contain; }
+
 /* The board can live beside the app sidebar or inside the admin dashboard. */
 .request-board { container-type: inline-size; }
 .request-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; align-items: center; }
