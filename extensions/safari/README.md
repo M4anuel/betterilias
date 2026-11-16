@@ -1,9 +1,9 @@
-# BetterIlias Companion for Safari 1.1.2
+# BetterIlias Companion for Safari 1.1.3
 
 An independently authored Safari Web Extension for macOS and iPhone/iPad,
-requiring Safari/iOS 16.4 or later. The implementation uses Safari background
-scripts; Manifest V3 makes this background nonpersistent automatically. The
-`persistent` key is omitted because Apple's cloud packager flags it as unsupported.
+requiring Safari/iOS 16.4 or later. The manifest explicitly declares one service
+worker, bundled from the Safari-owned sources. It uses neither the `persistent`
+nor `background.scripts` key, and needs no worker imports.
 
 See [the analysis](../../docs/SAFARI_REBUILD_ANALYSIS.md) for existing companion
 behaviour, the previous prototype's coupling and what Apple's empty errors do
@@ -15,15 +15,16 @@ From the repository root, use a fresh output directory:
 
 ```powershell
 node scripts/sync-extension-locales.mjs
-python scripts/package_companions.py --browser safari --app-origin https://betterilias.ch --output scratch/safari-1.1.2-upload
-python scripts/validate_safari_package.py scratch/safari-1.1.2-upload/betterilias-safari.zip
+python scripts/package_companions.py --browser safari --app-origin https://betterilias.ch --output scratch/safari-1.1.3-upload
+python scripts/validate_safari_package.py scratch/safari-1.1.3-upload/betterilias-safari.zip
 ```
 
 Upload `betterilias-safari.zip` through App Store Connect > Users and Access >
 Xcode Cloud > Safari Web Extension Packager. Use the ZIP itself, not the containing
 output directory, a Chrome/Firefox ZIP or the validation report. Keep the existing
-`ch.betterilias.companion` app record/bundle ID. Version 1.1.2 corrects the product
-name and retains the omission of `persistent`. Apple assigns the native build number.
+`ch.betterilias.companion` app record/bundle ID. Version 1.1.3 explicitly declares
+a service worker after Apple's build 16 classified background scripts as persistent.
+Apple assigns the native build number.
 The manifest name is exactly `BetterIlias Companion`, matching the product name
 in Apple's diagnostic. Do not insert a space between Better and Ilias. It has
 20 letters and 21 characters including the space before Companion.
@@ -56,9 +57,12 @@ German/English, dark/light mode, touch targets and Dynamic Type are supported.
 
 ## Development and release acceptance
 
-Edit Safari files directly. `scripts/sync-extension-locales.mjs` regenerates only
-translation resources; it never copies Chrome/Firefox executable code to Safari.
-All network/cookie work belongs to `core.js` in the background page. The popup
+Edit Safari's authored files directly. The build regenerates translations and
+`service-worker.js` from Safari's own `config.js`, `core.js` and `background.js`;
+it never copies Chrome/Firefox code or overwrites Safari's authored sources.
+Packaging bundles again with the configured server origin embedded and omits
+the unreferenced core/background source files from the upload. All network/cookie
+work belongs to `core.js` in that worker. The popup
 only sends a restricted command protocol; content scripts cannot force operations
 or choose backend addresses.
 

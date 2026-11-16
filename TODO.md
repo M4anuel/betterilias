@@ -10,7 +10,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   the registered extension name and reject that key during local validation.
 - [x] Match Safari's manifest name to Apple's reported product name exactly:
   `BetterIlias Companion`, with no space between Better and Ilias.
-- [ ] Upload Safari Companion 1.1.2 to Apple's packager and verify TestFlight on
+- [x] Declare a single bundled Safari service worker after build 16 treated the
+  Manifest V3 background scripts as a persistent page. Omit both legacy keys.
+- [ ] Upload Safari Companion 1.1.3 to Apple's packager and verify TestFlight on
   macOS and iPhone/iPad. Local WebKit/API simulations do not prove native signing,
   packaging, Safari permissions or physical-device background execution.
   See `docs/SAFARI_REBUILD_ANALYSIS.md`.

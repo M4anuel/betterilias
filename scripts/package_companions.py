@@ -85,6 +85,14 @@ def package(origin, output, browser='all'):
                     shutil.copyfile(source, target / name)
             (target / 'config.js').write_text('globalThis.SafariCompanionConfig = Object.freeze(' +
                 json.dumps({'serverUrl': origin, 'frontendUrl': origin}) + ');\n', encoding='utf-8')
+            sources = ('config.js', 'core.js', 'background.js')
+            worker = '// Generated from Safari-owned config.js, core.js and background.js. Do not edit.\n'
+            worker += '\n;\n'.join('// ' + name + '\n' + (target / name).read_text(encoding='utf-8') for name in sources) + '\n'
+            (target / 'service-worker.js').write_text(worker, encoding='utf-8')
+            # The upload has exactly one background entry, with its own config
+            # embedded. Retain config.js separately for the popup/page bridge.
+            (target / 'core.js').unlink()
+            (target / 'background.js').unlink()
             path = target / 'manifest.json'
             manifest = json.loads(path.read_text(encoding='utf-8'))
             manifest['host_permissions'] = ['https://ilias.unibe.ch/*', origin + '/*']
