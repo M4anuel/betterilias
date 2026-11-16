@@ -1,7 +1,8 @@
+import { DialogShell } from './ui/DialogShell';
+import { Button } from './ui/Button';
 import { ErrorNotice } from './ErrorNotice';
 import { t, useLanguage } from '../lib/i18n';
-import React, { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { cache, MEMBERSHIP_FORM_CACHE_PREFIX } from '../lib/cache';
 import { MembershipAction, MembershipFormResponse, MembershipResult } from '../types';
@@ -21,18 +22,15 @@ export const CourseMembershipModal: React.FC<Props> = ({ refId, title, action, o
   const [values, setValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const closeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     let active = true;
-    const previousFocus = document.activeElement as HTMLElement | null;
-    closeButton.current?.focus();
     const cached = cache.getCachedMembershipForm(refId, action);
     if (cached && !form) {
       setForm(cached);
     }
     const storageKey = `${MEMBERSHIP_FORM_CACHE_PREFIX}${refId}_${action}`;
     if (cached && cache.isIliasSaverFresh(storageKey)) {
-      return () => { active = false; previousFocus?.focus(); };
+      return () => { active = false; };
     }
     setIsRevalidating(true);
     api.getMembershipForm(refId, action).then((next) => {
@@ -45,7 +43,7 @@ export const CourseMembershipModal: React.FC<Props> = ({ refId, title, action, o
     }).finally(() => {
       if (active) setIsRevalidating(false);
     });
-    return () => { active = false; previousFocus?.focus(); };
+    return () => { active = false; };
   }, [refId, action]);
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -62,22 +60,7 @@ export const CourseMembershipModal: React.FC<Props> = ({ refId, title, action, o
     }
   };
   const label = action === 'join' ? t("Kurs beitreten") : t("Kurs verlassen");
-  return <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-    <section role="dialog" aria-modal="true" aria-labelledby="membership-title"
-      className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl space-y-4"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && !busy) onClose();
-        if (event.key === 'Tab') {
-          const buttons = event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a[href]');
-          const first = buttons[0], last = buttons[buttons.length - 1];
-          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-        }
-      }}>
-      <div className="flex justify-between items-start gap-4">
-        <div><h2 id="membership-title" className="text-lg font-bold">{label}</h2><p className="text-sm mt-1">{title}</p></div>
-        <button ref={closeButton} type="button" disabled={busy} onClick={onClose} aria-label={t("Schliessen")}><X className="h-5 w-5" /></button>
-      </div>
+  return <DialogShell size="small" titleId="membership-title" title={label} description={title} closeDisabled={busy} onRequestClose={onClose} bodyClassName="space-y-4">
       {!form && !error && <p role="status">{t("Kursaktion wird geladen…")}</p>}
       {error && <ErrorNotice message={error} connectionInline />}
       {form && <form onSubmit={submit} className="space-y-4">
@@ -90,12 +73,11 @@ export const CourseMembershipModal: React.FC<Props> = ({ refId, title, action, o
             onChange={(event) => setValues((prev) => ({ ...prev, [field.name]: field.field_type === 'checkbox' ? (event.target.checked ? field.value : '') : event.target.value }))}
             className={field.field_type === 'checkbox' ? 'ml-2' : 'mt-1 block w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2'} />
         </label>)}
-        <div className="flex justify-end gap-3">
-          <button type="button" disabled={busy} onClick={onClose} className="px-3 py-2 text-sm">{t("Abbrechen")}</button>
-          {form.available ? <button type="submit" disabled={busy || isRevalidating} title={isRevalidating ? t("Aktualisierung läuft... Bitte warten") : undefined} className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? t("Wird gespeichert…") : label}</button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button disabled={busy} onClick={onClose}>{t("Abbrechen")}</Button>
+          {form.available ? <Button type="submit" variant="primary" disabled={busy || isRevalidating} title={isRevalidating ? t("Aktualisierung läuft... Bitte warten") : undefined}>{busy ? t("Wird gespeichert…") : label}</Button>
             : <a href={form.ilias_url} target="_blank" rel="noreferrer" className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white">{t("In ILIAS öffnen")}</a>}
         </div>
       </form>}
-    </section>
-  </div>;
+  </DialogShell>;
 };
