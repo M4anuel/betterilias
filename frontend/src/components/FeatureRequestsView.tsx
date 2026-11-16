@@ -1,6 +1,9 @@
+import { FeedbackBanner } from './ui/FeedbackBanner';
+import { Badge } from './ui/Badge';
+import { Button, IconButton } from './ui/Button';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, CalendarClock, Check, CircleCheck, CircleDot, CircleX, Info, LoaderCircle, Plus, SlidersHorizontal, Wrench, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, CalendarClock, Check, CircleCheck, CircleDot, CircleX, Info, Plus, SlidersHorizontal, Wrench, X } from 'lucide-react';
 import { t, useLanguage } from '../lib/i18n';
 import { confirmDialog } from '../lib/dialog';
 import { navigationGuard, useNavigationGuard } from '../lib/navigationGuard';
@@ -10,24 +13,20 @@ import { DiscussionComposer } from './DiscussionComposer';
 import { FileDropzone } from './FileDropzone';
 import { ErrorNotice } from './ErrorNotice';
 
-const button = 'inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-semibold hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-teal-500 disabled:cursor-wait disabled:opacity-60 dark:border-slate-600 dark:hover:bg-slate-800';
 const field = 'mt-1 min-h-12 w-full min-w-0 rounded-xl border border-slate-400 bg-transparent px-3 py-2 text-base text-slate-900 focus-visible:outline-2 focus-visible:outline-teal-500 dark:border-slate-500 dark:text-white';
 function nickname() { try { return localStorage.getItem('betterilias_community_nickname') || ''; } catch { return ''; } }
 function remember(value: string) { try { localStorage.setItem('betterilias_community_nickname', value); } catch { /* optional */ } }
 
 const statusAppearance = {
-  open: { icon: CircleDot, colors: 'border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200' },
-  planned: { icon: CalendarClock, colors: 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200' },
-  in_progress: { icon: Wrench, colors: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200' },
-  completed: { icon: CircleCheck, colors: 'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-200' },
-  declined: { icon: CircleX, colors: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200' },
-};
+  open: { icon: CircleDot, tone: 'neutral' },
+  planned: { icon: CalendarClock, tone: 'info' },
+  in_progress: { icon: Wrench, tone: 'warning' },
+  completed: { icon: CircleCheck, tone: 'success' },
+  declined: { icon: CircleX, tone: 'danger' },
+} as const;
 
 function RequestStatusBadge({ status }: { status: RequestStatus }) {
-  const { icon: Icon, colors } = statusAppearance[status];
-  return <span data-request-status={status} className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold leading-5 ${colors}`}>
-    <Icon size={15} className="shrink-0" aria-hidden="true" /><span>{t(`requests.status.${status}`)}</span>
-  </span>;
+  return <Badge data-request-status={status} {...statusAppearance[status]}>{t(`requests.status.${status}`)}</Badge>;
 }
 
 export function FeatureRequestsView({ selectedId, onSelect, admin = false, initialSuccess = false }: { selectedId?: string | null; onSelect?: (id: string | null, saved?: boolean) => void; admin?: boolean; initialSuccess?: boolean }) {
@@ -122,30 +121,30 @@ export function FeatureRequestsView({ selectedId, onSelect, admin = false, initi
   const author = (name: string) => name || t('requests.anonymous');
   const date = (stamp: number) => new Date(stamp * 1000).toLocaleString(language);
   const cancel = async () => { if (await navigationGuard.confirmNavigation()) clear(); };
-  const actions = <button type="submit" className={button} disabled={busy}>{busy && <LoaderCircle aria-hidden size={18} className="animate-spin motion-reduce:animate-none" />}{t(draft ? 'requests.publish' : 'forum.send')}</button>;
+  const actions = <Button type="submit" loading={busy}>{t(draft ? 'requests.publish' : 'forum.send')}</Button>;
   const controls = (request: FeatureRequest, comment?: RequestComment) => (admin || (comment ? comment.owned : request.owned)) && <div className="flex flex-wrap gap-2">
-    <button type="button" className={button} disabled={busy || dirty} onClick={() => comment ? setReply({ id: comment.id, message: comment.message, nickname: comment.nickname }) : begin(request)}>{t('forum.edit_post')}</button>
-    <button type="button" className={button} disabled={busy || dirty} onClick={() => void remove(request, comment)}>{t('requests.delete')}</button>
+    <Button type="button" disabled={busy || dirty} onClick={() => comment ? setReply({ id: comment.id, message: comment.message, nickname: comment.nickname }) : begin(request)}>{t('forum.edit_post')}</Button>
+    <Button type="button" disabled={busy || dirty} onClick={() => void remove(request, comment)}>{t('requests.delete')}</Button>
   </div>;
   return <section id={admin ? 'feature-requests' : undefined} data-feature-requests className="request-board mx-auto w-full min-w-0 max-w-5xl space-y-4 p-3 text-slate-900 sm:p-6 dark:text-slate-100">
     <header className="relative grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-1 gap-y-1 sm:gap-x-3"><h1 className="min-w-0 break-words text-base font-bold min-[360px]:text-lg sm:text-2xl">{t('requests.title')}</h1>
       <details ref={information} className="shrink-0" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); information.current?.removeAttribute('open'); information.current?.querySelector('summary')?.focus(); } }}>
         <summary aria-label={t('requests.information')} className="flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-teal-500 dark:text-slate-400 dark:hover:bg-slate-800 [&::-webkit-details-marker]:hidden"><Info size={18} aria-hidden="true" /></summary>
         <div data-escape-scope className="request-information absolute right-0 top-full z-30 w-80 max-w-[calc(100vw-4rem)] rounded-xl border border-slate-200 bg-white p-3 text-sm leading-relaxed shadow-lg dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex items-start gap-2"><p className="min-w-0 flex-1">{t('requests.cookie_hint')}</p><button type="button" className={`${button} shrink-0 border-0 px-0`} aria-label={t('Schliessen')} onClick={() => { information.current?.removeAttribute('open'); information.current?.querySelector('summary')?.focus(); }}><X size={18} aria-hidden="true" /></button></div>
+          <div className="flex items-start gap-2"><p className="min-w-0 flex-1">{t('requests.cookie_hint')}</p><IconButton variant="ghost" label={t('Schliessen')} onClick={() => { information.current?.removeAttribute('open'); information.current?.querySelector('summary')?.focus(); }}><X size={18} aria-hidden="true" /></IconButton></div>
           {!admin && <a href="/admin/#feature-requests" className="mt-2 inline-flex min-h-11 items-center font-semibold text-teal-800 underline focus-visible:outline-2 dark:text-teal-200">{t('requests.manage')}</a>}
         </div>
       </details>
-      {!admin && !draft && <button type="button" className={button} aria-label={t('requests.new')} disabled={busy || dirty} onClick={() => begin()}><Plus size={18} aria-hidden="true" /><span className="hidden sm:inline">{t('requests.new')}</span></button>}
+      {!admin && !draft && <Button type="button" aria-label={t('requests.new')} disabled={busy || dirty} onClick={() => begin()}><Plus size={18} aria-hidden="true" /><span className="hidden sm:inline">{t('requests.new')}</span></Button>}
       <p className="col-span-full max-w-2xl text-sm text-slate-600 dark:text-slate-300">{t(admin ? 'requests.admin_hint' : 'requests.intro')}</p>
     </header>
     {error && <div ref={errorSummary} tabIndex={-1}><ErrorNotice connectionInline message={error} onDismiss={() => setError('')} onRetry={() => setRefresh(v => v + 1)} /></div>}
-    {success && <div role="status" className="flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-100"><Check size={18} /><span className="min-w-0 flex-1">{success}</span><button type="button" className={button} aria-label={t('Schliessen')} onClick={() => setSuccess('')}><X size={16} /></button></div>}
+    {success && <FeedbackBanner message={success} onDismiss={() => setSuccess('')} />}
     {admin && page.storage && <p className="text-sm">{t('requests.storage', { used: (page.storage.used / 1e9).toFixed(2), limit: (page.storage.limit / 1e9).toFixed(2) })}</p>}
     {!id && !draft && <>
       <search aria-label={t('requests.search')} className="request-filters" data-expanded={filtersExpanded}>
         <label className="min-w-0"><span className="sr-only">{t('requests.search')}</span><input name="search" type="search" placeholder={t('requests.search')} className={field} maxLength={180} value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value, page: '0' })} /></label>
-        <button type="button" className={`${button} request-filter-toggle`} aria-expanded={filtersExpanded} aria-controls={filterPanelId} onClick={() => setFiltersExpanded(value => !value)}><SlidersHorizontal size={18} aria-hidden="true" /><span>{t('requests.filters')}</span>{(filters.category || filters.status || filters.sort !== 'top') && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-teal-600 dark:bg-teal-400" />}</button>
+        <Button type="button" className={`request-filter-toggle`} aria-expanded={filtersExpanded} aria-controls={filterPanelId} onClick={() => setFiltersExpanded(value => !value)}><SlidersHorizontal size={18} aria-hidden="true" /><span>{t('requests.filters')}</span>{(filters.category || filters.status || filters.sort !== 'top') && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-teal-600 dark:bg-teal-400" />}</Button>
         <div id={filterPanelId} className="request-filter-fields">
           {(['sort', 'category', 'status'] as const).map(key => <label key={key} className="min-w-0 text-sm font-semibold"><span className="request-filter-label">{t(`requests.${key}`)}</span><select aria-label={t(`requests.${key}`)} name={key} className={field} value={filters[key]} onChange={e => setFilters({ ...filters, [key]: e.target.value, page: '0' })}>{key !== 'sort' && <option value="">{t(key === 'category' ? 'requests.all_categories' : 'requests.all_statuses')}</option>}{(key === 'sort' ? ['top', 'newest'] : key === 'category' ? requestCategories : requestStatuses).map(value => <option key={value} value={value}>{t(`requests.${key === 'sort' ? value : `${key}.${value}`}` as Parameters<typeof t>[0])}</option>)}</select></label>)}
         </div>
@@ -160,28 +159,28 @@ export function FeatureRequestsView({ selectedId, onSelect, admin = false, initi
           <p className="mt-2 break-words text-xs text-slate-500 dark:text-slate-400">{t(`requests.category.${request.category}`)} · {t('requests.comment_count', { count: request.comment_count })}</p>
         </div>
       </article>)}</div>
-      <div className="flex justify-between gap-2"><button type="button" className={button} disabled={loading || filters.page === '0'} onClick={() => setFilters({ ...filters, page: String(+filters.page - 1) })}>{t('forum.previous')}</button><button type="button" className={button} disabled={loading || !page.has_more} onClick={() => setFilters({ ...filters, page: String(+filters.page + 1) })}>{t('forum.next')}</button></div>
+      <div className="flex justify-between gap-2"><Button type="button" disabled={loading || filters.page === '0'} onClick={() => setFilters({ ...filters, page: String(+filters.page - 1) })}>{t('forum.previous')}</Button><Button type="button" disabled={loading || !page.has_more} onClick={() => setFilters({ ...filters, page: String(+filters.page + 1) })}>{t('forum.next')}</Button></div>
     </>}
     {loading && <p role="status">{t('requests.loading')}</p>}
-    {id && !draft && <button type="button" className={button} disabled={busy} onClick={() => void select(null)}><ArrowLeft size={18} />{t('requests.back')}</button>}
+    {id && !draft && <Button type="button" disabled={busy} onClick={() => void select(null)}><ArrowLeft size={18} />{t('requests.back')}</Button>}
     {current && !draft && <article className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
       <header><div className="flex flex-wrap items-center gap-2"><RequestStatusBadge status={current.status} /><span className="text-xs text-slate-500 dark:text-slate-400">{t(`requests.category.${current.category}`)}</span></div><h2 className="mt-2 break-words text-xl font-bold">{current.title}</h2><p className="mt-2 break-words text-xs text-slate-500 dark:text-slate-400">{author(current.nickname)} · {date(current.created)}</p></header>
       <p className="max-w-[72ch] whitespace-pre-wrap break-words text-sm leading-relaxed">{current.description}</p>
       <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">{current.images.map((image, n) => { const small = image.variants[0], full = image.variants.at(-1)!; const alt = t('requests.image_alt', { number: n + 1, title: current.title }); return <button type="button" key={image.id} className="min-w-0 cursor-zoom-in rounded-xl focus-visible:outline-2" onClick={() => setEnlarged({ url: full.url, alt })}><img className="h-auto max-h-72 w-full rounded-xl object-contain" src={small.url} srcSet={image.variants.map(v => `${v.url} ${v.width}w`).join(', ')} sizes="(max-width: 640px) 90vw, 400px" width={small.width} height={small.height} loading={n === 0 ? 'eager' : 'lazy'} fetchPriority={n === 0 ? 'high' : undefined} decoding="async" alt={alt} /></button>; })}</div>
       {current.images_archived && <p className="text-sm text-slate-500 dark:text-slate-400">{t('requests.images_archived')}</p>}
-      <div className="flex flex-wrap items-center gap-2">{!admin && ([-1, 1] as const).map(value => <button type="button" key={value} className={button} disabled={busy} aria-pressed={current.my_vote === value} aria-label={t(value === 1 ? 'requests.upvote' : 'requests.downvote')} onClick={() => void perform(async () => { setCurrent(await requestApi.write(`/${current.id}/vote`, 'PUT', { value: current.my_vote === value ? 0 : value })); })}>{value === 1 ? <ArrowUp size={18} /> : <ArrowDown size={18} />}{current.my_vote === value && <Check size={14} />}</button>)}<span className="px-2 font-bold">{current.score} {t('requests.votes')}</span>{controls(current)}</div>
+      <div className="flex flex-wrap items-center gap-2">{!admin && ([-1, 1] as const).map(value => <Button type="button" key={value} disabled={busy} aria-pressed={current.my_vote === value} aria-label={t(value === 1 ? 'requests.upvote' : 'requests.downvote')} onClick={() => void perform(async () => { setCurrent(await requestApi.write(`/${current.id}/vote`, 'PUT', { value: current.my_vote === value ? 0 : value })); })}>{value === 1 ? <ArrowUp size={18} /> : <ArrowDown size={18} />}{current.my_vote === value && <Check size={14} />}</Button>)}<span className="px-2 font-bold">{current.score} {t('requests.votes')}</span>{controls(current)}</div>
       {admin && <label className="block max-w-xs text-sm font-semibold">{t('requests.status')}<select aria-label={t('requests.status')} className={field} value={current.status} disabled={busy} onChange={e => { const status = e.target.value; void perform(async () => { setCurrent(await requestApi.write(`/${current.id}/status`, 'PUT', { status }, true)); }); }}>{requestStatuses.map(value => <option key={value} value={value}>{t(`requests.status.${value}`)}</option>)}</select></label>}
       <h3 className="border-t border-slate-200 pt-4 font-bold dark:border-slate-700">{t('requests.comments')}</h3>
       {current.comments?.map(comment => <article key={comment.id} className="min-w-0 space-y-2 border-b border-slate-200 pb-4 dark:border-slate-700"><header className="break-words text-xs text-slate-500 dark:text-slate-400">{author(comment.nickname)} · {date(comment.created)}{comment.updated > comment.created ? ` · ${t('forum.edited')}` : ''}</header><p className="max-w-[72ch] whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm bg-slate-50 p-3 text-sm dark:bg-slate-800/70">{comment.message}</p>{controls(current, comment)}</article>)}
-      {!reply && !admin && <button type="button" className={button} disabled={busy} onClick={() => setReply({ message: '', nickname: nickname() })}>{t('forum.reply')}</button>}
+      {!reply && !admin && <Button type="button" disabled={busy} onClick={() => setReply({ message: '', nickname: nickname() })}>{t('forum.reply')}</Button>}
     </article>}
     {draft && <form aria-label={t(editing ? 'requests.edit' : 'requests.new')} action="/api/feature-requests" method="post" onSubmit={save} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
       <DiscussionComposer containerRef={composer} title={t(editing ? 'requests.edit' : 'requests.new')} onCancel={() => void cancel()} disabled={busy} actions={actions}>
         <div className="forum-reply-message space-y-3"><label className="block text-sm font-semibold">{t('requests.request_title')}<input name="title" className={field} required maxLength={180} value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} /></label><label className="block text-sm font-semibold">{t('requests.description')}<textarea aria-label={t('requests.description')} name="description" className={`${field} min-h-40 resize-y`} required maxLength={12000} value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} /></label></div>
         <div className="forum-reply-options space-y-3"><label className="block text-sm font-semibold">{t('requests.nickname')}<input name="nickname" autoComplete="nickname" className={field} maxLength={50} readOnly={Boolean(editing)} value={draft.nickname} onChange={e => setDraft({ ...draft, nickname: e.target.value })} /></label><label className="block text-sm font-semibold">{t('requests.category')}<select aria-label={t('requests.category')} className={field} name="category" value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value as RequestCategory })}>{requestCategories.map(value => <option key={value} value={value}>{t(`requests.category.${value}`)}</option>)}</select></label>
           <p className="text-xs text-slate-500 dark:text-slate-400">{t('requests.image_hint')}</p>{(!editing || current?.status !== 'completed') && !admin && <FileDropzone compact accept="image/jpeg,image/png,image/webp" disabled={busy} onFiles={addFiles} />}
-          {draft.images.map((image, n) => <div key={image} className="flex items-center justify-between gap-2 text-sm"><span>{t('requests.image_number', { number: n + 1 })}</span><button type="button" className={button} aria-label={t('requests.remove_image', { number: n + 1 })} onClick={() => setDraft({ ...draft, images: draft.images.filter(v => v !== image) })}><X size={16} /></button></div>)}
-          {files.map((item, n) => <div key={n} className="flex min-w-0 items-center gap-2 text-sm"><span className="min-w-0 flex-1 break-words">{item.file.name}</span><button type="button" className={button} aria-label={t('forum.remove_file', { name: item.file.name })} onClick={() => setFiles(old => old.filter((_, i) => i !== n))}><X size={16} /></button></div>)}
+          {draft.images.map((image, n) => <div key={image} className="flex items-center justify-between gap-2 text-sm"><span>{t('requests.image_number', { number: n + 1 })}</span><Button type="button" aria-label={t('requests.remove_image', { number: n + 1 })} onClick={() => setDraft({ ...draft, images: draft.images.filter(v => v !== image) })}><X size={16} /></Button></div>)}
+          {files.map((item, n) => <div key={n} className="flex min-w-0 items-center gap-2 text-sm"><span className="min-w-0 flex-1 break-words">{item.file.name}</span><Button type="button" aria-label={t('forum.remove_file', { name: item.file.name })} onClick={() => setFiles(old => old.filter((_, i) => i !== n))}><X size={16} /></Button></div>)}
           {busy && <p role="status" className="text-sm">{progress || t('requests.processing')}</p>}
         </div>
       </DiscussionComposer>
@@ -189,6 +188,6 @@ export function FeatureRequestsView({ selectedId, onSelect, admin = false, initi
     {reply && current && <form aria-label={t('requests.comments')} action={`/api/feature-requests/${current.id}/comments`} method="post" className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900" onSubmit={e => { e.preventDefault(); if (!reply.message.trim()) { setError(t('requests.required')); return; } void perform(async () => { setCurrent(await requestApi.write(`/${current.id}/comments${reply.id ? `/${reply.id}` : ''}`, reply.id ? 'PATCH' : 'POST', reply, admin)); remember(reply.nickname); setReply(null); }); }}>
       <DiscussionComposer containerRef={composer} title={t(reply.id ? 'forum.edit_post' : 'forum.reply')} onCancel={() => void cancel()} disabled={busy} actions={actions}><div className="forum-reply-message"><label className="block text-sm font-semibold">{t('forum.message')}<textarea aria-label={t('forum.message')} name="message" className={`${field} min-h-32 resize-y`} required maxLength={6000} value={reply.message} onChange={e => setReply({ ...reply, message: e.target.value })} /></label></div><div className="forum-reply-options"><label className="block text-sm font-semibold">{t('requests.nickname')}<input name="nickname" autoComplete="nickname" className={field} maxLength={50} readOnly={Boolean(reply.id)} value={reply.nickname} onChange={e => setReply({ ...reply, nickname: e.target.value })} /></label></div></DiscussionComposer>
     </form>}
-    {<dialog ref={dialog} aria-label={enlarged?.alt || t('forum.attachments')} className="m-auto max-h-[90dvh] w-[95vw] max-w-6xl overflow-auto rounded-2xl border-0 bg-white p-3 text-slate-900 backdrop:bg-slate-950/70 dark:bg-slate-900 dark:text-white" onCancel={() => setEnlarged(null)} onClick={e => { if (e.target === e.currentTarget) setEnlarged(null); }}><div className="sticky top-0 flex justify-end"><button type="button" className={button} aria-label={t('Schliessen')} onClick={() => setEnlarged(null)}><X size={20} /></button></div><img src={enlarged?.url} alt={enlarged?.alt || ''} hidden={!enlarged} className="h-auto max-w-full" /></dialog>}
+    {<dialog ref={dialog} aria-label={enlarged?.alt || t('forum.attachments')} className="m-auto max-h-[90dvh] w-[95vw] max-w-6xl overflow-auto rounded-2xl border-0 bg-white p-3 text-slate-900 backdrop:bg-slate-950/70 dark:bg-slate-900 dark:text-white" onCancel={() => setEnlarged(null)} onClick={e => { if (e.target === e.currentTarget) setEnlarged(null); }}><div className="sticky top-0 flex justify-end"><Button type="button" aria-label={t('Schliessen')} onClick={() => setEnlarged(null)}><X size={20} /></Button></div><img src={enlarged?.url} alt={enlarged?.alt || ''} hidden={!enlarged} className="h-auto max-w-full" /></dialog>}
   </section>;
 }

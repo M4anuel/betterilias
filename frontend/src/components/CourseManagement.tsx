@@ -1,3 +1,4 @@
+import { FeedbackBanner } from './ui/FeedbackBanner';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ExternalLink, FileText, Folder, GripVertical, LoaderCircle, RefreshCw, Save, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api';
@@ -180,19 +181,11 @@ export function CourseManagement({ context, title, courseRefId, isRevalidating, 
           onComplete={(key, items) => changed(items, key)} onStart={() => setFeedback(null)} editorUrl={data?.editor_url} />
       </fieldset>
     </div>
-    {feedback && <div data-management-feedback className={`flex items-start gap-2 rounded-xl border p-3 text-sm ${feedback.kind === 'error'
-      ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200'
-      : feedback.kind === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200'
-      : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200'}`}>
-      <p role={feedback.kind === 'error' ? 'alert' : 'status'} className="min-w-0 flex-1 self-center break-words">
-        {feedback.kind === 'error' ? feedback.message : feedback.kind === 'warning'
-          ? t('management.saved_refresh_failed', { result: t(feedback.key) }) : t(feedback.key)}
-      </p>
-      <button type="button" aria-label={t('Schliessen')} onClick={() => { setFeedback(null); heading.current?.focus({ preventScroll: true }); }}
-        className="inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-black/5 dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current">
-        <X size={18} aria-hidden="true" />
-      </button>
-    </div>}
+    {feedback && <FeedbackBanner data-management-feedback tone={feedback.kind === 'error' ? 'error' : feedback.kind === 'warning' ? 'warning' : 'success'}
+      message={feedback.kind === 'error' ? feedback.message : feedback.kind === 'warning'
+        ? t('management.saved_refresh_failed', { result: t(feedback.key) }) : t(feedback.key)}
+      onDismiss={() => { setFeedback(null); heading.current?.focus({ preventScroll: true }); }} />}
+
     {uncertain && <a target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-teal-700 underline dark:text-teal-300"
       href={`https://ilias.unibe.ch/ilias.php?baseClass=ilrepositorygui&ref_id=${refId}`}><ExternalLink size={14} />{t('authoring.open_ilias')}</a>}
     <div className="flex flex-wrap items-center gap-2">

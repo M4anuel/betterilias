@@ -1,3 +1,4 @@
+import { FeedbackBanner } from './ui/FeedbackBanner';
 import { useConnectionRetry } from '../lib/connection';
 import { ErrorNotice } from './ErrorNotice';
 import { t, useLanguage } from '../lib/i18n';
@@ -572,12 +573,7 @@ export const TAExerciseEditorView: React.FC<TAExerciseEditorViewProps> = ({
       {/* Notifications */}
       {error && <ErrorNotice message={error} />}
 
-      {successMsg && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-sm">
-          <CheckCircle2 className="h-5 w-5 shrink-0" />
-          <span>{successMsg}</span>
-        </div>
-      )}
+      {successMsg && <FeedbackBanner message={successMsg} />}
 
       {isLoading ? (
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-16 text-center border border-slate-200 dark:border-slate-800">

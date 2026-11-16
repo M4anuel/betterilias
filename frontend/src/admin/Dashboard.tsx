@@ -1,3 +1,5 @@
+import { FeedbackBanner } from '../components/ui/FeedbackBanner';
+import { Button } from '../components/ui/Button';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Activity, ArrowLeft, ArrowRight, Check, ChevronDown, LogOut, Moon, RefreshCw, ShieldCheck, Sun, TriangleAlert } from 'lucide-react';
@@ -93,7 +95,7 @@ export function AdminDashboard() {
     </div></header>
     <main id="admin-main" className="admin-main">
       {authenticated ? <>
-        {error && <div role="alert" className="admin-alert">{label(error)}</div>}
+        {error && <FeedbackBanner tone="error" message={label(error)} />}
         <a className="admin-button" href="#feature-requests">{t('requests.manage')}</a>
         <Overview onExpired={expired} expires={session.expires_at} />
         <ReportsPanel onExpired={expired} />
@@ -104,8 +106,8 @@ export function AdminDashboard() {
         <p className="admin-eyebrow">BetterIlias · {t('admin.title')}</p>
         <h1 id="admin-login-title">{t('admin.sign_in')}</h1>
         <p className="admin-muted">{t('admin.login_hint')}</p>
-        {checking ? <p role="status">{t('admin.checking')}</p> : disabled ? <div className="admin-alert" role="status">{t('admin.disabled')}</div> : <>
-          {error && <div role="alert" className="admin-alert">{label(error)}</div>}
+        {checking ? <p role="status">{t('admin.checking')}</p> : disabled ? <FeedbackBanner tone="warning" message={t('admin.disabled')} /> : <>
+          {error && <FeedbackBanner tone="error" message={label(error)} />}
           <form onSubmit={login}>
             <label htmlFor="admin-key">{t('admin.key')}</label>
             <input ref={password} id="admin-key" type="password" autoComplete="off" autoCapitalize="none" spellCheck={false} value={key} onChange={e => setKey(e.target.value)} required maxLength={256} disabled={signingIn} />
@@ -192,7 +194,7 @@ function Overview({ onExpired, expires }: { onExpired: () => void; expires: numb
       <button type="button" className="admin-button" disabled={loading || more} onClick={() => setRefresh(n => n + 1)}><RefreshCw size={17} aria-hidden="true" />{t(loading ? 'admin.refreshing' : 'admin.refresh')}</button>
     </div>
     <div className="admin-update"><span>{t('admin.updated', { time: date(updated) })}</span><span>{t('admin.expires', { time: date(expires) })}</span></div>
-    {error && <div role="alert" className="admin-alert">{label(error)}<button className="admin-button" onClick={() => setRefresh(n => n + 1)}>{t('admin.retry')}</button></div>}
+    {error && <FeedbackBanner tone="error" message={label(error)} actions={<Button onClick={() => setRefresh(n => n + 1)}>{t('admin.retry')}</Button>} />}
     <section className="admin-stat-grid" aria-label={t('admin.metrics')} aria-busy={loading}>
       <Stat title={t('admin.requests')} value={number(diagnostic?.retained_request_metrics.count)} note={t('admin.retained')} icon={<Activity size={19} />} />
       <Stat title={t('admin.errors')} value={number(diagnostic?.retained_request_metrics.server_errors)} note={t('admin.server_errors_hint')} alert={!!diagnostic?.retained_request_metrics.server_errors} />
