@@ -30,6 +30,8 @@ interface Report {
     outcome?: string;
     request_id?: string;
     parser?: string;
+    route?: string;
+    method?: string;
     distribution?: string;
     app_version?: string;
     build?: string;
@@ -535,6 +537,14 @@ export function ReportsPanel({ onExpired }: { onExpired: () => void }) {
                 </dd>
               </div>
             )}
+            {selected.payload?.route && (
+              <div>
+                <dt>{t('reports.route')}</dt>
+                <dd>
+                  <code>{selected.payload.method ? `${selected.payload.method} ` : ''}{selected.payload.route}</code>
+                </dd>
+              </div>
+            )}
             {selected.payload?.parser && (
               <div>
                 <dt>{t('reports.parser')}</dt>
@@ -571,7 +581,12 @@ export function ReportsPanel({ onExpired }: { onExpired: () => void }) {
               )}
             </>
           ) : (
-            <p className="admin-small">{t('reports.no_structure')}</p>
+            <div className="report-no-structure">
+              <h4>{text(`reports.reason_${selected.code.toLowerCase()}`) || t('reports.no_structure')}</h4>
+              <p className="admin-small">
+                {t('reports.no_structure_explanation')}
+              </p>
+            </div>
           )}
 
           <div className="report-actions">

@@ -51,6 +51,8 @@ class UpstreamReportPayload(BaseModel):
     operation: str | None = Field(default=None, max_length=64)
     outcome: str | None = Field(default=None, max_length=64)
     parser: str | None = Field(default=None, max_length=80)
+    route: str | None = Field(default=None, max_length=120)
+    method: str | None = Field(default=None, max_length=10)
     structure: dict | None = None
     occurred_at: float | None = None
 

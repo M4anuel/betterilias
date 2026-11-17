@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 from bs4 import BeautifulSoup, Tag
 
 from backend.config import settings
-from backend.diagnostic_metadata import APP_VERSION, release
+from backend.diagnostic_metadata import APP_VERSION, release, route_template
 from backend.observability import emit, OPERATIONS, OUTCOMES
 
 KINDS = ('parsing', 'upstream', 'security', 'concurrency', 'application', 'client')
@@ -257,6 +257,10 @@ def ingest_upstream_report(payload):
         stored_payload['outcome'] = payload['outcome']
     if payload.get('parser') in _parsers or payload.get('parser') == 'unspecified':
         stored_payload['parser'] = payload['parser']
+    if payload.get('route'):
+        stored_payload['route'] = str(payload['route'])[:120]
+    if payload.get('method'):
+        stored_payload['method'] = str(payload['method'])[:10]
     if payload.get('structure') and isinstance(payload['structure'], dict):
         outline = str(payload['structure'].get('outline') or '')[:30000]
         nodes = int(payload['structure'].get('nodes') or 0)
@@ -294,6 +298,8 @@ async def forward_report_upstream(report_id, instance_origin=''):
         'operation': payload.get('operation'),
         'outcome': payload.get('outcome'),
         'parser': payload.get('parser'),
+        'route': payload.get('route'),
+        'method': payload.get('method'),
         'structure': payload.get('structure'),
         'occurred_at': payload.get('occurred_at') or report['created'],
     }
@@ -304,7 +310,7 @@ async def forward_report_upstream(report_id, instance_origin=''):
         return res.json()
 
 
-def prepare(session_id, code, status=0, request_id=None, parser=None, structure=None, operation=None, outcome=None):
+def prepare(session_id, code, status=0, request_id=None, parser=None, structure=None, operation=None, outcome=None, route=None, method=None):
     if code not in CODES or not disclosure()['available']:
         return {}
     payload = {'schema': 1, 'code': code, 'status': status, 'policy': POLICY, 'occurred_at': time.time()}
@@ -318,6 +324,10 @@ def prepare(session_id, code, status=0, request_id=None, parser=None, structure=
         payload['parser'] = parser
     if structure is not None:
         payload['structure'] = structure
+    if route and isinstance(route, str) and len(route) <= 120:
+        payload['route'] = route
+    if method and isinstance(method, str) and method in ('GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'):
+        payload['method'] = method
     saved = False
     with database() as db:
         owner = _owner(db, session_id)
@@ -460,10 +470,22 @@ class ReportMiddleware:
                 if owner and (status >= 500 or status in (400, 408, 409) or incomplete):
                     headers = list(message.get('headers', []))
                     request_id = scope.get('state', {}).get('diagnostic_request_id')
+                    route = route_template(scope)
+                    method = scope.get('method', '')
                     try:
-                        prepared = await asyncio.to_thread(prepare, owner, state.get('code', 'WRITE_INCOMPLETE' if incomplete else 'HTTP_ERROR'), status,
-                                                          request_id, state.get('parser'), state.get('structure'),
-                                                          state.get('operation'), state.get('outcome'))
+                        prepared = await asyncio.to_thread(
+                            prepare,
+                            owner,
+                            state.get('code', 'WRITE_INCOMPLETE' if incomplete else 'HTTP_ERROR'),
+                            status,
+                            request_id,
+                            state.get('parser'),
+                            state.get('structure'),
+                            state.get('operation'),
+                            state.get('outcome'),
+                            route if route != 'unmatched' else None,
+                            method if method else None,
+                        )
                         if prepared.get('capture_id'):
                             headers.extend([(b'x-diagnostic-capture', prepared['capture_id'].encode()),
                                             (b'x-diagnostic-code', prepared['code'].encode())])
