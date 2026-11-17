@@ -13,7 +13,7 @@ from weakref import ref
 import httpx
 from starlette.routing import Mount, compile_path
 
-APP_VERSION = '1.1.1'
+APP_VERSION = '1.2.0'
 ROOT = Path(__file__).resolve().parent.parent
 REASONS = frozenset(('empty_html', 'empty_result', 'dom_extraction', 'timeout', 'network_error',
     'storage_error', 'permission_denied', 'missing_key', 'invalid_value', 'type_error',
