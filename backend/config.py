@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     )
 
     app_env: Literal['production', 'development', 'test'] = 'production'
+    app_domain: str = Field(default='', max_length=255)
+    self_hosted: bool | None = None
+    upstream_report_url: str = Field(default='https://betterilias.ch/api/diagnostics/upstream-report', max_length=512)
+    allow_upstream_error_sharing: bool = True
     coordination_dir: str = '.coordination'
     feature_requests_dir: str = '.feature_requests'
     feature_images_max_bytes: int = Field(default=10_000_000_000, ge=1)
@@ -49,6 +53,15 @@ class Settings(BaseSettings):
     @property
     def diagnostic_reports_path(self) -> Path:
         return BASE_DIR / self.diagnostic_reports_dir
+
+    @property
+    def is_self_hosted(self) -> bool:
+        if self.self_hosted is not None:
+            return bool(self.self_hosted)
+        domain = self.app_domain.strip().lower()
+        if domain == 'betterilias.ch' and self.app_env == 'production':
+            return False
+        return True
 
     # ILIAS Configuration
     ilias_base_url: str = "https://ilias.unibe.ch"

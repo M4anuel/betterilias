@@ -4,6 +4,7 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Support self-hosted distribution error reporting with upstream sharing to betterilias.ch, marked with app version and distribution origin, and provide a dedicated self-hosted error logs section in the admin dashboard.
 - [x] Consolidate feedback banners, badges, buttons/icon buttons and native dialog
   shells across community, course management, grading, diagnostics and admin UI.
   Preserve domain-specific authentication, write certainty and draft ownership;

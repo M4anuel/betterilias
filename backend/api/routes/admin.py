@@ -124,9 +124,11 @@ def summary():
 @router.get('/reports', dependencies=[Depends(administrator)])
 def reports(state: Literal['open', 'resolved', 'all'] = 'open',
             kind: Literal['parsing', 'upstream', 'security', 'concurrency', 'application', 'client'] | None = None,
+            distribution: Literal['local', 'self-hosted', 'all'] | None = None,
+            app_version: str | None = None,
             before: int | None = Query(default=None, ge=1, le=9223372036854775807),
             limit: int = Query(default=50, ge=1, le=100)):
-    return storage(diagnostic_reports.list_reports, state, kind, before, limit)
+    return storage(diagnostic_reports.list_reports, state, kind, before, limit, distribution, app_version)
 
 
 @router.get('/reports/{report_id}', dependencies=[Depends(administrator)])
@@ -148,3 +150,19 @@ def update_report(payload: ReportState, report_id: str = Path(pattern=r'^[a-f0-9
     if not changed:
         raise HTTPException(409, detail=t('reports.changed'))
     return storage(diagnostic_reports.get_report, report_id)
+
+
+@router.post('/reports/{report_id}/share-upstream', dependencies=[Depends(administrator), Depends(browser_mutation)])
+async def share_report_upstream(request: Request, report_id: str = Path(pattern=r'^[a-f0-9]{32}$')):
+    if not settings.allow_upstream_error_sharing or not settings.upstream_report_url:
+        raise HTTPException(403, detail=t('reports.sharing_disabled'))
+    origin = request.url.hostname or ''
+    try:
+        result = await diagnostic_reports.forward_report_upstream(report_id, instance_origin=origin)
+        if not result:
+            raise HTTPException(404, detail=t('reports.not_found'))
+        return {'shared': True, 'upstream_result': result}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(502, detail=t('reports.upstream_failed')) from exc

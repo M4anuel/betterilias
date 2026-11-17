@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 from bs4 import BeautifulSoup, Tag
 
 from backend.config import settings
+from backend.diagnostic_metadata import APP_VERSION, release
 from backend.observability import emit, OPERATIONS, OUTCOMES
 
 KINDS = ('parsing', 'upstream', 'security', 'concurrency', 'application', 'client')
@@ -45,9 +46,19 @@ def disclosure():
         valid = parsed.scheme == 'https' and bool(parsed.hostname) and not parsed.username and not parsed.password
     except ValueError:
         valid = False
-    return {'available': settings.app_env != 'production' or bool(settings.diagnostic_report_operator_name.strip() and valid),
-            'operator_name': settings.diagnostic_report_operator_name, 'privacy_url': url if valid else '',
-            'retention_days': settings.diagnostic_reports_retention_days, 'policy': POLICY, 'preference_days': 90}
+    return {
+        'available': settings.app_env != 'production' or bool(settings.diagnostic_report_operator_name.strip() and valid),
+        'operator_name': settings.diagnostic_report_operator_name,
+        'privacy_url': url if valid else '',
+        'retention_days': settings.diagnostic_reports_retention_days,
+        'policy': POLICY,
+        'preference_days': 90,
+        'self_hosted': settings.is_self_hosted,
+        'app_version': APP_VERSION,
+        'build': release()['build'],
+        'can_share_upstream': settings.is_self_hosted and settings.allow_upstream_error_sharing and bool(settings.upstream_report_url),
+        'upstream_url': settings.upstream_report_url if settings.is_self_hosted else '',
+    }
 
 
 def register_parser(name):
@@ -138,6 +149,9 @@ def database():
         ''')
         for table, column, definition in (('reports', 'consent', "TEXT NOT NULL DEFAULT 'legacy'"),
                                           ('reports', 'source', "TEXT NOT NULL DEFAULT ''"),
+                                          ('reports', 'distribution', "TEXT NOT NULL DEFAULT 'local'"),
+                                          ('reports', 'app_version', "TEXT NOT NULL DEFAULT ''"),
+                                          ('reports', 'build', "TEXT NOT NULL DEFAULT ''"),
                                           ('preferences', 'source', "TEXT NOT NULL DEFAULT ''")):
             if column not in {row[1] for row in db.execute(f'PRAGMA table_info({table})')}:
                 try:
@@ -204,15 +218,90 @@ def preference(session_id, mode=None):
     return result
 
 
-def _save(db, owner, payload, consent='once', source=''):
+def _save(db, owner, payload, consent='once', source='', distribution=None, app_version=None, build=None):
     report_id = secrets.token_hex(16)
+    dist = distribution or ('self-hosted' if settings.is_self_hosted else 'local')
+    version = app_version or APP_VERSION
+    bld = build or release()['build']
     fingerprint = hashlib.sha256(json.dumps([payload['code'], payload['status'], payload.get('operation'),
-        payload.get('parser'), payload.get('structure')], sort_keys=True).encode()).hexdigest()
-    db.execute('INSERT INTO reports(id,owner,created,kind,code,fingerprint,state,payload,policy,consent,source) VALUES(?,?,?,?,?,?,\'open\',?,?,?,?)',
+        payload.get('parser'), payload.get('structure'), dist, version], sort_keys=True).encode()).hexdigest()
+    db.execute('INSERT INTO reports(id,owner,created,kind,code,fingerprint,state,payload,policy,consent,source,distribution,app_version,build) VALUES(?,?,?,?,?,?,\'open\',?,?,?,?,?,?,?)',
         (report_id, owner, time.time(), CODES[payload['code']], payload['code'], fingerprint,
-         json.dumps(payload, separators=(',', ':')), POLICY, consent, source))
+         json.dumps(payload, separators=(',', ':')), POLICY, consent, source, dist, version, bld))
     _prune(db)
     return report_id
+
+
+def ingest_upstream_report(payload):
+    """Store an incoming report shared from an external self-hosted distribution."""
+    code = payload.get('code')
+    if code not in CODES:
+        raise ValueError('Invalid diagnostic error code')
+    app_version = str(payload.get('app_version') or 'unknown')[:32]
+    build = str(payload.get('build') or '')[:64]
+    instance_origin = str(payload.get('instance_origin') or 'self-hosted')[:256]
+    stored_payload = {
+        'schema': 1,
+        'code': code,
+        'status': int(payload.get('status') or 0),
+        'policy': POLICY,
+        'occurred_at': float(payload.get('occurred_at') or time.time()),
+        'distribution': 'self-hosted',
+        'app_version': app_version,
+        'build': build,
+        'instance_origin': instance_origin,
+    }
+    if payload.get('operation') in OPERATIONS:
+        stored_payload['operation'] = payload['operation']
+    if payload.get('outcome') in OUTCOMES:
+        stored_payload['outcome'] = payload['outcome']
+    if payload.get('parser') in _parsers or payload.get('parser') == 'unspecified':
+        stored_payload['parser'] = payload['parser']
+    if payload.get('structure') and isinstance(payload['structure'], dict):
+        outline = str(payload['structure'].get('outline') or '')[:30000]
+        nodes = int(payload['structure'].get('nodes') or 0)
+        limited = bool(payload['structure'].get('limited'))
+        stored_payload['structure'] = {'outline': outline, 'nodes': min(1000, max(0, nodes)), 'limited': limited}
+    owner = hashlib.sha256(f'self-hosted:{instance_origin}:{app_version}'.encode()).hexdigest()
+    with database() as db:
+        report_id = _save(
+            db, owner, stored_payload,
+            consent='upstream',
+            source=instance_origin,
+            distribution='self-hosted',
+            app_version=app_version,
+            build=build,
+        )
+    emit('report.created')
+    return report_id
+
+
+async def forward_report_upstream(report_id, instance_origin=''):
+    """Forward a local report to the central betterilias.ch upstream endpoint."""
+    if not settings.allow_upstream_error_sharing or not settings.upstream_report_url:
+        raise ValueError('Upstream sharing is disabled')
+    report = get_report(report_id)
+    if not report:
+        return None
+    payload = report.get('payload', {})
+    upstream_payload = {
+        'code': report['code'],
+        'status': payload.get('status', 0),
+        'app_version': report.get('app_version') or APP_VERSION,
+        'build': report.get('build') or release()['build'],
+        'distribution': 'self-hosted',
+        'instance_origin': instance_origin or settings.app_domain or 'self-hosted',
+        'operation': payload.get('operation'),
+        'outcome': payload.get('outcome'),
+        'parser': payload.get('parser'),
+        'structure': payload.get('structure'),
+        'occurred_at': payload.get('occurred_at') or report['created'],
+    }
+    import httpx
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.post(settings.upstream_report_url, json=upstream_payload)
+        res.raise_for_status()
+        return res.json()
 
 
 def prepare(session_id, code, status=0, request_id=None, parser=None, structure=None, operation=None, outcome=None):
@@ -302,26 +391,39 @@ def delete_owned(session_id):
     emit('report.deleted')
 
 
-def list_reports(state='open', kind=None, before=None, limit=50):
+def list_reports(state='open', kind=None, before=None, limit=50, distribution=None, app_version=None):
     predicates, args = [], []
     if state != 'all':
         predicates.append('state=?'); args.append(state)
     if kind:
         predicates.append('kind=?'); args.append(kind)
+    if distribution and distribution != 'all':
+        predicates.append('distribution=?'); args.append(distribution)
+    if app_version:
+        predicates.append('app_version=?'); args.append(app_version)
     if before:
         predicates.append('seq<?'); args.append(before)
     where = ' WHERE ' + ' AND '.join(predicates) if predicates else ''
     with database() as db:
-        rows = db.execute('SELECT seq,id,created,kind,code,fingerprint,state,revision,resolved_at FROM reports' + where +
-            ' ORDER BY seq DESC LIMIT ?', [*args, min(100, limit)]).fetchall()
+        rows = db.execute(
+            'SELECT seq,id,created,kind,code,fingerprint,state,revision,resolved_at,source,distribution,app_version,build FROM reports' + where +
+            ' ORDER BY seq DESC LIMIT ?', [*args, min(100, limit)]
+        ).fetchall()
         counts = db.execute('SELECT kind,state,count(*) AS count FROM reports GROUP BY kind,state').fetchall()
-    return {'reports': [dict(row) for row in rows], 'counts': [dict(row) for row in counts],
-            'next_before': rows[-1]['seq'] if len(rows) == limit else None}
+        dist_counts = db.execute('SELECT distribution,state,count(*) AS count FROM reports GROUP BY distribution,state').fetchall()
+        versions = [r[0] for r in db.execute('SELECT DISTINCT app_version FROM reports WHERE app_version != "" ORDER BY app_version DESC').fetchall()]
+    return {
+        'reports': [dict(row) for row in rows],
+        'counts': [dict(row) for row in counts],
+        'distribution_counts': [dict(row) for row in dist_counts],
+        'versions': versions,
+        'next_before': rows[-1]['seq'] if len(rows) == limit else None
+    }
 
 
 def get_report(report_id):
     with database() as db:
-        row = db.execute('SELECT id,created,kind,code,fingerprint,state,revision,resolved_at,payload,policy,consent FROM reports WHERE id=?', (report_id,)).fetchone()
+        row = db.execute('SELECT id,created,kind,code,fingerprint,state,revision,resolved_at,payload,policy,consent,source,distribution,app_version,build FROM reports WHERE id=?', (report_id,)).fetchone()
     if row is None:
         return None
     result = dict(row)

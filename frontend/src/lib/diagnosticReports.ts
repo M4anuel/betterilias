@@ -3,7 +3,20 @@ import { cache } from './cache';
 import { getLanguage } from './i18n';
 
 export type ReportingMode = 'ask' | 'always' | 'never';
-export interface ReportingDisclosure { mode: ReportingMode; available: boolean; operator_name: string; privacy_url: string; retention_days: number; policy: number; preference_days: number }
+export interface ReportingDisclosure {
+  mode: ReportingMode;
+  available: boolean;
+  operator_name: string;
+  privacy_url: string;
+  retention_days: number;
+  policy: number;
+  preference_days: number;
+  self_hosted?: boolean;
+  app_version?: string;
+  build?: string;
+  can_share_upstream?: boolean;
+  upstream_url?: string;
+}
 type Capture = { capture_id: string; code: string; owner: string; disclosure: ReportingDisclosure };
 type ConsentState = { capture: Capture | null; busy: boolean; error: string; saved: boolean };
 let state: ConsentState = { capture: null, busy: false, error: '', saved: false };
@@ -66,14 +79,14 @@ export async function clientDiagnostic(code: 'CLIENT_RENDER' | 'CLIENT_CONNECTIO
   } catch { /* The original error remains visible; never recursively report reporting failures. */ }
 }
 
-export async function decideDiagnostic(decision: 'once' | 'always' | 'decline') {
+export async function decideDiagnostic(decision: 'once' | 'always' | 'decline', shareUpstream = false) {
   const capture = state.capture;
   if (!capture || state.busy) return;
   const current = generation;
   publish({ busy: true, error: '' });
   try {
-    const result = await reportingRequest<{ saved: boolean }>('decision', { method: 'POST',
-      body: JSON.stringify({ capture_id: capture.capture_id, decision }) }, capture.owner);
+    const result = await reportingRequest<{ saved: boolean; upstream_shared?: boolean }>('decision', { method: 'POST',
+      body: JSON.stringify({ capture_id: capture.capture_id, decision, share_upstream: shareUpstream }) }, capture.owner);
     if (current !== generation) return;
     queue = queue.filter(item => item !== capture);
     if (decision === 'always') {
@@ -81,7 +94,7 @@ export async function decideDiagnostic(decision: 'once' | 'always' | 'decline') 
       // Same disclosed report class; explicitly chosen automatic consent also
       // covers this burst. The server remains the authority on tenant ownership.
       for (const item of queue) {
-        try { await reportingRequest('decision', { method: 'POST', body: JSON.stringify({ capture_id: item.capture_id, decision: 'once' }) }, item.owner); }
+        try { await reportingRequest('decision', { method: 'POST', body: JSON.stringify({ capture_id: item.capture_id, decision: 'once', share_upstream: shareUpstream }) }, item.owner); }
         catch { /* Each candidate still expires; no unbounded retry queue. */ }
       }
       if (current !== generation) return;
