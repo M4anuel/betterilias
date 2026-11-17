@@ -31,15 +31,31 @@ That is a runtime configuration problem, not evidence of an archive/build failur
 
 Apple explicitly lists `cookies.onChanged` as unsupported in Safari. Apple also
 requires nonpersistent background execution on iOS and documents a background
-page with `scripts` and `persistent: false`. The new client uses that Safari
-model, without worker imports, Chrome toolbar canvas code or Firefox shims.
+page with `scripts`. The initial independent client used those background
+scripts; the current release uses one explicit Safari service worker without
+imports, Chrome toolbar canvas code or Firefox shims.
 See [Apple compatibility guidance](https://developer.apple.com/documentation/safariservices/assessing-your-safari-web-extension-s-browser-compatibility)
 and [Safari lifecycle guidance](https://developer.apple.com/documentation/safariservices/optimizing-your-web-extension-for-safari).
 
-WebKit's own manifest parser accepts background `scripts` and `persistent: false`
-with Manifest V3; it rejects persistence set to true. This Safari declaration is
-intentional, rather than applying Chrome's manifest restrictions to Safari. See
+WebKit's runtime parser accepts `persistent: false` with Manifest V3, but Apple's
+cloud packager reported that key as unsupported in build 14 for both platforms.
+Runtime compatibility does not establish cloud-packager compatibility. The
+manifests from 1.1.1 onward therefore omit `persistent`; Manifest V3 is already
+nonpersistent by default, and the validator now rejects the key. See
 [WebKit's background manifest parser](https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/Extensions/WebExtension.cpp).
+
+Apple subsequently reported that the manifest name `Better Ilias Companion`
+did not match the registered product name `BetterIlias Companion`. Version
+1.1.2 uses Apple's exact reported product name without the extra space.
+
+Build 16 confirmed version 1.1.2 but warned that persistent background pages
+are unsupported on iOS, despite the omitted persistence key. Its macOS errors
+array remained empty. Version 1.1.3 therefore stops declaring background scripts
+and explicitly declares `service_worker: service-worker.js`. This generated,
+single-file bundle contains only the independent Safari config, core and event
+handlers. There is no `persistent` key, background page or worker import.
+Local validation rejects legacy declarations and the API harness executes the
+actual worker bundle. Apple's native build result still needs verification.
 
 Safari 18.4 also changed extension-page CORS to honour per-site grants. Declaring
 a host in the manifest alone does not replace the user's website permission.
@@ -62,7 +78,8 @@ appropriate for the independently written Safari client. See
 
 ## New implementation and package checks
 
-- Safari 16.4+ Manifest V3 with an explicitly nonpersistent background page.
+- Safari 16.4+ Manifest V3 with one explicit `service_worker`. The worker bundles
+  the Safari-owned config, core and event handlers without imports or DOM APIs.
 - One background controller owns cookies, verification and credential storage.
   Concurrent requests share a flight; bounded persisted leases recover after
   suspension. Preference revisions and fresh cookie fingerprints reject stale
@@ -86,8 +103,10 @@ appropriate for the independently written Safari client. See
 - A separate validation report records version, size and SHA-256. It explicitly
   records native Apple validation as not run.
 
-The frontend build now regenerates translations only. A regression verifies that
-it leaves all authored Safari executable/UI resources unchanged.
+The frontend build regenerates translations and the derived Safari worker bundle.
+A regression verifies that it leaves all authored Safari executable/UI resources
+unchanged. Packaging embeds the selected host configuration in its worker and
+omits the unreferenced core/background source files from the upload.
 
 ## Validation boundaries
 

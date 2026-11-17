@@ -1,3 +1,5 @@
+import { FeedbackBanner } from '../components/ui/FeedbackBanner';
+import { Button } from '../components/ui/Button';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Archive, Download, FolderOpen, RefreshCw } from 'lucide-react';
 import { getLocale, t, useLanguage } from '../lib/i18n';
@@ -98,7 +100,7 @@ export function ReportsPanel({ onExpired }: { onExpired: () => void }) {
     <div className="admin-filters"><div><label htmlFor="report-state">{t('reports.state')}</label><select id="report-state" ref={stateSelect} value={state} onChange={event => setState(event.target.value)} disabled={busy}>
       <option value="open">{t('reports.open')}</option><option value="resolved">{t('reports.resolved')}</option><option value="all">{t('reports.all')}</option></select></div>
       <div><label htmlFor="report-kind">{t('reports.kind')}</label><select id="report-kind" value={kind} onChange={event => setKind(event.target.value)} disabled={busy}><option value="">{t('reports.all_kinds')}</option>{kinds.map(item => <option key={item} value={item}>{text(`reports.kind.${item}`)}</option>)}</select></div></div>
-    {error && <div role="alert" className="admin-alert">{text(error)}<button type="button" className="admin-button" onClick={() => selected ? void inspect(selected.id) : setRefresh(value => value + 1)}>{t('admin.retry')}</button></div>}
+    {error && <FeedbackBanner tone="error" message={text(error)} actions={<Button onClick={() => selected ? void inspect(selected.id) : setRefresh(value => value + 1)}>{t('admin.retry')}</Button>} />}
     {loading ? <p role="status">{t('reports.loading')}</p> : page.reports.length ? <ul className="report-list">{page.reports.map(report => <li key={report.id}>
       <button type="button" className="report-select" aria-expanded={selected?.id === report.id} onClick={event => { rowTrigger.current = event.currentTarget; void inspect(report.id); }}><span><strong>{text(`reports.kind.${report.kind}`)}</strong><code>{report.code}</code></span><span>{date(report.created)}</span><span className="admin-badge">{text(`reports.${report.state === 'open' ? 'open' : 'resolved'}`)}</span></button>
     </li>)}</ul> : !error && <p role="status" className="admin-empty">{t('reports.admin_empty')}</p>}

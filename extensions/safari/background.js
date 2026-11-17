@@ -1,4 +1,4 @@
-// Register synchronously on every Safari nonpersistent background-page wakeup.
+// Register synchronously on every Safari service-worker wakeup.
 (() => {
   const companion = SafariCompanion;
   const run = async () => { try { await companion.sync(false); } catch { /* Retry from popup/next activity. */ } };

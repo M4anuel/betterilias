@@ -93,7 +93,7 @@ def test_membership_actions_and_automatic_icons():
             dialog.get_by_label('Course password').fill('wrong')
             dialog.get_by_label('Agree').check()
             dialog.get_by_role('button', name='Kurs beitreten', exact=True).click()
-            playwright.expect(dialog.get_by_role('alert')).to_have_text('Wrong password')
+            playwright.expect(dialog.get_by_role('alert')).to_contain_text('Wrong password')
             dialog.get_by_label('Course password').fill('correct')
             dialog.get_by_role('button', name='Kurs beitreten', exact=True).click()
             playwright.expect(dialog).to_have_count(0)

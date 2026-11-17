@@ -1,4 +1,4 @@
-// Safari background-page logic. No Chrome worker loaders or popup-owned writes.
+// Safari background logic. No Chrome worker loaders or popup-owned writes.
 globalThis.SafariCompanion = (() => {
   const api = browser, config = SafariCompanionConfig;
   const KEY = 'safariCompanion', ILIAS = 'https://ilias.unibe.ch', ALARM = 'betterilias-safari-check';

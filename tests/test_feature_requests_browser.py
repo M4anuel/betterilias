@@ -14,8 +14,8 @@ def mount(page, admin=False):
       window.communityData={id:'abc',title:'Better keyboard navigation',description:'A helpful improvement with a long description. '.repeat(4),category:'qol',status:'open',nickname:'Student',created:1700000000,updated:1700000000,owned:true,score:0,my_vote:0,comment_count:0,comments:[],images:[],images_archived:false};
       window.communityWrites=[];
       window.communityQueries=[];
-      requestApi.list=async query=>{communityQueries.push(query);return {items:[structuredClone(communityData)],has_more:false,storage:{used:1000,limit:10000000000}};};
-      requestApi.detail=async()=>structuredClone(communityData);
+      requestApi.list=async query=>{communityQueries.push(query);return {items:structuredClone(window.communityItems||[communityData]),has_more:false,storage:{used:1000,limit:10000000000}};};
+      requestApi.detail=async id=>structuredClone(window.communityItems?.find(item=>item.id===id)||communityData);
       requestApi.upload=async()=>{if(window.failUpload)throw Error('Image storage is full');return {id:'image'};};
       requestApi.write=async(path,method,payload,admin)=>{
         communityWrites.push({path,method,payload,admin});
@@ -106,6 +106,9 @@ def test_admin_moderates_and_confirms_delete(workflow_page, width, height, code,
         status.select_option(value)
         page.wait_for_function('value=>communityData.status===value',arg=value)
         page.get_by_role('status').filter(has_text=tr['requests.saved']).wait_for()
+        badge=page.locator('[data-request-status]')
+        assert badge.get_attribute('data-request-status') == value
+        assert badge.inner_text() == tr[f'requests.status.{value}']
         assert page.evaluate('communityWrites.at(-1).admin')
     page.get_by_role('button',name=tr['requests.back'],exact=True).click()
     page.get_by_role('button',name='Better keyboard navigation',exact=True).click()
@@ -173,6 +176,43 @@ def test_compact_filters_information_and_resize(workflow_page, width, height, co
         positions=page.locator('search input,search select').evaluate_all('els=>els.map(e=>e.getBoundingClientRect().y)')
         assert max(positions)-min(positions) < 3
     shot(page,f'filtered-row-{width}-{height}-{code}-{scheme}')
+
+
+@pytest.mark.parametrize('width,height', [(320,740),(390,844),(430,844),(768,850),(1280,900),(844,390)])
+@pytest.mark.parametrize('code,scheme', [('en','light'),('de','dark'),('en','dark'),('de','light')])
+def test_status_badges_are_prominent_readable_and_match_details(workflow_page, width, height, code, scheme):
+    page=workflow_page;page.set_viewport_size({'width':width,'height':height});tr=language(page,code,scheme);mount(page)
+    page.get_by_role('searchbox',name=tr['requests.search'],exact=True).wait_for()
+    page.evaluate("window.communityItems=['open','planned','in_progress','completed','declined'].map(status=>({...communityData,id:status,status,title:'Keyboard navigation '+status}))")
+    page.get_by_role('searchbox',name=tr['requests.search'],exact=True).fill('keyboard')
+    page.wait_for_function("document.querySelectorAll('[data-request-status]').length===5")
+    cards=page.locator('[data-feature-requests] article')
+    for status in ['open','planned','in_progress','completed','declined']:
+        card=cards.filter(has=page.locator(f'[data-request-status="{status}"]'))
+        badge=card.locator('[data-request-status]')
+        assert badge.inner_text() == tr[f'requests.status.{status}']
+        assert badge.get_attribute('role') is None  # Static metadata must not create five live regions.
+        assert badge.locator('svg').get_attribute('aria-hidden') == 'true'
+        title=card.get_by_role('button',name='Keyboard navigation '+status,exact=True)
+        badge_box=badge.bounding_box();title_box=title.bounding_box()
+        assert badge_box['y']+badge_box['height'] <= title_box['y']+1
+        assert badge_box['x'] >= 0 and badge_box['x']+badge_box['width'] <= width
+        contrast=badge.evaluate('''el=>{
+          const style=getComputedStyle(el),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+          function luminance(color){ctx.fillStyle=color;ctx.fillRect(0,0,1,1);const rgb=Array.from(ctx.getImageData(0,0,1,1).data).slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;}
+          const a=luminance(style.color),b=luminance(style.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+        }''')
+        assert contrast >= 4.5, (status, scheme, contrast)
+    shot(page,f'status-list-{width}-{height}-{code}-{scheme}')
+    cards.last.scroll_into_view_if_needed()
+    shot(page,f'status-list-end-{width}-{height}-{code}-{scheme}')
+    page.get_by_role('button',name='Keyboard navigation in_progress',exact=True).click()
+    page.get_by_role('heading',name='Keyboard navigation in_progress',exact=True).wait_for()
+    badge=page.locator('[data-request-status]')
+    assert badge.get_attribute('data-request-status') == 'in_progress'
+    assert badge.inner_text() == tr['requests.status.in_progress']
+    assert badge.bounding_box()['y'] < page.get_by_role('heading',name='Keyboard navigation in_progress',exact=True).bounding_box()['y']
+    shot(page,f'status-detail-{width}-{height}-{code}-{scheme}')
 
 
 def test_attachment_viewer_restores_keyboard_focus(workflow_page):

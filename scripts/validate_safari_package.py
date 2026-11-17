@@ -45,9 +45,11 @@ def validate(source):
     if manifest.get('manifest_version') != 3:
         raise ValueError('Expected the Safari Manifest V3 client.')
     background = manifest.get('background', {})
-    if background.get('persistent') is not False or 'service_worker' in background or not background.get('scripts'):
-        raise ValueError('Safari uses one explicitly nonpersistent background page.')
-    resources = list(background['scripts']) + [manifest['action']['default_popup']]
+    if 'persistent' in background:
+        raise ValueError('Apple packager rejects the persistent key; Manifest V3 is nonpersistent by default.')
+    if background != {'service_worker': 'service-worker.js'}:
+        raise ValueError('Expected one explicit service_worker entry, without scripts/page/persistent declarations.')
+    resources = [background['service_worker'], manifest['action']['default_popup']]
     resources.extend(manifest['icons'].values())
     resources.extend(manifest['action']['default_icon'].values())
     for script in manifest['content_scripts']:
@@ -75,8 +77,8 @@ def validate(source):
                 raise ValueError('UTF-8 BOM is not permitted: ' + name)
     if any(name in files for name in ('request.js', 'toolbar.js')):
         raise ValueError('Retired cross-browser runtime leaked into Safari package.')
-    return {'version': manifest['version'], 'files': len(files), 'bytes': sum(map(len, files.values())),
-            'background': 'nonpersistent Safari page', 'native_apple_validation': 'not run',
+    return {'name': manifest['name'], 'version': manifest['version'], 'files': len(files), 'bytes': sum(map(len, files.values())),
+            'background': 'explicit Safari service worker (single bundle)', 'native_apple_validation': 'not run',
             **({'sha256': hashlib.sha256(source.read_bytes()).hexdigest()} if source.is_file() else {})}
 
 

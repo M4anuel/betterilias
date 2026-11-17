@@ -50,7 +50,7 @@ function harness({ alarms = true } = {}) {
           json: async () => h.stall === 'body' ? new Promise(() => {}) :
             ({ success: h.valid, authenticated: h.valid, session_id: 'verified-' + payload.cookies.PHPSESSID, user_name: 'Student' }) };
       } });
-    for (const file of ['config.js', 'core.js', 'background.js']) vm.runInContext(fs.readFileSync(new URL(file, root), 'utf8'), context);
+    vm.runInContext(fs.readFileSync(new URL('service-worker.js', root), 'utf8'), context);
     h.context = context; return context.SafariCompanion;
   };
   h.api = api; h.core = h.worker();

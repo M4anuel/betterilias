@@ -4,9 +4,23 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Consolidate feedback banners, badges, buttons/icon buttons and native dialog
+  shells across community, course management, grading, diagnostics and admin UI.
+  Preserve domain-specific authentication, write certainty and draft ownership;
+  usage and follow-up boundaries are documented in `docs/SHARED_UI.md`.
+- [ ] Continue the UI reuse audit with form fields, info/action disclosures,
+  upload/attachment rows, filter layouts and empty states when changing those
+  workflows; verify unused `ExerciseModal`/`CourseLogsPanel` before removal.
+
 - [x] Rebuild Safari Companion independently of Chrome/Firefox: Safari background
   page, isolated cookie verification, activity-based sync and validated upload ZIP.
-- [ ] Upload Safari Companion 1.1.0 to Apple's packager and verify TestFlight on
+- [x] Remove the `persistent` key flagged by Apple's build 14 packager, preserve
+  the registered extension name and reject that key during local validation.
+- [x] Match Safari's manifest name to Apple's reported product name exactly:
+  `BetterIlias Companion`, with no space between Better and Ilias.
+- [x] Declare a single bundled Safari service worker after build 16 treated the
+  Manifest V3 background scripts as a persistent page. Omit both legacy keys.
+- [ ] Upload Safari Companion 1.1.3 to Apple's packager and verify TestFlight on
   macOS and iPhone/iPad. Local WebKit/API simulations do not prove native signing,
   packaging, Safari permissions or physical-device background execution.
   See `docs/SAFARI_REBUILD_ANALYSIS.md`.
@@ -15,6 +29,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   shared forum composer, administrator moderation and bounded image storage.
 - [x] Compact request search/filters, disclose public-content/browser ownership
   guidance on demand and make existing administrator status management discoverable.
+- [x] Promote request statuses to labelled icon/colour badges above card titles
+  and in detail headers, with matching light/dark styles and responsive coverage.
 - [ ] Replace the shared administrator key with individual sign-in and server-enforced
   roles (administrator/moderator and scoped permissions), including account recovery,
   revocation and attributable moderation. Until then, request moderation/status
