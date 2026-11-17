@@ -8,6 +8,7 @@
     "build": "node ../scripts/sync-extension-locales.mjs && node ./node_modules/typescript/bin/tsc && vite build",
     "check:locales": "node ../scripts/check-locales.mjs",
     "test:i18n": "node --test ../tests/localisation.test.mjs",
+    "test:graph": "node --test ../tests/repository_graph.test.mjs",
     "preview": "vite preview"
   },
   "devDependencies": {
