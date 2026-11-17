@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { ErrorNotice } from './ErrorNotice';
 import { useConnectionRetry } from '../lib/connection';
 import { SidebarPinButton } from './SidebarPinButton';
@@ -323,8 +324,26 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     });
   };
 
-  const [savingMemberId, setSavingMemberId] = useState<string | null>(null);
-  const [savedSuccessId, setSavedSuccessId] = useState<string | null>(null);
+  const [entrySaveStates, setEntrySaveStates] = useState<Record<string, 'pending' | 'saved'>>({});
+  const entrySaveFlights = useRef(new Map<string, Promise<void>>());
+  const entrySaveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const saveMounted = useRef(false);
+  useEffect(() => {
+    saveMounted.current = true;
+    const clear = () => {
+      entrySaveTimers.current.forEach(clearTimeout);
+      entrySaveTimers.current.clear();
+      entrySaveFlights.current.clear();
+      setEntrySaveStates({});
+    };
+    window.addEventListener('betterilias-session-changed', clear);
+    return () => {
+      saveMounted.current = false;
+      entrySaveTimers.current.forEach(clearTimeout);
+      entrySaveTimers.current.clear();
+      window.removeEventListener('betterilias-session-changed', clear);
+    };
+  }, []);
   const [gradingFeedback, setGradingFeedback] = useState<GradeSavedFeedback | null>(null);
   const [localEdits, setLocalEdits] = useState<
     Record<
@@ -371,6 +390,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const [fileUploadSuccessId, setFileUploadSuccessId] = useState<string | null>(null);
 
   const currentAssKey = selectedTaAssId || taSubmissionsData?.active_assignment_id || 'default';
+  const saveScope = cache.getRequestScope().key;
+  const visibleSaveContext = useRef('');
+  visibleSaveContext.current = JSON.stringify([saveScope, exerciseRefId, currentAssKey]);
+  const getSaveKey = useCallback((memberId: string) =>
+    JSON.stringify([saveScope, exerciseRefId, currentAssKey, memberId]),
+    [saveScope, exerciseRefId, currentAssKey]);
   const getEditKey = useCallback(
     (memberId: string, assId?: string | null) => `${assId || currentAssKey}_${memberId}`,
     [currentAssKey]
@@ -420,7 +445,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   useNavigationGuard({
     id: `exercise-grading-${exerciseRefId}`,
     isDirty: () => hasDirtyGrades,
-    isPending: () => uploadingMemberId !== null || deletingFeedbackFileId !== null,
+    isPending: () => entrySaveFlights.current.size > 0 || uploadingMemberId !== null || deletingFeedbackFileId !== null,
     message: () => t("Sie haben ungespeicherte Bewertungen oder Notizen. Möchten Sie die Seite wirklich verlassen?"),
     onDiscard: () => {
       setLocalEdits((prev) => {
@@ -774,7 +799,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         return;
       }
       setSelectedTaAssId(newAssId);
-      setSavedSuccessId(null);
       const cacheKey = `${exerciseRefId}_${newAssId || 'default'}`;
       let cached: ExerciseSubmissionsResponse | null = submissionsCacheRef.current[cacheKey] || null;
       if (!cached) {
@@ -1114,7 +1138,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
       if (taGradeFilter.length > 0) {
       list = list.filter((s) => {
-        if (savedSuccessId === s.member_id) {
+        if (entrySaveStates[getSaveKey(s.member_id)] === 'saved') {
           return true;
         }
 
@@ -1234,7 +1258,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     taSubmissionFilter,
     taGradeFilter,
     localEdits,
-    savedSuccessId,
+    entrySaveStates,
+    getSaveKey,
     taSortField,
     taSortOrder,
     teamSortNames,
@@ -1291,145 +1316,115 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     }));
   };
 
+  type GradeDraft = { status: string; mark: string; feedback: string; notice: string };
+  const sameGrade = (a: GradeDraft | undefined, b: GradeDraft | undefined) =>
+    a === b || Boolean(a && b && a.status === b.status && a.mark === b.mark &&
+      a.feedback === b.feedback && a.notice === b.notice);
+
+  // Capture ownership and the submitted draft before yielding. Requests for other
+  // members may finish in either order; neither owns another entry's UI state.
+  const saveGrade = (memberId: string, draft: GradeDraft): Promise<void> => {
+    const key = getSaveKey(memberId);
+    const existing = entrySaveFlights.current.get(key);
+    if (existing) return existing;
+    const scope = cache.getRequestScope();
+    const context = visibleSaveContext.current;
+    const assId = currentAssKey === 'default' ? undefined : currentAssKey;
+    const editKey = getEditKey(memberId);
+    const baseline = localEdits[editKey];
+    const submitted = { ...draft };
+    const dataAtStart = taSubmissionsData;
+    const rtoken = dataAtStart?.rtoken;
+    const isCurrent = () => saveMounted.current && !scope.signal.aborted &&
+      cache.getRequestScope().key === scope.key;
+    const isVisible = () => isCurrent() && visibleSaveContext.current === context;
+    const oldTimer = entrySaveTimers.current.get(key);
+    if (oldTimer) clearTimeout(oldTimer);
+    entrySaveTimers.current.delete(key);
+    setEntrySaveStates(prev => ({ ...prev, [key]: 'pending' }));
+
+    const flight = Promise.resolve().then(async () => {
+      try {
+        await api.gradeSubmission(exerciseRefId, memberId, {
+          member_id: memberId, ass_id: assId, status: submitted.status,
+          mark: submitted.mark || undefined, feedback: submitted.feedback,
+          notice: submitted.notice, rtoken,
+        });
+        if (!isCurrent()) return;
+        const patch = (data: ExerciseSubmissionsResponse): ExerciseSubmissionsResponse => ({
+          ...data,
+          submissions: data.submissions.map(s => s.member_id === memberId
+            ? { ...s, passed_status: submitted.status, mark: submitted.mark,
+                feedback: submitted.feedback, notice: submitted.notice } : s),
+        });
+        // Patch the latest cache, rather than the response snapshot, preserving
+        // other members' saves that completed while this request was pending.
+        const cacheKey = `${exerciseRefId}_${assId || 'default'}`;
+        const latest = submissionsCacheRef.current[cacheKey] ||
+          cache.getCachedExerciseSubmissions(exerciseRefId, assId) || dataAtStart;
+        if (latest) {
+          const updated = patch(latest);
+          submissionsCacheRef.current[cacheKey] = updated;
+          cache.setCachedExerciseSubmissions(exerciseRefId, assId, updated);
+          const defaultData = cache.getCachedExerciseSubmissions(exerciseRefId);
+          if (assId && defaultData?.active_assignment_id === assId) {
+            const updatedDefault = patch(defaultData);
+            submissionsCacheRef.current[`${exerciseRefId}_default`] = updatedDefault;
+            cache.setCachedExerciseSubmissions(exerciseRefId, undefined, updatedDefault);
+          }
+        }
+        if (isVisible()) {
+          setLocalEdits(prev => isVisible() && sameGrade(prev[editKey], baseline)
+            ? { ...prev, [editKey]: { ...submitted, isDirty: false } } : prev);
+          setTaSubmissionsData(prev => isVisible() && prev ? patch(prev) : prev);
+          const sub = dataAtStart?.submissions.find(s => s.member_id === memberId);
+          setGradingFeedback({
+            id: key + Date.now(), memberId,
+            studentName: sub?.student_name || t("Einreichung"), teamId: sub?.team_id,
+            status: submitted.status, mark: submitted.mark || undefined,
+            wasFilteredOut: taGradeFilter.includes('not_graded') &&
+              (['passed', 'failed'].includes(submitted.status) || Boolean(submitted.mark.trim())),
+          });
+        }
+        setEntrySaveStates(prev => ({ ...prev, [key]: 'saved' }));
+        entrySaveTimers.current.set(key, setTimeout(() => {
+          entrySaveTimers.current.delete(key);
+          if (isCurrent()) setEntrySaveStates(prev => {
+            const next = { ...prev }; delete next[key]; return next;
+          });
+        }, 2500));
+      } catch (error) {
+        if (isCurrent()) setEntrySaveStates(prev => {
+          const next = { ...prev }; delete next[key]; return next;
+        });
+        throw error;
+      } finally {
+        if (entrySaveFlights.current.get(key) === flight) entrySaveFlights.current.delete(key);
+      }
+    });
+    entrySaveFlights.current.set(key, flight);
+    return flight;
+  };
+
   const handleSaveSubmission = async (memberId: string) => {
-    const k = getEditKey(memberId);
-    const edit = localEdits[k];
+    const edit = localEdits[getEditKey(memberId)];
     if (!edit) return;
-
-    setSavingMemberId(memberId);
+    const context = visibleSaveContext.current;
+    const scope = cache.getRequestScope();
     try {
-      await api.gradeSubmission(exerciseRefId, memberId, {
-        member_id: memberId,
-        ass_id: selectedTaAssId || undefined,
-        status: edit.status,
-        mark: edit.mark || undefined,
-        feedback: edit.feedback,
-        notice: edit.notice,
-        rtoken: taSubmissionsData?.rtoken,
-      });
-
-      setLocalEdits((prev) => ({
-        ...prev,
-        [k]: {
-          ...prev[k],
-          isDirty: false,
-        },
-      }));
-
-      // Update in-memory submissions data and caches
-      setTaSubmissionsData((prev) => {
-        if (!prev) return prev;
-        const updated = {
-          ...prev,
-          submissions: prev.submissions.map((s) => {
-            if (s.member_id === memberId) {
-              return {
-                ...s,
-                passed_status: edit.status,
-                mark: edit.mark,
-                feedback: edit.feedback,
-                notice: edit.notice,
-              };
-            }
-            return s;
-          }),
-        };
-        const cacheKey = `${exerciseRefId}_${selectedTaAssId || 'default'}`;
-        submissionsCacheRef.current[cacheKey] = updated;
-        cache.setCachedExerciseSubmissions(exerciseRefId, selectedTaAssId || undefined, updated);
-        return updated;
-      });
-
-      setSavedSuccessId(memberId);
-      setTimeout(() => setSavedSuccessId(null), 2500);
-
-      // Trigger modeless feedback toast
-      const sub = taSubmissionsData?.submissions.find((s) => s.member_id === memberId);
-      const isNotGradedFilter = taGradeFilter.includes('not_graded');
-      const isNowGraded = ['passed', 'failed'].includes(edit.status) || Boolean(edit.mark && edit.mark.trim());
-      setGradingFeedback({
-        id: `toast_${Date.now()}`,
-        memberId,
-        studentName: sub?.student_name || t("Einreichung"),
-        teamId: sub?.team_id,
-        status: edit.status,
-        mark: edit.mark || undefined,
-        wasFilteredOut: isNotGradedFilter && isNowGraded,
-      });
+      await saveGrade(memberId, edit);
     } catch (err: any) {
+      if (!saveMounted.current || scope.signal.aborted || cache.getRequestScope().key !== scope.key ||
+          visibleSaveContext.current !== context) return;
       await alertDialog({
         title: t("Fehler beim Speichern"),
         message: t("Fehler beim Speichern: {p0}", { p0: err.message }),
         variant: 'danger',
       });
-    } finally {
-      setSavingMemberId(null);
     }
   };
 
-  const handleSaveFromModal = async (
-    memberId: string,
-    updated: { status: string; mark: string; feedback: string; notice: string }
-  ) => {
-    await api.gradeSubmission(exerciseRefId, memberId, {
-      member_id: memberId,
-      ass_id: selectedTaAssId || undefined,
-      status: updated.status,
-      mark: updated.mark || undefined,
-      feedback: updated.feedback,
-      notice: updated.notice,
-      rtoken: taSubmissionsData?.rtoken,
-    });
-
-    const k = getEditKey(memberId);
-    setLocalEdits((prev) => ({
-      ...prev,
-      [k]: {
-        ...updated,
-        isDirty: false,
-      },
-    }));
-
-    setTaSubmissionsData((prev) => {
-      if (!prev) return prev;
-      const updatedData = {
-        ...prev,
-        submissions: prev.submissions.map((s) => {
-          if (s.member_id === memberId) {
-            return {
-              ...s,
-              passed_status: updated.status,
-              mark: updated.mark,
-              feedback: updated.feedback,
-              notice: updated.notice,
-            };
-          }
-          return s;
-        }),
-      };
-      const cacheKey = `${exerciseRefId}_${selectedTaAssId || 'default'}`;
-      submissionsCacheRef.current[cacheKey] = updatedData;
-      cache.setCachedExerciseSubmissions(exerciseRefId, selectedTaAssId || undefined, updatedData);
-      return updatedData;
-    });
-
-    setSavedSuccessId(memberId);
-    setTimeout(() => setSavedSuccessId(null), 2500);
-
-    // Trigger modeless feedback toast
-    const sub = taSubmissionsData?.submissions.find((s) => s.member_id === memberId);
-    const isNotGradedFilter = taGradeFilter.includes('not_graded');
-    const isNowGraded = ['passed', 'failed'].includes(updated.status) || Boolean(updated.mark && updated.mark.trim());
-    setGradingFeedback({
-      id: `toast_${Date.now()}`,
-      memberId,
-      studentName: sub?.student_name || t("Einreichung"),
-      teamId: sub?.team_id,
-      status: updated.status,
-      mark: updated.mark || undefined,
-      wasFilteredOut: isNotGradedFilter && isNowGraded,
-    });
-  };
+  const handleSaveFromModal = (memberId: string, updated: GradeDraft) => saveGrade(memberId, updated);
 
   const handleRefresh = useCallback(() => {
     loadOverview(true);
@@ -2255,8 +2250,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                   notice: sub.notice || '',
                   isDirty: false,
                 };
-                const isSaving = savingMemberId === sub.member_id;
-                const isSaved = savedSuccessId === sub.member_id;
+                const isSaving = entrySaveStates[getSaveKey(sub.member_id)] === 'pending';
+                const isSaved = entrySaveStates[getSaveKey(sub.member_id)] === 'saved';
                 const hasSubmitted = Boolean(
                   sub.download_url ||
                   (sub.files && sub.files.length > 0) ||
@@ -2767,22 +2762,19 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
                       {/* Right: Save Button */}
                       <div className="flex md:flex-col justify-end items-end gap-2 shrink-0">
-                        <button
+                        <Button
                           type="button"
                           onClick={() => handleSaveSubmission(sub.member_id)}
-                          disabled={isSaving || isLoadingTaSubmissions}
+                          loading={isSaving}
+                          disabled={isLoadingTaSubmissions}
+                          data-member-id={sub.member_id}
+                          data-save-state={isSaving ? 'pending' : isSaved ? 'saved' : 'idle'}
                           title={isLoadingTaSubmissions ? t("Aktualisierung läuft... Bitte warten") : t("Speichern")}
-                          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer ${
-                            isSaved
-                              ? 'bg-emerald-600'
-                              : edit.isDirty
-                              ? 'bg-indigo-600 hover:bg-indigo-700'
-                              : 'bg-slate-700 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 border dark:border-slate-700'
-                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          variant="primary"
+                          className="submission-card-save gap-1.5 px-4 py-2 text-xs font-bold shadow-sm"
                         >
                           {isSaving ? (
                             <>
-                              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                               <span>{t("Speichern...")}</span>
                             </>
                           ) : isLoadingTaSubmissions ? (
@@ -2791,7 +2783,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             </>
                           ) : isSaved ? (
                             <>
-                              <Check className="h-3.5 w-3.5 text-white" />
+                              <Check className="h-3.5 w-3.5" />
                               <span>{t("Gespeichert!")}</span>
                             </>
                           ) : (
@@ -2800,7 +2792,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               <span>{t("Speichern")}</span>
                             </>
                           )}
-                        </button>
+                        </Button>
                         {edit.isDirty && (
                           <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
                             {t("Ungespeichert")}
@@ -2829,6 +2821,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       {/* Submission Detail Modal (TA view "i" / Details button, closes on outside click and ESC) */}
       {detailModalSubmission && (
         <SubmissionDetailModal
+          key={getSaveKey(detailModalSubmission.member_id)}
           submission={detailModalSubmission}
           exerciseTitle={overviewData?.title}
           assignmentTitle={
@@ -2837,6 +2830,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           exerciseRefId={exerciseRefId}
           assId={selectedTaAssId || undefined}
           isUpdating={isLoadingTaSubmissions}
+          savePending={entrySaveStates[getSaveKey(detailModalSubmission.member_id)] === 'pending'}
           initialEdit={localEdits[getEditKey(detailModalSubmission.member_id)]}
           initialFeedbackFiles={rowFeedbackFiles[getEditKey(detailModalSubmission.member_id)]}
           onFeedbackFilesChange={(memberId, files) => {

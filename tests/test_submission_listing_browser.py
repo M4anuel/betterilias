@@ -14,7 +14,8 @@ pytestmark = pytest.mark.skipif(
 @pytest.mark.parametrize('width,height', [(320, 740), (390, 740), (430, 740),
                                          (768, 900), (1280, 900), (667, 375)])
 @pytest.mark.parametrize('language,scheme', [('de', 'dark'), ('en', 'light')])
-def test_complete_submissions_retry_and_local_filters(local_site, tmp_path, width, height, language, scheme):
+@pytest.mark.parametrize('error_status', [409, 502])
+def test_complete_submissions_retry_and_local_filters(local_site, tmp_path, width, height, language, scheme, error_status):
     pw = pytest.importorskip('playwright.sync_api')
     tr = json.loads((ROOT / 'locales' / f'{language}.json').read_text(encoding='utf8')).__getitem__
     failure = tr('Could not load all submissions from ILIAS. Please refresh and try again.')
@@ -35,7 +36,7 @@ def test_complete_submissions_retry_and_local_filters(local_site, tmp_path, widt
         path = urlparse(route.request.url).path
         if path.endswith('/submissions'):
             requests.append(route.request.method)
-            route.fulfill(status=502 if fail else 200, content_type='application/json',
+            route.fulfill(status=error_status if fail else 200, content_type='application/json',
                           body=json.dumps(dict(detail=failure, code='SUBMISSIONS_INCOMPLETE') if fail else data))
         else:
             mock_api(route)
@@ -55,16 +56,20 @@ def test_complete_submissions_retry_and_local_filters(local_site, tmp_path, widt
         """)
         page.route('**/api/**', respond)
         page.goto(local_site + '/?course=42&exercise=200&tab=submissions')
-        alert = page.get_by_role('alert').filter(has_text=failure)
+        # Gateway failures use the shared recovery notice; domain errors remain inline.
+        alert = (page.locator('[data-connection-notice]') if error_status == 502
+                 else page.get_by_role('alert').filter(has_text=failure))
         pw.expect(alert).to_be_visible()
         pw.expect(page.locator('.submission-card')).to_have_count(0)
         assert requests
         assert_no_overflow(page)
         alert.scroll_into_view_if_needed()
         pw.expect(alert).to_be_in_viewport()
-        if width < 640:
-            assert alert.locator('p').bounding_box()['width'] >= alert.bounding_box()['width'] - 36
-        page.screenshot(path=str(tmp_path / f'submission-list-error-{width}-{language}.png'))
+        assert alert.evaluate('e => e.scrollWidth <= e.clientWidth + 1')
+        if error_status == 502:
+            pw.expect(alert).to_contain_text(tr('connection.unavailable.hint'))
+            pw.expect(page.get_by_role('alert')).to_have_count(0)
+        page.screenshot(path=str(tmp_path / f'submission-list-error-{error_status}-{width}-{language}.png'))
         fail = False
         retry = alert.get_by_role('button', name=tr('Erneut versuchen'), exact=True)
         retry.focus()
@@ -79,5 +84,5 @@ def test_complete_submissions_retry_and_local_filters(local_site, tmp_path, widt
         quick_filter.click()
         pw.expect(page.locator('.submission-card')).to_have_count(50)
         assert set(requests) == {'GET'}
-        page.screenshot(path=str(tmp_path / f'submission-list-complete-{width}-{language}.png'))
+        page.screenshot(path=str(tmp_path / f'submission-list-complete-{error_status}-{width}-{language}.png'))
         browser.close()

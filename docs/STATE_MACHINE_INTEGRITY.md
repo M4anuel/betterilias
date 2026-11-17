@@ -58,3 +58,30 @@ To prevent duplicate resource creation when an HTTP connection drops after ILIAS
 
 - **Backend Unit Tests**: [`tests/test_state_machine_integrity.py`](../tests/test_state_machine_integrity.py) validates native transport failures, interleaved calendar jobs, and feedback replacement safety in isolated temporary environments.
 - **Frontend & Browser Tests**: [`tests/test_state_machine_browser.py`](../tests/test_state_machine_browser.py) runs Chromium browser interactions validating editor drafts, dirty-state preservation, modal queue dismissal, and toast lifetimes across 320, 390, 430, 768, and 1280 px breakpoints in both light and dark themes.
+
+
+### Correction save ownership
+
+Correction cards and the submission detail modal share one write routine. Pending
+and 2.5-second card success states are keyed by credential generation, exercise,
+assignment and member. A synchronous per-entry flight guard prevents duplicate
+writes while allowing other entries to save. Completing or failing one entry
+never clears another entry's pending state or success timer. The shared `Button`
+provides the card spinner, busy semantics and reduced-motion support; saving text
+has priority over a concurrent listing refresh.
+
+Completions patch the latest matching assignment cache and only the matching visible
+context. Parent drafts become clean only if their fields still match the baseline
+captured at dispatch. The detail modal also retains its submitted-snapshot comparison
+for edits made during a save. Timers are cleaned up on unmount, and account changes
+invalidate stale successes and errors. Existing backend coordination, error dialogs,
+allocation and redistribution behavior are unchanged.
+
+`tests/test_correction_save_browser.py` exercises reverse-order writes, independent
+success expiry, same-entry retries, failure isolation, search/filter removal,
+refreshes, shared card/modal pending state, newer modal edits, account/exercise
+changes and unmounts. Screenshots and interactions cover 320/390/430/768/1280 px
+and short landscape, German/English and light/dark. These use Chromium emulation
+and deferred mocked API responses; no physical-device or live ILIAS verification
+is claimed. The listing recovery regression also covers current shared gateway
+recovery and inline domain errors without replaying writes.

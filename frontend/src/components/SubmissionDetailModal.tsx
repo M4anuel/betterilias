@@ -1,6 +1,6 @@
 import { Badge } from './ui/Badge';
 import { t, useLanguage } from '../lib/i18n';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   X,
   User,
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { SubmissionItem, FeedbackFileItem } from '../types';
 import { api } from '../lib/api';
+import { cache } from '../lib/cache';
 import { useNavigationGuard } from '../lib/navigationGuard';
 import { confirmDialog, alertDialog } from '../lib/dialog';
 import { SubmissionDownloadButton, FeedbackFileDownloadButton } from './DownloadButtons';
@@ -36,6 +37,7 @@ interface SubmissionDetailModalProps {
   exerciseRefId?: string;
   assId?: string;
   isUpdating?: boolean;
+  savePending?: boolean;
   initialEdit?: {
     status: string;
     mark: string;
@@ -58,6 +60,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
   exerciseRefId,
   assId,
   isUpdating,
+  savePending,
   initialEdit,
   initialFeedbackFiles,
   onFeedbackFilesChange,
@@ -79,8 +82,19 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
     initialEdit?.notice !== undefined ? initialEdit.notice : submission.notice || ''
   );
 
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingLocally, setIsSaving] = useState(false);
+  const isSaving = isSavingLocally || Boolean(savePending);
   const [isSaved, setIsSaved] = useState(false);
+  const saveActive = useRef(false);
+  const saveFlight = useRef(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    saveActive.current = true;
+    return () => {
+      saveActive.current = false;
+      clearTimeout(savedTimer.current);
+    };
+  }, []);
   const draftSnapshot = JSON.stringify({ status, mark, feedback, notice });
   const [savedSnapshot, setSavedSnapshot] = useState(draftSnapshot);
   const isDirty = draftSnapshot !== savedSnapshot;
@@ -245,22 +259,32 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
 
   const handleSave = async () => {
     if (!onSave) return;
-    if (isSaving) return;
+    if (isSaving || saveFlight.current) return;
+    saveFlight.current = true;
+    const scope = cache.getRequestScope();
+    const isCurrentSave = () => saveActive.current && !scope.signal.aborted &&
+      cache.getRequestScope().key === scope.key;
+    clearTimeout(savedTimer.current);
     const submittedSnapshot = draftSnapshot;
     setIsSaving(true);
     try {
       await onSave(submission.member_id, { status, mark, feedback, notice });
+      if (!isCurrentSave()) return;
       setIsSaved(true);
       setSavedSnapshot(submittedSnapshot);
-      setTimeout(() => setIsSaved(false), 3000);
+      savedTimer.current = setTimeout(() => {
+        if (isCurrentSave()) setIsSaved(false);
+      }, 3000);
     } catch (err: any) {
+      if (!isCurrentSave()) return;
       await alertDialog({
         title: t("Fehler beim Speichern"),
         message: err.message || t("Fehler beim Speichern der Bewertung"),
         variant: 'danger',
       });
     } finally {
-      setIsSaving(false);
+      saveFlight.current = false;
+      if (isCurrentSave()) setIsSaving(false);
     }
   };
 
