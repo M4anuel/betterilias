@@ -443,11 +443,179 @@ def _event_level(event):
     return 'INFO'
 
 
+_ANSI_RESET = '\033[0m'
+_ANSI_DIM = '\033[90m'
+_ANSI_BOLD = '\033[1m'
+_ANSI_RED = '\033[31m'
+_ANSI_GREEN = '\033[32m'
+_ANSI_YELLOW = '\033[33m'
+_ANSI_CYAN = '\033[36m'
+_ANSI_MAGENTA = '\033[35m'
+_ANSI_BOLD_RED = '\033[1;31m'
+_ANSI_BOLD_YELLOW = '\033[1;33m'
+
+_STATUS_TEXTS = {
+    200: "200 OK",
+    201: "201 Created",
+    204: "204 No Content",
+    304: "304 Not Modified",
+    400: "400 Bad Request",
+    401: "401 Unauthorized",
+    403: "403 Forbidden",
+    404: "404 Not Found",
+    409: "409 Conflict",
+    410: "410 Gone",
+    422: "422 Unprocessable",
+    429: "429 Too Many Req",
+    500: "500 Server Error",
+    502: "502 Bad Gateway",
+    503: "503 Unavailable",
+    504: "504 Gateway Timeout",
+}
+
+
+def _should_use_color():
+    if os.environ.get('NO_COLOR') or os.environ.get('TERM') == 'dumb':
+        return False
+    if os.environ.get('FORCE_COLOR'):
+        return True
+    return hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
+
+
+def format_console_event(event: dict, color: bool | None = None) -> str:
+    """Format an observability event for clean, human-readable terminal output."""
+    if settings.console_format == 'json':
+        return json.dumps(event, separators=(',', ':'))
+
+    if color is None:
+        color = _should_use_color()
+
+    # 1. Clean Timestamp: HH:MM:SS
+    ts = event.get('timestamp')
+    if isinstance(ts, (int, float)):
+        try:
+            time_str = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone().strftime('%H:%M:%S')
+        except (OSError, OverflowError, ValueError):
+            time_str = datetime.now().strftime('%H:%M:%S')
+    else:
+        time_str = datetime.now().strftime('%H:%M:%S')
+
+    time_disp = f"{_ANSI_DIM}{time_str}{_ANSI_RESET}" if color else time_str
+
+    # 2. Level Badge
+    level = event.get('level') or _event_level(event)
+    category = event.get('category')
+    if category == 'audit':
+        badge = f"{_ANSI_MAGENTA}[AUDIT]{_ANSI_RESET}" if color else "[AUDIT]"
+    elif level == 'ERROR':
+        badge = f"{_ANSI_BOLD_RED}[ERROR]{_ANSI_RESET}" if color else "[ERROR]"
+    elif level == 'WARNING':
+        badge = f"{_ANSI_BOLD_YELLOW}[WARN] {_ANSI_RESET}" if color else "[WARN] "
+    else:
+        badge = f"{_ANSI_CYAN}[INFO] {_ANSI_RESET}" if color else "[INFO] "
+
+    # 3. HTTP Request formatting (when method or route present)
+    method = event.get('method')
+    route = event.get('route')
+    status = event.get('status')
+    duration_ms = event.get('duration_ms')
+
+    if method or route:
+        m_str = str(method or 'GET').upper()
+        m_padded = f"{m_str:<6}"
+        if color:
+            m_padded = f"{_ANSI_BOLD}{m_padded}{_ANSI_RESET}"
+
+        r_str = str(route or 'unmatched')
+        r_padded = f"{r_str:<32}"
+
+        # Status
+        status_part = ""
+        if status:
+            st_text = _STATUS_TEXTS.get(status, str(status))
+            st_padded = f"{st_text:<16}"
+            if color:
+                if status < 300:
+                    status_part = f"{_ANSI_GREEN}{st_padded}{_ANSI_RESET}"
+                elif status < 400:
+                    status_part = f"{_ANSI_CYAN}{st_padded}{_ANSI_RESET}"
+                elif status < 500:
+                    status_part = f"{_ANSI_YELLOW}{st_padded}{_ANSI_RESET}"
+                else:
+                    status_part = f"{_ANSI_BOLD_RED}{st_padded}{_ANSI_RESET}"
+            else:
+                status_part = st_padded
+
+        # Duration
+        dur_part = ""
+        if duration_ms is not None:
+            if duration_ms >= 1000:
+                d_val = f"{duration_ms / 1000:.1f}s"
+            else:
+                d_val = f"{int(round(duration_ms))}ms"
+            d_padded = f"{d_val:>7}"
+            if color:
+                if duration_ms > 2000:
+                    dur_part = f"{_ANSI_RED}{d_padded}{_ANSI_RESET}"
+                elif duration_ms > 800:
+                    dur_part = f"{_ANSI_YELLOW}{d_padded}{_ANSI_RESET}"
+                else:
+                    dur_part = f"{_ANSI_DIM}{d_padded}{_ANSI_RESET}"
+            else:
+                dur_part = d_padded
+
+        # Trailing details (dashes / tabs)
+        extras = []
+        if event.get('reason'):
+            extras.append(f"reason: {event['reason']}")
+        if event.get('parser'):
+            extras.append(f"parser: [{event['parser']}]")
+        if event.get('operation'):
+            extras.append(f"op: {event['operation']}")
+        if event.get('error_kind'):
+            extras.append(f"error: {event['error_kind']}")
+        if event.get('component'):
+            extras.append(f"comp: {event['component']}")
+
+        trailing = f"  \t—  {', '.join(extras)}" if extras else ""
+        return f"{time_disp}  {badge}  {m_padded} {r_padded} {status_part} {dur_part}{trailing}".rstrip()
+
+    # 4. Parser failures
+    if event.get('code') == 'parser.failed':
+        parser = event.get('parser', 'unspecified')
+        reason = event.get('reason', '')
+        error_kind = event.get('error_kind', '')
+        trailing_parts = [f"reason: {reason}"]
+        if error_kind:
+            trailing_parts.append(f"kind: {error_kind}")
+        p_label = f"PARSER [{parser}] failed  \t—  {', '.join(trailing_parts)}"
+        if color:
+            p_label = f"{_ANSI_BOLD_RED}PARSER [{parser}] failed{_ANSI_RESET}  \t—  {', '.join(trailing_parts)}"
+        return f"{time_disp}  {badge}  {p_label}"
+
+    # 5. Outbound failures / timeouts
+    if str(event.get('code', '')).startswith('outbound.'):
+        code = event.get('code')
+        st_num = event.get('status', '—')
+        target = "ilias.unibe.ch"
+        out_msg = f"OUTBOUND {code} [{target}] (status: {st_num})"
+        if event.get('reason'):
+            out_msg += f"  \t—  reason: {event['reason']}"
+        return f"{time_disp}  {badge}  {out_msg}"
+
+    # 6. Generic / Other events (runtime, mutation, report, etc.)
+    code = event.get('code', 'event')
+    ignored = {'schema', 'worker', 'build', 'app_version', 'timestamp', 'level', 'category', 'code'}
+    details = [f"{k}: {v}" for k, v in event.items() if k not in ignored and v is not None and v != '']
+    det_str = f"  \t—  {', '.join(details)}" if details else ""
+    return f"{time_disp}  {badge}  {code}{det_str}"
+
+
 def _write_console(event):
     global _console_failures
     try:
-        _console.log(getattr(logging, event.get('level', _event_level(event))),
-                     '%s', json.dumps(event, separators=(',', ':')))
+        formatted = format_console_event(event)
+        _console.log(getattr(logging, event.get('level', _event_level(event))), '%s', formatted)
     except (OSError, ValueError):
         # Logging must never stop the writer or dump a raw exception to stderr.
         _console_failures += 1

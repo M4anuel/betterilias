@@ -10,6 +10,7 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   is documented in `docs/STATE_MACHINE_INTEGRITY.md`.
 
 - [x] Support self-hosted distribution error reporting with upstream sharing to betterilias.ch, marked with app version and distribution origin, and provide a dedicated self-hosted error logs section in the admin dashboard.
+- [x] Format terminal console logs into human-readable output with semantic ANSI colors for status codes, clean HH:MM:SS timestamps, and aligned columns, while retaining raw JSON in the events SQLite database.
 - [x] Consolidate feedback banners, badges, buttons/icon buttons and native dialog
   shells across community, course management, grading, diagnostics and admin UI.
   Preserve domain-specific authentication, write certainty and draft ownership;

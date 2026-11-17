@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from typing import List, Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,6 +31,7 @@ class Settings(BaseSettings):
     diagnostic_report_operator_name: str = Field(default='', max_length=120)
     diagnostic_report_privacy_url: str = ''
     log_console_level: Literal['INFO', 'WARNING', 'ERROR', 'OFF'] = 'INFO'
+    log_console_format: Literal['human', 'json'] | None = None
     observability_retention_days: int = Field(default=7, ge=1, le=30)
     observability_max_events: int = Field(default=50000, ge=100, le=500000)
     observability_queue_size: int = Field(default=2048, ge=16, le=10000)
@@ -62,6 +64,14 @@ class Settings(BaseSettings):
         if domain == 'betterilias.ch' and self.app_env == 'production':
             return False
         return True
+
+    @property
+    def console_format(self) -> Literal['human', 'json']:
+        if self.log_console_format is not None:
+            return self.log_console_format
+        if self.app_env == 'test' or 'pytest' in sys.modules or 'PYTEST_CURRENT_TEST' in os.environ:
+            return 'json'
+        return 'human'
 
     # ILIAS Configuration
     ilias_base_url: str = "https://ilias.unibe.ch"
