@@ -85,18 +85,21 @@ def test_safe_inspect_zip_path_traversal():
     assert any("traversal" in err.lower() for err in errors)
 
 
-def test_parse_unit_from_path():
+@pytest.mark.parametrize('separator', ['-', '_'])
+@pytest.mark.parametrize('prefix', ['', 'feedback/', 'TA/wrapped/feedback/'])
+@pytest.mark.parametrize('case', ['lower', 'upper'])
+def test_parse_unit_from_path(separator, prefix, case):
     user_map = {"101": SubmissionItem(member_id="101", student_name="Alice", submission_status="submitted")}
     team_map = {"55": SubmissionItem(member_id="102", student_name="Bob", team_id="55", submission_status="submitted")}
 
     # Team path
-    uid, utype, raw = parse_unit_from_path("feedback/team-55/feedback.pdf", user_map, team_map)
+    uid, utype, raw = parse_unit_from_path(f"{prefix}{'TEAM' if case == 'upper' else 'team'}{separator}55/feedback.pdf", user_map, team_map)
     assert uid == "team:55"
     assert utype == "team"
     assert raw == "55"
 
     # User path
-    uid, utype, raw = parse_unit_from_path("feedback/user-101/review.txt", user_map, team_map)
+    uid, utype, raw = parse_unit_from_path(f"{prefix}{'USER' if case == 'upper' else 'user'}{separator}101/review.txt", user_map, team_map)
     assert uid == "user:101"
     assert utype == "user"
     assert raw == "101"
@@ -106,8 +109,9 @@ def test_parse_unit_from_path():
     assert uid == "user:101"
 
 
+@pytest.mark.parametrize('separator', ['-', '_'])
 @pytest.mark.asyncio
-async def test_preview_and_commit_feedback_import():
+async def test_preview_and_commit_feedback_import(separator):
     # Setup mock submissions
     subs = [
         SubmissionItem(
@@ -142,9 +146,9 @@ async def test_preview_and_commit_feedback_import():
     # Create ZIP containing feedback for both units
     zip_content = {
         "betterilias-feedback.json": json.dumps({"ass_id": "42", "exercise_ref_id": "999"}).encode("utf-8"),
-        "feedback/team-55/feedback.pdf": b"review team 55",  # Has conflict
-        "feedback/user-102/solution_review.txt": b"review student 102",  # New
-        "feedback/user-999/unknown.txt": b"unknown student",  # Unmatched
+        f"feedback/team{separator}55/feedback.pdf": b"review team 55",  # Has conflict
+        f"feedback/user{separator}102/solution_review.txt": b"review student 102",  # New
+        f"feedback/user{separator}999/unknown.txt": b"unknown student",  # Unmatched
     }
     zip_bytes = create_test_zip(zip_content)
 
@@ -379,3 +383,14 @@ async def test_manual_mapping_overwrite_deletes_existing_file():
         ass_id="42",
         feedback_url="https://ilias.unibe.ch/feedback-102",
     )
+
+
+@pytest.mark.parametrize('separator', ['-', '_'])
+@pytest.mark.parametrize('kind,recipient', [('team', '55'), ('user', '101')])
+def test_single_recipient_folder_is_not_stripped_as_wrapper(separator, kind, recipient):
+    path = f'{kind}{separator}{recipient}/review.pdf'
+    valid, skipped, errors = safe_inspect_zip(create_test_zip({path: b'review'}))
+    assert errors == []
+    assert skipped == []
+    assert valid == [(path, b'review')]
+    assert parse_unit_from_path(valid[0][0], {}, {}) == (f'{kind}:{recipient}', kind, recipient)

@@ -1574,7 +1574,7 @@
   "BetterIlias-Paket:": "BetterIlias package:",
   "ZIP mit betterilias-feedback.json und feedback/team-123/ bzw. feedback/user-456/ Ordnern.": "ZIP with betterilias-feedback.json and feedback/team-123/ or feedback/user-456/ folders.",
   "Direkte ID-Ordner:": "Direct ID folders:",
-  "ZIP mit team-<id>/ oder user-<id>/ Ordnern (z. B. team-12/korrektur.pdf).": "ZIP with team-<id>/ or user-<id>/ folders (e.g. team-12/review.pdf).",
+  "ZIP mit team-<id>/ oder user-<id>/ Ordnern (z. B. team-12/korrektur.pdf).": "ZIP with team-<id>/ or user-<id>/ folders. Underscores also work (e.g. team_12/review.pdf).",
   "ILIAS-Multi-Feedback:": "ILIAS multi-feedback:",
   "Natives ILIAS-Archiv mit Unterordnern pro Teilnehmer-ID.": "Native ILIAS archive with subfolders per participant ID.",
   "Hinweis: Eingereichte Originalabgaben im submissions/-Ordner werden automatisch ignoriert und nicht erneut hochgeladen.": "Note: Original submissions inside submissions/ folder are automatically ignored and never re-uploaded.",

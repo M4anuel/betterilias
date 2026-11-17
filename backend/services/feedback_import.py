@@ -143,7 +143,8 @@ def safe_inspect_zip(zip_bytes: bytes) -> Tuple[List[Tuple[str, bytes]], List[st
             if len(first_parts) == 1 and "" not in first_parts:
                 candidate = list(first_parts)[0]
                 # Don't strip if the candidate is already a recognizable structural folder (like "feedback" or "submissions")
-                if candidate.lower() not in ["feedback", "submissions"]:
+                if (candidate.lower() not in ["feedback", "submissions"]
+                        and not candidate.lower().startswith(("team-", "team_", "user-", "user_"))):
                     wrapper_prefix = candidate + "/"
 
             for info in infolist:
@@ -200,8 +201,8 @@ def parse_unit_from_path(
     """
     Attempts to identify the recipient (unit_id, unit_type, raw_id) from the relative path.
     Supported patterns:
-    - feedback/team-<id>/... or team-<id>/...
-    - feedback/user-<id>/... or user-<id>/...
+    - feedback/team-<id>/... or team-<id>/... (also team_<id>)
+    - feedback/user-<id>/... or user-<id>/... (also user_<id>)
     - .../<numeric_user_id>/filename (native individual layout)
     """
     parts = clean_path.split("/")
@@ -210,17 +211,17 @@ def parse_unit_from_path(
 
     filename = parts[-1]
 
-    # Pattern 1 & 2: Explicit prefix team- or user-
+    # Pattern 1 & 2: Explicit team/user prefix with dash or underscore
     for part in parts[:-1]:
         part_clean = part.strip()
-        if part_clean.lower().startswith("team-"):
+        if part_clean.lower().startswith(("team-", "team_")):
             tid = part_clean[5:].strip()
             if tid in team_map or f"team:{tid}" in team_map:
                 return f"team:{tid}", "team", tid
             # Fallback check if it's numeric team
             return f"team:{tid}", "team", tid
 
-        if part_clean.lower().startswith("user-"):
+        if part_clean.lower().startswith(("user-", "user_")):
             uid = part_clean[5:].strip()
             return f"user:{uid}", "user", uid
 

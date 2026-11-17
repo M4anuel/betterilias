@@ -358,6 +358,11 @@ Only normalize a native bulk ZIP into this structure when its original entries c
 
 ### Supported input families
 
+Team/user recipient folders accept either `-` or `_` before the ID, for example
+`team-12/`, `team_12/`, `user-456/` and `user_456/`, including nested `feedback/`
+layouts. Exported packages continue to use dashes. A single recipient folder is
+preserved during ZIP wrapper normalization. Recipient verification is unchanged.
+
 1. **BetterIlias round trip:** manifest plus `feedback/team-<id>/...` or `feedback/user-<id>/...`, either as a directory selection or ZIP.
 2. **Explicit native-ID folders:** the same team/user folder layout without a manifest; resolve against the currently selected assignment and show the mapping before upload. Optional single outer wrapper/TA folder must be normalized explicitly.
 3. **Native individual multi-feedback ZIP:** use the actual structure downloaded from ILIAS. In inspected ILIAS 9 source, the recipient is the final user-ID component in a second-level folder, with files directly below it; deeper paths are not imported by that native reader. Validate exact structure/context/membership rather than loosely matching names.

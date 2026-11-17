@@ -4,6 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Accept both dashes and underscores in feedback-import team/user folder
+  prefixes and preserve direct single-recipient ZIP folders (version 1.1.1).
+
 - [x] Keep correction-card pending/saved states independent per account, exercise,
   assignment and member; share save completion with details, preserve newer drafts,
   and ignore stale responses. Redistribution is unchanged. Deferred browser coverage
