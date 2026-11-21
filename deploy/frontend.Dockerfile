@@ -10,7 +10,7 @@ COPY extensions ./extensions
 COPY scripts/sync-extension-locales.mjs scripts/build-safari-worker.mjs scripts/check-locales.mjs ./scripts/
 RUN npm --prefix frontend run build
 
-FROM caddy:2.11-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
+FROM caddy:2.11-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.source="https://github.com/M4anuel/betterilias" \
       org.opencontainers.image.revision=$VCS_REF
