@@ -134,6 +134,15 @@ performed during this investigation.
 
 ## Remaining feature scope
 
+Future upgrade: remove the companion dependency from UniSport login by obtaining
+an approved SWITCH client with a BetterIlias HTTPS callback. Confirm that the
+UniApp backend accepts tokens issued to that client; SWITCH login alone does not
+establish API compatibility. Keep authorization-code exchange and token storage
+on the backend, with PKCE, state, nonce and independent session isolation.
+Replace the native-callback bridge once the direct web flow is verified. UniSport
+API calls already run through the backend and do not require the companion after
+login; the existing ILIAS companion integration is a separate concern.
+
 Public offer search/detail views and bookmarks remain to be implemented.
 Follow with verified manual registration and explicitly armed one-occurrence
 client-timed registration. Autologin, recurring subscriptions and browser-closed

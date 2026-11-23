@@ -22,6 +22,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   disconnection, affiliation selection and read-only registrations (1.3.0).
 - [ ] Verify the prototype with a real SWITCH account; add public offer search/
   detail views and bookmarks. Keep ILIAS authentication independent.
+- [ ] Upgrade UniSport to direct web login without the companion: obtain an
+  approved SWITCH client/HTTPS callback for BetterIlias and verify that UniApp
+  accepts tokens issued to that client. Keep token exchange and credentials on
+  the backend, preserving PKCE/state/nonce checks and independent UniSport
+  sessions. Replace the native-callback bridge only after the web flow works.
 - [ ] Follow with manual registration and verified outcomes, then explicitly
   armed, one-occurrence client-timed registration. Autologin/session renewal,
   recurring subscriptions and browser-closed scheduling remain later features.
