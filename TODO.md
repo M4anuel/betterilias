@@ -20,8 +20,17 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   Protocol evidence and test boundaries: `docs/UNISPORT_INTEGRATION.md`.
 - [x] Add default Unisport navigation in every semester, independent connection/
   disconnection, affiliation selection and read-only registrations (1.3.0).
-- [ ] Verify the prototype with a real SWITCH account; add public offer search/
-  detail views and bookmarks. Keep ILIAS authentication independent.
+- [x] Add public offer browsing, local search/sport filters, details and viewing
+  existing bookmarks (1.4.0). Cache the complete catalogue and derived sport
+  types for 15 minutes, details for five minutes, and private lists for one
+  minute in account/affiliation-scoped tab storage. Persist public data in
+  IndexedDB and the shared server volume, retain last complete snapshots on
+  refresh failure, and provide timestamps and explicit refresh controls.
+- [ ] Complete live account acceptance for affiliations, bookmarks and
+  registrations. The owner reported that the 1.3.0 login prototype appears to
+  work; automated personal-account checks remain synthetic.
+- [ ] Add bookmark editing with confirmed readback. Keep ILIAS authentication
+  independent and never reuse personal-list caches across account generations.
 - [ ] Upgrade UniSport to direct web login without the companion: obtain an
   approved SWITCH client/HTTPS callback for BetterIlias and verify that UniApp
   accepts tokens issued to that client. Keep token exchange and credentials on

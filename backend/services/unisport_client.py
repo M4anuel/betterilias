@@ -1,10 +1,4 @@
-"""Read-only UniApp transport; not an authentication implementation.
-
-The caller must supply an independently verified Unisport account context.
-No ILIAS session, login fallback, affiliation discovery or registration is implied.
-The only upstream operations established by the supplied developer excerpt are
-getOffer and myApplications; mutations are deliberately absent from this adapter.
-"""
+"""Read-only UniApp transport with explicit public and account-owned reads."""
 import hashlib
 import json
 from dataclasses import dataclass
@@ -44,9 +38,9 @@ class UnisportAccount:
 
 
 class UnisportClient:
-    def __init__(self, account: UnisportAccount, *, transport=None, budget=None):
+    def __init__(self, account: UnisportAccount | None = None, *, transport=None, budget=None):
         self.account = account
-        self.identity = 'unisport:' + hashlib.sha256(account.subject.encode()).hexdigest()
+        self.identity = 'unisport:' + (hashlib.sha256(account.subject.encode()).hexdigest() if account else 'public')
         self.budget = budget or OutboundBudget()
         policy = TargetPolicy(native_url=ORIGIN, media_origins=[], allow_local=False)
         self.client = httpx.AsyncClient(transport=EgressTransport(policy=policy, inner=transport),
@@ -58,16 +52,21 @@ class UnisportClient:
     async def __aexit__(self, *args):
         await self.client.aclose()
 
-    async def _read(self, path, locale, **params):
+    async def _read(self, path, locale, *, public=False, **params):
         if locale not in ('de', 'en'):
             raise ValueError('Unsupported Unisport language')
+        headers = {'Accept': 'application/json'}
+        if not public:
+            if self.account is None:
+                raise UnisportReadError('connection_required')
+            headers.update({'Authorization': 'Bearer ' + self.account.id_token.get_secret_value(),
+                'X-UNICAMPUS-AFFILIATION': self.account.affiliation})
         permit = await self.budget.acquire(self.identity)
         try:
-            async with self.client.stream('GET', BASE + path, params={**params, 'locale': locale}, headers={
-                'Authorization': 'Bearer ' + self.account.id_token.get_secret_value(),
-                'X-UNICAMPUS-AFFILIATION': self.account.affiliation,
-                'Accept': 'application/json',
-            }) as response:
+            # UniApp uses explicit bearer/affiliation headers. Do not replay
+            # even an upstream-set cookie on subsequent public cache requests.
+            self.client.cookies.clear()
+            async with self.client.stream('GET', BASE + path, params={**params, 'locale': locale}, headers=headers) as response:
                 if response.status_code in (401, 403):
                     raise UnisportReadError('connection_required')
                 if response.status_code != 200:
@@ -86,26 +85,37 @@ class UnisportClient:
         finally:
             await permit.close()
 
-    async def offer(self, offer_id: int, locale='de'):
+    async def offer(self, offer_id: int, locale='de', *, public=False):
         if type(offer_id) is not int or offer_id <= 0:
             raise ValueError('A positive offer ID is required')
-        data = await self._read(f'/sports/offers/getOffer/{offer_id}', locale)
+        data = await self._read(f'/sports/offers/getOffer/{offer_id}', locale, public=public)
         if not isinstance(data, dict):
             raise UnisportReadError('invalid_response')
         return data
 
     async def applications(self, locale='de'):
+        return await self._pages('/sports/offers/myApplications', locale, 'incomplete_applications')
+
+    async def bookmarks(self, locale='de'):
+        return await self._pages('/sports/recommendation/myBookmarks', locale, 'incomplete_bookmarks')
+
+    async def catalogue(self, locale='de'):
+        # The public endpoint accepts 100 items per page (verified separately).
+        return await self._pages('/sports/offers/search', locale, 'incomplete_catalogue',
+            public=True, size=100, search='', available='false')
+
+    async def _pages(self, path, locale, error, *, public=False, size=PAGE_SIZE, **params):
         items, seen_pages = [], set()
-        for offset in range(0, MAX_APPLICATIONS, PAGE_SIZE):
-            page = await self._read('/sports/offers/myApplications', locale, offset=offset, limit=PAGE_SIZE)
-            if not isinstance(page, list) or len(page) > PAGE_SIZE or any(not isinstance(item, dict) for item in page):
-                raise UnisportReadError('incomplete_applications')
+        for offset in range(0, MAX_APPLICATIONS, size):
+            page = await self._read(path, locale, public=public, offset=offset, limit=size, **params)
+            if not isinstance(page, list) or len(page) > size or any(not isinstance(item, dict) for item in page):
+                raise UnisportReadError(error)
             if page:
                 fingerprint = hashlib.sha256(json.dumps(page, sort_keys=True).encode()).digest()
                 if fingerprint in seen_pages:
-                    raise UnisportReadError('incomplete_applications')
+                    raise UnisportReadError(error)
                 seen_pages.add(fingerprint)
             items.extend(page)
-            if len(page) < PAGE_SIZE:
+            if len(page) < size:
                 return items
-        raise UnisportReadError('incomplete_applications')
+        raise UnisportReadError(error)

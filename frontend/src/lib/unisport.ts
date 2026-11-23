@@ -11,13 +11,16 @@ export function unisportCredential(): string {
   return credential;
 }
 
-export async function unisportFetch<T>(path: string, credential: string, method = 'GET', body?: unknown): Promise<T> {
+export async function unisportFetch<T>(path: string, credential: string, method = 'GET', body?: unknown, signal?: AbortSignal, scope?: string): Promise<T> {
   const response = await fetch('/api/unisport' + path, {
     method, credentials: 'omit', cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', 'X-Unisport-Session': credential, 'Accept-Language': getLanguage() },
-    body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(60000),
+    headers: { 'Content-Type': 'application/json', 'X-Unisport-Session': credential, 'Accept-Language': getLanguage(),
+      ...(scope ? { 'X-Unisport-Scope': scope } : {}) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000),
   });
   const data = await response.json().catch(() => null);
+  if (response.status === 401 || response.headers.get('X-Unisport-Connection-Changed') === '1') window.dispatchEvent(new Event('unisport-connection-changed'));
   if (!response.ok) throw new Error(typeof data?.detail === 'string' ? data.detail : t('unisport.read_failed'));
   return data as T;
 }

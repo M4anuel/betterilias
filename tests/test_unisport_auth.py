@@ -61,12 +61,15 @@ def test_start_is_pkce_bound_private_and_independent():
 
 @pytest.mark.parametrize('changes', [
     {'iss': 'https://other.example/'}, {'aud': 'other'}, {'nonce': 'other'},
-    {'exp': 1}, {'iat': int(time.time()) + 900}, {'sub': ''}, {'sub': None},
+    {'exp': 1}, {'iat': 'future'}, {'sub': ''}, {'sub': None},
     {'exp': '9999999999'}, {'iat': True}, {'azp': 'other'},
     {'aud': [auth.CLIENT, 'other']}, {'auth_time': 'yesterday'},
 ])
 def test_id_token_rejects_invalid_claims(signing, changes):
     sign, keys = signing
+    # Collection can precede execution by a long time in the full suite.
+    if changes.get('iat') == 'future':
+        changes = {**changes, 'iat': int(time.time()) + 900}
     with pytest.raises(auth.LoginError):
         auth.validate_id_token(sign('nonce', **changes), keys, 'nonce')
 
@@ -187,7 +190,7 @@ def test_http_api_separate_capabilities_flag_and_no_secrets():
     assert response.status_code == 200 and response.headers['cache-control'] == 'no-store'
     state = response.json()['state']
     status = client.get('/api/unisport/connection', headers=headers).json()
-    assert status == {'phase': 'pending', 'affiliation': None}
+    assert status == {'phase': 'pending', 'affiliation': None, 'scope': None}
     assert state not in json.dumps(status) and 'verifier' not in json.dumps(status)
     assert client.get('/api/unisport/connection', headers={'X-Unisport-Session': secrets.token_urlsafe(32)}).json()['phase'] == 'disconnected'
     assert client.post('/api/unisport/auth/complete', headers=headers, json={'callback': callback('wrong')}).status_code == 400

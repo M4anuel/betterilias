@@ -48,6 +48,16 @@ the companion does not delete an established server connection or log out SWITCH
 Safari does not include this prototype. These practices may be updated as the
 prototype develops; this policy will be updated when data use changes.
 
+UniSport public catalogue data, derived sport types and offer details are cached
+on the server and in browser IndexedDB without account credentials or personal
+bookmark flags. Private bookmark/registration results may be cached in browser
+tab storage for one minute of validity, scoped to the current login generation,
+affiliation and language; disconnect clears those personal caches. Public caches
+can be removed through the browser's site-data controls. Server public caches
+retain previous complete snapshots for up to seven days; the detail cache is
+bounded to 128 entries. Browser public snapshots can remain until replaced,
+evicted or cleared, with timestamps and stale-data feedback when displayed.
+
 ---
 
 ## Deutsch (Datenschutzerklärung)
@@ -95,3 +105,15 @@ Das Trennen der Verbindung löscht sie sofort. Das Schliessen des Browsers oder
 Entfernen des Companions löscht keine bestehende Serververbindung und meldet dich
 nicht bei SWITCH ab. Safari enthält diesen Prototyp nicht. Bei Änderungen der
 Datenverwendung wird diese Erklärung aktualisiert.
+
+Öffentliche Unisport-Angebote, daraus abgeleitete Sportarten und Angebotsdetails
+werden auf dem Server und im Browser in IndexedDB gespeichert, ohne Zugangsdaten
+oder persönliche Merkliste-Markierungen. Persönliche Merklisten und Anmeldungen
+können für eine Minute Gültigkeit im Browser-Tab gespeichert werden, getrennt
+nach Anmeldung, Zugehörigkeit und Sprache. Das Trennen der Verbindung löscht
+diese persönlichen Caches. Öffentliche Browser-Caches lassen sich über die
+Webseitendaten-Einstellungen löschen. Der Server behält vorherige vollständige
+öffentliche Datenstände bis zu sieben Tage und höchstens 128 Angebotsdetails.
+Öffentliche Browser-Daten bleiben gegebenenfalls bis zum Ersetzen, Verdrängen oder
+Löschen erhalten; bei der Anzeige erscheinen Zeitstempel und Hinweise auf ältere
+Daten.

@@ -102,3 +102,35 @@ async def test_exhausted_pagination_is_not_complete(account,budget,monkeypatch):
         return httpx.Response(200,json=[{'id':i} for i in range(offset,offset+20)])
     async with UnisportClient(account,transport=httpx.MockTransport(handler),budget=budget) as client:
         with pytest.raises(UnisportReadError,match='incomplete_applications'):await client.applications()
+
+
+@pytest.mark.asyncio
+async def test_complete_public_catalogue_never_sends_credentials(account, budget):
+    calls=[]
+    def handler(request):
+        calls.append(request)
+        assert 'authorization' not in request.headers and 'x-unicampus-affiliation' not in request.headers and 'cookie' not in request.headers
+        assert request.url.params['limit']=='100' and request.url.params['search']=='' and request.url.params['available']=='false'
+        offset=int(request.url.params['offset'])
+        return httpx.Response(200,headers={'set-cookie':'private=must-not-be-replayed'},
+            json=[{'id':i+1,'title':'Offer'} for i in range(offset,min(offset+100,103))])
+    async with UnisportClient(account,transport=httpx.MockTransport(handler),budget=budget) as client:
+        assert len(await client.catalogue('en'))==103
+    assert len(calls)==2
+
+
+@pytest.mark.asyncio
+async def test_public_detail_and_private_bookmarks_are_explicit(account,budget):
+    calls=[]
+    def handler(request):
+        calls.append(request)
+        public='getOffer' in request.url.path
+        assert ('authorization' in request.headers) is not public
+        assert ('x-unicampus-affiliation' in request.headers) is not public
+        return httpx.Response(200,json={'id':12} if public else [{'id':12}])
+    async with UnisportClient(account,transport=httpx.MockTransport(handler),budget=budget) as client:
+        await client.offer(12,'en',public=True)
+        assert await client.bookmarks('en')==[{'id':12}]
+    async with UnisportClient(transport=httpx.MockTransport(handler),budget=budget) as client:
+        with pytest.raises(UnisportReadError,match='connection_required'): await client.bookmarks()
+    assert len(calls)==2

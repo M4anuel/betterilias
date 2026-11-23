@@ -7,6 +7,10 @@ This is an unofficial prototype reusing the inspected native application's
 public client, not an approved BetterIlias SWITCH registration. Real-account
 acceptance remains a manual check; synthetic tests do not establish it.
 
+Version 1.4.0 adds public offer browsing, local search/sport filters, cached
+details and viewing existing bookmarks. Public browsing does not require SWITCH
+login. Bookmark editing and booking inside BetterIlias remain future steps.
+
 ## Try it locally
 
 1. Install the updated backend requirements (`python -m pip install -r requirements.txt`
@@ -25,6 +29,45 @@ acceptance remains a manual check; synthetic tests do not establish it.
    SWITCH**. Complete login/consent directly on the real provider's page.
 6. Return to BetterIlias, choose and confirm an affiliation, then load personal
    registrations. No booking request is made.
+7. Browse the public offers, filter by search text/sport type and open details.
+   Use the saved-offers filter after choosing an affiliation to view bookmarks
+   already present in the UniSport account. The official offer link opens the
+   university's page separately.
+
+## Catalogue and personal cache policy
+
+The complete public catalogue is fetched in bounded 100-item pages, with duplicate
+page and malformed-response detection. Only a complete successful snapshot is
+published. Sport types are derived from all its offers, so filtering does not
+depend on the first visible page. Search and filters run locally; showing more
+cards does not fetch more upstream pages.
+
+| Data | Fresh for | Storage and scope |
+| --- | --- | --- |
+| Complete catalogue and sport types | 15 minutes | Shared server SQLite and browser IndexedDB, separately per language |
+| Offer details | 5 minutes | Shared server SQLite and browser IndexedDB, per offer ID/language; bounded to 128 details |
+| Existing bookmarks and registrations | 1 minute | Browser sessionStorage, scoped to login generation, affiliation, list kind and language |
+
+Public server data lives in `COORDINATION_DIR/unisport-public/cache.sqlite3` and
+contains no credentials, personal bookmark flags or private lists. Shared locks
+coalesce concurrent refreshes across workers. A failed refresh retains the last
+complete snapshot; the server can serve it for up to seven days marked stale.
+The browser retains its last public snapshot for offline/error recovery and
+shows its timestamp, with an older-data warning after freshness expires. Explicit
+refresh bypasses normal TTLs. Browser storage failures do not prevent browsing.
+
+Public calls send neither bearer/affiliation credentials nor cookies. Bookmarks
+provide membership and fallback titles only; current occurrences and status come
+from the cached public catalogue/details, not the potentially old personalized
+DTO. Private responses check account generation and affiliation again before
+returning, and the UI rejects responses belonging to a previous scope. Disconnect
+clears the tab's personal caches. A reconnect gets a new opaque cache scope;
+provider subject IDs and tokens are not exposed for cache naming.
+
+Availability remains a snapshot, not a booking guarantee. Dates with explicit
+offsets are displayed in Europe/Zurich time. Detail text is converted to plain
+text, and official links are restricted to HTTPS university hosts. No booking or
+bookmark mutation is performed by the new browsing workflows.
 
 If the browser asks to open the UniBE app, do not approve launching another app;
 return to BetterIlias and check the connection. The companion observes the
@@ -143,8 +186,8 @@ Replace the native-callback bridge once the direct web flow is verified. UniSpor
 API calls already run through the backend and do not require the companion after
 login; the existing ILIAS companion integration is a separate concern.
 
-Public offer search/detail views and bookmarks remain to be implemented.
-Follow with verified manual registration and explicitly armed one-occurrence
+Bookmark editing remains to be implemented. Follow with verified manual
+registration and explicitly armed one-occurrence
 client-timed registration. Autologin, recurring subscriptions and browser-closed
 scheduling remain later features. Mocked authentication is development/test-only
 and must not enable production account operations.
@@ -168,3 +211,12 @@ and must not enable production account operations.
   Screenshots are reviewed for appearance as well as overflow.
 - No real SWITCH login/token exchange, live personal UniApp read, booking,
   physical iOS Safari or Android Chrome validation has been performed.
+- Version 1.4.0 public-only live acceptance loaded a complete snapshot containing
+  923 offers and 133 derived sport types on 2026-11-23. No account credentials
+  were used. The project owner separately reported that the login prototype
+  appears to work; this does not extend the agent's live private-account checks.
+- Catalogue tests cover persistent/reused caches, complete pagination, language
+  separation, bounded detail storage, stale fallback, local filters and focus
+  restoration, IndexedDB reload, private-cache scope changes and rejection of
+  in-flight private responses after disconnect. UI checks use Chromium emulation
+  at the same phone/tablet/desktop widths and language/theme combinations above.

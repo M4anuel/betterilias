@@ -12,7 +12,7 @@ pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '
 
 
 def mount(page, connected=False):
-    state = {'phase': 'connected' if connected else 'disconnected', 'affiliation': None}
+    state = {'phase': 'connected' if connected else 'disconnected', 'affiliation': None, 'scope': 'a' * 64 if connected else None}
     writes = []
     def api(route):
         request = route.request; path = urlsplit(request.url).path
@@ -21,6 +21,7 @@ def mount(page, connected=False):
         if request.method != 'GET': writes.append((path, request.method, request.post_data_json))
         if path.endswith('/auth/start'):
             state['phase'] = 'pending'; data = dict(authorization_url='https://login.eduid.ch/synthetic', state='x' * 43)
+        elif path.endswith('/catalogue'): data = {'items': [], 'sports': [], 'fetched_at': 1795459500, 'stale': False}
         elif path.endswith('/affiliations'): data = {'affiliations': ['student@example.edu', 'staff@example.edu']}
         elif path.endswith('/affiliation'):
             state['affiliation'] = request.post_data_json['affiliation']; data = {'affiliation': state['affiliation']}
