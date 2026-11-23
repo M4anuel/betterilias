@@ -26,7 +26,7 @@ export interface SidebarOrderItem {
   title?: string;
 }
 
-export type SidebarDefaultNavItem = 'semester' | 'calendar' | 'my_courses' | 'repository' | 'feature_requests';
+export type SidebarDefaultNavItem = 'semester' | 'calendar' | 'my_courses' | 'repository' | 'feature_requests' | 'unisport';
 
 export interface DashboardResponse {
   courses: CourseItem[];

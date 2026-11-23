@@ -36,6 +36,7 @@ const DEFAULT_NAV_ITEMS: { id: SidebarDefaultNavItem; type: 'nav' }[] = [
   { id: 'my_courses', type: 'nav' },
   { id: 'repository', type: 'nav' },
     { id: 'feature_requests', type: 'nav' },
+    { id: 'unisport', type: 'nav' },
 ];
 
 export const NicknameModal: React.FC<NicknameModalProps> = ({

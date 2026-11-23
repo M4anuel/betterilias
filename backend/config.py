@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     upstream_report_url: str = Field(default='https://betterilias.ch/api/diagnostics/upstream-report', max_length=512)
     allow_upstream_error_sharing: bool = True
     coordination_dir: str = '.coordination'
+    # Experimental companion-based SWITCH login; independent of ILIAS sessions.
+    unisport_enabled: bool = False
     feature_requests_dir: str = '.feature_requests'
     feature_images_max_bytes: int = Field(default=10_000_000_000, ge=1)
     # Private diagnostics; never serve this directory as static content.

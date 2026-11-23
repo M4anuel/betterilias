@@ -120,7 +120,10 @@ def package(origin, output, browser='all'):
                                         if item not in ('http://localhost/*', 'http://127.0.0.1/*')]
         manifest['host_permissions'].append(pattern)
         for script in manifest['content_scripts']:
-            script['matches'] = [pattern]
+            # Provider callback scripts must retain their pinned provider host.
+            # Only the BetterIlias page bridge follows the deployment origin.
+            if 'content.js' in script.get('js', []):
+                script['matches'] = [pattern]
         path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         _write_unix_zip(target, output / f'betterilias-{browser}.zip')
     return output

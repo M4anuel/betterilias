@@ -24,6 +24,7 @@ from backend.diagnostic_reports import ReportMiddleware, problem
 from backend.diagnostic_metadata import APP_VERSION, register_routes
 from backend import activity
 from backend.api.routes import feature_requests
+from backend.api.routes import unisport
 
 configure_logging()
 logger = logging.getLogger("ilias.main")
@@ -184,6 +185,7 @@ async def httpx_network_handler(request: Request, exc: httpx.NetworkError):
 
 # Register API Routes
 app.include_router(auth.router, prefix="/api")
+app.include_router(unisport.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(materials.router, prefix="/api")
 app.include_router(exercises.router, prefix="/api")

@@ -18,10 +18,29 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
   }
   if (!allowedOrigins.has(window.location.origin)) return;
 
+  // Only this configured BetterIlias page can request a UniSport login. Provider
+  // tokens and authorization codes never travel through the page message bridge.
+  window.addEventListener('message', event => {
+    if (event.source !== window || event.origin !== location.origin) return;
+    const message = event.data;
+    if (!['UNISPORT_START', 'UNISPORT_PING', 'UNISPORT_CANCEL'].includes(message?.type) || typeof message.requestId !== 'string' || message.requestId.length > 80) return;
+    void (async () => {
+      let success = false;
+      try { success = (await browserAPI.runtime.sendMessage(message))?.success === true; } catch (_) {}
+      window.postMessage({ type: 'UNISPORT_REPLY', requestId: message.requestId, success }, location.origin);
+    })();
+  });
+  browserAPI.runtime.onMessage.addListener(message => {
+    if (message?.type === 'UNISPORT_FINISHED') {
+      window.postMessage({ type: 'UNISPORT_FINISHED', success: message.success === true }, location.origin);
+    }
+    return false;
+  });
+
   function applySessionToPage(sessionId) {
     if (!sessionId) return;
 
-    // 1. Write to webpage localStorage (supporting Firefox wrappedJSObject and Chromium)
+    // 1. Write to webpage localStorage
     try {
       if (typeof window.wrappedJSObject !== 'undefined' && window.wrappedJSObject.localStorage) {
         window.wrappedJSObject.localStorage.setItem('betterilias_session_id', sessionId);

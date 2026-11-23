@@ -2,6 +2,30 @@
 
 Unchecked items are unfinished; completed work is listed separately below. Current behavior and limitations are also recorded in [`docs/ILIAS_SUPPORT_MATRIX.md`](docs/ILIAS_SUPPORT_MATRIX.md) and [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECIFICATION.md).
 
+## Unisport integration (in progress)
+
+- [x] Add a read-only UniApp transport for offer details and complete application
+  lists, using separate supplied Unisport credentials and the shared egress/budget
+  infrastructure. It does not implement login or verify supplied token ownership.
+- [x] Inspect the supplied UniSportPro test14 source: SWITCH authorization-code
+  flow with S256 PKCE, RS256 ID-token checks, protected refresh-token lifecycle,
+  explicit affiliation selection and public offer search are implemented there.
+- [x] Adapt the desktop callback transport to BetterIlias (1.3.0 opt-in prototype).
+  Chrome/Firefox companions capture the native callback; the backend verifies
+  state, nonce, PKCE and signed ID tokens, with isolated short-lived connections,
+  explicit affiliation confirmation and read-only personal registrations.
+  The prototype uses client `unibe-campusapp` and native callback
+  `ch.unibe.campusapp://campusapp.unibe.ch` with explicit `form_post` responses
+  for Firefox compatibility. Real SWITCH login acceptance remains a manual check.
+  Protocol evidence and test boundaries: `docs/UNISPORT_INTEGRATION.md`.
+- [x] Add default Unisport navigation in every semester, independent connection/
+  disconnection, affiliation selection and read-only registrations (1.3.0).
+- [ ] Verify the prototype with a real SWITCH account; add public offer search/
+  detail views and bookmarks. Keep ILIAS authentication independent.
+- [ ] Follow with manual registration and verified outcomes, then explicitly
+  armed, one-occurrence client-timed registration. Autologin/session renewal,
+  recurring subscriptions and browser-closed scheduling remain later features.
+
 ## Deployment and onboarding
 
 - [x] Link Firefox Add-ons from the landing page and Companion setup dialog,

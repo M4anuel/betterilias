@@ -1,5 +1,10 @@
 # BetterIlias browser companions
 
+Chrome and Firefox source version 1.1.0 includes the opt-in UniSport login
+prototype. Reload the extension and BetterIlias tab, then follow
+[the prototype setup](../docs/UNISPORT_INTEGRATION.md#try-it-locally).
+Published store versions may not contain it yet. Safari does not support it.
+
 - [Chrome, Edge and Brave](chrome/README.md): load `extensions/chrome/`.
 - [Firefox](firefox/README.md): load `extensions/firefox/manifest.json`.
 - [Safari on Mac, iPhone and iPad](safari/README.md): package `extensions/safari/`

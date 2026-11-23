@@ -26,6 +26,8 @@ interface SidebarProps {
   isMyCoursesSelected: boolean;
   onSelectCalendar?: () => void;
   isCalendarSelected?: boolean;
+  onSelectUnisport?: () => void;
+  isUnisportSelected?: boolean;
   onSelectRequests?: () => void;
   isRequestsSelected?: boolean;
   isCollapsed: boolean;
@@ -50,6 +52,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMyCoursesSelected,
   onSelectCalendar,
   isCalendarSelected = false,
+  onSelectUnisport,
+  isUnisportSelected = false,
   onSelectRequests,
   isRequestsSelected = false,
   isCollapsed,
@@ -169,7 +173,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </span>}
     </div>
   );
-  const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isMyCoursesSelected && !isCalendarSelected && !isRequestsSelected;
+  const isSemesterSelected = selectedCourseId === null && !isRepositorySelected && !isMyCoursesSelected && !isCalendarSelected && !isRequestsSelected && !isUnisportSelected;
   const hiddenNavItems = useMemo(() => new Set(cache.getHiddenSidebarNavItems(semester)), [nicknamesVersion, semester]);
   const semesterOption = useMemo(() => (semester ? getSemesterOption(semester) : null), [semester, language]);
   const semesterLabel = semesterOption ? semesterOption.short : semester;
@@ -187,6 +191,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return renderNavigation('nav_calendar', title, iconName, isCalendarSelected, onSelectCalendar);
       case 'my_courses':
         return renderNavigation('nav_my_courses', title, iconName, isMyCoursesSelected, onSelectMyCourses);
+      case 'unisport':
+        return onSelectUnisport ? renderNavigation('nav_unisport', title, iconName, isUnisportSelected, onSelectUnisport) : null;
       case 'feature_requests':
         return onSelectRequests ? renderNavigation('nav_feature_requests', title, iconName, isRequestsSelected, onSelectRequests) : null;
       case 'repository':
@@ -202,6 +208,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'my_courses', type: 'nav' },
     { id: 'repository', type: 'nav' },
     { id: 'feature_requests', type: 'nav' },
+    { id: 'unisport', type: 'nav' },
   ];
   const hasCustomOrder = customOrder !== null && customOrder.length > 0;
   const placedCourses = new Set<string>();

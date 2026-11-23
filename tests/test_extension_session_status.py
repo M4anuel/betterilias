@@ -71,7 +71,7 @@ def test_live_handoff_uses_page_readable_events_while_background_is_pending(dire
 const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/strict');
 const writes=[], events=[];
 let storageListener, runtimeListener, cloned=0;
-const page={location:{origin:'http://localhost:5173'},localStorage:{setItem:(_,value)=>writes.push(value)},postMessage:()=>{}};
+const page={location:{origin:'http://localhost:5173'},localStorage:{setItem:(_,value)=>writes.push(value)},postMessage:()=>{},addEventListener:()=>{}};
 const api={storage:{local:{get:async keys=>keys.includes('sessionId')?{sessionId:'initial'}:{}},
   onChanged:{addListener:fn=>storageListener=fn}},
   runtime:{sendMessage:async()=>new Promise(()=>{}),onMessage:{addListener:fn=>runtimeListener=fn}}};
@@ -162,12 +162,13 @@ const source=fs.readFileSync(process.argv[1],'utf8');
       return {frontendUrl:'http://localhost:9123/app',serverUrl:'http://127.0.0.1:9124/'};
     }}},runtime:{sendMessage:(_,callback)=>callback({}),onMessage:{addListener:fn=>listeners.push(fn)}}};
     const context=vm.createContext({chrome:api,URL,console,
-      window:{location:{origin},localStorage:{setItem:(...args)=>writes.push(args)},postMessage:data=>messages.push(data)},
+      window:{location:{origin},localStorage:{setItem:(...args)=>writes.push(args)},postMessage:data=>messages.push(data),addEventListener:()=>{}},
       document:{dispatchEvent:()=>{}},CustomEvent:class {}});
     await vm.runInContext(source,context);
     assert.equal(sessionReads,allowed?1:0,origin);
     assert.equal(writes.length,allowed?1:0,origin);
-    assert.equal(listeners.length,allowed?1:0,origin);
+    // Independent ILIAS session and UniSport completion listeners.
+    assert.equal(listeners.length,allowed?2:0,origin);
     assert.equal(messages.length,allowed?2:0,origin);
   }
 })().catch(error=>{console.error(error);process.exitCode=1});
