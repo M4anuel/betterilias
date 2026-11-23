@@ -85,3 +85,28 @@ and short landscape, German/English and light/dark. These use Chromium emulation
 and deferred mocked API responses; no physical-device or live ILIAS verification
 is claimed. The listing recovery regression also covers current shared gateway
 recovery and inline domain errors without replaying writes.
+
+
+### Correction-file lists
+
+Cards and submission details share feedback-file metadata reads keyed by credential
+generation, exercise, assignment and member. Concurrent reads coalesce; confirmed
+empty lists are cached, while failures remain retryable and preserve displayed files.
+Uploads/deletions update the shared cache, supersede earlier reads and reconcile the
+card/detail lists. Bulk imports and explicit refresh invalidate matching entries.
+Errors reuse `ErrorNotice`, with an accessible retry inside the detail overlay.
+
+Metadata is cached in memory for 30 seconds by default (at most 512 entries). With
+ILIAS Saver enabled, its configured TTL also applies to a private `sessionStorage`
+cache that survives reloads within the tab. Storage keys use a digest of the account
+credential, not another plaintext credential copy. Account changes/logout clear both
+layers; disabling Saver clears tab persistence. Only file-list metadata is stored,
+without upload/removal actions or downloaded file contents. Storage failures fall
+back to memory. This does not change the download manager or cache file binaries.
+
+`tests/test_feedback_files_cache_browser.py` covers coalescing, empty/failure caching,
+assignment isolation, switching/reopening views, uploads/deletions racing older
+reads, Saver reload/expiry, logout and unavailable storage. Retry/detail/refresh
+interactions and screenshots run at 320/390/430/768/1280 px and short landscape,
+in German/English and light/dark, using Chromium emulation and mocked API responses.
+Physical-device and live ILIAS behavior has not been verified.

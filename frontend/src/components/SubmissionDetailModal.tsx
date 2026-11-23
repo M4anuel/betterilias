@@ -1,3 +1,6 @@
+import { feedbackFilesCache } from '../lib/feedbackFilesCache';
+import { ErrorNotice } from './ErrorNotice';
+import { useConnectionRetry } from '../lib/connection';
 import { Badge } from './ui/Badge';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useEffect, useState, useRef } from 'react';
@@ -108,25 +111,42 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
   const [uploadSuccessMsg, setUploadSuccessMsg] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
 
+  const [feedbackFilesError, setFeedbackFilesError] = useState<string | null>(null);
   useEffect(() => {
-    if (exerciseRefId && submission.evaluation_by_file_url) {
-      if (!initialFeedbackFiles || initialFeedbackFiles.length === 0) {
-        setIsLoadingFeedbackFiles(true);
-      }
-      api
-        .getFeedbackFiles(exerciseRefId, submission.member_id, assId, submission.evaluation_by_file_url)
-        .then((res) => {
-          setFeedbackFiles(res.files || []);
-          onFeedbackFilesChange?.(submission.member_id, res.files || []);
-        })
-        .catch(() => {})
-        .finally(() => setIsLoadingFeedbackFiles(false));
-    }
-  }, [exerciseRefId, submission.member_id, submission.evaluation_by_file_url, assId]);
+    if (initialFeedbackFiles !== undefined) setFeedbackFiles(initialFeedbackFiles);
+  }, [initialFeedbackFiles]);
+  const [feedbackFilesRefresh, setFeedbackFilesRefresh] = useState(0);
+  const feedbackChanged = useRef(onFeedbackFilesChange);
+  feedbackChanged.current = onFeedbackFilesChange;
+  const retryFeedbackFiles = () => {
+    if (exerciseRefId) feedbackFilesCache.invalidate(exerciseRefId, assId, submission.member_id);
+    setFeedbackFilesRefresh(value => value + 1);
+  };
+  useConnectionRetry(retryFeedbackFiles);
+  useEffect(() => {
+    if (!exerciseRefId || !submission.evaluation_by_file_url) return;
+    let cancelled = false;
+    const scope = cache.getRequestScope();
+    const active = () => !cancelled && !scope.signal.aborted && cache.getRequestScope().key === scope.key;
+    setIsLoadingFeedbackFiles(true);
+    api.getFeedbackFiles(exerciseRefId, submission.member_id, assId, submission.evaluation_by_file_url)
+      .then(res => {
+        if (!active()) return;
+        setFeedbackFiles(res.files || []);
+        setFeedbackFilesError(null);
+        feedbackChanged.current?.(submission.member_id, res.files || []);
+      })
+      .catch(error => {
+        if (active() && error.name !== 'AbortError') setFeedbackFilesError(error.message || t('Failed to fetch feedback files'));
+      })
+      .finally(() => { if (active()) setIsLoadingFeedbackFiles(false); });
+    return () => { cancelled = true; };
+  }, [exerciseRefId, submission.member_id, submission.evaluation_by_file_url, assId, feedbackFilesRefresh]);
 
   const uploadFeedbackFileDirect = async (file: File) => {
     if (!file || !exerciseRefId || isUploadingFile) return;
 
+    const scope = cache.getRequestScope();
     setIsUploadingFile(true);
     setUploadSuccessMsg(null);
     try {
@@ -137,11 +157,14 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
         assId,
         submission.evaluation_by_file_url
       );
+      if (!saveActive.current || scope.signal.aborted) return;
+      setFeedbackFilesError(null);
       setFeedbackFiles(res.files || []);
       onFeedbackFilesChange?.(submission.member_id, res.files || []);
-      setUploadSuccessMsg(`"${file.name}" erfolgreich hochgeladen.`);
+      setUploadSuccessMsg(t("Korrekturdatei erfolgreich hochgeladen!"));
       setTimeout(() => setUploadSuccessMsg(null), 3500);
     } catch (err: any) {
+      if (!saveActive.current || scope.signal.aborted) return;
       await alertDialog({
         title: t("Fehler beim Hochladen"),
         message: t("Fehler beim Hochladen: {p0}", { p0: err.message }),
@@ -172,6 +195,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
 
   const handleDeleteFeedbackFile = async (fileId: string) => {
     if (!exerciseRefId || deletingFileId) return;
+    const scope = cache.getRequestScope();
     const confirmed = await confirmDialog({
       title: t("Korrekturdatei löschen"),
       message: t("Möchten Sie diese Korrekturdatei wirklich löschen?"),
@@ -179,7 +203,7 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
       cancelLabel: t("Abbrechen"),
       variant: 'danger',
     });
-    if (!confirmed) return;
+    if (!confirmed || !saveActive.current || scope.signal.aborted) return;
 
     setDeletingFileId(fileId);
     try {
@@ -190,9 +214,12 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
         assId,
         submission.evaluation_by_file_url
       );
+      if (!saveActive.current || scope.signal.aborted) return;
+      setFeedbackFilesError(null);
       setFeedbackFiles(res.files || []);
       onFeedbackFilesChange?.(submission.member_id, res.files || []);
     } catch (err: any) {
+      if (!saveActive.current || scope.signal.aborted) return;
       await alertDialog({
         title: t("Fehler beim Löschen"),
         message: err.message || t("Fehler beim Löschen der Korrekturdatei"),
@@ -661,7 +688,8 @@ export const SubmissionDetailModal: React.FC<SubmissionDetailModalProps> = ({
                 </div>
               )}
 
-              {isLoadingFeedbackFiles ? (
+              {feedbackFilesError && <ErrorNotice connectionInline message={feedbackFilesError} onRetry={retryFeedbackFiles} retryDisabled={isLoadingFeedbackFiles} />}
+              {isLoadingFeedbackFiles && feedbackFiles.length === 0 ? (
                 <div className="p-3 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-2">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600" />
                   <span>{t("Lade Korrekturdateien aus ILIAS...")}</span>

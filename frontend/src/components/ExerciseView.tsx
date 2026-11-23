@@ -1,3 +1,4 @@
+import { feedbackFilesCache } from '../lib/feedbackFilesCache';
 import { Button } from './ui/Button';
 import { ErrorNotice } from './ErrorNotice';
 import { useConnectionRetry } from '../lib/connection';
@@ -393,6 +394,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const saveScope = cache.getRequestScope().key;
   const visibleSaveContext = useRef('');
   visibleSaveContext.current = JSON.stringify([saveScope, exerciseRefId, currentAssKey]);
+  const renderedContext = visibleSaveContext.current;
   const getSaveKey = useCallback((memberId: string) =>
     JSON.stringify([saveScope, exerciseRefId, currentAssKey, memberId]),
     [saveScope, exerciseRefId, currentAssKey]);
@@ -430,7 +432,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const [rowFeedbackFiles, setRowFeedbackFiles] = useState<Record<string, FeedbackFileItem[]>>({});
   const [loadingFeedbackFilesFor, setLoadingFeedbackFilesFor] = useState<Record<string, boolean>>({});
   const [deletingFeedbackFileId, setDeletingFeedbackFileId] = useState<string | null>(null);
-  const fetchedFeedbackMembersRef = useRef<Set<string>>(new Set());
+  const [feedbackFileErrors, setFeedbackFileErrors] = useState<Record<string, string>>({});
+  const [feedbackFileRefresh, setFeedbackFileRefresh] = useState(0);
 
   // Check for unsaved grades or feedback notes
   const hasCurrentAssDirtyGrades = useMemo(
@@ -834,8 +837,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         setTaSubmissionsData(null);
       }
 
-      fetchedFeedbackMembersRef.current.clear();
-      setRowFeedbackFiles({});
       lastRevalidatedAssKeyRef.current = `${exerciseRefId}_${newAssId}`;
       loadTaSubmissions(newAssId, false);
     },
@@ -844,6 +845,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   const uploadMemberFeedbackFile = async (memberId: string, file: File) => {
     if (!file) return;
+    const context = visibleSaveContext.current;
+    const key = getSaveKey(memberId);
+    const scope = cache.getRequestScope();
+    const assignment = currentAssKey === 'default' ? undefined : currentAssKey;
     setUploadingMemberId(memberId);
     try {
       const sub = taSubmissionsData?.submissions?.find((s) => s.member_id === memberId);
@@ -851,10 +856,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         exerciseRefId,
         memberId,
         file,
-        selectedTaAssId || undefined,
+        assignment,
         sub?.evaluation_by_file_url
       );
-      const k = getEditKey(memberId);
+      if (scope.signal.aborted || visibleSaveContext.current !== context) return;
+      const k = key;
+      setFeedbackFileErrors(prev => { const next = { ...prev }; delete next[key]; return next; });
       setRowFeedbackFiles((prev) => ({
         ...prev,
         [k]: res.files || [],
@@ -862,6 +869,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       setFileUploadSuccessId(memberId);
       setTimeout(() => setFileUploadSuccessId(null), 3500);
     } catch (err: any) {
+      if (scope.signal.aborted || visibleSaveContext.current !== context) return;
       await alertDialog({
         title: t("Fehler beim Hochladen"),
         message: t("Fehler beim Hochladen der Korrekturdatei: {p0}", { p0: err.message }),
@@ -874,6 +882,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   const handleDeleteRowFeedbackFile = async (memberId: string, fileId: string, feedbackUrl?: string) => {
     if (!exerciseRefId || deletingFeedbackFileId) return;
+    const context = visibleSaveContext.current;
+    const scope = cache.getRequestScope();
+    const key = getSaveKey(memberId);
+    const assignment = currentAssKey === 'default' ? undefined : currentAssKey;
     const confirmed = await confirmDialog({
       title: t("Korrekturdatei löschen"),
       message: t("Möchten Sie diese Korrekturdatei wirklich löschen?"),
@@ -881,7 +893,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       cancelLabel: t("Abbrechen"),
       variant: 'danger',
     });
-    if (!confirmed) return;
+    if (!confirmed || scope.signal.aborted || visibleSaveContext.current !== context) return;
 
     setDeletingFeedbackFileId(fileId);
     try {
@@ -889,15 +901,18 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
         exerciseRefId,
         memberId,
         fileId,
-        selectedTaAssId || undefined,
+        assignment,
         feedbackUrl
       );
-      const k = getEditKey(memberId);
+      if (scope.signal.aborted || visibleSaveContext.current !== context) return;
+      const k = key;
+      setFeedbackFileErrors(prev => { const next = { ...prev }; delete next[key]; return next; });
       setRowFeedbackFiles((prev) => ({
         ...prev,
         [k]: res.files || [],
       }));
     } catch (err: any) {
+      if (scope.signal.aborted || visibleSaveContext.current !== context) return;
       await alertDialog({
         title: t("Fehler beim Löschen"),
         message: err.message || t("Fehler beim Löschen der Korrekturdatei"),
@@ -908,65 +923,41 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     }
   };
 
-  // Auto-load feedback files in overview when file mode is active
+  // Cache ownership is shared with details and mutation responses. Failed reads
+  // remain retryable and never replace a known list with an empty success.
   useEffect(() => {
-    if (activeTab === 'ta_grading' && evalModeInOverview === 'file' && taSubmissionsData?.submissions && exerciseRefId) {
-      const needed = taSubmissionsData.submissions.filter(
-        (s) => s.evaluation_by_file_url && !fetchedFeedbackMembersRef.current.has(s.member_id)
-      );
-      if (needed.length === 0) return;
-
-      needed.forEach((s) => fetchedFeedbackMembersRef.current.add(s.member_id));
-
-      let isCancelled = false;
-      const unfinished = new Set(needed.map(submission => submission.member_id));
-      const fetchBatch = async () => {
-        const queue = [...needed];
-        const workers = Array.from({ length: Math.min(3, queue.length) }, async () => {
-          while (queue.length > 0 && !isCancelled) {
-            const sub = queue.shift();
-            if (!sub || !sub.evaluation_by_file_url) continue;
-            const k = getEditKey(sub.member_id);
-            setLoadingFeedbackFilesFor((prev) => ({ ...prev, [k]: true }));
-            try {
-              const res = await api.getFeedbackFiles(
-                exerciseRefId,
-                sub.member_id,
-                selectedTaAssId || undefined,
-                sub.evaluation_by_file_url
-              );
-              if (!isCancelled) {
-                setRowFeedbackFiles((prev) => ({
-                  ...prev,
-                  [k]: res.files || [],
-                }));
-              }
-            } catch {
-              if (!isCancelled) {
-                setRowFeedbackFiles((prev) => ({
-                  ...prev,
-                  [k]: [],
-                }));
-              }
-            } finally {
-              if (!isCancelled) {
-                unfinished.delete(sub.member_id);
-                setLoadingFeedbackFilesFor((prev) => ({ ...prev, [k]: false }));
-              }
-            }
+    if (activeTab !== 'ta_grading' || evalModeInOverview !== 'file') return;
+    let cancelled = false;
+    const scope = cache.getRequestScope();
+    const queue = [...(taSubmissionsData?.submissions || [])].filter(s => s.evaluation_by_file_url);
+    const assignment = currentAssKey === 'default' ? undefined : currentAssKey;
+    const active = () => !cancelled && !scope.signal.aborted && cache.getRequestScope().key === scope.key;
+    const workers = Array.from({ length: Math.min(3, queue.length) }, async () => {
+      while (queue.length && active()) {
+        const sub = queue.shift()!;
+        const key = getSaveKey(sub.member_id);
+        setLoadingFeedbackFilesFor(prev => ({ ...prev, [key]: true }));
+        try {
+          const result = await api.getFeedbackFiles(exerciseRefId, sub.member_id, assignment, sub.evaluation_by_file_url!);
+          if (active()) {
+            setRowFeedbackFiles(prev => ({ ...prev, [key]: result.files || [] }));
+            setFeedbackFileErrors(prev => { const next = { ...prev }; delete next[key]; return next; });
           }
-        });
-        await Promise.all(workers);
-      };
+        } catch (error: any) {
+          if (active() && error.name !== 'AbortError') setFeedbackFileErrors(prev => ({ ...prev, [key]: error.message || t('Failed to fetch feedback files') }));
+        } finally {
+          if (active()) setLoadingFeedbackFilesFor(prev => ({ ...prev, [key]: false }));
+        }
+      }
+    });
+    void Promise.all(workers);
+    return () => { cancelled = true; setLoadingFeedbackFilesFor({}); };
+  }, [activeTab, evalModeInOverview, taSubmissionsData?.submissions, exerciseRefId, currentAssKey, getSaveKey, feedbackFileRefresh]);
 
-      fetchBatch();
-      return () => {
-        isCancelled = true;
-        unfinished.forEach(memberId => fetchedFeedbackMembersRef.current.delete(memberId));
-        setLoadingFeedbackFilesFor({});
-      };
-    }
-  }, [activeTab, evalModeInOverview, taSubmissionsData?.submissions, exerciseRefId, selectedTaAssId]);
+  const retryFeedbackFiles = (memberId?: string) => {
+    feedbackFilesCache.invalidate(exerciseRefId, currentAssKey === 'default' ? undefined : currentAssKey, memberId);
+    setFeedbackFileRefresh(value => value + 1);
+  };
 
   const handleUploadFeedbackFile = async (
     memberId: string,
@@ -1428,6 +1419,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   const handleRefresh = useCallback(() => {
     loadOverview(true);
+    feedbackFilesCache.invalidate(exerciseRefId);
+    setFeedbackFileRefresh(value => value + 1);
     if (activeTab === 'ta_grading') {
       loadTaSubmissions(selectedTaAssId || undefined, false, true);
     } else if (activeTab === 'info') {
@@ -2243,6 +2236,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             <div className="space-y-3">
               {filteredTaSubmissions.map((sub) => {
                 const subAssKey = getEditKey(sub.member_id);
+                const feedbackKey = getSaveKey(sub.member_id);
                 const edit = localEdits[subAssKey] || {
                   status: sub.passed_status || 'not_graded',
                   mark: sub.mark || '',
@@ -2517,12 +2511,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                               <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
                                 {t("Korrektur per Datei")}
                               </span>
-                              {rowFeedbackFiles[subAssKey] && rowFeedbackFiles[subAssKey].length > 0 && (
+                              {rowFeedbackFiles[feedbackKey] && rowFeedbackFiles[feedbackKey].length > 0 && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
                                   <FileText className="h-3 w-3" />
                                   <span>
-                                    {rowFeedbackFiles[subAssKey].length}{' '}
-                                    {rowFeedbackFiles[subAssKey].length === 1
+                                    {rowFeedbackFiles[feedbackKey].length}{' '}
+                                    {rowFeedbackFiles[feedbackKey].length === 1
                                       ? t("Datei")
                                       : t("Dateien")}
                                   </span>
@@ -2562,14 +2556,18 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                             </div>
                           </div>
 
+                          {feedbackFileErrors[feedbackKey] && <ErrorNotice
+                            message={feedbackFileErrors[feedbackKey]}
+                            onRetry={() => retryFeedbackFiles(sub.member_id)}
+                            retryDisabled={loadingFeedbackFilesFor[feedbackKey]} />}
                           {/* Uploaded Feedback Files List */}
-                          {loadingFeedbackFilesFor[subAssKey] && !rowFeedbackFiles[subAssKey] ? (
+                          {loadingFeedbackFilesFor[feedbackKey] && !rowFeedbackFiles[feedbackKey] ? (
                             <div className="p-2.5 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80">
                               <span>{t("Lade Korrekturdateien aus ILIAS...")}</span>
                             </div>
-                          ) : rowFeedbackFiles[subAssKey] && rowFeedbackFiles[subAssKey].length > 0 ? (
+                          ) : rowFeedbackFiles[feedbackKey] && rowFeedbackFiles[feedbackKey].length > 0 ? (
                             <div className="space-y-1.5">
-                              {rowFeedbackFiles[subAssKey].map((ff) => (
+                              {rowFeedbackFiles[feedbackKey].map((ff) => (
                                 <div
                                   key={ff.id}
                                   className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 p-2 text-xs"
@@ -2657,7 +2655,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                 <span className="font-semibold text-indigo-700 dark:text-indigo-300">
                                   {t("Datei hier loslassen zum Hochladen...")}
                                 </span>
-                              ) : rowFeedbackFiles[subAssKey] && rowFeedbackFiles[subAssKey].length > 0 ? (
+                              ) : rowFeedbackFiles[feedbackKey] && rowFeedbackFiles[feedbackKey].length > 0 ? (
                                 <span>{t("Weitere Korrekturdatei per Drag & Drop hierher ziehen oder auswählen.")}</span>
                               ) : sub.evaluation_by_file_url ? (
                                 <span>{t("Korrekturdatei per Drag & Drop hierher ziehen oder Button nutzen.")}</span>
@@ -2683,7 +2681,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
                                     <span>
                                       {uploadingMemberId === sub.member_id
                                         ? t("Lädt...")
-                                        : rowFeedbackFiles[subAssKey] && rowFeedbackFiles[subAssKey].length > 0
+                                        : rowFeedbackFiles[feedbackKey] && rowFeedbackFiles[feedbackKey].length > 0
                                         ? t("Datei hinzufügen")
                                         : t("Datei hochladen")}
                                     </span>
@@ -2828,13 +2826,16 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             taAssignmentsList.find((a) => a.ass_id === selectedTaAssId)?.title
           }
           exerciseRefId={exerciseRefId}
-          assId={selectedTaAssId || undefined}
+          assId={currentAssKey === 'default' ? undefined : currentAssKey}
           isUpdating={isLoadingTaSubmissions}
           savePending={entrySaveStates[getSaveKey(detailModalSubmission.member_id)] === 'pending'}
           initialEdit={localEdits[getEditKey(detailModalSubmission.member_id)]}
-          initialFeedbackFiles={rowFeedbackFiles[getEditKey(detailModalSubmission.member_id)]}
+          initialFeedbackFiles={rowFeedbackFiles[getSaveKey(detailModalSubmission.member_id)]}
           onFeedbackFilesChange={(memberId, files) => {
-            setRowFeedbackFiles((prev) => ({ ...prev, [getEditKey(memberId)]: files }));
+            if (visibleSaveContext.current !== renderedContext) return;
+            const key = getSaveKey(memberId);
+            setFeedbackFileErrors(prev => { const next = { ...prev }; delete next[key]; return next; });
+            setRowFeedbackFiles((prev) => ({ ...prev, [key]: files }));
           }}
           onSave={handleSaveFromModal}
           onClose={() => setDetailModalSubmission(null)}
@@ -2855,6 +2856,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           isOpen={isReturnFeedbackModalOpen}
           onClose={() => setIsReturnFeedbackModalOpen(false)}
           onSuccess={() => {
+            feedbackFilesCache.invalidate(exerciseRefId);
+            setFeedbackFileRefresh(value => value + 1);
             loadTaSubmissions(selectedTaAssId || undefined, false, true);
           }}
         />

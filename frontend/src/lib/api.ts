@@ -1,3 +1,4 @@
+import { feedbackFilesCache, feedbackFilesKey } from './feedbackFilesCache';
 import { t, getLanguage } from './i18n';
 import {
   AuthStatus,
@@ -576,6 +577,8 @@ export const api = {
     assId: string,
     req: FeedbackImportCommitRequest
   ): Promise<FeedbackImportCommitResponse> {
+    const scope = cache.getRequestScope();
+    feedbackFilesCache.invalidate(exerciseId, assId);
     const res = await sessionFetch(
       `${API_BASE}/exercises/${encodeURIComponent(exerciseId)}/assignments/${encodeURIComponent(assId)}/feedback-import/commit`,
       {
@@ -588,7 +591,9 @@ export const api = {
       const err = await res.json().catch(() => ({}));
       throw new Error(apiError(err) || t('Feedback-Import fehlgeschlagen'));
     }
-    return res.json();
+    const result = await res.json();
+    if (!scope.signal.aborted) feedbackFilesCache.invalidate(exerciseId, assId);
+    return result;
   },
 
   async applyTAAllocation(
@@ -634,18 +639,20 @@ export const api = {
     assId?: string,
     feedbackUrl?: string
   ): Promise<FeedbackFilesResponse> {
-    const params = new URLSearchParams();
-    if (assId) params.set('ass_id', assId);
-    if (feedbackUrl) params.set('feedback_url', feedbackUrl);
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    const res = await sessionFetch(
-      `${API_BASE}/exercises/${encodeURIComponent(exerciseRefId)}/submissions/${encodeURIComponent(memberId)}/feedback-files${qs}`
-    );
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(apiError(err) || t("Failed to fetch feedback files"));
-    }
-    return res.json();
+    return feedbackFilesCache.read(feedbackFilesKey(exerciseRefId, memberId, assId), async () => {
+      const params = new URLSearchParams();
+      if (assId) params.set('ass_id', assId);
+      if (feedbackUrl) params.set('feedback_url', feedbackUrl);
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const res = await sessionFetch(
+        `${API_BASE}/exercises/${encodeURIComponent(exerciseRefId)}/submissions/${encodeURIComponent(memberId)}/feedback-files${qs}`
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(apiError(err) || t("Failed to fetch feedback files"));
+      }
+      return res.json();
+    });
   },
 
   async uploadFeedbackFile(
@@ -655,6 +662,8 @@ export const api = {
     assId?: string,
     feedbackUrl?: string
   ): Promise<FeedbackFilesResponse> {
+    const scope = cache.getRequestScope();
+    feedbackFilesCache.invalidate(exerciseRefId, assId, memberId);
     const formData = new FormData();
     formData.append('file', file);
     if (assId) {
@@ -674,7 +683,9 @@ export const api = {
       const err = await res.json().catch(() => ({}));
       throw new Error(apiError(err) || t("Failed to upload feedback file"));
     }
-    return res.json();
+    const data = await res.json();
+    await feedbackFilesCache.write(feedbackFilesKey(exerciseRefId, memberId, assId), data, scope);
+    return data;
   },
 
   async deleteFeedbackFile(
@@ -684,6 +695,8 @@ export const api = {
     assId?: string,
     feedbackUrl?: string
   ): Promise<FeedbackFilesResponse> {
+    const scope = cache.getRequestScope();
+    feedbackFilesCache.invalidate(exerciseRefId, assId, memberId);
     const params = new URLSearchParams();
     if (assId) params.set('ass_id', assId);
     if (feedbackUrl) params.set('feedback_url', feedbackUrl);
@@ -698,7 +711,9 @@ export const api = {
       const err = await res.json().catch(() => ({}));
       throw new Error(apiError(err) || t("Failed to delete feedback file"));
     }
-    return res.json();
+    const data = await res.json();
+    await feedbackFilesCache.write(feedbackFilesKey(exerciseRefId, memberId, assId), data, scope);
+    return data;
   },
 
   async getPodcasts(refId: string): Promise<PodcastSeriesResponse> {
