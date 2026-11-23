@@ -4,6 +4,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Deployment and onboarding
 
+- [x] Link Firefox Add-ons from the landing page and Companion setup dialog,
+  replacing temporary installation steps with store installation (version 1.2.2).
+
 - [x] Share correction-file list caching across cards/details, retain known files
   on failed refresh, retry failed reads, and reject stale results after uploads,
   deletions or account changes (version 1.2.1). Saver metadata uses tab storage.

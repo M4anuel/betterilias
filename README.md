@@ -136,7 +136,9 @@ for configuration and verification details.
 
 1. Install the companion extension using the instructions for
    [Chrome/Edge/Brave](extensions/chrome/README.md) or
-   [Firefox](extensions/firefox/README.md).
+   [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/betterilias-companion/).
+   For local development or self-hosted configuration, see the
+   [Firefox development instructions](extensions/firefox/README.md).
 2. Log into [Uni Bern ILIAS](https://ilias.unibe.ch) normally, including SWITCH
    edu-ID/2FA when required.
 3. With BetterIlias running, open the extension and choose **Sync session with
@@ -144,8 +146,9 @@ for configuration and verification details.
 4. Open the app. When the session expires, repeat the sync.
 
 The app sends the resulting session ID with API requests. Both browser extensions
-support German/English and light/dark appearance. Firefox temporary installations
-must be loaded again after restarting Firefox.
+support German/English and light/dark appearance. The Firefox store installation
+persists across browser restarts; temporary development installations must be
+loaded again after restarting Firefox.
 
 ### Extension-only login and deployment mode
 

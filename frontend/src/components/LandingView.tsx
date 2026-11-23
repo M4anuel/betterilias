@@ -1,3 +1,4 @@
+import { COMPANION_STORES } from '../lib/companionStores';
 import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useMemo } from 'react';
 import {
@@ -625,7 +626,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               </div>
             </div>
 
-            {/* Extension GitHub Links Box (Single line, handsome cards) */}
+            {/* Extension store links */}
             <div className="lg:col-span-5 flex flex-col p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs space-y-3">
               <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                 {t("landing.extension_box_title")}
@@ -637,32 +638,32 @@ export const LandingView: React.FC<LandingViewProps> = ({
               <div className="space-y-2 pt-1">
                 {/* Google Chrome Link */}
                 <a
-                  href="https://github.com/M4anuel/betterilias/tree/main/extensions/chrome"
+                  href={COMPANION_STORES.chrome}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold transition shadow-2xs group"
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950/70 text-amber-700 dark:text-amber-400 font-extrabold text-[11px]">
+                    <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950/70 text-amber-700 dark:text-amber-400 font-extrabold text-[11px]">
                       Cr
                     </span>
-                    <span className="whitespace-nowrap">{t("landing.extension_github_chrome")}</span>
+                    <span className="min-w-0">{t("landing.extension_store_chrome")}</span>
                   </div>
                   <ExternalLink className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition shrink-0" />
                 </a>
 
                 {/* Mozilla Firefox Link */}
                 <a
-                  href="https://github.com/M4anuel/betterilias/tree/main/extensions/firefox"
+                  href={COMPANION_STORES.firefox}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold transition shadow-2xs group"
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-400 font-extrabold text-[11px]">
+                    <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-400 font-extrabold text-[11px]">
                       Fx
                     </span>
-                    <span className="whitespace-nowrap">{t("landing.extension_github_firefox")}</span>
+                    <span className="min-w-0">{t("landing.extension_store_firefox")}</span>
                   </div>
                   <ExternalLink className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition shrink-0" />
                 </a>

@@ -13,6 +13,15 @@ sendet ILIAS-Cookies ausschliesslich an die konfigurierte ILIAS-Instanz.
 
 ## 🚀 Installation in Mozilla Firefox
 
+Installiere [BetterIlias Companion aus Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/betterilias-companion/)
+und bestätige die Installation in Firefox. Öffne danach die Erweiterung über das
+Puzzle-Symbol in der Symbolleiste. Die Store-Version verbindet sich mit
+`https://betterilias.ch` und bleibt nach einem Browser-Neustart installiert.
+
+### Temporäre Installation für Entwicklung und eigene Server
+
+Für eine lokale Entwicklungsversion oder eine angepasste Server-Adresse:
+
 1. **Repository herunterladen oder klonen**:
    - Lade den Ordner `extensions/firefox/` von GitHub herunter:
      [https://github.com/M4anuel/betterilias/tree/main/extensions/firefox](https://github.com/M4anuel/betterilias/tree/main/extensions/firefox)

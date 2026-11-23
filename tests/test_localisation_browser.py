@@ -330,18 +330,21 @@ def test_extension_checking_invalid_recovery_and_unavailable(local_site, directo
 
 
 @pytest.mark.parametrize('language,scheme', [('de', 'dark'), ('de', 'light'), ('en', 'dark'), ('en', 'light')])
-def test_extension_setup_addresses_copy_and_fit_viewports(local_site, language, scheme):
+def test_extension_store_links_and_setup_fit_viewports(local_site, language, scheme):
     pw = pytest.importorskip('playwright.sync_api')
     tr = json.loads((ROOT / 'locales' / f'{language}.json').read_text(encoding='utf-8'))
+    stores = {
+        'chrome': 'https://chromewebstore.google.com/detail/betterilias-companion/jpofcbijmjcndakhbbcnmedcdcfefiea',
+        'firefox': 'https://addons.mozilla.org/en-US/firefox/addon/betterilias-companion/',
+    }
     artifacts = ROOT / 'scratch' / 'extension-setup-checks'
     artifacts.mkdir(parents=True, exist_ok=True)
     with pw.sync_playwright() as p:
         browser = p.chromium.launch(headless=True, channel=os.environ.get('BETTERILIAS_BROWSER_CHANNEL'))
-        page = browser.new_page(viewport={'width': 1280, 'height': 900}, color_scheme=scheme)
+        page = browser.new_page(viewport={'width': 1280, 'height': 900}, color_scheme=scheme,
+                                user_agent='Mozilla/5.0 Firefox/145.0')
         page.add_init_script('localStorage.setItem("betterilias_language", ' + json.dumps(language) + ');'
-            'localStorage.setItem("betterilias_theme_mode", ' + json.dumps(scheme) + ');'
-            'Object.defineProperty(navigator, "clipboard", {value: {writeText: async text => {'
-            'if (window.rejectCopy) throw Error("denied"); window.copiedAddress = text;}}});')
+            'localStorage.setItem("betterilias_theme_mode", ' + json.dumps(scheme) + ');')
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
         def respond(route):
@@ -351,32 +354,46 @@ def test_extension_setup_addresses_copy_and_fit_viewports(local_site, language, 
                 route.fulfill(status=401, content_type='application/json', body='{"detail":"Unauthenticated"}')
         page.route('**/api/**', respond)
         page.goto(local_site)
-        trigger = page.get_by_role('button', name=tr['Browser-Erweiterung'], exact=True)
+        for browser_name, url in stores.items():
+            link = page.locator(f'a[href="{url}"]')
+            pw.expect(link).to_contain_text(tr[f'landing.extension_store_{browser_name}'])
+            pw.expect(link).to_have_attribute('href', url)
+        for width in (320, 390, 430, 768, 1280):
+            page.set_viewport_size(dict(width=width, height=900))
+            link = page.locator(f'a[href="{stores["firefox"]}"]')
+            link.scroll_into_view_if_needed()
+            bounds = link.bounding_box()
+            assert bounds and bounds['x'] >= 0 and bounds['x'] + bounds['width'] <= width
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            page.screenshot(path=str(artifacts / f'landing-{language}-{scheme}-{width}.png'))
+        trigger = page.get_by_role('button', name=tr['landing.extension_cta'], exact=True)
         trigger.click()
         panel = page.get_by_role('dialog', name=tr['BetterIlias Companion'])
+        # Firefox user-agent selects the store without requiring manual switching.
+        pw.expect(panel.get_by_role('link', name=tr['extension.store.firefox_open'], exact=True)).to_have_attribute('href', stores['firefox'])
         for width, height in [(320, 740), (390, 844), (430, 900), (768, 1024), (1280, 900), (844, 390)]:
             page.set_viewport_size(dict(width=width, height=height))
-            for browser_name, addresses in [('Chrome / Edge / Brave', ['chrome://extensions', 'edge://extensions']),
-                                             ('Mozilla Firefox', ['about:debugging#/runtime/this-firefox'])]:
-                panel.get_by_role('button', name=tr[browser_name], exact=True).click()
-                for address in addresses:
-                    label = tr['extension.setup.copy_address'].replace('{address}', address)
-                    control = panel.get_by_role('button', name=label, exact=True)
-                    control.click()
-                    assert page.evaluate('window.copiedAddress') == address
-                    pw.expect(panel.get_by_role('status')).to_have_text(tr['Kopiert!'])
-                    bounds = control.bounding_box()
-                    assert bounds and bounds['height'] >= 44 and bounds['x'] >= 0
-                    assert bounds['x'] + bounds['width'] <= width
-                expected = 'firefox' if browser_name == 'Mozilla Firefox' else 'chrome'
-                assert panel.locator(f'a[href="https://github.com/M4anuel/betterilias/tree/main/extensions/{expected}"]').count() == 2
+            for browser_label, selected in [('Chrome / Edge / Brave', 'chrome'), ('Mozilla Firefox', 'firefox')]:
+                panel.get_by_role('button', name=tr[browser_label], exact=True).click()
+                key = 'extension.store.firefox_open' if selected == 'firefox' else 'extension.store.open'
+                link = panel.get_by_role('link', name=tr[key], exact=True)
+                pw.expect(link).to_have_attribute('href', stores[selected])
+                pw.expect(link).to_have_attribute('target', '_blank')
+                link.scroll_into_view_if_needed()
+                bounds = link.bounding_box()
+                assert bounds and bounds['height'] >= 44 and bounds['x'] >= 0
+                assert bounds['x'] + bounds['width'] <= width
+                assert panel.locator('a[href*="github.com"]').count() == 0
+                assert 'about:debugging' not in panel.inner_text()
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-                close = panel.get_by_role('button', name=tr['Schliessen'], exact=True).first
-                pw.expect(close).to_be_in_viewport()
-                page.screenshot(path=str(artifacts / f'{language}-{scheme}-{width}-{height}-{expected}.png'))
-        page.evaluate('window.rejectCopy = true')
-        panel.get_by_role('button', name=tr['extension.setup.copy_address'].replace('{address}', 'about:debugging#/runtime/this-firefox'), exact=True).click()
-        pw.expect(panel.get_by_role('status')).to_have_text(tr['extension.setup.copy_failed'])
+                pw.expect(panel.get_by_role('button', name=tr['Schliessen'], exact=True).first).to_be_in_viewport()
+                page.screenshot(path=str(artifacts / f'{language}-{scheme}-{width}-{height}-{selected}.png'))
+        # Exercise the actual link while keeping this regression independent of the store network.
+        page.context.route(stores['firefox'], lambda route: route.fulfill(content_type='text/html', body='<h1>Store fixture</h1>'))
+        with page.expect_popup() as opened:
+            panel.get_by_role('link', name=tr['extension.store.firefox_open'], exact=True).click()
+        assert opened.value.url == stores['firefox']
+        opened.value.close()
         page.keyboard.press('Escape')
         pw.expect(panel).to_have_count(0)
         pw.expect(trigger).to_be_focused()
