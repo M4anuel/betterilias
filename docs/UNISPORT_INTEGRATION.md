@@ -11,6 +11,8 @@ Version 1.4.0 adds public offer browsing, local search/sport filters, cached
 details and viewing existing bookmarks. Public browsing does not require SWITCH
 login. Version 1.5.0 adds manual registration, dynamic additional questions and
 cancellation through the native API. Bookmark editing remains a future step.
+Version 1.6.0 adds direct official participant-list links from existing
+registrations and verified signup results.
 
 ## Try it locally
 
@@ -41,6 +43,10 @@ cancellation through the native API. Bookmark editing remains a future step.
    **Cancel registration** in the personal list. Read and confirm any returned
    cancellation conditions. Use **Check request status** after an uncertain
    result; this never resubmits a provider mutation.
+10. Use **Participant list** next to an existing registration or after a verified
+    signup. It opens the official ZSSW list in a separate tab. A SWITCH/ZSSW
+    website login may be required; the official site enforces registration and
+    access rights. Native UniApp login does not itself create a ZSSW web session.
 
 ## Catalogue and personal cache policy
 
@@ -326,9 +332,30 @@ for mutations bypass them, and private tab caches are invalidated after dispatch
 
 No participant-list/Anmeldeliste endpoint was found in the inspected native
 UniSport transport. This is an investigation result, not proof that the backend
-has no such API. Retain the official offer link; ZSSW participant lists remain
-outside the native integration. Do not reuse personal cancellation IDs from saved
-HTML or assume the UniApp token also establishes a ZSSW browser session.
+has no such API. Version 1.6.0 uses the known official website route directly:
+`https://www.zssw.unibe.ch/usp/zms/aii/anmeldeliste/{websiteCourseId}/index_ger.html`.
+The supplied archery list confirms headings Nachname, Vorname and Angebot. Its
+website course ID is 3003; the corresponding native offer ID is 28028. The IDs
+must not be interchanged. Anonymous GET of that list on 2026-11-24 returned 302
+to SWITCH's SAML endpoint; authenticated participant access remains a manual check.
+
+Derive links only from recognized HTTPS ZSSW offer paths (`angebot`, `program`,
+`offre`) in normalized offer URLs; keep the observed German participant-list path
+for every interface language. Do not infer website course IDs from native IDs or
+accept arbitrary origins. Personal-list cards reuse the complete public catalogue
+already loaded/cached by the browsing component; no per-card detail requests,
+extra catalogue reads or participant-name caching are introduced. Cancelled rows
+and offers without a known website mapping have no participant link. Booking
+dialogs show it for verified signup results and still-owned pre-cancellation
+states, then hide it after confirmed cancellation.
+
+Links use native anchors, announce their new tab, and retain the browser's normal
+official-site login flow. The native API token and BetterIlias credentials never
+appear in the participant URL or get forwarded to ZSSW. Participant rows are
+displayed on the official page, not fetched/rendered inside BetterIlias. Do not
+reuse personal cancellation IDs from saved HTML or assume the UniApp token also
+establishes a ZSSW browser session. Supplied personal HTML remains outside git;
+participant navigation tests use synthetic accounts and names only.
 
 `tests/test_unisport_booking.py` exercises synthetic native payloads, dynamic
 forms, dependencies, dates/files, separate cancellation confirmation, readback,
@@ -338,3 +365,6 @@ light/dark at 320/390/430/768/1280 CSS px plus short landscape, actual choices,
 file selection, draft resizing/reopening, pending buttons, focus restoration,
 lost responses and read-only recovery. Screenshots are inspected. These are
 Chromium emulation checks, not physical-device or live provider mutation tests.
+`tests/test_unisport_participants_browser.py` checks safe website-ID mapping,
+cached catalogue reuse, link visibility, real keyboard/new-tab navigation and
+absence of forwarded API credentials at the same screen widths/languages/themes.

@@ -2429,5 +2429,8 @@
   "unisport.offer_changed": "Der Termin oder die Bedingungen haben sich geändert. Prüfe dein Konto und öffne das Angebot erneut, bevor du weiterfährst.",
   "unisport.booking_unavailable": "Diese Aktion ist für diesen Termin und dieses Konto derzeit nicht verfügbar. Prüfe das offizielle Angebot für die An- und Abmeldebedingungen.",
   "unisport.applications_changed": "Eine Anmeldeanfrage hat sich geändert. Lade deine Anmeldungen neu, um den aktuellen Kontostand zu sehen.",
-  "unisport.selected_file": "Ausgewählte Datei: {name}"
+  "unisport.selected_file": "Ausgewählte Datei: {name}",
+  "unisport.participants": "Anmeldeliste",
+  "unisport.participants_hint": "Öffnet die offizielle Anmeldeliste. Allenfalls musst du dich dort mit SWITCH anmelden; die Seite prüft deine Anmeldung und Zugriffsrechte.",
+  "unisport.new_tab": " (öffnet in einem neuen Tab)"
 }

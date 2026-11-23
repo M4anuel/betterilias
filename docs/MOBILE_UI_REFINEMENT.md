@@ -1,5 +1,15 @@
 # Mobile UI refinement
 
+## UniSport participant links
+
+The new-tab announcement uses `sr-only` inside the participant-list anchor. The
+anchor needs `position: relative`, for the same reason as course buttons below:
+an absolutely positioned hidden label can escape the app scroller and extend the
+document with blank space. Participant-link browser regressions assert both
+document width and height, review screenshots and exercise keyboard/new-tab
+navigation at 320/390/430/768/1280 px and short landscape, German/English and
+light/dark. These checks use Chromium emulation and synthetic participant pages.
+
 ## My Courses & Groups scrolling
 
 The screen-reader full course title uses absolute positioning through `sr-only`.

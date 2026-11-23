@@ -2429,5 +2429,8 @@
   "unisport.offer_changed": "The occurrence or conditions changed. Check your account and reopen the offer before continuing.",
   "unisport.booking_unavailable": "This action is currently unavailable for this occurrence and account. Check the official offer for registration and cancellation conditions.",
   "unisport.applications_changed": "A registration request changed. Refresh your registrations to see the latest account state.",
-  "unisport.selected_file": "Selected file: {name}"
+  "unisport.selected_file": "Selected file: {name}",
+  "unisport.participants": "Participant list",
+  "unisport.participants_hint": "Opens the official participant list. You may need to sign in there with SWITCH; the site checks your registration and access.",
+  "unisport.new_tab": " (opens in a new tab)"
 }

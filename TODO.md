@@ -41,8 +41,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   private data; persist dispatch receipts and never automatically replay a POST.
   Keep catalogue caching independent. Protocol and limitations are documented in
   `docs/UNISPORT_INTEGRATION.md`; live booking acceptance remains a manual check.
-- [ ] Investigate participant-list (Anmeldeliste) support separately. No endpoint
-  was found in UniBE Mobile 3.4.0; retain access through the official offer page.
+- [x] Add direct Anmeldeliste access (1.6.0) from existing registrations and
+  verified signup results, using the ZSSW website course ID from cached offer
+  URLs. Open the official participant page in a new tab with its own browser
+  login/access checks; never substitute a native UniApp offer ID.
 - [ ] Add explicitly armed, one-occurrence client-timed registration. Autologin/session renewal,
   recurring subscriptions and browser-closed scheduling remain later features.
 

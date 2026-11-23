@@ -20,7 +20,9 @@ function CacheTime({ snapshot, language, ttl }: { snapshot: { fetched_at: number
   })}</p>;
 }
 
-export function UnisportCatalogue({ credential, scope, affiliation }: { credential: string; scope?: string | null; affiliation: string | null }) {
+export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoaded }: {
+  credential: string; scope?: string | null; affiliation: string | null; onOffersLoaded?: (offers: UnisportOffer[]) => void;
+}) {
   const language = useLanguage();
   const locale = language === 'de' ? 'de' : 'en';
   const [catalogue, setCatalogue] = useState<Snapshot<Catalogue> | null>(null);
@@ -45,6 +47,12 @@ export function UnisportCatalogue({ credential, scope, affiliation }: { credenti
   const canReadSaved = Boolean(scope && affiliation);
   const accountKey = JSON.stringify([scope, affiliation, locale]);
   const currentSaved = savedScope === accountKey ? saved : null;
+
+  useEffect(() => {
+    // Reuse the complete cached snapshot for registration links: no per-card
+    // detail fetches or additional upstream catalogue reads.
+    onOffersLoaded?.(catalogue?.items || []);
+  }, [catalogue, onOffersLoaded]);
 
   async function loadCatalogue(force = false) {
     const sequence = ++publicSequence.current;
