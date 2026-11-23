@@ -9,7 +9,8 @@ acceptance remains a manual check; synthetic tests do not establish it.
 
 Version 1.4.0 adds public offer browsing, local search/sport filters, cached
 details and viewing existing bookmarks. Public browsing does not require SWITCH
-login. Bookmark editing and booking inside BetterIlias remain future steps.
+login. Version 1.5.0 adds manual registration, dynamic additional questions and
+cancellation through the native API. Bookmark editing remains a future step.
 
 ## Try it locally
 
@@ -33,6 +34,13 @@ login. Bookmark editing and booking inside BetterIlias remain future steps.
    Use the saved-offers filter after choosing an affiliation to view bookmarks
    already present in the UniSport account. The official offer link opens the
    university's page separately.
+8. After connecting and confirming affiliation, choose **Manage registration**
+   in offer details. Review the freshly fetched conditions/costs and explicitly
+   confirm registration, then complete any returned additional questions.
+9. Cancel through **Manage registration** for an already registered offer, or
+   **Cancel registration** in the personal list. Read and confirm any returned
+   cancellation conditions. Use **Check request status** after an uncertain
+   result; this never resubmits a provider mutation.
 
 ## Catalogue and personal cache policy
 
@@ -186,8 +194,8 @@ Replace the native-callback bridge once the direct web flow is verified. UniSpor
 API calls already run through the backend and do not require the companion after
 login; the existing ILIAS companion integration is a separate concern.
 
-Bookmark editing remains to be implemented. Follow with verified manual
-registration and explicitly armed one-occurrence
+Bookmark editing remains to be implemented. Manual registration/cancellation
+uses the native API in 1.5.0 (see below). Follow with explicitly armed one-occurrence
 client-timed registration. Autologin, recurring subscriptions and browser-closed
 scheduling remain later features. Mocked authentication is development/test-only
 and must not enable production account operations.
@@ -220,3 +228,113 @@ and must not enable production account operations.
   restoration, IndexedDB reload, private-cache scope changes and rejection of
   in-flight private responses after disconnect. UI checks use Chromium emulation
   at the same phone/tablet/desktop widths and language/theme combinations above.
+
+## Native registration and cancellation (1.5.0)
+
+The Android package `ch.unibe.campusapp`, UniBE Mobile **3.4.0 (10193)**, was
+downloaded from the public APKPure mirror on 2026-11-23 and inspected statically.
+Android `apksigner verify --print-certs` passed. The certificate SHA-256 was
+`7e6dcdeda83c3857ecfd5f91ded74d1067499682e1373c6546a060ddf831b835`;
+the base APK SHA-256 was
+`4d60a8108e9340dde3aa66a371795a7e774e00e0d0157bb693acfcb07bfb86b4`.
+This is mirror-sourced artifact evidence, not a Play Store installation or live
+account acceptance. The APK, proprietary assets/disassembly and supplied personal
+ZSSW HTML are excluded from the repository. Tests contain synthetic data only.
+
+Flutter/Dart AOT inspection recovered these POST calls in
+`data/sport/remote/sport_auth_remote_data_source_impl.dart`. All use the existing
+UniApp `/api/v3` origin, bearer ID token, selected affiliation and `locale`:
+
+| Operation | Path suffix | Body / result |
+| --- | --- | --- |
+| Initial registration (`0xa100d4`) | `/sports/offers/apply/{offerId}` | No body; dynamic response containing `id`, `formComponents`, `result`, `offer` |
+| Extra answers (`0x941254`) | `/sports/offers/submitAdditionalInfos/{offerId}` | `{"items":[{"id":"component-id","answers":["answer"]}]}`; registration result |
+| Initial cancellation (`0x9233c0`) | `/sports/offers/cancelApplication/{offerId}` | No body; `confirmationText` and optional updated `offer` |
+| Confirm cancellation (`0x916c8c`) | `/sports/offers/confirmCancellation/{offerId}` | No body; same cancellation result |
+
+The app's registration action (`0x94ba74`) builds the form route using its
+original offer ID (`0x94bb48`, `0x94c540`); the router forwards this path parameter
+to the form screen (`0x92b078`). The form submits that same ID, not the dynamic
+response's `id` field. The native repository (`0xa10298`) parses the registration
+result from the response root; the dynamic DTO also declares an optional `result`
+field. BetterIlias accepts both result shapes. Answers are arrays of strings.
+Choice IDs and component IDs are strings. Native file handling base64-encodes raw file bytes
+as the single answer (repository method `0x940edc`); date handling formats
+`yyyy-MM-dd` (`FormatDate.backendSportFormComponent`, `0x93f8f4`). Components use
+`textField`, `textArea`, `checkBox`, `radioType`, `dropDown`, `dateType`, `fileType`,
+integer `required`, `dependantComponentId`/`dependantComponentValue`, nested
+`additionalComponents` and choice-specific additional components. BetterIlias
+supports those bounded controls and dependencies; unknown/malformed controls
+block further submission instead of dropping required questions.
+
+`SportOfferStatus` maps 1=open, 2=future, 3=closed, 4=cancelled by the user,
+5=undefined, 6=fully booked, 7=no registration needed, 8=user cancellation possible,
+9=user cancellation impossible, 10=already registered. Status 4 does not mean the
+organiser cancelled the offer. Provider registration results distinguish
+`success`/`failed`; HTTP 200 alone is insufficient. No CAPTCHA references or
+parameters were found in the native UniSport call paths. This does not establish
+that the upstream server can never demand additional checks. The downloaded ZSSW
+web registration form independently uses invisible reCAPTCHA; its cancellation
+form does not. BetterIlias does not recreate or bypass that website challenge.
+
+### State, isolation and verification
+
+The backend first fetches fresh private offer details and the complete private
+application list. It binds a ten-minute intent to the owner, login generation,
+affiliation, offer ID and exact occurrence start. Initial registration requires
+status 1 and a current registration window when supplied; cancellation requires
+an owned matching occurrence and status 8. Ambiguous occurrence/membership data
+blocks the write. Offer conditions are rechecked before the initial POST. Form
+submissions use the bound offer ID and stored provider-issued schema, never a client-supplied URL
+or replacement form definition. Headers are checked again after budget acquisition
+and before provider dispatch.
+
+Private SQLite receipts and shared local-volume locks serialize the same account,
+affiliation and occurrence across workers/browser capabilities. A durable
+`dispatched` state is written before every possible provider POST. Separate
+`start`, `answers` and `confirm` steps prevent a repeated earlier click from
+advancing the next step. Status GETs never POST. Timeouts, malformed responses,
+lost form responses and process crashes remain uncertain until fresh private
+state establishes the outcome; they never trigger blind retries. A clearly
+resolved prior operation can be recognized after reconnection without disclosing
+its form to the new login generation. Outstanding unresolved operations cannot
+be restarted from another connection; use the official account UI to resolve them.
+
+Completion requires complete private membership readback and matching private
+offer state for the same occurrence. Registration preserves the provider's
+status text; waiting-list membership must not be labelled a confirmed place.
+Cancellation requires disappearance of the owned occurrence and an appropriate
+updated offer state. Offers that advance to another occurrence during verification
+stay uncertain rather than claiming success for the wrong date.
+
+Only an opaque receipt ID is retained in account/affiliation/occurrence-scoped
+tab storage. It conveys no authentication authority without the separate browser
+capability and current scope header. Answers, file bytes and tokens are not stored
+in receipts or browser caches. Booking requests also require the displayed
+affiliation in `X-Unisport-Affiliation`, so an affiliation change in another tab
+cannot silently book under a different affiliation. Full offer conditions are
+removed from receipts after dispatch; abandoned expired preparations are pruned,
+and protected receipts are pruned seven days after their occurrence on subsequent
+preparations. Unresolved future occurrences remain protected against replay.
+Text/file drafts stay in mounted component memory
+across resizing and closing/reopening the dialog; reloading loses unsent drafts.
+Provider steps that expire after a dispatch require status checking or completion
+in the official UI. Public catalogue/sport caches remain independent; reads used
+for mutations bypass them, and private tab caches are invalidated after dispatch.
+
+### Participant lists and test limits
+
+No participant-list/Anmeldeliste endpoint was found in the inspected native
+UniSport transport. This is an investigation result, not proof that the backend
+has no such API. Retain the official offer link; ZSSW participant lists remain
+outside the native integration. Do not reuse personal cancellation IDs from saved
+HTML or assume the UniApp token also establishes a ZSSW browser session.
+
+`tests/test_unisport_booking.py` exercises synthetic native payloads, dynamic
+forms, dependencies, dates/files, separate cancellation confirmation, readback,
+expiry/occurrence/condition changes, ownership/scope and duplicate/concurrent
+requests. `tests/test_unisport_booking_browser.py` covers German/English and
+light/dark at 320/390/430/768/1280 CSS px plus short landscape, actual choices,
+file selection, draft resizing/reopening, pending buttons, focus restoration,
+lost responses and read-only recovery. Screenshots are inspected. These are
+Chromium emulation checks, not physical-device or live provider mutation tests.

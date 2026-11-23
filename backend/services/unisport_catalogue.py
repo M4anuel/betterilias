@@ -62,7 +62,7 @@ def present_offer(raw, *, detail=False):
         opens=nested('registrationTimeSlot', 'begin'), closes=nested('registrationTimeSlot', 'end'),
         level=nested('performanceLevel', 'title'), location=nested('location', 'title'),
         address=nested('location', 'subtitle'), status=text(raw.get('registration')),
-        free_places=text(raw.get('freePlaces')), cancelled=bool(raw.get('outage')) or raw.get('status') == 4,
+        free_places=text(raw.get('freePlaces')), cancelled=bool(raw.get('outage')),
         url=public_url(nested('moreInfo', 'url')))
     if detail:
         infos = raw.get('generalInfos')

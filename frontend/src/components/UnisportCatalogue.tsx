@@ -8,6 +8,8 @@ import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { ErrorNotice } from './ErrorNotice';
 import { FeedbackBanner } from './ui/FeedbackBanner';
+import { UnisportBooking } from './UnisportBooking';
+import { navigationGuard } from '../lib/navigationGuard';
 
 type Saved = { id: number; title: string };
 type Filter = { query: string; sport: string; saved: boolean };
@@ -203,7 +205,7 @@ export function UnisportCatalogue({ credential, scope, affiliation }: { credenti
     </div>
     {selected !== null && <div className="space-y-4" aria-labelledby="unisport-offer-title">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button onClick={() => setSelected(null)}><ArrowLeft size={16} aria-hidden="true" />{t('unisport.back_to_offers')}</Button>
+        <Button onClick={() => { void navigationGuard.confirmNavigation().then(allowed => { if (allowed) setSelected(null); }); }}><ArrowLeft size={16} aria-hidden="true" />{t('unisport.back_to_offers')}</Button>
         <Button loading={detailLoading} onClick={() => void loadDetail(selected, true)}>{t('unisport.refresh')}</Button>
       </div>
       <h2 id="unisport-offer-title" ref={detailHeading} tabIndex={-1} className="break-words text-xl font-bold focus:outline-none">{detail?.offer.title || t('unisport.offer')}</h2>
@@ -218,6 +220,10 @@ export function UnisportCatalogue({ credential, scope, affiliation }: { credenti
           {detail.offer.closes && <p className="text-sm">{t('unisport.registration_closes', { time: unisportDate(detail.offer.closes, locale) })}</p>}
           {(detail.offer.important || detail.offer.outage) && <FeedbackBanner tone="warning" message={detail.offer.important || detail.offer.outage} />}
           {detail.offer.special && <p className="whitespace-pre-wrap break-words text-sm">{detail.offer.special}</p>}
+          {scope && affiliation && detail.offer.begin ? <UnisportBooking
+            key={JSON.stringify([scope, affiliation, detail.offer.id, detail.offer.begin])}
+            credential={credential} scope={scope} affiliation={affiliation} offerId={detail.offer.id} begin={detail.offer.begin} />
+            : <p className="text-sm text-slate-600 dark:text-slate-400">{t('unisport.booking_login')}</p>}
           {detail.offer.url && <a href={detail.offer.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center gap-2 rounded-lg font-semibold text-teal-800 underline focus-visible:outline-2 focus-visible:outline-teal-500 dark:text-teal-300">
             {t('unisport.official_offer')}<ExternalLink size={16} aria-hidden="true" />
           </a>}

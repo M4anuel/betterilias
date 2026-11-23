@@ -1,4 +1,4 @@
-"""Read-only UniApp transport with explicit public and account-owned reads."""
+"""Pinned UniApp transport with explicit public reads and account-owned writes."""
 import hashlib
 import json
 from dataclasses import dataclass
@@ -53,6 +53,21 @@ class UnisportClient:
         await self.client.aclose()
 
     async def _read(self, path, locale, *, public=False, **params):
+        return await self._request('GET', path, locale, public=public, params=params)
+
+    async def mutate(self, operation, identifier, locale='de', *, answers=None, before_dispatch=None):
+        # Only protocol-recovered operations; never accept an upstream URL/path.
+        if operation not in ('apply', 'cancelApplication', 'confirmCancellation', 'submitAdditionalInfos'):
+            raise ValueError('Unsupported UniSport operation')
+        if type(identifier) is not int or identifier <= 0:
+            raise ValueError('A positive UniSport identifier is required')
+        data = await self._request('POST', f'/sports/offers/{operation}/{identifier}', locale,
+            body={'items': answers} if operation == 'submitAdditionalInfos' else None, before_dispatch=before_dispatch)
+        if not isinstance(data, dict):
+            raise UnisportReadError('invalid_response')
+        return data
+
+    async def _request(self, method, path, locale, *, public=False, params=None, body=None, before_dispatch=None):
         if locale not in ('de', 'en'):
             raise ValueError('Unsupported Unisport language')
         headers = {'Accept': 'application/json'}
@@ -66,7 +81,10 @@ class UnisportClient:
             # UniApp uses explicit bearer/affiliation headers. Do not replay
             # even an upstream-set cookie on subsequent public cache requests.
             self.client.cookies.clear()
-            async with self.client.stream('GET', BASE + path, params={**params, 'locale': locale}, headers=headers) as response:
+            if before_dispatch:
+                before_dispatch()
+            async with self.client.stream(method, BASE + path, params={**(params or {}), 'locale': locale},
+                    headers=headers, **({'json': body} if body is not None else {})) as response:
                 if response.status_code in (401, 403):
                     raise UnisportReadError('connection_required')
                 if response.status_code != 200:

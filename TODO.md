@@ -36,8 +36,14 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   accepts tokens issued to that client. Keep token exchange and credentials on
   the backend, preserving PKCE/state/nonce checks and independent UniSport
   sessions. Replace the native-callback bridge only after the web flow works.
-- [ ] Follow with manual registration and verified outcomes, then explicitly
-  armed, one-occurrence client-timed registration. Autologin/session renewal,
+- [x] Add manual native-API registration, dynamic questions/file answers and
+  cancellation with provider confirmation (1.5.0). Verify outcomes against fresh
+  private data; persist dispatch receipts and never automatically replay a POST.
+  Keep catalogue caching independent. Protocol and limitations are documented in
+  `docs/UNISPORT_INTEGRATION.md`; live booking acceptance remains a manual check.
+- [ ] Investigate participant-list (Anmeldeliste) support separately. No endpoint
+  was found in UniBE Mobile 3.4.0; retain access through the official offer page.
+- [ ] Add explicitly armed, one-occurrence client-timed registration. Autologin/session renewal,
   recurring subscriptions and browser-closed scheduling remain later features.
 
 ## Deployment and onboarding

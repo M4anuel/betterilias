@@ -10,6 +10,9 @@ from backend.config import settings
 from backend.i18n import t, current_language
 from backend.services import unisport_auth as auth
 from backend.services import unisport_catalogue as public
+from backend.services import unisport_booking as booking
+from backend.coordination import CoordinationBusy
+from backend.outbound_budget import OutboundUnavailable
 from backend.services.unisport_client import UnisportAccount, UnisportClient, UnisportReadError
 
 router = APIRouter(prefix='/unisport', tags=['unisport'])
@@ -33,6 +36,62 @@ class Callback(BaseModel):
 
 class Affiliation(BaseModel):
     affiliation: str = Field(min_length=1, max_length=512)
+
+
+class BookingPreparation(BaseModel):
+    begin: str = Field(min_length=1, max_length=80)
+    kind: str = Field(pattern=r'^(auto|apply|cancel)$')
+
+
+class BookingSubmission(BaseModel):
+    step: str = Field(pattern=r'^(start|answers|confirm)$')
+    answers: dict[str, list[str]] = Field(default_factory=dict, max_length=80)
+
+
+Scope = Annotated[str, Header(min_length=64, max_length=64, pattern=r'^[a-f0-9]{64}$')]
+AffiliationHeader = Annotated[str, Header(min_length=1, max_length=512)]
+Intent = Annotated[str, Path(pattern=r'^[A-Za-z0-9_-]{43}$')]
+
+
+def booking_failed(error):
+    if isinstance(error, booking.BookingError):
+        if error.code == 'connection_changed':
+            return connection_changed()
+        messages = {
+            'intent_missing': t('unisport.intent_missing'), 'intent_expired': t('unisport.intent_expired'),
+            'invalid_answers': t('unisport.invalid_answers'), 'offer_changed': t('unisport.offer_changed'),
+            'booking_unavailable': t('unisport.booking_unavailable'), 'booking_uncertain': t('unisport.booking_uncertain'),
+            'unsupported_form': t('unisport.unsupported_form'),
+        }
+        return HTTPException(409, messages.get(error.code, t('unisport.read_failed')), headers={'Cache-Control': 'no-store'})
+    return HTTPException(502, t('unisport.read_failed'), headers={'Cache-Control': 'no-store'})
+
+
+@router.post('/offers/{offer_id}/booking')
+async def prepare_booking(owner: Owner, offer_id: Annotated[int, Path(gt=0)], payload: BookingPreparation, x_unisport_scope: Scope, x_unisport_affiliation: AffiliationHeader):
+    state, data = private_account(owner, x_unisport_scope, x_unisport_affiliation)
+    try:
+        return await booking.prepare(owner, state, data, offer_id, payload.begin, payload.kind, locale())
+    except (booking.BookingError, UnisportReadError, OutboundUnavailable, CoordinationBusy) as error:
+        raise booking_failed(error) from None
+
+
+@router.get('/bookings/{intent}')
+async def booking_status(owner: Owner, intent: Intent, x_unisport_scope: Scope, x_unisport_affiliation: AffiliationHeader):
+    state, data = private_account(owner, x_unisport_scope, x_unisport_affiliation)
+    try:
+        return await booking.operate(owner, state, data, intent)
+    except (booking.BookingError, UnisportReadError, OutboundUnavailable, CoordinationBusy) as error:
+        raise booking_failed(error) from None
+
+
+@router.post('/bookings/{intent}')
+async def submit_booking(owner: Owner, intent: Intent, payload: BookingSubmission, x_unisport_scope: Scope, x_unisport_affiliation: AffiliationHeader):
+    state, data = private_account(owner, x_unisport_scope, x_unisport_affiliation)
+    try:
+        return await booking.operate(owner, state, data, intent, payload.step, payload.answers)
+    except (booking.BookingError, UnisportReadError, OutboundUnavailable, CoordinationBusy) as error:
+        raise booking_failed(error) from None
 
 
 def failed():
@@ -83,7 +142,7 @@ def locale():
     return 'de' if current_language.get() == 'de' else 'en'
 
 
-def private_account(owner, expected_scope=None):
+def private_account(owner, expected_scope=None, expected_affiliation=None):
     data = connected(owner)
     current = auth.record(owner)
     if not current or current[1] != data:
@@ -93,6 +152,8 @@ def private_account(owner, expected_scope=None):
         raise connection_changed()
     if not data['affiliation']:
         raise HTTPException(409, t('unisport.choose_affiliation'))
+    if expected_affiliation is not None and expected_affiliation != data['affiliation']:
+        raise connection_changed()
     return current[0], data
 
 
