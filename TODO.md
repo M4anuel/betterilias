@@ -71,6 +71,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   shells across community, course management, grading, diagnostics and admin UI.
   Preserve domain-specific authentication, write certainty and draft ownership;
   usage and follow-up boundaries are documented in `docs/SHARED_UI.md`.
+- [x] Standardize modal dialogs with DialogShell (StudentAssignmentModal, ContentOrderModal,
+  NicknameModal, and TAExerciseManagementView deletion confirmation), enforce mobile touch
+  targets >= 44x44 CSS px across modal controls, calendar exceptions, and download buttons,
+  and scope ExerciseView TA filters in localStorage to courseRefId and exerciseRefId (version 1.6.1).
 - [ ] Continue the UI reuse audit with form fields, info/action disclosures,
   upload/attachment rows, filter layouts and empty states when changing those
   workflows; verify unused `ExerciseModal`/`CourseLogsPanel` before removal.

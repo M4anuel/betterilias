@@ -226,14 +226,26 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const [isLoadingTaSubmissions, setIsLoadingTaSubmissions] = useState(false);
   const [taSubmissionsError, setTaSubmissionsError] = useState<string | null>(null);
   const [taSearchQuery, setTaSearchQuery] = useState('');
+
+  // Scoped storage keys for TA filters (per courseRefId & exerciseRefId)
+  const filterSubKey = `ilias_ta_filter_submission_${courseRefId}_${exerciseRefId}`;
+  const filterGradeKey = `ilias_ta_filter_grade_${courseRefId}_${exerciseRefId}`;
+  const quickFiltersKey = `ilias_ta_quick_filters_${courseRefId}_${exerciseRefId}`;
+
   // Submission requirement filter (Radio: 'all' | 'submitted' | 'not_submitted')
   const [taSubmissionFilter, setTaSubmissionFilter] = useState<'all' | 'submitted' | 'not_submitted'>(() => {
-    return (localStorage.getItem('ilias_ta_filter_submission') as 'all' | 'submitted' | 'not_submitted') || 'all';
+    return (
+      (localStorage.getItem(`ilias_ta_filter_submission_${courseRefId}_${exerciseRefId}`) as 'all' | 'submitted' | 'not_submitted') ||
+      (localStorage.getItem('ilias_ta_filter_submission') as 'all' | 'submitted' | 'not_submitted') ||
+      'all'
+    );
   });
 
   // Grade status multi-select filter (e.g. ['not_graded'], ['passed'], ['failed'], or [] for all)
   const [taGradeFilter, setTaGradeFilter] = useState<string[]>(() => {
     try {
+      const scoped = localStorage.getItem(`ilias_ta_filter_grade_${courseRefId}_${exerciseRefId}`);
+      if (scoped) return JSON.parse(scoped);
       const saved = localStorage.getItem('ilias_ta_filter_grade');
       return saved ? JSON.parse(saved) : [];
     } catch {
@@ -244,6 +256,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   // Quick Filters collection (customizable via dialog)
   const [quickFilters, setQuickFilters] = useState<TAQuickFilter[]>(() => {
     try {
+      const scoped = localStorage.getItem(`ilias_ta_quick_filters_${courseRefId}_${exerciseRefId}`);
+      if (scoped) return JSON.parse(scoped);
       const saved = localStorage.getItem('ilias_ta_quick_filters');
       return saved
         ? JSON.parse(saved)
@@ -269,6 +283,42 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     }
   });
 
+  // Re-synchronize scoped filters when courseRefId or exerciseRefId change
+  useEffect(() => {
+    const subKey = `ilias_ta_filter_submission_${courseRefId}_${exerciseRefId}`;
+    const gradeKey = `ilias_ta_filter_grade_${courseRefId}_${exerciseRefId}`;
+    const qfKey = `ilias_ta_quick_filters_${courseRefId}_${exerciseRefId}`;
+
+    const savedSub = localStorage.getItem(subKey);
+    setTaSubmissionFilter((savedSub as 'all' | 'submitted' | 'not_submitted') || 'all');
+
+    try {
+      const savedGrade = localStorage.getItem(gradeKey);
+      setTaGradeFilter(savedGrade ? JSON.parse(savedGrade) : []);
+    } catch {
+      setTaGradeFilter([]);
+    }
+
+    try {
+      const savedQf = localStorage.getItem(qfKey);
+      if (savedQf) {
+        setQuickFilters(JSON.parse(savedQf));
+      } else {
+        setQuickFilters([
+          {
+            id: 'to_grade',
+            get label() { return t("Zu bewerten"); },
+            color: 'indigo',
+            gradeStatus: ['not_graded'],
+            submissionStatus: 'submitted',
+          },
+        ]);
+      }
+    } catch {
+      // fallback
+    }
+  }, [courseRefId, exerciseRefId]);
+
   // Settings modal open state
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isDistributeModalOpen, setIsDistributeModalOpen] = useState(false);
@@ -277,13 +327,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
 
   const handleSetSubmissionFilter = (val: 'all' | 'submitted' | 'not_submitted') => {
     setTaSubmissionFilter(val);
-    localStorage.setItem('ilias_ta_filter_submission', val);
+    localStorage.setItem(filterSubKey, val);
   };
 
   const handleToggleGradeFilter = (gradeVal: string) => {
     setTaGradeFilter((prev) => {
       const next = prev.includes(gradeVal) ? prev.filter((g) => g !== gradeVal) : [...prev, gradeVal];
-      localStorage.setItem('ilias_ta_filter_grade', JSON.stringify(next));
+      localStorage.setItem(filterGradeKey, JSON.stringify(next));
       return next;
     });
   };
@@ -297,11 +347,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     if (isCurrentlyActive) {
       handleSetSubmissionFilter('all');
       setTaGradeFilter([]);
-      localStorage.setItem('ilias_ta_filter_grade', JSON.stringify([]));
+      localStorage.setItem(filterGradeKey, JSON.stringify([]));
     } else {
       handleSetSubmissionFilter(qf.submissionStatus);
       setTaGradeFilter(qf.gradeStatus);
-      localStorage.setItem('ilias_ta_filter_grade', JSON.stringify(qf.gradeStatus));
+      localStorage.setItem(filterGradeKey, JSON.stringify(qf.gradeStatus));
     }
   };
 
@@ -312,7 +362,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
     };
     setQuickFilters((prev) => {
       const updated = [...prev, item];
-      localStorage.setItem('ilias_ta_quick_filters', JSON.stringify(updated));
+      localStorage.setItem(quickFiltersKey, JSON.stringify(updated));
       return updated;
     });
   };
@@ -320,7 +370,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
   const handleDeleteQuickFilter = (id: string) => {
     setQuickFilters((prev) => {
       const updated = prev.filter((q) => q.id !== id);
-      localStorage.setItem('ilias_ta_quick_filters', JSON.stringify(updated));
+      localStorage.setItem(quickFiltersKey, JSON.stringify(updated));
       return updated;
     });
   };
@@ -1507,7 +1557,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
           type="button"
           onClick={() => {
             setTaGradeFilter([]);
-            localStorage.setItem('ilias_ta_filter_grade', JSON.stringify([]));
+            localStorage.setItem(filterGradeKey, JSON.stringify([]));
           }}
           className={`rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
             taGradeFilter.length === 0
@@ -2207,7 +2257,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
             onResetFilter={() => {
               handleSetSubmissionFilter('all');
               setTaGradeFilter([]);
-              localStorage.setItem('ilias_ta_filter_grade', JSON.stringify([]));
+              localStorage.setItem(filterGradeKey, JSON.stringify([]));
             }}
           />
 

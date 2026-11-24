@@ -44,7 +44,7 @@ export const TAExportZipButton: React.FC<TAExportZipButtonProps> = ({
         type="button"
         onClick={handleClick}
         disabled={inProgress}
-        className="flex items-center justify-center h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-700 transition cursor-pointer shrink-0 ml-1 mr-0.5 disabled:cursor-wait"
+        className="flex items-center justify-center min-h-11 min-w-11 sm:h-7 sm:w-7 sm:min-h-0 sm:min-w-0 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-700 transition cursor-pointer shrink-0 ml-1 mr-0.5 disabled:cursor-wait"
         title={title}
         aria-label={title}
       >

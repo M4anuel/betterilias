@@ -1,7 +1,7 @@
 import { t, useLanguage } from '../lib/i18n';
 import React, { useState, useEffect, useRef } from 'react';
+import { DialogShell } from './ui/DialogShell';
 import {
-  X,
   Check,
   RotateCcw,
   ChevronDown,
@@ -55,7 +55,6 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
   const [hasCustomOrder, setHasCustomOrder] = useState<boolean>(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [hiddenNavItems, setHiddenNavItems] = useState<SidebarDefaultNavItem[]>([]);
-  const backdropMouseDownRef = useRef(false);
   const initialized = useRef(false);
   const initializedSemester = useRef(semester);
 
@@ -110,18 +109,6 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
       });
     }
   }, [isOpen, courses, semester]);
-
-  // Close on Escape key
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
 
   const handleSave = () => {
     // Save nicknames & icons for courses
@@ -227,43 +214,37 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
   };
 
   return (
-    <div
-      className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
-      onMouseDown={(e) => {
-        backdropMouseDownRef.current = e.target === e.currentTarget;
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && backdropMouseDownRef.current) {
-          onClose();
-        }
-        backdropMouseDownRef.current = false;
-      }}
-    >
-      <div
-        className="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150 transition-colors"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4">
-          <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-              {t("Vorlesungen anpassen")}
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {t("Wähle ein individuelles Icon und einen kurzen Namen für deine Seitenleiste.")}
-            </p>
-          </div>
+    <DialogShell
+      open={isOpen}
+      onRequestClose={onClose}
+      className="app-overlay"
+      size="medium"
+      title={t("Vorlesungen anpassen")}
+      description={t("Wähle ein individuelles Icon und einen kurzen Namen für deine Seitenleiste.")}
+      bodyClassName="p-0 flex flex-col"
+      footer={
+        <div className="flex items-center justify-end gap-2">
           <button
+            type="button"
             onClick={onClose}
-            aria-label={t("Schliessen")}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition cursor-pointer"
+            className="min-h-11 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition cursor-pointer"
           >
-            <X className="h-5 w-5" />
+            {t("Abbrechen")}
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
+            className="min-h-11 min-w-0 flex items-center justify-center gap-1.5 rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition cursor-pointer"
+          >
+            <Check className="h-4 w-4 shrink-0" />
+            <span>{t("Änderungen speichern")}</span>
           </button>
         </div>
-
-        {/* Action Toolbar for Sections & Reordering */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
+      }
+    >
+      {/* Action Toolbar for Sections & Reordering */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 shrink-0">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -774,26 +755,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
             })
           )}
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 sm:px-6 py-3.5">
-          <button
-            onClick={onClose}
-            className="min-h-11 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition cursor-pointer"
-          >
-            {t("Abbrechen")}
-          </button>
-          <button
-            onClick={handleSave}
-            style={{ backgroundColor: 'var(--accent, #0AACA5)' }}
-            className="min-h-11 min-w-0 flex items-center justify-center gap-1.5 rounded-lg px-3 sm:px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition cursor-pointer"
-          >
-            <Check className="h-4 w-4 shrink-0" />
-            <span>{t("Änderungen speichern")}</span>
-          </button>
-        </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 };
 

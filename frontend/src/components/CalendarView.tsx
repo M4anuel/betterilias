@@ -3181,7 +3181,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             setRuleExceptions((prev) => prev.filter((d) => d !== exDate))
                           }
                           aria-label={t('Entfernen')}
-                          className="hover:text-rose-900 cursor-pointer"
+                          className="inline-flex items-center justify-center min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 p-2 sm:p-0.5 -m-2 sm:m-0 rounded-md hover:text-rose-900 cursor-pointer touch-manipulation"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -3234,7 +3234,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 type="button"
                 onClick={() => setIsExportModalOpen(false)}
                 aria-label={t('Schliessen')}
-                className="min-h-10 min-w-10 inline-flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -3253,7 +3253,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   <button
                     type="button"
                     onClick={handleRotateSubscription}
-                    className="min-h-9 sm:min-h-8 rounded-lg bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 cursor-pointer"
+                    className="min-h-11 sm:min-h-8 rounded-lg bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 cursor-pointer flex items-center justify-center"
                   >
                     {activeSubscriptionUrl
                       ? t('calendar.export_modal.sub_rotate')
@@ -3263,7 +3263,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     <button
                       type="button"
                       onClick={handleRevokeSubscription}
-                      className="min-h-9 sm:min-h-8 rounded-lg bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 dark:bg-rose-950/50 dark:text-rose-300 cursor-pointer"
+                      className="min-h-11 sm:min-h-8 rounded-lg bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 dark:bg-rose-950/50 dark:text-rose-300 cursor-pointer flex items-center justify-center"
                     >
                       {t('calendar.export_modal.sub_revoke')}
                     </button>

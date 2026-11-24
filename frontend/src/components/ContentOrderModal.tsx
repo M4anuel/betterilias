@@ -1,7 +1,7 @@
 import { t, useLanguage } from '../lib/i18n';
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
+import { DialogShell } from './ui/DialogShell';
 import {
-  X,
   ChevronUp,
   ChevronDown,
   RotateCcw,
@@ -49,22 +49,6 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
   onResetToDefault,
 }) => {
   useLanguage();
-  const modalRef = useRef<HTMLDivElement>(null);
-  const mouseDownInsideRef = useRef(false);
-
-  // Keyboard navigation: Escape closes modal
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -198,56 +182,48 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
     };
   };
 
-  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
-      mouseDownInsideRef.current = false;
-    } else {
-      mouseDownInsideRef.current = true;
-    }
-  };
-
-  const handleBackdropMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!mouseDownInsideRef.current && modalRef.current && !modalRef.current.contains(e.target as Node)) {
-      onClose();
-    }
-    mouseDownInsideRef.current = false;
-  };
-
   return (
-    <div
-      className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
-      onMouseDown={handleBackdropMouseDown}
-      onMouseUp={handleBackdropMouseUp}
-    >
-      <div
-        ref={modalRef}
-        className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-150 transition-colors"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4 bg-slate-50/80 dark:bg-slate-800/80">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-              <SlidersHorizontal className="h-4 w-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">{t("Reihenfolge der Abschnitte & Blöcke")}</h2>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {t("Passe die Anordnung der Vorlesungsblöcke nach deinen Wünschen an")}
-              </p>
-            </div>
+    <DialogShell
+      open={isOpen}
+      onRequestClose={onClose}
+      className="app-overlay"
+      size="small"
+      title={
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <SlidersHorizontal className="h-4 w-4" />
           </div>
+          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            {t("Reihenfolge der Abschnitte & Blöcke")}
+          </span>
+        </div>
+      }
+      description={t("Passe die Anordnung der Vorlesungsblöcke nach deinen Wünschen an")}
+      bodyClassName="space-y-4"
+      footer={
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onResetToDefault}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition cursor-pointer min-h-11 sm:min-h-9"
+            title={t("Auf die originale ILIAS-Reihenfolge der Dozierenden zurücksetzen")}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>{t("Auf ILIAS-Standard zurücksetzen")}</span>
+          </button>
+
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
-            title={t("Schliessen")}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 dark:bg-slate-100 px-4 py-2 text-xs font-bold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 transition cursor-pointer shadow-xs min-h-11 sm:min-h-9"
           >
-            <X className="h-4 w-4" />
+            <Check className="h-3.5 w-3.5" />
+            <span>{t("Fertig")}</span>
           </button>
         </div>
-
-        {/* Content body */}
-        <div className="p-5 overflow-y-auto space-y-4 flex-1">
+      }
+    >
+      <div className="space-y-4">
           {/* List of Reorderable Blocks */}
           <div className="space-y-2">
             {orderedIds.map((blockId, idx) => {
@@ -361,30 +337,7 @@ export const ContentOrderModal: React.FC<ContentOrderModalProps> = ({
             </button>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-6 py-3.5 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onResetToDefault}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition cursor-pointer"
-            title={t("Auf die originale ILIAS-Reihenfolge der Dozierenden zurücksetzen")}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span>{t("Auf ILIAS-Standard zurücksetzen")}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 dark:bg-slate-100 px-4 py-2 text-xs font-bold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 transition cursor-pointer shadow-xs"
-          >
-            <Check className="h-3.5 w-3.5" />
-            <span>{t("Fertig")}</span>
-          </button>
-        </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 };
 

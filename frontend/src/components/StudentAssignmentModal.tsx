@@ -1,5 +1,6 @@
 import { t, useLanguage, assignmentStatusText } from '../lib/i18n';
 import React, { useEffect, useMemo, useState } from 'react';
+import { DialogShell } from './ui/DialogShell';
 import {
   X,
   FileText,
@@ -580,46 +581,38 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
   }, [exerciseRefId, assId]);
 
   return (
-    <div
-      className="app-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-150"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          handleSafeClose();
-        }
-      }}
-    >
-      <div
-        className="relative w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8 flex flex-col max-h-[90dvh] transition-colors"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4 bg-slate-50/70 dark:bg-slate-800/80 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shrink-0">
-              <FileText className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 truncate">
-                {detail?.title || assignmentTitle}
-              </h2>
-              <p className="text-xs text-slate-400 dark:text-slate-500">{t("Übungsblatt & Einreichung")}</p>
-            </div>
+    <DialogShell
+      open={true}
+      onRequestClose={handleSafeClose}
+      className="app-overlay"
+      size="large"
+      title={
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shrink-0">
+            <FileText className="h-5 w-5" />
           </div>
-
+          <span className="text-base font-bold text-slate-900 dark:text-slate-100 truncate">
+            {detail?.title || assignmentTitle}
+          </span>
+        </div>
+      }
+      description={t("Übungsblatt & Einreichung")}
+      bodyClassName="p-6 space-y-6"
+      footer={
+        <div className="flex items-center justify-between">
+          <span className="desktop-only text-[11px] text-slate-400 dark:text-slate-500">{t("Drücke Esc zum Schliessen")}</span>
           <button
             type="button"
             onClick={handleSafeClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
-            aria-label={t("Schliessen")}
-            title={t("Schliessen")}
+            className="rounded-xl bg-slate-900 dark:bg-slate-800 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:hover:bg-slate-700 transition cursor-pointer min-h-11 sm:min-h-9"
           >
-            <X className="h-5 w-5" />
+            {t("Schliessen")}
           </button>
         </div>
-
-        {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {isLoading && !detail ? (
+      }
+    >
+      {/* Modal Body */}
+      {isLoading && !detail ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-400">
               <RefreshCw className="h-6 w-6 animate-spin text-indigo-600" />
               <p className="text-xs font-semibold">{t("Lade Details zur Aufgabe...")}</p>
@@ -1309,20 +1302,6 @@ export const StudentAssignmentModal: React.FC<StudentAssignmentModalProps> = ({
               </div>
             </>
           ) : null}
-        </div>
-
-        {/* Modal Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-6 py-3.5 bg-slate-50/70 dark:bg-slate-800/80 shrink-0">
-          <span className="desktop-only text-[11px] text-slate-400 dark:text-slate-500">{t("Drücke Esc zum Schliessen")}</span>
-          <button
-            type="button"
-            onClick={handleSafeClose}
-            className="rounded-xl bg-slate-900 dark:bg-slate-800 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:hover:bg-slate-700 transition cursor-pointer"
-          >
-            {t("Schliessen")}
-          </button>
-        </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 };

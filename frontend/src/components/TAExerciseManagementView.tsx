@@ -1,3 +1,4 @@
+import { DialogShell } from './ui/DialogShell';
 import { FeedbackBanner } from './ui/FeedbackBanner';
 import { useConnectionRetry } from '../lib/connection';
 import { ErrorNotice } from './ErrorNotice';
@@ -523,29 +524,29 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <div className="app-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl">
-            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400 mb-4">
+        <DialogShell
+          open={true}
+          onRequestClose={() => { if (!isDeleting) setDeleteTarget(null); }}
+          closeDisabled={isDeleting}
+          className="app-overlay"
+          size="small"
+          title={
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
               <div className="p-2.5 rounded-xl bg-rose-100 dark:bg-rose-950/50">
                 <Trash2 className="h-6 w-6" />
               </div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              <span className="text-lg font-bold text-slate-900 dark:text-slate-100">
                 {t("Übung unwiderruflich löschen?")}
-              </h2>
+              </span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
-              {t("Möchten Sie die Übung")}{' '}
-              <strong className="text-slate-900 dark:text-slate-100 font-semibold">
-                &ldquo;{deleteTarget.title}&rdquo;
-              </strong>{' '}
-              {t("wirklich löschen? Alle zugehörigen Einreichungen und Dateien in ILIAS werden gelöscht.")}
-            </p>
+          }
+          footer={
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition cursor-pointer"
+                className="min-h-11 sm:min-h-9 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition cursor-pointer"
               >
                 {t("Abbrechen")}
               </button>
@@ -553,14 +554,22 @@ export const TAExerciseManagementView: React.FC<TAExerciseManagementViewProps> =
                 type="button"
                 onClick={handleDeleteConfirm}
                 disabled={isDeleting}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                className="min-h-11 sm:min-h-9 flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
               >
                 {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 <span>{t("Übung endgültig löschen")}</span>
               </button>
             </div>
-          </div>
-        </div>
+          }
+        >
+          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+            {t("Möchten Sie die Übung")}{' '}
+            <strong className="text-slate-900 dark:text-slate-100 font-semibold">
+              &ldquo;{deleteTarget.title}&rdquo;
+            </strong>{' '}
+            {t("wirklich löschen? Alle zugehörigen Einreichungen und Dateien in ILIAS werden gelöscht.")}
+          </p>
+        </DialogShell>
       )}
     </div>
   );

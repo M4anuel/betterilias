@@ -69,6 +69,13 @@ def check_prerequisites():
         subprocess.run([NPM_CMD, "install"], cwd=str(FRONTEND_DIR), check=True)
 
 def main():
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print("Usage: python start.py [options]")
+        print("\nUnified launcher for ILIAS Alternative (FastAPI backend + React frontend).")
+        print("\nOptions:")
+        print("  -h, --help    Show this help message and exit")
+        return 0
+
     print("=" * 65)
     print(" 🚀 Starting ILIAS Alternative (Uni Bern)")
     print("=" * 65)
