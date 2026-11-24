@@ -53,6 +53,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   regressions and the actual production container stack before publishing.
 - [x] Include the official ZSSW website identity login in the connection flow
   and resume participant-list loading after its return (1.7.1, Companion 1.2.1).
+- [x] Hide UniSport navigation, sidebar customisation and the direct view unless
+  the server explicitly enables `UNISPORT_ENABLED` (1.7.2).
 - [ ] Add explicitly armed, one-occurrence client-timed registration. Autologin/session renewal,
   recurring subscriptions and browser-closed scheduling remain later features.
 

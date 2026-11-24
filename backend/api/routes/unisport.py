@@ -19,6 +19,13 @@ from backend.services.unisport_client import UnisportAccount, UnisportClient, Un
 router = APIRouter(prefix='/unisport', tags=['unisport'])
 
 
+@router.get('/availability')
+def availability(response: Response):
+    """Public feature flag only; credentials and provider data stay private."""
+    response.headers['Cache-Control'] = 'no-store'
+    return {'enabled': settings.unisport_enabled}
+
+
 def owner(response: Response, x_unisport_session: Annotated[str | None, Header()] = None):
     response.headers['Cache-Control'] = 'no-store'
     if not settings.unisport_enabled:

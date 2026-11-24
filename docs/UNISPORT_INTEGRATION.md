@@ -24,6 +24,9 @@ step, with Companion 1.2.1 resuming participant reads after the official return.
    in the application's virtual environment; `uv pip install` also works).
 2. Set `UNISPORT_ENABLED=true` in the repository-root `.env` and restart the
    backend. The default is false, including in production.
+   From 1.7.2 the frontend hides UniSport navigation/customisation and its direct
+   view unless `/api/unisport/availability` explicitly reports `enabled: true`.
+   Reload the page after changing the server flag; no frontend build flag is needed.
 3. Reload the unpacked Chrome extension from `extensions/chrome/`, or temporarily
    load `extensions/firefox/manifest.json` in Firefox's `about:debugging`.
    These folders contain Companion 1.2.1; the store releases may still be older.

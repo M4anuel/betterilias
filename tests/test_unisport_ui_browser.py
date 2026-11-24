@@ -96,6 +96,7 @@ def test_login_pending_cancel_failure_and_retry(workflow_page):
 def test_app_navigation_and_history_without_ilias_login(workflow_page, width):
     page=workflow_page; page.set_viewport_size({'width':width,'height':844}); tr=language(page,'en','light')
     mount(page)
+    page.route('**/api/unisport/availability', lambda route: route.fulfill(content_type='application/json',body='{"enabled":true}'))
     page.evaluate('''async()=>{
       const {api}=await import('/src/lib/api.ts');
       api.getAuthStatus=async()=>({authenticated:false,cookies_present:false});
@@ -120,3 +121,37 @@ def test_app_navigation_and_history_without_ilias_login(workflow_page, width):
     assert page.locator('aside button[aria-current="page"]').count()==1
     page.mouse.move(width-5, 80)
     shot(page,f'app-navigation-{width}-en-light')
+
+
+@pytest.mark.parametrize('width', [320, 768, 1280])
+@pytest.mark.parametrize('mode', ['disabled', 'failed', 'enabled'])
+def test_app_hides_unisport_until_server_explicitly_enables_it(workflow_page,width,mode):
+    page=workflow_page;page.set_viewport_size({'width':width,'height':844});tr=language(page,'de','dark')
+    calls=[]
+    def handle(route):
+        path=urlsplit(route.request.url).path;calls.append(path)
+        if path.endswith('/availability'):
+            route.fulfill(status=503 if mode=='failed' else 200,content_type='application/json',body=json.dumps({'enabled':mode=='enabled'}))
+        elif path.endswith('/catalogue'):
+            route.fulfill(content_type='application/json',body='{"items":[],"sports":[],"stale":false,"fetched_at":1795459500}')
+        else:route.fulfill(content_type='application/json',body='{"phase":"disconnected","affiliation":null}')
+    page.route('**/api/unisport/**',handle)
+    page.evaluate('''async()=>{
+      const {api}=await import('/src/lib/api.ts');
+      api.getAuthStatus=async()=>({authenticated:false,cookies_present:false});
+      api.getSemesters=async semester=>({semester:semester||'HS2026',active_semester:semester||'HS2026',available_semesters:['HS2026'],courses:[],grouped_by_category:{}});
+      history.replaceState(null,'','?view=unisport');
+      const {App}=await import('/src/App.tsx');mountAudit(App,{});
+    }''')
+    page.wait_for_function("performance.getEntriesByType('resource').some(item=>item.name.endsWith('/api/unisport/availability'))")
+    if mode=='enabled':page.get_by_role('heading',name=tr['unisport.title'],exact=True).wait_for()
+    else:
+        page.wait_for_timeout(100)
+        assert page.get_by_role('heading',name=tr['unisport.title'],exact=True).count()==0
+        assert calls==['/api/unisport/availability']
+    if width<1024:page.get_by_role('button',name=tr['Sidebar umschalten'],exact=True).click()
+    assert page.get_by_role('button',name=tr['unisport.title'],exact=True).count()==(1 if mode=='enabled' else 0)
+    page.get_by_role('button',name=tr['Vorlesungen anpassen'],exact=True).click()
+    # The hidden feature must not remain available in sidebar customisation.
+    assert page.locator('[data-nav-card=unisport]').count()==(1 if mode=='enabled' else 0)
+    shot(page,f'availability-{mode}-{width}-de-dark')

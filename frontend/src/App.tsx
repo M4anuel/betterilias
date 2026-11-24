@@ -134,6 +134,19 @@ export function parseStateFromUrl(defaultSemester: string): NavigationState {
 }
 
 export const App: React.FC = () => {
+  const [unisportEnabled, setUnisportEnabled] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch('/api/unisport/availability', { credentials: 'omit', cache: 'no-store',
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) });
+        const value = response.ok ? await response.json() : null;
+        if (!controller.signal.aborted) setUnisportEnabled(value?.enabled === true);
+      } catch { /* Keep optional navigation hidden when availability is unknown. */ }
+    })();
+    return () => controller.abort();
+  }, []);
   const language = useLanguage();
   const approvedHistoryNavigation = useRef(false);
   const isMobile = useMobileViewport();
@@ -1124,7 +1137,7 @@ export const App: React.FC = () => {
 
   // --- Dynamic Document Title ---
   useEffect(() => {
-    if (isUnisportOpen) { document.title = `${t('unisport.title')} - BetterIlias`; return; }
+    if (isUnisportOpen) { document.title = unisportEnabled ? `${t('unisport.title')} - BetterIlias` : 'BetterIlias'; return; }
     if (isRequestsOpen) {
       document.title = `BetterIlias – ${t('requests.title')}`;
     } else if (isLandingOpen) {
@@ -1150,6 +1163,7 @@ export const App: React.FC = () => {
   }, [
     language,
     isUnisportOpen,
+    unisportEnabled,
     isRequestsOpen,
     isLandingOpen,
     myCourses,
@@ -1199,7 +1213,7 @@ export const App: React.FC = () => {
     pushAppHistory(state, '', stateToUrl(state)); setMobileNavigationOpen(false);
   };
   const navigateUnisport = async () => {
-    if (!await navigationGuard.confirmNavigation()) return;
+    if (!unisportEnabled || !await navigationGuard.confirmNavigation()) return;
     setIsUnisportOpen(true); setIsRequestsOpen(false); setIsLandingOpen(false);
     setMyCourses(false); setRepositoryId(null); setIsCalendarOpen(false);
     setSelectedCourseId(null); setCurrentContainerId(null); setActiveExerciseRefId(null); setActiveExerciseTab(null);
@@ -1208,7 +1222,7 @@ export const App: React.FC = () => {
     pushAppHistory(state, '', stateToUrl(state)); setMobileNavigationOpen(false);
   };
   const sidebar = <Sidebar
-    onSelectUnisport={() => { void navigateUnisport(); }} isUnisportSelected={isUnisportOpen}
+    onSelectUnisport={unisportEnabled ? () => { void navigateUnisport(); } : undefined} isUnisportSelected={unisportEnabled && isUnisportOpen}
     onSelectRequests={() => { void navigationGuard.confirmNavigation().then(approved => { if (approved) navigateRequests(); }); }}
     isRequestsSelected={isRequestsOpen}
     width={effectiveSidebarWidth}
@@ -1262,7 +1276,7 @@ export const App: React.FC = () => {
         <div className="flex min-w-0 flex-1 flex-col">
         <main ref={workspaceRef} className={`@container/workspace min-w-0 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50 ${workspaceWidth < 768 ? 'workspace-compact' : ''}`}>
           <WorkspaceWidth.Provider value={workspaceWidth}>
-          {isUnisportOpen ? <UnisportView /> : isRequestsOpen ? <FeatureRequestsView key={requestId || 'board'} initialSuccess={requestSaved} selectedId={requestId} onSelect={navigateRequests} /> : isLandingOpen ? (
+          {isUnisportOpen && unisportEnabled ? <UnisportView /> : isRequestsOpen ? <FeatureRequestsView key={requestId || 'board'} initialSuccess={requestSaved} selectedId={requestId} onSelect={navigateRequests} /> : isLandingOpen || isUnisportOpen ? (
             <LandingView
               onOpenApp={handleOpenApp}
               onOpenExtensionInfo={() => setIsExtensionModalOpen(true)}
@@ -1357,6 +1371,7 @@ export const App: React.FC = () => {
 
       {/* Nickname & Icon Editor Modal */}
       <NicknameModal
+        unisportEnabled={unisportEnabled}
         semester={selectedSemester}
         courses={allCourses}
         isOpen={isNicknameModalOpen}
