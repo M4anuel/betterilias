@@ -15,6 +15,8 @@ Version 1.6.0 adds direct official participant-list links from existing
 registrations and verified signup results.
 Version 1.7.0 reads those lists through Companion 1.2.0 into a cached dialog with
 live search, and caches native registration reads on both server and client.
+Version 1.7.1 makes the separate website identity login an explicit connection
+step, with Companion 1.2.1 resuming participant reads after the official return.
 
 ## Try it locally
 
@@ -24,7 +26,7 @@ live search, and caches native registration reads on both server and client.
    backend. The default is false, including in production.
 3. Reload the unpacked Chrome extension from `extensions/chrome/`, or temporarily
    load `extensions/firefox/manifest.json` in Firefox's `about:debugging`.
-   These folders contain Companion 1.2.0; the store releases may still be older.
+   These folders contain Companion 1.2.1; the store releases may still be older.
    Accept `login.eduid.ch` and `www.zssw.unibe.ch` access. Safari is not supported by
    this prototype.
 4. In Companion settings, set the backend and frontend addresses to match the
@@ -34,6 +36,10 @@ live search, and caches native registration reads on both server and client.
    SWITCH**. Complete login/consent directly on the real provider's page.
 6. Return to BetterIlias, choose and confirm an affiliation, then load personal
    registrations. No booking request is made.
+   For participant lists, use **Complete website login** below the affiliation
+   selector. Select the matching organisation/identity on SWITCH for the
+   university sport website. Saving a native API affiliation cannot select that
+   SAML identity: SWITCH releases the selected identity separately to each service.
 7. Browse the public offers, filter by search text/sport type and open details.
    Use the saved-offers filter after choosing an affiliation to view bookmarks
    already present in the UniSport account. The official offer link opens the
@@ -48,9 +54,23 @@ live search, and caches native registration reads on both server and client.
 10. Use **Participant list** next to an existing registration or after a verified
     signup. The dialog filters names and offers locally as you type. An updated
     Companion reads the fixed ZSSW page with the browser's existing website
-    session. If needed, follow the official-page link, sign in with SWITCH,
-    return and refresh. The site enforces registration/access rights. Native
+    session. If login is required, choose **Complete website login** in the
+    dialog. The Companion opens that list's protected route in a normal tab and
+    resumes the list read on the exact ZSSW return. Closing the login reports
+    cancellation. The site enforces registration/access rights. Native
     UniApp login does not itself create a ZSSW web session.
+
+Website login tracking contains only the owner/login tab IDs, configured frontend
+origin, native scope/affiliation, fixed target path and ten-minute expiry in
+extension session storage. It survives service-worker restarts and is removed
+on completion, cancellation or native disconnect. No provider form fields,
+identity chooser contents, passwords or SAML assertions are read. A return to
+another site/path cannot complete it. Returning to the target is navigation
+completion, not proof of list entitlement; the normal bounded HTML read still
+validates the participant table before displaying rows.
+
+See SWITCH's [identity chooser documentation](https://help.switch.ch/de/eduid/federation/login/chooser/):
+the chosen organisational identity is released to the requesting service.
 
 ## Catalogue and personal cache policy
 

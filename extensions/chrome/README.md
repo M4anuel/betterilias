@@ -67,12 +67,13 @@ production hostname before publishing a production extension. Use development
 mode for a local HTTP backend, and same-origin HTTPS for the deployed app/API.
 See [deployment security](../../docs/DEPLOYMENT_SECURITY.md) for exact requirements.
 
-## UniSport participant lists (Companion 1.2.0)
+## UniSport participant lists (Companion 1.2.1)
 
 Reload this extension version and accept access to `www.zssw.unibe.ch`, then reload
 BetterIlias. Participant lists open inside BetterIlias with live search and a
-five-minute private tab cache. If needed, use the dialog's official-page link to
-sign in to ZSSW with SWITCH, return and refresh. The native UniApp connection and
+five-minute private tab cache. Use **Complete website login** after affiliation selection, or in the dialog
+when login is required. Select your identity on the official SWITCH page; the
+Companion returns to BetterIlias and retries the list after the ZSSW return. The native UniApp connection and
 the website login remain separate. This read supports regular browser windows;
 the official page remains the fallback for private windows or blocked cookies.
 This source release does not imply browser-store publication.

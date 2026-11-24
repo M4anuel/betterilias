@@ -51,6 +51,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   preserve source timestamps, offer explicit refresh and invalidate on writes.
   Keep booking authorization/readback fresh; verify CI dependency order, browser
   regressions and the actual production container stack before publishing.
+- [x] Include the official ZSSW website identity login in the connection flow
+  and resume participant-list loading after its return (1.7.1, Companion 1.2.1).
 - [ ] Add explicitly armed, one-occurrence client-timed registration. Autologin/session renewal,
   recurring subscriptions and browser-closed scheduling remain later features.
 

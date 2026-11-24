@@ -2431,7 +2431,7 @@
   "unisport.applications_changed": "Eine Anmeldeanfrage hat sich geändert. Lade deine Anmeldungen neu, um den aktuellen Kontostand zu sehen.",
   "unisport.selected_file": "Ausgewählte Datei: {name}",
   "unisport.participants": "Anmeldeliste",
-  "unisport.participants_hint": "Die Liste wird fünf Minuten zwischengespeichert. Melde dich falls nötig auf der offiziellen Seite mit SWITCH an und lade sie hier erneut.",
+  "unisport.participants_hint": "Die Liste wird fünf Minuten zwischengespeichert. Die Website-Anmeldung verwendet die offizielle SWITCH-Identitätsauswahl; der Listenzugriff wird separat geprüft.",
   "unisport.participants_search": "Namen oder Angebote suchen",
   "unisport.participants_loading": "Anmeldeliste wird geladen…",
   "unisport.participants_count": "{shown} von {total} Teilnehmenden",
@@ -2439,10 +2439,16 @@
   "unisport.participants_empty": "Es sind keine Teilnehmenden aufgeführt.",
   "unisport.participants_no_matches": "Keine Teilnehmenden passen zu deiner Suche.",
   "unisport.participants_official": "Offizielle Liste öffnen / anmelden",
-  "unisport.participants_login_required": "Melde dich auf der offiziellen Unisport-Seite mit SWITCH an und versuche es hier erneut. Der Zugriff setzt auch eine Anmeldung für dieses Angebot voraus.",
+  "unisport.participants_login_required": "Schliesse unten die Website-Anmeldung ab. Der Zugriff auf diese Liste setzt auch eine Anmeldung für das Angebot voraus.",
   "unisport.participants_read_failed": "Die Anmeldeliste konnte nicht gelesen werden. Versuche es erneut oder öffne die offizielle Seite.",
   "unisport.participants_session_changed": "Deine Verbindung hat sich geändert. Lade die Liste für die aktuelle Website-Sitzung neu.",
   "unisport.participants_unavailable": "Verwende einen aktualisierten Chrome- oder Firefox-Companion in einem normalen Browserfenster. Die offizielle Liste ist unten weiterhin verfügbar.",
   "unisport.refresh_applications": "Anmeldungen aktualisieren",
-  "unisport.new_tab": " (öffnet in einem neuen Tab)"
+  "unisport.new_tab": " (öffnet in einem neuen Tab)",
+  "unisport.website_login_title": "Website-Anmeldung für Teilnahmelisten",
+  "unisport.website_login": "Website-Anmeldung abschliessen",
+  "unisport.website_login_hint": "Die Zugehörigkeit für die native API meldet dich nicht auf der ZSSW-Website an. Wähle auf der offiziellen SWITCH-Seite die passende Organisation oder Identität. Passwort und Identitätsauswahl bleiben dort.",
+  "unisport.website_login_waiting": "Schliesse die Identitätsauswahl im geöffneten Tab ab. BetterIlias fährt nach der Rückkehr zu ZSSW fort.",
+  "unisport.website_login_returned": "Von der Website-Anmeldung zurückgekehrt. Der Zugriff wird beim Öffnen jeder Teilnahmeliste geprüft.",
+  "unisport.website_login_cancelled": "Die Website-Anmeldung wurde geschlossen oder ist abgelaufen. Du kannst sie erneut starten."
 }

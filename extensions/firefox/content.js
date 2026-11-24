@@ -23,7 +23,7 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin) return;
     const message = event.data;
-    if (!['UNISPORT_START', 'UNISPORT_PING', 'UNISPORT_CANCEL', 'UNISPORT_PARTICIPANTS_CONTEXT', 'UNISPORT_PARTICIPANTS_READ'].includes(message?.type) || typeof message.requestId !== 'string' || message.requestId.length > 80) return;
+    if (!['UNISPORT_START', 'UNISPORT_PING', 'UNISPORT_CANCEL', 'UNISPORT_PARTICIPANTS_CONTEXT', 'UNISPORT_PARTICIPANTS_READ', 'UNISPORT_PARTICIPANTS_LOGIN'].includes(message?.type) || typeof message.requestId !== 'string' || message.requestId.length > 80) return;
     void (async () => {
       let result;
       try { result = await browserAPI.runtime.sendMessage(message); } catch (_) {}
@@ -36,6 +36,8 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     if (message?.type === 'UNISPORT_FINISHED') {
       window.postMessage({ type: 'UNISPORT_FINISHED', success: message.success === true }, location.origin);
     }
+    if (message?.type === 'UNISPORT_PARTICIPANTS_LOGIN_FINISHED')
+      window.postMessage({ type: message.type, scope: message.scope, affiliation: message.affiliation, success: message.success === true }, location.origin);
     if (message?.type === 'UNISPORT_PARTICIPANTS_COOKIES_CHANGED')
       window.postMessage({ type: message.type }, location.origin);
     return false;

@@ -58,7 +58,7 @@ retain previous complete snapshots for up to seven days; the detail cache is
 bounded to 128 entries. Browser public snapshots can remain until replaced,
 evicted or cleared, with timestamps and stale-data feedback when displayed.
 
-Companion 1.2.0 can read the official ZSSW participant list on request using the
+Companion 1.2.0 and later can read the official ZSSW participant list on request using the
 browser's existing website session. It accesses cookies applicable to
 `https://www.zssw.unibe.ch` locally to compute an opaque, instance/connection-bound
 cache identity; those cookie values are not forwarded to BetterIlias. Only the
@@ -72,6 +72,14 @@ visible data when the identity changes. Native disconnect clears private caches,
 and closing the tab removes the tab store. A normal Chrome/Firefox window and
 the updated Companion are required; incognito/private windows and Firefox
 containers are unsupported for this read. The official list remains a fallback.
+
+From Companion 1.2.1, you can complete website login in an official tab. The
+extension stores only tab IDs, BetterIlias origin, native scope/affiliation,
+fixed return path and a ten-minute expiry in extension session storage. It
+observes the return to ZSSW and resumes the requested list read. It does not
+read the SWITCH identity chooser, passwords or SAML responses. Completion,
+cancellation and native disconnect remove the transaction; expired transactions
+are ignored and removed on the next start.
 
 Private native registration snapshots are also cached on the server with one
 minute of validity, under private file permissions and isolated by connection capability
@@ -142,7 +150,7 @@ Webseitendaten-Einstellungen löschen. Der Server behält vorherige vollständig
 Löschen erhalten; bei der Anzeige erscheinen Zeitstempel und Hinweise auf ältere
 Daten.
 
-Companion 1.2.0 kann auf Wunsch die offizielle ZSSW-Anmeldeliste mit der
+Companion 1.2.0 und neuer kann auf Wunsch die offizielle ZSSW-Anmeldeliste mit der
 bestehenden Website-Sitzung des Browsers lesen. Cookies für
 `https://www.zssw.unibe.ch` werden lokal verwendet, um eine undurchsichtige,
 an Instanz und Verbindung gebundene Cache-Kennung zu berechnen. Diese Cookie-Werte
@@ -158,6 +166,15 @@ löscht private Caches, das Schliessen des Tabs entfernt den Tab-Speicher. Benö
 einen aktualisierten Companion in einem normalen Chrome-/Firefox-Fenster;
 private Fenster und Firefox-Container werden für diesen Abruf nicht unterstützt.
 Die offizielle Liste bleibt als Alternative verfügbar.
+
+Ab Companion 1.2.1 kannst du die Website-Anmeldung in einem offiziellen Tab
+abschliessen. Die Erweiterung speichert dafür nur Tab-IDs, BetterIlias-Ursprung,
+native Verbindungskennung/Zugehörigkeit, festen Rückkehrpfad und eine
+Zehn-Minuten-Frist im flüchtigen Erweiterungsspeicher. Sie beobachtet die
+Rückkehr zu ZSSW und setzt den angeforderten Listenabruf fort. Sie liest weder
+die SWITCH-Identitätsauswahl noch Passwörter oder SAML-Antworten. Abschluss,
+Abbruch und Trennen entfernen den Vorgang; abgelaufene Vorgänge werden ignoriert
+und beim nächsten Start entfernt.
 
 Persönliche native Anmeldungen werden zusätzlich auf dem Server mit einer Minute
 Gültigkeit unter privaten Dateirechten gespeichert, getrennt nach Hash der

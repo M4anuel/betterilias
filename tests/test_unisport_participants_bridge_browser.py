@@ -94,6 +94,40 @@ def test_chromium_participants_cookie_session_fetch_bounds_and_trusted_sender(tm
                 result=invoke({'type':'UNISPORT_PARTICIPANTS_READ',**MESSAGE,'course':'3003','context':second['data']['context']})
                 assert not result['success'] and 'html' not in (result.get('data') or {})
             assert worker.evaluate('chrome.storage.session.get(null)')=={}
+            # Website login is a real top-level SAML navigation, not a fetch of
+            # the identity chooser or an API affiliation pretending to log in.
+            control['mode']='redirect'
+            owner.evaluate("window.loginResults=[];addEventListener('message',e=>{if(e.data?.type==='UNISPORT_PARTICIPANTS_LOGIN_FINISHED')loginResults.push(e.data)})")
+            assert not invoke({'type':'UNISPORT_PARTICIPANTS_LOGIN',**MESSAGE,'course':'../login'})['success']
+            assert invoke({'type':'UNISPORT_PARTICIPANTS_LOGIN',**MESSAGE,'course':'3003','url':'https://untrusted.invalid/'})['success']
+            deadline=time.monotonic()+5
+            while time.monotonic()<deadline:
+                login=next((tab for tab in context.pages if tab.url==origin+'/login'),None)
+                if login:break
+                owner.wait_for_timeout(50)
+            assert login and owner.evaluate('loginResults')==[]
+            saved=worker.evaluate('chrome.storage.session.get(null)')
+            assert len(saved)==1 and 'credential' not in next(iter(saved.values()))
+            # Returning to an unrelated page must not finish the transaction.
+            login.goto(origin+'/unrelated');owner.wait_for_timeout(100)
+            assert owner.evaluate('loginResults')==[]
+            control['mode']='ok'
+            with login.expect_event('close'):
+                login.goto(origin+'/usp/zms/aii/anmeldeliste/3003/index_ger.html',wait_until='commit')
+            owner.wait_for_function('()=>loginResults.length===1')
+            assert owner.evaluate('loginResults[0]')=={'type':'UNISPORT_PARTICIPANTS_LOGIN_FINISHED',**MESSAGE,'success':True}
+            assert worker.evaluate('chrome.storage.session.get(null)')=={}
+            # Closing the login tab reports cancellation; it never authenticates.
+            control['mode']='redirect'
+            assert invoke({'type':'UNISPORT_PARTICIPANTS_LOGIN',**MESSAGE,'course':'3003'})['success']
+            deadline=time.monotonic()+5
+            while time.monotonic()<deadline:
+                login=next((tab for tab in context.pages if tab.url==origin+'/login'),None)
+                if login:break
+                owner.wait_for_timeout(50)
+            assert login
+            login.close();owner.wait_for_function('()=>loginResults.length===2')
+            assert owner.evaluate('loginResults[1].success') is False
         finally:context.close()
 
 

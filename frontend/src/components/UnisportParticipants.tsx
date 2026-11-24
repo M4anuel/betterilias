@@ -6,12 +6,15 @@ import { clearParticipantCache, filterParticipants, loadParticipants, participan
 import { Button } from './ui/Button';
 import { DialogShell } from './ui/DialogShell';
 import { ErrorNotice } from './ErrorNotice';
+import { UnisportWebsiteLogin } from './UnisportWebsiteLogin';
+import { UnisportCompanionError } from '../lib/unisport';
 
 export function UnisportParticipants({ offerUrl, scope, affiliation }: { offerUrl?: string | null; scope: string; affiliation: string }) {
   const language = useLanguage(), id = useId();
   const href = unisportParticipantsUrl(offerUrl), course = href?.split('/').at(-2);
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [query, setQuery] = useState('');
   const [snapshot, setSnapshot] = useState<ParticipantSnapshot | null>(null);
+  const [loginRequired, setLoginRequired] = useState(false);
   const sequence = useRef(0), identity = useRef(''), mounted = useRef(false);
   const contextKey = JSON.stringify([scope, affiliation, course]);
   const rows = useMemo(() => filterParticipants(snapshot?.items || [], query), [snapshot, query]);
@@ -20,7 +23,7 @@ export function UnisportParticipants({ offerUrl, scope, affiliation }: { offerUr
   async function load(force = false) {
     if (!course) return;
     const current = ++sequence.current;
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setLoginRequired(false);
     try {
       const context = await participantContext(scope, affiliation);
       if (!mounted.current || current !== sequence.current) return;
@@ -29,7 +32,7 @@ export function UnisportParticipants({ offerUrl, scope, affiliation }: { offerUr
       const next = await loadParticipants(scope, affiliation, course, context, force);
       if (mounted.current && current === sequence.current) setSnapshot(next);
     } catch (failure) {
-      if (mounted.current && current === sequence.current) { setSnapshot(null); setError(failure instanceof Error ? failure.message : t('unisport.participants_read_failed')); }
+      if (mounted.current && current === sequence.current) { setSnapshot(null); setLoginRequired(failure instanceof UnisportCompanionError && failure.code === 'participants_login_required'); setError(failure instanceof Error ? failure.message : t('unisport.participants_read_failed')); }
     } finally { if (mounted.current && current === sequence.current) setBusy(false); }
   }
   useEffect(() => {
@@ -59,7 +62,9 @@ export function UnisportParticipants({ offerUrl, scope, affiliation }: { offerUr
           <Button loading={busy} onClick={() => void load(true)} className="min-h-12"><RefreshCw size={16} aria-hidden="true" />{t('unisport.refresh')}</Button>
         </search>
         {busy && <p role="status" className="text-sm">{t('unisport.participants_loading')}</p>}
-        {error && <ErrorNotice message={error} connectionInline onRetry={() => void load(true)} retryDisabled={busy} />}
+        {error && !loginRequired && <ErrorNotice message={error} connectionInline onRetry={() => void load(true)} retryDisabled={busy} />}
+        {loginRequired && <p role="status" className="text-sm">{error}</p>}
+        {loginRequired && <UnisportWebsiteLogin scope={scope} affiliation={affiliation} course={course} onComplete={() => void load(true)} />}
         {snapshot && <>
           <p className="text-xs text-slate-600 dark:text-slate-400">{t('unisport.cached_at', { time: unisportDate(new Date(snapshot.fetched_at * 1000).toISOString(), language) })}</p>
           <p role="status" className="text-sm">{t('unisport.participants_count', { shown: rows.length, total: snapshot.items.length })}</p>

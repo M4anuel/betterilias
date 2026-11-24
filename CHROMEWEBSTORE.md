@@ -1,6 +1,6 @@
 # BetterIlias Companion store notes
 
-Updated 2026-11-24. Companion 1.2.0 is a prototype source update; this document
+Updated 2026-11-24. Companion 1.2.1 is a prototype source update; this document
 does not mean it has been submitted or approved in either browser store.
 
 ## Store listing
@@ -77,6 +77,11 @@ Update the matching store disclosures before submission. No store upload or
 approval is implied by publishing source code.
 
 ## Version history
+
+- 1.2.1 (2026-11-24): Guide the separate ZSSW website identity login in an
+  official provider tab and resume participant-list loading on return. Track
+  fixed return paths and tab ownership in session storage, with cancellation
+  and expiry. No new permissions or provider-form access.
 
 - 1.2.0 (2026-11-24): Read official UniSport participant lists inside BetterIlias,
   search names live, retain a short-lived local cache and detect website-session

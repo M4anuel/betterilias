@@ -75,7 +75,7 @@ production hostname before publishing a production extension. Use development
 mode for a local HTTP backend, and same-origin HTTPS for the deployed app/API.
 See [deployment security](../../docs/DEPLOYMENT_SECURITY.md) for exact requirements.
 
-## UniSport participant lists (Companion 1.2.0)
+## UniSport participant lists (Companion 1.2.1)
 
 Reload/install this extension version, accept access to `www.zssw.unibe.ch` and
 reload BetterIlias. Participant lists open inside BetterIlias with live search

@@ -9,6 +9,7 @@ import { clearPrivate, readPrivate, writePrivate } from '../lib/unisportCache';
 import { UnisportOffer, unisportDate } from '../lib/unisportOffers';
 import { UnisportBooking } from './UnisportBooking';
 import { UnisportParticipants } from './UnisportParticipants';
+import { UnisportWebsiteLogin } from './UnisportWebsiteLogin';
 
 type Connection = { phase: 'disconnected' | 'pending' | 'exchanging' | 'connected'; affiliation: string | null; scope?: string | null };
 type Application = { id?: number; title?: string; status?: number; registration?: string; begin?: string; end?: string; offerNextDate?: { begin?: string; end?: string } };
@@ -176,6 +177,10 @@ export function UnisportView() {
         {!choices.length && <p className="text-sm">{t('unisport.no_affiliations')}</p>}
         <Button type="submit" loading={busy}>{t('unisport.save_affiliation')}</Button>
       </form>}
+      {connection.phase === 'connected' && connection.scope && connection.affiliation && <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+        <h2 className="font-semibold">{t('unisport.website_login_title')}</h2>
+        <UnisportWebsiteLogin scope={connection.scope} affiliation={connection.affiliation} />
+      </div>}
     </div>
     <UnisportCatalogue credential={credential} scope={connection.phase === 'connected' ? connection.scope : null} affiliation={connection.affiliation} onOffersLoaded={setCatalogueOffers} />
     {connection.phase === 'connected' && connection.affiliation && <div className="space-y-3">

@@ -211,3 +211,27 @@ def test_valid_empty_list_and_malformed_rows_are_distinct(workflow_page):
     page.get_by_role('button',name=tr['unisport.refresh'],exact=True).click()
     page.get_by_text(tr['unisport.participants_read_failed'],exact=True).wait_for()
     assert page.get_by_text('Partial',exact=True).count()==0
+
+
+def test_website_identity_login_resumes_list_and_ignores_other_accounts(workflow_page):
+    page=workflow_page;tr=language(page,'de','dark');page.set_viewport_size({'width':320,'height':740})
+    companion(page);mount_dialog(page)
+    page.evaluate("""()=>{
+      window.participantFailure='participants_login_required';window.loginStarts=[];
+      addEventListener('message',e=>{if(e.data?.type==='UNISPORT_PARTICIPANTS_LOGIN'){
+        loginStarts.push(e.data);postMessage({type:'UNISPORT_REPLY',requestId:e.data.requestId,success:true},location.origin)
+      }});
+    }""")
+    page.get_by_role('button',name=tr['unisport.participants'],exact=True).click()
+    page.get_by_role('button',name=tr['unisport.website_login'],exact=True).click()
+    page.get_by_text(tr['unisport.website_login_waiting'],exact=True).wait_for()
+    assert page.evaluate('loginStarts[0].course')=='3003'
+    page.evaluate("postMessage({type:'UNISPORT_PARTICIPANTS_LOGIN_FINISHED',scope:'z'.repeat(64),affiliation:'student',success:true},location.origin)")
+    page.wait_for_timeout(50)
+    assert page.get_by_text(tr['unisport.website_login_waiting'],exact=True).count()==1
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    folder=ROOT/'scratch/unisport-participant-checks';folder.mkdir(parents=True,exist_ok=True)
+    page.screenshot(path=str(folder/'website-login-320-de-dark.png'),full_page=True)
+    page.evaluate("participantFailure='';postMessage({type:'UNISPORT_PARTICIPANTS_LOGIN_FINISHED',scope:'a'.repeat(64),affiliation:'student',success:true},location.origin)")
+    page.get_by_text('Example',exact=True).wait_for()
+    assert page.locator('tbody tr').count()==3

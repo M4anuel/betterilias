@@ -3,7 +3,8 @@
 (() => {
   const api = typeof browser !== 'undefined' ? browser : chrome;
   const ORIGIN = 'https://www.zssw.unibe.ch';
-  const TYPES = ['UNISPORT_PARTICIPANTS_CONTEXT', 'UNISPORT_PARTICIPANTS_READ'];
+  const TYPES = ['UNISPORT_PARTICIPANTS_CONTEXT', 'UNISPORT_PARTICIPANTS_READ', 'UNISPORT_PARTICIPANTS_LOGIN'];
+  const LOGIN_PREFIX = 'unisport.website.';
   const MAX_BYTES = 2_000_000;
   async function context(message, sender) {
     const host = new URL(ORIGIN).hostname;
@@ -29,6 +30,26 @@
             || !/^[a-f0-9]{64}$/.test(message.scope || '')
             || typeof message.affiliation !== 'string' || !message.affiliation || message.affiliation.length > 512) {
           respond({ success: false, code: 'participants_unavailable' }); return;
+        }
+        if (message.type === 'UNISPORT_PARTICIPANTS_LOGIN') {
+          if (message.course !== undefined && !/^[1-9]\d{0,11}$/.test(message.course)) throw new Error();
+          // Start the actual protected service, preserving its SAML return path.
+          // SWITCH performs identity selection itself; native API affiliation is
+          // not a SAML assertion and must never be substituted for that choice.
+          const path = message.course ? '/usp/zms/aii/anmeldeliste/' + message.course + '/index_ger.html' : '/usp/zms/aii/';
+          const saved = await api.storage.session.get(null);
+          for (const [key, value] of Object.entries(saved)) {
+            if (key.startsWith(LOGIN_PREFIX) && (value.owner === sender.tab.id || value.expires <= Date.now())) {
+              await api.storage.session.remove(key);
+              try { await api.tabs.remove(value.tab); } catch (_) {}
+            }
+          }
+          const tab = await api.tabs.create({ url: 'about:blank', active: true });
+          await api.storage.session.set({ [LOGIN_PREFIX + tab.id]: { tab: tab.id, owner: sender.tab.id,
+            origin: new URL(sender.url).origin, scope: message.scope, affiliation: message.affiliation,
+            path, expires: Date.now() + 600000 } });
+          await api.tabs.update(tab.id, { url: ORIGIN + path });
+          respond({ success: true }); return;
         }
         const identity = await context(message, sender);
         if (message.type === 'UNISPORT_PARTICIPANTS_CONTEXT') {
@@ -68,6 +89,42 @@
       } catch (_) { respond({ success: false, code: 'participants_read_failed' }); }
     })();
     return true;
+  });
+  async function finishLogin(tabId, success) {
+    const key = LOGIN_PREFIX + tabId;
+    const pending = (await api.storage.session.get(key))[key];
+    if (!pending) return;
+    await api.storage.session.remove(key);
+    if (pending.expires <= Date.now()) return;
+    const owner = await api.tabs.get(pending.owner).catch(() => null);
+    if (!owner || new URL(owner.url).origin !== pending.origin
+        || !await globalThis.BetterIliasUnisportPage({ tab: owner, frameId: 0, url: owner.url })) return;
+    await api.tabs.sendMessage(owner.id, { type: 'UNISPORT_PARTICIPANTS_LOGIN_FINISHED',
+      scope: pending.scope, affiliation: pending.affiliation, success });
+    if (success) {
+      await api.tabs.update(owner.id, { active: true });
+      await api.tabs.remove(tabId).catch(() => {});
+    }
+  }
+  api.tabs.onUpdated.addListener((tabId, change, tab) => {
+    if (change.status !== 'complete') return;
+    void (async () => {
+      const pending = (await api.storage.session.get(LOGIN_PREFIX + tabId))[LOGIN_PREFIX + tabId];
+      // A redirect to SWITCH, WAYF, consent, or another website is not completion.
+      // Participant authorization is checked again by the subsequent bounded read.
+      if (pending && tab.url === ORIGIN + pending.path) await finishLogin(tabId, true);
+    })().catch(() => {});
+  });
+  api.tabs.onRemoved.addListener(tabId => {
+    void (async () => {
+      await finishLogin(tabId, false);
+      for (const [key, value] of Object.entries(await api.storage.session.get(null))) {
+        if (key.startsWith(LOGIN_PREFIX) && value.owner === tabId) {
+          await api.storage.session.remove(key);
+          await api.tabs.remove(value.tab).catch(() => {});
+        }
+      }
+    })().catch(() => {});
   });
   api.cookies.onChanged.addListener(change => {
     const domain = change.cookie?.domain?.replace(/^\./, '');
