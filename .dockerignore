@@ -20,6 +20,7 @@
 !frontend/public/**
 !scripts/
 !scripts/sync-extension-locales.mjs
+!scripts/build-safari-worker.mjs
 !scripts/sync-safari-companion.mjs
 !scripts/check-locales.mjs
 !extensions/

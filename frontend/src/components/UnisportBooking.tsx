@@ -8,7 +8,7 @@ import { Button } from './ui/Button';
 import { DialogShell } from './ui/DialogShell';
 import { FeedbackBanner } from './ui/FeedbackBanner';
 import { ErrorNotice } from './ErrorNotice';
-import { UnisportParticipantLink } from './UnisportParticipantLink';
+import { UnisportParticipants } from './UnisportParticipants';
 
 type Field = {
   id: string; kind: string; title: string; required: boolean;
@@ -157,7 +157,7 @@ export function UnisportBooking({ credential, scope, affiliation, offerId, begin
           {phase === 'confirmation' && <FeedbackBanner tone="warning" message={operation.confirmation} />}
           {phase === 'confirmed' && <FeedbackBanner tone="success" message={t(operation.kind === 'apply' ? 'unisport.registration_confirmed' : 'unisport.cancellation_confirmed')} />}
           {(operation.kind === 'apply' && phase === 'confirmed' || operation.kind === 'cancel' && (phase === 'ready' || phase === 'confirmation')) &&
-            <UnisportParticipantLink offerUrl={operation.offer.url} />}
+            <UnisportParticipants offerUrl={operation.offer.url} scope={scope} affiliation={affiliation} />}
           {operation.provider_status && <p role="status" className="whitespace-pre-wrap text-sm font-semibold">{operation.provider_status}</p>}
           {phase === 'rejected' && <FeedbackBanner tone="error" message={operation.reason || t('unisport.booking_rejected')} />}
           {phase === 'unsupported' && <FeedbackBanner tone="warning" message={t('unisport.unsupported_form')} />}

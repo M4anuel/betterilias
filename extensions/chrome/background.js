@@ -1,6 +1,7 @@
 // background.js - BetterIlias Companion Background Service Worker / Script
 if (typeof importScripts === 'function') importScripts('i18n.js', 'toolbar.js', 'request.js');
 if (typeof importScripts === 'function') importScripts('unisport.js');
+if (typeof importScripts === 'function') importScripts('unisport-participants.js');
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 let syncDebounceTimeout = null;

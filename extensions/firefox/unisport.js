@@ -18,6 +18,7 @@
       return backend.href.replace(/\/+$/, '');
     } catch (_) { return null; }
   }
+  globalThis.BetterIliasUnisportPage = trustedPage;
 
   function parameters(callback, state) {
     try {
@@ -73,7 +74,7 @@
           if (message.type === 'UNISPORT_CANCEL') {
             const stored = await api.storage.session.get(null);
             for (const [key, value] of Object.entries(stored)) {
-              if (key.startsWith(PREFIX) && value.owner === sender.tab.id) {
+              if ((key.startsWith(PREFIX) || key.startsWith('unisport.website.')) && value.owner === sender.tab.id) {
                 await api.storage.session.remove(key);
                 try { await api.tabs.remove(value.tab); } catch (_) {}
               }

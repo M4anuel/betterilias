@@ -13,6 +13,10 @@ login. Version 1.5.0 adds manual registration, dynamic additional questions and
 cancellation through the native API. Bookmark editing remains a future step.
 Version 1.6.0 adds direct official participant-list links from existing
 registrations and verified signup results.
+Version 1.7.0 reads those lists through Companion 1.2.0 into a cached dialog with
+live search, and caches native registration reads on both server and client.
+Version 1.7.1 makes the separate website identity login an explicit connection
+step, with Companion 1.2.1 resuming participant reads after the official return.
 
 ## Try it locally
 
@@ -22,8 +26,8 @@ registrations and verified signup results.
    backend. The default is false, including in production.
 3. Reload the unpacked Chrome extension from `extensions/chrome/`, or temporarily
    load `extensions/firefox/manifest.json` in Firefox's `about:debugging`.
-   These folders contain Companion 1.1.0; the store releases may still be older.
-   Accept the new `login.eduid.ch` host permission. Safari is not supported by
+   These folders contain Companion 1.2.1; the store releases may still be older.
+   Accept `login.eduid.ch` and `www.zssw.unibe.ch` access. Safari is not supported by
    this prototype.
 4. In Companion settings, set the backend and frontend addresses to match the
    instance being tested (normally `http://localhost:8000` and
@@ -32,6 +36,10 @@ registrations and verified signup results.
    SWITCH**. Complete login/consent directly on the real provider's page.
 6. Return to BetterIlias, choose and confirm an affiliation, then load personal
    registrations. No booking request is made.
+   For participant lists, use **Complete website login** below the affiliation
+   selector. Select the matching organisation/identity on SWITCH for the
+   university sport website. Saving a native API affiliation cannot select that
+   SAML identity: SWITCH releases the selected identity separately to each service.
 7. Browse the public offers, filter by search text/sport type and open details.
    Use the saved-offers filter after choosing an affiliation to view bookmarks
    already present in the UniSport account. The official offer link opens the
@@ -44,9 +52,25 @@ registrations and verified signup results.
    cancellation conditions. Use **Check request status** after an uncertain
    result; this never resubmits a provider mutation.
 10. Use **Participant list** next to an existing registration or after a verified
-    signup. It opens the official ZSSW list in a separate tab. A SWITCH/ZSSW
-    website login may be required; the official site enforces registration and
-    access rights. Native UniApp login does not itself create a ZSSW web session.
+    signup. The dialog filters names and offers locally as you type. An updated
+    Companion reads the fixed ZSSW page with the browser's existing website
+    session. If login is required, choose **Complete website login** in the
+    dialog. The Companion opens that list's protected route in a normal tab and
+    resumes the list read on the exact ZSSW return. Closing the login reports
+    cancellation. The site enforces registration/access rights. Native
+    UniApp login does not itself create a ZSSW web session.
+
+Website login tracking contains only the owner/login tab IDs, configured frontend
+origin, native scope/affiliation, fixed target path and ten-minute expiry in
+extension session storage. It survives service-worker restarts and is removed
+on completion, cancellation or native disconnect. No provider form fields,
+identity chooser contents, passwords or SAML assertions are read. A return to
+another site/path cannot complete it. Returning to the target is navigation
+completion, not proof of list entitlement; the normal bounded HTML read still
+validates the participant table before displaying rows.
+
+See SWITCH's [identity chooser documentation](https://help.switch.ch/de/eduid/federation/login/chooser/):
+the chosen organisational identity is released to the requesting service.
 
 ## Catalogue and personal cache policy
 
@@ -60,7 +84,9 @@ cards does not fetch more upstream pages.
 | --- | --- | --- |
 | Complete catalogue and sport types | 15 minutes | Shared server SQLite and browser IndexedDB, separately per language |
 | Offer details | 5 minutes | Shared server SQLite and browser IndexedDB, per offer ID/language; bounded to 128 details |
-| Existing bookmarks and registrations | 1 minute | Browser sessionStorage, scoped to login generation, affiliation, list kind and language |
+| Existing bookmarks | 1 minute | Browser sessionStorage, scoped to login generation, affiliation, list kind and language |
+| Native registrations (1.7.0) | 1 minute | Private server SQLite and browser sessionStorage, scoped to capability hash/login generation/affiliation/language |
+| Scraped participant rows (1.7.0) | 5 minutes | Browser tab storage only, scoped to native generation/affiliation/course and opaque website-cookie identity; at most 20 lists |
 
 Public server data lives in `COORDINATION_DIR/unisport-public/cache.sqlite3` and
 contains no credentials, personal bookmark flags or private lists. Shared locks
@@ -343,16 +369,17 @@ Derive links only from recognized HTTPS ZSSW offer paths (`angebot`, `program`,
 `offre`) in normalized offer URLs; keep the observed German participant-list path
 for every interface language. Do not infer website course IDs from native IDs or
 accept arbitrary origins. Personal-list cards reuse the complete public catalogue
-already loaded/cached by the browsing component; no per-card detail requests,
-extra catalogue reads or participant-name caching are introduced. Cancelled rows
+already loaded/cached by the browsing component; no per-card detail requests or
+extra catalogue reads are introduced. Participant-row caching is added only in
+the private browser cache described below for 1.7.0. Cancelled rows
 and offers without a known website mapping have no participant link. Booking
 dialogs show it for verified signup results and still-owned pre-cancellation
 states, then hide it after confirmed cancellation.
 
-Links use native anchors, announce their new tab, and retain the browser's normal
-official-site login flow. The native API token and BetterIlias credentials never
-appear in the participant URL or get forwarded to ZSSW. Participant rows are
-displayed on the official page, not fetched/rendered inside BetterIlias. Do not
+Version 1.6.0 links use native anchors and announce their new tab. Version 1.7.0
+uses a dialog action, retaining the official anchor as a login/fallback path.
+The native API token and BetterIlias credentials never appear in the participant
+URL or get forwarded to ZSSW. Do not
 reuse personal cancellation IDs from saved HTML or assume the UniApp token also
 establishes a ZSSW browser session. Supplied personal HTML remains outside git;
 participant navigation tests use synthetic accounts and names only.
@@ -366,5 +393,54 @@ file selection, draft resizing/reopening, pending buttons, focus restoration,
 lost responses and read-only recovery. Screenshots are inspected. These are
 Chromium emulation checks, not physical-device or live provider mutation tests.
 `tests/test_unisport_participants_browser.py` checks safe website-ID mapping,
-cached catalogue reuse, link visibility, real keyboard/new-tab navigation and
-absence of forwarded API credentials at the same screen widths/languages/themes.
+cached catalogue reuse, live dialog filtering, source timestamp/cache reuse,
+resize/focus restoration, session invalidation and official-page fallback at the
+same screen widths/languages/themes. Tests use synthetic names and HTML only.
+
+## Scraped participant dialog and registration cache (1.7.0)
+
+Companion 1.2.0 adds narrowly scoped `https://www.zssw.unibe.ch/*` host access in
+both Chrome and Firefox. Only configured top-level BetterIlias pages may request
+the fixed German Anmeldeliste path, with a bounded numeric website course ID.
+No arbitrary URL supplied by a page is fetched. The background request uses
+the browser's current normal cookie store, bounded HTML, a 20-second deadline,
+no referrer and manual redirect handling; redirects/auth failures require the
+official website login rather than proxying or reading login forms. Private
+windows and Firefox containers are rejected instead of silently selecting another
+cookie store. Cookie restrictions may still require using the official page.
+See the [Chrome cookie guidance](https://developer.chrome.com/docs/extensions/develop/concepts/storage-and-cookies).
+
+Before reading a cached list, the browser hashes applicable ZSSW cookies together
+with the configured instance origin, native scope and affiliation. Only this
+opaque identity reaches the page; cookie values are not exported. Reads compare
+the identity again after receiving HTML. Cookie-change notifications recheck it
+before hiding visible data, so harmless unchanged cookie rewrites do not clear
+a valid cache. Native disconnect/cache invalidation prevents late reads from
+repopulating private storage. Participant HTML and names are never sent to the
+BetterIlias backend, put in public IndexedDB or logged. The frontend parses an
+inert template, requires the positive Nachname/Vorname/Angebot table structure,
+and renders only bounded text cells; scripts, images and other page HTML are not
+injected or executed. Missing access/table structure is not cached as an empty
+list. Search filters the entire cached list without further network requests.
+The Firefox content/identifying-information declarations and privacy/store docs
+are updated for this local delivery; source publication is not a store release.
+
+Native registration snapshots live in the private UniSport coordination database
+for one minute of validity. Keys contain owner capability hash, login generation,
+verified account/affiliation and language; no token is copied into a cache row.
+Shared locks coalesce reads/refreshes and serialize cache loading against native
+mutations for that account. Booking dispatch and outcome reconciliation invalidate
+the account's cached snapshots. Booking eligibility/readback still uses the raw
+client and never this cache. Disconnect drops owned cache rows; expiry pruning
+and a 2000-entry bound prevent unlimited growth. Failed/incomplete loads and
+responses from replaced connections are not cached.
+
+`GET /api/unisport/applications` preserves its legacy array response. Optional
+`metadata=true` returns `{items,fetched_at}` and `refresh=true` bypasses older
+snapshots. The frontend preserves this original timestamp in tab storage rather
+than restarting freshness on every cache hit. **Load registrations** reuses fresh
+data; the adjacent refresh action forces an update. `tests/test_unisport_applications.py`
+checks isolation, coalescing, expiry, refresh and concurrent write invalidation.
+Actual installed Chromium and Firefox regressions use isolated profiles with
+synthetic website cookies and fixed local endpoints, validating the real bridge
+without any real SWITCH login or participant account read.

@@ -15,6 +15,7 @@ from pydantic import SecretStr
 from backend.coordination import SharedLock
 from backend.outbound_budget import OutboundUnavailable
 from backend.services import unisport_auth as auth
+from backend.services import unisport_applications as private_lists
 from backend.services.unisport_catalogue import plain_html, present_offer
 from backend.services.unisport_client import UnisportAccount, UnisportClient, UnisportReadError
 
@@ -296,6 +297,7 @@ async def operate(owner, state, data, intent, step=None, supplied=None):
         check_connection(owner, state, account)
         if time.time() > value['expires_at'] and value['phase'] in ('ready', 'form', 'confirmation'):
             value['phase'] = 'expired' if value['phase'] == 'ready' else 'unsupported'
+        invalidate = value['phase'] in ('dispatched', 'uncertain')
         async with UnisportClient(account) as client:
             if value['phase'] in ('dispatched', 'uncertain'):
                 value['phase'] = 'uncertain'
@@ -342,12 +344,14 @@ async def operate(owner, state, data, intent, step=None, supplied=None):
                 # Durable dispatch BEFORE any possible provider write, including
                 # budget wait, timeout, malformed responses and worker shutdown.
                 value['phase'] = 'dispatched'
+                invalidate = True
                 for key in ('infos', 'important', 'special', 'outage'):
                     value['offer'].pop(key, None)
                 put(intent, owner, state, context, value)
                 try:
-                    result = await client.mutate(operation, identifier, value['locale'], answers=answers,
-                        before_dispatch=lambda: check_connection(owner, state, account))
+                    async with private_lists.mutation(account):
+                        result = await client.mutate(operation, identifier, value['locale'], answers=answers,
+                            before_dispatch=lambda: check_connection(owner, state, account))
                     if value['kind'] == 'cancel':
                         confirmation = clean(result.get('confirmationText'))
                         if step == 'start' and confirmation:
@@ -379,5 +383,7 @@ async def operate(owner, state, data, intent, step=None, supplied=None):
                 if value['phase'] == 'uncertain':
                     await reconcile(client, value)
             put(intent, owner, state, context, value)
+        if invalidate:
+            await private_lists.invalidate(account)
         check_connection(owner, state, account)
         return view(intent, value)

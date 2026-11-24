@@ -61,7 +61,7 @@ Für eine lokale Entwicklungsversion oder eine angepasste Server-Adresse:
 
 - **Manifest V3 & Gecko-optimiert**: Entwickelt nach den neuesten Mozilla WebExtension MV3 Standards.
 - **Dark Mode Support**: Passt sich automatisch den Systemeinstellungen an (`prefers-color-scheme`).
-- **Sicher & Datenschutzfreundlich**: Liest ausschliesslich Cookies für `ilias.unibe.ch`. Passwörter oder persönliche Daten werden zu keinem Zeitpunkt abgefangen.
+- **Sicher & Datenschutzfreundlich**: Verwendet ILIAS-Cookies für die bestehende Verbindung. Der optionale Unisport-Abruf verwendet die ZSSW-Website-Sitzung lokal; ihre Cookies werden nicht zum BetterIlias-Server gesendet. Passwörter werden nicht gelesen oder gespeichert.
 
 
 
@@ -73,4 +73,15 @@ valid for 60 seconds, rather than putting the session ID in the address bar.
 The manifest currently permits the listed localhost origins; add the intended
 production hostname before publishing a production extension. Use development
 mode for a local HTTP backend, and same-origin HTTPS for the deployed app/API.
-See [deployment security](../docs/DEPLOYMENT_SECURITY.md) for exact requirements.
+See [deployment security](../../docs/DEPLOYMENT_SECURITY.md) for exact requirements.
+
+## UniSport participant lists (Companion 1.2.1)
+
+Reload/install this extension version, accept access to `www.zssw.unibe.ch` and
+reload BetterIlias. Participant lists open inside BetterIlias with live search
+and a five-minute private tab cache. Use the dialog's official-page link to sign
+in to ZSSW with SWITCH if needed, then return and refresh. The native connection
+and website login remain separate. Use a regular window without Firefox
+containers; private/container windows retain the official-page fallback.
+The Firefox declaration includes website content and identifying information
+for names displayed locally in BetterIlias. No browser-store publication is implied.
