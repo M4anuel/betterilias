@@ -6,7 +6,13 @@ import { webcrypto } from 'node:crypto';
 
 const root = new URL('../extensions/safari/', import.meta.url);
 const flush = () => new Promise(resolve => setImmediate(resolve));
-async function until(check) { for (let n = 0; n < 150 && !check(); n++) await flush(); assert.ok(check()); }
+async function until(check) {
+  // WebCrypto runs on a worker thread. A fixed number of setImmediate turns
+  // can expire before that thread runs on a busy CI host.
+  const deadline = performance.now() + 3000;
+  while (!check() && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 5));
+  assert.ok(check());
+}
 function event() { return { listeners: [], addListener(fn) { this.listeners.push(fn); } }; }
 function harness({ alarms = true } = {}) {
   const h = { storage: {}, now: 1000000, cookie: 'cookie-A', posts: [], notices: [], opened: [], recovered: [], reloads: [], valid: true, fail: false, denied: false, alarmCreates: 0 };
