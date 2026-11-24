@@ -11,6 +11,7 @@ from backend.i18n import t, current_language
 from backend.services import unisport_auth as auth
 from backend.services import unisport_catalogue as public
 from backend.services import unisport_booking as booking
+from backend.services import unisport_applications as private_lists
 from backend.coordination import CoordinationBusy
 from backend.outbound_budget import OutboundUnavailable
 from backend.services.unisport_client import UnisportAccount, UnisportClient, UnisportReadError
@@ -128,6 +129,7 @@ def connection(owner: Owner):
 @router.delete('/connection')
 def disconnect(owner: Owner):
     auth.disconnect(owner)
+    private_lists.drop(owner=owner)
     return {'disconnected': True}
 
 
@@ -220,13 +222,15 @@ async def select_affiliation(payload: Affiliation, owner: Owner):
 
 
 @router.get('/applications')
-async def applications(owner: Owner, x_unisport_scope: Annotated[str | None, Header(max_length=64, pattern=r'^[a-f0-9]{64}$')] = None):
-    state, data = private_account(owner, x_unisport_scope)
+async def applications(owner: Owner, x_unisport_scope: Annotated[str | None, Header(max_length=64, pattern=r'^[a-f0-9]{64}$')] = None,
+        x_unisport_affiliation: Annotated[str | None, Header(max_length=512)] = None, metadata: bool = False, refresh: bool = False):
+    state, data = private_account(owner, x_unisport_scope, x_unisport_affiliation)
     account = UnisportAccount(data['subject'], SecretStr(data['token']), data['affiliation'])
     try:
         async with UnisportClient(account) as client:
-            result = await client.applications(locale())
+            result = await private_lists.snapshot(owner, state, account, locale(), lambda: client.applications(locale()),
+                lambda: unchanged(owner, state, data), refresh=refresh)
         unchanged(owner, state, data)
-        return result
-    except UnisportReadError:
+        return result if metadata else result['items']
+    except (UnisportReadError, OutboundUnavailable, CoordinationBusy):
         raise HTTPException(502, t('unisport.read_failed')) from None

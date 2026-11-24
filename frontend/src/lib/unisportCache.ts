@@ -75,16 +75,15 @@ export async function writePublic<T>(key: string, payload: Snapshot<T>): Promise
   } catch { /* A full/disabled browser store must not prevent browsing. */ }
 }
 
-export function readPrivate<T>(scope: string, affiliation: string, kind: string, language: string): { data: T; fetched_at: number } | null {
+export function readPrivate<T>(scope: string, affiliation: string, kind: string, language: string, ttl = 60000): { data: T; fetched_at: number } | null {
   try {
     const raw = sessionStorage.getItem(PRIVATE_PREFIX + JSON.stringify([scope, affiliation, kind, language]));
     const value = raw ? JSON.parse(raw) : null;
-    return value && fresh(value, 60000) ? value : null;
+    return value && fresh(value, ttl) ? value : null;
   } catch { return null; }
 }
 
-export function writePrivate<T>(scope: string, affiliation: string, kind: string, language: string, data: T): number {
-  const fetched_at = Date.now() / 1000;
+export function writePrivate<T>(scope: string, affiliation: string, kind: string, language: string, data: T, fetched_at = Date.now() / 1000): number {
   try { sessionStorage.setItem(PRIVATE_PREFIX + JSON.stringify([scope, affiliation, kind, language]), JSON.stringify({ data, fetched_at })); }
   catch { /* Private results remain available in the mounted component. */ }
   return fetched_at;
@@ -93,4 +92,14 @@ export function writePrivate<T>(scope: string, affiliation: string, kind: string
 export function clearPrivate(): void {
   try { for (const key of Object.keys(sessionStorage)) if (key.startsWith(PRIVATE_PREFIX)) sessionStorage.removeItem(key); }
   catch { /* Browser storage may be disabled. */ }
+  window.dispatchEvent(new Event('unisport-private-cache-cleared'));
+}
+
+export function prunePrivateKind(kindPrefix: string, keep = 0): void {
+  try {
+    const entries = Object.keys(sessionStorage).filter(key => key.startsWith(PRIVATE_PREFIX)
+      && String(JSON.parse(key.slice(PRIVATE_PREFIX.length))[2]).startsWith(kindPrefix));
+    entries.sort((a, b) => JSON.parse(sessionStorage.getItem(b) || '{}').fetched_at - JSON.parse(sessionStorage.getItem(a) || '{}').fetched_at);
+    for (const key of entries.slice(keep)) sessionStorage.removeItem(key);
+  } catch { /* Storage is optional; no participant data is written elsewhere. */ }
 }

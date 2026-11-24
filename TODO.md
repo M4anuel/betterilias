@@ -45,6 +45,12 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   verified signup results, using the ZSSW website course ID from cached offer
   URLs. Open the official participant page in a new tab with its own browser
   login/access checks; never substitute a native UniApp offer ID.
+- [x] Show scraped participant lists in a searchable dialog (1.7.0), with
+  five-minute account/website-session-scoped browser caches and Companion 1.2.0
+  parity. Cache native registration reads for one minute on server/client,
+  preserve source timestamps, offer explicit refresh and invalidate on writes.
+  Keep booking authorization/readback fresh; verify CI dependency order, browser
+  regressions and the actual production container stack before publishing.
 - [ ] Add explicitly armed, one-occurrence client-timed registration. Autologin/session renewal,
   recurring subscriptions and browser-closed scheduling remain later features.
 

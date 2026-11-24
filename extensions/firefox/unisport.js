@@ -18,6 +18,7 @@
       return backend.href.replace(/\/+$/, '');
     } catch (_) { return null; }
   }
+  globalThis.BetterIliasUnisportPage = trustedPage;
 
   function parameters(callback, state) {
     try {

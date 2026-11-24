@@ -54,7 +54,7 @@ sendet ILIAS-Cookies ausschliesslich an die konfigurierte ILIAS-Instanz.
 - **Sitzungsstatus**: Ein kleiner Punkt am Toolbar-Logo ist amber während der Prüfung oder wenn sie nicht möglich ist, grün nach erfolgreicher Prüfung und rot bei einer fehlenden oder ungültigen Sitzung. Die genaue Bedeutung steht in der Kurzinfo und im Popup. **"Bei ILIAS anmelden"** öffnet die Anmeldung. Vorhandene Cookies allein gelten nicht als erfolgreiche Anmeldung.
 
 - **Dark Mode Support**: Erkennt automatisch die Systemeinstellungen deines Betriebssystems (`prefers-color-scheme`).
-- **Sicher & Datenschutzfreundlich**: Liest ausschliesslich Cookies für `ilias.unibe.ch`. Keine Passwörter werden abgefangen oder gespeichert.
+- **Sicher & Datenschutzfreundlich**: Verwendet ILIAS-Cookies für die bestehende Verbindung. Der optionale Unisport-Abruf verwendet die ZSSW-Website-Sitzung lokal; ihre Cookies werden nicht zum BetterIlias-Server gesendet. Passwörter werden nicht gelesen oder gespeichert.
 
 
 ## Deployment and connection links
@@ -65,4 +65,14 @@ valid for 60 seconds, rather than putting the session ID in the address bar.
 The manifest currently permits the listed localhost origins; add the intended
 production hostname before publishing a production extension. Use development
 mode for a local HTTP backend, and same-origin HTTPS for the deployed app/API.
-See [deployment security](../docs/DEPLOYMENT_SECURITY.md) for exact requirements.
+See [deployment security](../../docs/DEPLOYMENT_SECURITY.md) for exact requirements.
+
+## UniSport participant lists (Companion 1.2.0)
+
+Reload this extension version and accept access to `www.zssw.unibe.ch`, then reload
+BetterIlias. Participant lists open inside BetterIlias with live search and a
+five-minute private tab cache. If needed, use the dialog's official-page link to
+sign in to ZSSW with SWITCH, return and refresh. The native UniApp connection and
+the website login remain separate. This read supports regular browser windows;
+the official page remains the fallback for private windows or blocked cookies.
+This source release does not imply browser-store publication.

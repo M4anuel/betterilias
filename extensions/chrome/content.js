@@ -23,17 +23,21 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin) return;
     const message = event.data;
-    if (!['UNISPORT_START', 'UNISPORT_PING', 'UNISPORT_CANCEL'].includes(message?.type) || typeof message.requestId !== 'string' || message.requestId.length > 80) return;
+    if (!['UNISPORT_START', 'UNISPORT_PING', 'UNISPORT_CANCEL', 'UNISPORT_PARTICIPANTS_CONTEXT', 'UNISPORT_PARTICIPANTS_READ'].includes(message?.type) || typeof message.requestId !== 'string' || message.requestId.length > 80) return;
     void (async () => {
-      let success = false;
-      try { success = (await browserAPI.runtime.sendMessage(message))?.success === true; } catch (_) {}
-      window.postMessage({ type: 'UNISPORT_REPLY', requestId: message.requestId, success }, location.origin);
+      let result;
+      try { result = await browserAPI.runtime.sendMessage(message); } catch (_) {}
+      const participant = message.type.startsWith('UNISPORT_PARTICIPANTS_');
+      window.postMessage({ type: 'UNISPORT_REPLY', requestId: message.requestId, success: result?.success === true,
+        ...(participant ? { data: result?.data, code: result?.code } : {}) }, location.origin);
     })();
   });
   browserAPI.runtime.onMessage.addListener(message => {
     if (message?.type === 'UNISPORT_FINISHED') {
       window.postMessage({ type: 'UNISPORT_FINISHED', success: message.success === true }, location.origin);
     }
+    if (message?.type === 'UNISPORT_PARTICIPANTS_COOKIES_CHANGED')
+      window.postMessage({ type: message.type }, location.origin);
     return false;
   });
 
