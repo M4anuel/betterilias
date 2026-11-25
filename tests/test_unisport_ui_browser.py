@@ -152,6 +152,7 @@ def test_app_hides_unisport_until_server_explicitly_enables_it(workflow_page,wid
     if width<1024:page.get_by_role('button',name=tr['Sidebar umschalten'],exact=True).click()
     assert page.get_by_role('button',name=tr['unisport.title'],exact=True).count()==(1 if mode=='enabled' else 0)
     page.get_by_role('button',name=tr['Vorlesungen anpassen'],exact=True).click()
+    page.locator('[data-nav-card=semester]').wait_for(state='visible')
     # The hidden feature must not remain available in sidebar customisation.
     assert page.locator('[data-nav-card=unisport]').count()==(1 if mode=='enabled' else 0)
     shot(page,f'availability-{mode}-{width}-de-dark')
