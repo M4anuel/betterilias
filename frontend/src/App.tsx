@@ -991,11 +991,12 @@ export const App: React.FC = () => {
     };
 
     const handleCustomSync = (event: Event) => {
-      const customEvt = event as CustomEvent<{ sessionId?: string }>;
+      const customEvt = event as CustomEvent<{ sessionId?: string; renewed?: boolean }>;
       if (customEvt.detail?.sessionId) {
         const changed = localStorage.getItem('betterilias_cache_owner') !== customEvt.detail.sessionId;
         cache.setSessionId(customEvt.detail.sessionId);
         if (changed) { window.location.reload(); return; }
+        if (customEvt.detail.renewed) cache.invalidateSessionRequests();
         reloadContent();
       }
     };

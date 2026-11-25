@@ -101,23 +101,34 @@ A PHP session cookie issued on rejection is not evidence of authentication.
 `POST /api/unisport/ilias-connection` requires explicit UniSport capability,
 connection scope and affiliation headers. It accepts no client token/target.
 The server uses a fresh jar, pins the exact HTTPS UniBE ILIAS origin and confines
-token headers to the two fixed entry/alias URLs. Subsequent dashboard requests
-carry cookies only. Redirects are bounded and restricted to known read-only
-desktop routes. Responses are bounded to 4 MB and the exchange to 60 seconds,
+token headers to the two fixed entry/alias URLs. Subsequent verification requests
+carry cookies only. Responses are bounded to 4 MB and the exchange to 60 seconds,
 without automatic login retries or sharing verification requests.
 
-A fresh personal-dashboard response must contain a positive authenticated user
-control; generic page containers, cookies and HTTP 200 alone are insufficient.
-Archived-course access notices do not override positive identity. Before saving,
+Since 1.8.1, verification reads the fixed dashboard `jumpToProfile` command and
+follows only bounded, same-origin own-profile redirects. The server-selected
+`form_pd` editor must contain its unique, hidden `ne_un` login and the expected
+personal-profile action. Generic containers, public avatars and HTTP 200 alone
+are insufficient. A SHA-256 account key binds the native origin and unique login;
+names/initials are never used to match accounts. Archived-course access notices
+do not override positive identity. Before saving,
 a database transaction rechecks the original UniSport generation, affiliation,
-token/account data and expiry against disconnect/replacement. A new random
-ILIAS capability is always generated; no ambient cookie, old ILIAS header,
-default tenant or user-supplied session filename selects the destination.
-Only the verified ILIAS cookies, source and display name are saved. The UniBE
+token/account data and expiry against disconnect/replacement. An explicit
+`X-Session-Id` may nominate an existing capability for renewal. If its stored
+verified account key matches, the same capability is retained, including when
+the old upstream cookies have expired. Legacy sessions without that key require
+a separate cookie-only own-profile proof. Unknown/different accounts get a new
+random capability; ambient cookies and default tenants never nominate a renewal.
+An atomic snapshot comparison prevents concurrent logout/account replacement
+from resurrecting or overwriting the nominated session. Only the verified ILIAS
+cookies, account-key digest, source and display name are saved. The UniBE
 token never enters an ILIAS session file, the page, URL or diagnostic response.
 
-Success returns a capability to the initiating page, which uses the established
-account-switch path to clear old account caches and refresh the app. Native
+Same-account renewal preserves the cache owner, all SID-scoped caches and server
+state. It invalidates outstanding requests and refreshes authentication without
+reloading the application. A different/unmatched account requires confirmation
+after verification, then uses the existing cache-clearing account-switch path.
+Cancelling keeps the current selection and caches. Native
 download cookies are bound by normal authenticated API/status responses. A late
 result after a frontend account/affiliation change is ignored. Failed exchange
 does not replace existing ILIAS credentials. The new ILIAS connection is
@@ -125,9 +136,13 @@ independent: disconnect UniSport and log out ILIAS separately; existing ILIAS
 session expiry/cleanup and tenant isolation rules still apply.
 
 The first SWITCH authorization-code callback remains native-app-only, so this
-does not eliminate the Companion entirely. Real valid-token exchange and the
-resulting live ILIAS account still require user acceptance; tests use synthetic
-tokens/cookies, isolated session files and mocked upstream HTTP. Browser tests
+does not eliminate the Companion entirely. A read-only live local-account probe
+on 2026-11-26 confirmed valid-token exchange and cookie-only own-profile proof;
+it persisted no resulting credentials. This fixes the initial 502: the dashboard
+redirects through UniBE's semester plugin and no longer has the expected avatar.
+Verification now uses the own-profile route independently of those dashboard
+changes. Automated tests use synthetic tokens/cookies, isolated session files
+and mocked upstream HTTP. Browser tests
 cover both languages/themes and phone/tablet/desktop/short-landscape emulation.
 
 Companion 1.3.0 is required to retain this explicit source selection. The page
@@ -137,6 +152,12 @@ that frontend origin, including content-script startup after reload. Manual
 Companion sync clears the preference, as does a successfully claimed handoff.
 This is a source preference, not an additional credential; no token is sent to
 extension storage. Other BetterIlias origins retain independent preferences.
+Browser-cookie sync targeting a UniBE-renewed capability creates a separate
+capability instead of overwriting it, including when the old Companion still
+remembers that session ID. The existing manual-sync selection works in both
+Chrome and Firefox. Expected verification rejection returns 422 with a fixed
+`X-ILIAS-Verification-Stage`; transport failures remain 502. No provider body,
+identity value or token appears in the stage diagnostic.
 
 ## Catalogue and personal cache policy
 

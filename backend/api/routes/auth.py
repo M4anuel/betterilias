@@ -89,6 +89,14 @@ async def sync_extension_cookies(payload: ExtensionSyncInput, response: Response
     sid = payload.session_id
     if not valid_session_id(sid) or not SessionManager(sid).has_cookies():
         sid = SessionManager.generate_session_id()
+    snapshot = SessionManager(sid)._read_data()
+    # The Companion may still hold a capability subsequently renewed through
+    # UniBE. Give browser-cookie sync its own capability instead of silently
+    # replacing that connection with the browser's possibly different account.
+    protected = snapshot.get('metadata', {}).get('source') == 'unisport_id_token'
+    if protected:
+        sid = SessionManager.generate_session_id()
+        snapshot = {}
     metadata: Dict[str, Any] = {'source': payload.source or 'extension'}
     if payload.user_agent:
         metadata['user_agent'] = payload.user_agent
@@ -106,8 +114,15 @@ async def sync_extension_cookies(payload: ExtensionSyncInput, response: Response
         if previous_user and previous_user != user_or_msg:
             sid = SessionManager.generate_session_id()
         metadata['user_name'] = user_or_msg
-        SessionManager(sid).save_cookies(cookies, metadata=metadata)
-        if payload.session_id and valid_session_id(payload.session_id) and payload.session_id != sid:
+        manager = SessionManager(sid)
+        if snapshot and sid == payload.session_id:
+            if not manager.replace_unchanged(snapshot, cookies, metadata):
+                protected = True
+                sid = SessionManager.generate_session_id()
+                SessionManager(sid).save_cookies(cookies, metadata=metadata)
+        else:
+            manager.save_cookies(cookies, metadata=metadata)
+        if not protected and payload.session_id and valid_session_id(payload.session_id) and payload.session_id != sid:
             from backend.services.calendar_service import calendar_service
             calendar_service.migrate_tenant_state(payload.session_id, sid)
     return ExtensionSyncResponse(success=True, authenticated=is_valid,

@@ -55,6 +55,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   and resume participant-list loading after its return (1.7.1, Companion 1.2.1).
 - [x] Hide UniSport navigation, sidebar customisation and the direct view unless
   the server explicitly enables `UNISPORT_ENABLED` (1.7.2).
+- [x] Fix UniBE ILIAS verification using the own-profile route (1.8.1), preserve
+  all caches for proven same-account renewal, confirm actual/unmatched account
+  switches and prevent background Companion sync from replacing that connection.
 - [x] Add explicit UniBE ID-token exchange into a freshly verified, isolated
   ILIAS connection (1.8.0), with account-switch confirmation and stale-result
   guards. Initial SWITCH login continues to use the Companion.

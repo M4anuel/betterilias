@@ -187,28 +187,50 @@ def unchanged(owner, state, data):
 
 @router.post('/ilias-connection')
 @audit('auth_sync')
-async def connect_ilias(owner: Owner, x_unisport_scope: Scope, x_unisport_affiliation: AffiliationHeader):
+async def connect_ilias(owner: Owner, x_unisport_scope: Scope, x_unisport_affiliation: AffiliationHeader,
+        response: Response, x_session_id: Annotated[str | None, Header()] = None):
     state, data = private_account(owner, x_unisport_scope, x_unisport_affiliation)
     def validate():
         current = auth.record(owner)
         if not current or current != (state, data):
             raise connection_changed()
     account = UnisportAccount(data['subject'], SecretStr(data['token']), data['affiliation'])
+    # Only an explicit capability may nominate the existing cache/session owner.
+    previous = SessionManager(x_session_id) if x_session_id and re.fullmatch(r'[A-Za-z0-9_-]{1,256}', x_session_id) and x_session_id != 'default' else None
+    snapshot = previous._read_data() if previous else {}
     try:
         async with asyncio.timeout(60):
-            cookies, user = await unisport_ilias.exchange(account, owner, validate)
+            cookies, user, account_key = await unisport_ilias.exchange(account, owner, validate)
+            old_meta = snapshot.get('metadata', {})
+            old_key = old_meta.get('ilias_account_key') if old_meta.get('source') == 'unisport_id_token' else None
+            if snapshot.get('cookies') and not old_key:
+                try:
+                    _, old_key = await unisport_ilias.existing_identity(snapshot['cookies'], owner, validate)
+                except (unisport_ilias.ExchangeFailed, ScrapingParsingError, httpx.HTTPError, OutboundUnavailable, OutboundTargetRejected):
+                    old_key = None
+            renewed = bool(snapshot.get('cookies') and old_key and hmac.compare_digest(old_key, account_key))
         # Serialize the final connection check against disconnect/replacement.
-        # Always create a fresh capability; never select an ambient/default tenant.
+        # Reuse the capability only after proving the same unique ILIAS login.
         with auth.database() as db:
             db.execute('BEGIN IMMEDIATE')
             row = db.execute('SELECT state,expires,data FROM connections WHERE owner=?', (owner,)).fetchone()
             if not row or row[0] != state or row[1] <= time.time() or json.loads(row[2]) != data:
                 raise connection_changed()
-            sid = SessionManager.generate_session_id()
-            SessionManager(sid).save_cookies(cookies, metadata={'source': 'unisport_id_token', 'user_name': user})
-        return {'authenticated': True, 'session_id': sid, 'user_name': user}
-    except (unisport_ilias.ExchangeFailed, ScrapingParsingError, httpx.HTTPError, OutboundUnavailable, OutboundTargetRejected, CoordinationBusy, TimeoutError):
-        raise HTTPException(502, t('unisport.ilias_connect_failed'), headers={'Cache-Control': 'no-store'}) from None
+            metadata = {'source': 'unisport_id_token', 'user_name': user, 'ilias_account_key': account_key}
+            if renewed:
+                if not previous.replace_unchanged(snapshot, cookies, metadata):
+                    raise connection_changed()
+                sid = previous.session_id
+            else:
+                sid = SessionManager.generate_session_id()
+                SessionManager(sid).save_cookies(cookies, metadata=metadata)
+        return {'authenticated': True, 'session_id': sid, 'user_name': user, 'renewed': renewed}
+    except (unisport_ilias.ExchangeFailed, ScrapingParsingError, httpx.HTTPError, OutboundUnavailable, OutboundTargetRejected, CoordinationBusy, TimeoutError) as error:
+        # Report expected rejection as a completed audit outcome, with a fixed
+        # stage only. Never include provider bodies, URLs, cookies or tokens.
+        response.status_code = 422 if isinstance(error, (unisport_ilias.ExchangeFailed, ScrapingParsingError)) else 502
+        response.headers['X-ILIAS-Verification-Stage'] = error.stage if isinstance(error, unisport_ilias.ExchangeFailed) else 'upstream'
+        return {'authenticated': False, 'detail': t('unisport.ilias_connect_failed')}
 
 
 @router.get('/catalogue')

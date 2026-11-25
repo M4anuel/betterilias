@@ -92,6 +92,16 @@ class SessionManager:
         data = self._read_data()
         return data.get("cookies", {})
 
+    @coordinated(lambda self, *args, **kwargs: "session:" + str(self.cookie_file.resolve()))
+    def replace_unchanged(self, expected, cookies, metadata) -> bool:
+        """Replace a verified snapshot without resurrecting a revoked capability."""
+        current = self._read_data()
+        if not current.get('cookies') or any(current.get(key) != expected.get(key)
+                for key in ('cookies', 'metadata', 'saved_at', 'ilias_base_url')):
+            return False
+        self.save_cookies(cookies, metadata)
+        return True
+
     def load_metadata(self) -> Dict[str, Any]:
         """Load session metadata."""
         data = self._read_data()

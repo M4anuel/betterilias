@@ -15,11 +15,12 @@ export function unisportCredential(): string {
   return credential;
 }
 
-export async function unisportFetch<T>(path: string, credential: string, method = 'GET', body?: unknown, signal?: AbortSignal, scope?: string, affiliation?: string): Promise<T> {
+export async function unisportFetch<T>(path: string, credential: string, method = 'GET', body?: unknown, signal?: AbortSignal, scope?: string, affiliation?: string, iliasSession?: string | null): Promise<T> {
   const response = await fetch('/api/unisport' + path, {
     method, credentials: 'omit', cache: 'no-store',
     headers: { 'Content-Type': 'application/json', 'X-Unisport-Session': credential, 'Accept-Language': getLanguage(),
-      ...(scope ? { 'X-Unisport-Scope': scope } : {}), ...(affiliation ? { 'X-Unisport-Affiliation': affiliation } : {}) },
+      ...(scope ? { 'X-Unisport-Scope': scope } : {}), ...(affiliation ? { 'X-Unisport-Affiliation': affiliation } : {}),
+      ...(path === '/ilias-connection' && iliasSession ? { 'X-Session-Id': iliasSession } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000),
   });

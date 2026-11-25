@@ -184,17 +184,12 @@ def test_ilias_exchange_confirmation_pending_failure_and_activation(workflow_pag
     }''')
     action=page.get_by_role('button',name=tr['unisport.ilias_connect'],exact=True)
     action.click();modal=page.locator('dialog[open]')
-    modal.get_by_text(tr['unisport.ilias_replace_confirm'],exact=True).wait_for()
-    assert requests==[]
-    modal.get_by_role('button',name=tr['Abbrechen'],exact=True).click()
-    assert requests==[] and page.evaluate('iliasCache.getSessionId()')=='previous-ilias-capability'
-    action.click()
-    modal.get_by_role('button',name=tr['unisport.ilias_connect'],exact=True).click()
     wait_routes(page,requests,1)
     assert requests[0].request.method=='POST'
     headers=requests[0].request.headers
     assert headers['x-unisport-session']=='x'*43 and headers['x-unisport-scope']=='a'*64 and headers['x-unisport-affiliation']=='student'
-    assert 'x-session-id' not in headers and 'cookie' not in headers and 'authorization' not in headers
+    assert headers['x-session-id']=='previous-ilias-capability' and 'cookie' not in headers and 'authorization' not in headers
+    assert modal.count()==0
     page.get_by_text(tr['unisport.ilias_connect_pending'],exact=True).wait_for()
     assert action.is_disabled() and action.locator('svg.animate-spin').count()==1
     page.set_viewport_size({'width':1280 if width<768 else 390,'height':844})
@@ -207,9 +202,18 @@ def test_ilias_exchange_confirmation_pending_failure_and_activation(workflow_pag
     assert page.evaluate("localStorage.getItem('ilias_materials_cache_previous')")=='synthetic old draft'
     assert page.evaluate('activations')==[]
     assert page.evaluate("localStorage.getItem('betterilias_ilias_source')") is None
-    action.click();page.locator('dialog[open]').get_by_role('button',name=tr['unisport.ilias_connect'],exact=True).click()
+    action.click()
     wait_routes(page,requests,2)
     requests[1].fulfill(content_type='application/json',body=json.dumps({'authenticated':True,'session_id':'n'*43,'user_name':'Synthetic Student'}))
+    modal.get_by_text(tr['unisport.ilias_replace_confirm'].replace('{name}','Synthetic Student'),exact=True).wait_for()
+    assert page.evaluate('activations')==[]
+    shot(page,f'ilias-account-switch-{width}-{height}-{code}-{scheme}')
+    modal.get_by_role('button',name=tr['Abbrechen'],exact=True).click()
+    assert page.evaluate('iliasCache.getSessionId()')=='previous-ilias-capability'
+    assert page.evaluate("localStorage.getItem('ilias_materials_cache_previous')")=='synthetic old draft'
+    action.click();wait_routes(page,requests,3)
+    requests[2].fulfill(content_type='application/json',body=json.dumps({'authenticated':True,'session_id':'n'*43,'user_name':'Synthetic Student'}))
+    modal.get_by_role('button',name=tr['unisport.ilias_connect'],exact=True).click()
     page.wait_for_function('activations.length===1')
     assert page.evaluate('activations[0].sessionId')=='n'*43
     assert page.evaluate("localStorage.getItem('betterilias_ilias_source')")=='unisport'
@@ -239,3 +243,27 @@ def test_ilias_exchange_ignores_stale_results_after_account_changes(workflow_pag
     page.wait_for_timeout(100)
     assert page.evaluate('activations')==[]
     assert page.evaluate('iliasCache.getSessionId()')==('newer-ilias-capability' if change=='ilias-account' else None)
+
+
+@pytest.mark.parametrize('code,scheme',[('en','light'),('de','dark')])
+def test_same_account_renewal_keeps_cache_without_confirmation(workflow_page,code,scheme):
+    page=workflow_page;tr=language(page,code,scheme);requests=[]
+    page.route('**/api/unisport/ilias-connection',lambda route:requests.append(route))
+    page.evaluate('''async()=>{
+      const {cache}=await import('/src/lib/cache.ts');window.iliasCache=cache;
+      cache.setSessionId('p'.repeat(43));window.activations=[];
+      localStorage.setItem('ilias_materials_cache_previous','synthetic draft');
+      document.addEventListener('BETTERILIAS_SESSION_SYNCED',e=>{
+        activations.push(e.detail);cache.setSessionId(e.detail.sessionId);
+      });
+      const {UnisportIliasConnection}=await import('/src/components/UnisportIliasConnection.tsx');
+      mountAudit(UnisportIliasConnection,{credential:'x'.repeat(43),scope:'a'.repeat(64),affiliation:'student'});
+    }''')
+    page.get_by_role('button',name=tr['unisport.ilias_connect'],exact=True).click()
+    wait_routes(page,requests,1)
+    requests[0].fulfill(content_type='application/json',body=json.dumps({'authenticated':True,'session_id':'p'*43,'user_name':'Synthetic Student','renewed':True}))
+    page.wait_for_function('activations.length===1')
+    assert page.locator('dialog[open]').count()==0
+    assert page.evaluate('iliasCache.getSessionId()')=='p'*43
+    assert page.evaluate('activations[0].renewed') is True
+    assert page.evaluate("localStorage.getItem('ilias_materials_cache_previous')")=='synthetic draft'
