@@ -267,3 +267,28 @@ def test_same_account_renewal_keeps_cache_without_confirmation(workflow_page,cod
     assert page.evaluate('iliasCache.getSessionId()')=='p'*43
     assert page.evaluate('activations[0].renewed') is True
     assert page.evaluate("localStorage.getItem('ilias_materials_cache_previous')")=='synthetic draft'
+
+
+def test_app_renewal_preserves_request_scope_and_correction_file_cache(workflow_page):
+    page=workflow_page
+    page.route('**/api/unisport/availability',lambda route:route.fulfill(content_type='application/json',body='{"enabled":false}'))
+    page.evaluate('''async()=>{
+      const {cache}=await import('/src/lib/cache.ts');window.renewalCache=cache;cache.setSessionId('p'.repeat(43));
+      window.renewalScope=cache.getRequestScope();window.authChecks=0;
+      localStorage.setItem('ilias_materials_cache_previous','synthetic draft');
+      const {feedbackFilesCache}=await import('/src/lib/feedbackFilesCache.ts');window.renewalFiles=feedbackFilesCache;
+      await feedbackFilesCache.write('synthetic-resource',{member_id:'1',files:[{id:'review',title:'Correction.pdf'}]});
+      const {api}=await import('/src/lib/api.ts');
+      api.getAuthStatus=async()=>{authChecks++;return {authenticated:true,cookies_present:true,user_name:'Synthetic Student'};};
+      api.getSemesters=async semester=>({semester:semester||'HS2026',active_semester:'HS2026',available_semesters:['HS2026'],courses:[],grouped_by_category:{}});
+      const {App}=await import('/src/App.tsx');mountAudit(App,{});
+    }''')
+    page.wait_for_function('authChecks>0')
+    page.evaluate('''()=>{
+      window.previousChecks=authChecks;
+      document.dispatchEvent(new CustomEvent('BETTERILIAS_SESSION_SYNCED',{detail:{sessionId:'p'.repeat(43),renewed:true}}));
+    }''')
+    page.wait_for_function('authChecks>previousChecks')
+    assert page.evaluate('renewalCache.getRequestScope().key===renewalScope.key && !renewalScope.signal.aborted')
+    assert page.evaluate("localStorage.getItem('ilias_materials_cache_previous')")=='synthetic draft'
+    assert page.evaluate("renewalFiles.read('synthetic-resource',()=>{throw new Error('Renewal discarded correction cache');}).then(r=>r.files[0].title)")=='Correction.pdf'

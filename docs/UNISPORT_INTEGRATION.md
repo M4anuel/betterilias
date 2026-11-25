@@ -125,8 +125,8 @@ cookies, account-key digest, source and display name are saved. The UniBE
 token never enters an ILIAS session file, the page, URL or diagnostic response.
 
 Same-account renewal preserves the cache owner, all SID-scoped caches and server
-state. It invalidates outstanding requests and refreshes authentication without
-reloading the application. A different/unmatched account requires confirmation
+state, including the request scope and correction-file caches. Authentication
+refreshes without reloading the application. A different/unmatched account requires confirmation
 after verification, then uses the existing cache-clearing account-switch path.
 Cancelling keeps the current selection and caches. Native
 download cookies are bound by normal authenticated API/status responses. A late
