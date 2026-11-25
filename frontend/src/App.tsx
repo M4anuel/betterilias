@@ -984,17 +984,17 @@ export const App: React.FC = () => {
     const handleMessage = (event: MessageEvent) => {
       if (event.source === window && event.origin === window.location.origin && event.data?.type === 'BETTERILIAS_SESSION_SYNCED' && event.data?.sessionId) {
         const changed = localStorage.getItem('betterilias_cache_owner') !== event.data.sessionId;
-        cache.setSessionId(event.data.sessionId);
+        if (!cache.acceptSessionSync(event.data.sessionId)) return;
         if (changed) { window.location.reload(); return; }
         reloadContent();
       }
     };
 
     const handleCustomSync = (event: Event) => {
-      const customEvt = event as CustomEvent<{ sessionId?: string }>;
+      const customEvt = event as CustomEvent<{ sessionId?: string; source?: 'unisport' }>;
       if (customEvt.detail?.sessionId) {
         const changed = localStorage.getItem('betterilias_cache_owner') !== customEvt.detail.sessionId;
-        cache.setSessionId(customEvt.detail.sessionId);
+        if (!cache.acceptSessionSync(customEvt.detail.sessionId, customEvt.detail.source)) return;
         if (changed) { window.location.reload(); return; }
         reloadContent();
       }

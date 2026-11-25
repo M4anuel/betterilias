@@ -152,12 +152,27 @@ that frontend origin, including content-script startup after reload. Manual
 Companion sync clears the preference, as does a successfully claimed handoff.
 This is a source preference, not an additional credential; no token is sent to
 extension storage. Other BetterIlias origins retain independent preferences.
+The frontend also pins that explicit selection to its cache owner before cache
+initialization and ignores unsolicited Companion sync events while UniBE is
+selected. This protects reloads with older installed Companion content scripts
+that still write the obsolete browser capability into localStorage. Only a
+verified UniBE activation carries the explicit UniBE source marker. A current
+Companion's manual sync removes the preference and retains normal account-switch
+behavior. Browser regressions cover both early storage writes and later DOM/
+window messages, including correction-cache preservation.
+The owner reported successful ILIAS connection after this selection fix on
+2026-11-26; this does not establish extension-free initial SWITCH login.
 Browser-cookie sync targeting a UniBE-renewed capability creates a separate
 capability instead of overwriting it, including when the old Companion still
 remembers that session ID. The existing manual-sync selection works in both
 Chrome and Firefox. Expected verification rejection returns 422 with a fixed
 `X-ILIAS-Verification-Stage`; transport failures remain 502. No provider body,
 identity value or token appears in the stage diagnostic.
+Token-created cookies always retain the exchange's User-Agent, including when
+renewing a capability previously populated by a different browser. Native page
+checks and authentication status share positive account-menu detection for the
+current ILIAS UI; the same-origin own-profile menu command takes precedence over
+login/help links embedded elsewhere. Public-profile/content links do not qualify.
 
 ## Catalogue and personal cache policy
 

@@ -216,7 +216,8 @@ async def connect_ilias(owner: Owner, x_unisport_scope: Scope, x_unisport_affili
             row = db.execute('SELECT state,expires,data FROM connections WHERE owner=?', (owner,)).fetchone()
             if not row or row[0] != state or row[1] <= time.time() or json.loads(row[2]) != data:
                 raise connection_changed()
-            metadata = {'source': 'unisport_id_token', 'user_name': user, 'ilias_account_key': account_key}
+            metadata = {'source': 'unisport_id_token', 'user_name': user,
+                'ilias_account_key': account_key, 'user_agent': settings.user_agent}
             if renewed:
                 if not previous.replace_unchanged(snapshot, cookies, metadata):
                     raise connection_changed()

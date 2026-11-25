@@ -16,6 +16,7 @@ from backend.coordination import coordinated, atomic_json
 from backend.outbound_http import BudgetTransport
 from backend.outbound_budget import OutboundUnavailable
 from backend.outbound_targets import OutboundTargetRejected
+from backend.auth.indicators import authenticated_control
 
 logger = logging.getLogger("ilias.auth")
 
@@ -219,9 +220,9 @@ class SessionManager:
                 soup = BeautifulSoup(response.text, "html.parser")
                 # Authenticated pages may contain login/help links or archived
                 # "Kein Zugriffsrecht" notices. Prefer the actual user control.
-                identity = soup.select_one('.il-maincontrols-metabar a.il-user-avatar, #il_mbt_usr, span.il-avatar-initials, a.il-user-avatar')
-                if identity:
-                    return True, identity.get_text(strip=True) or identity.get('title') or t('Angemeldet')
+                identity = authenticated_control(response.text) if response.text.strip() else None
+                if identity is not None:
+                    return True, identity['name'] or self.load_metadata().get('user_name') or t('Angemeldet')
                 if (
                     "cmd=force_login" in text_lower
                     or "login.php?client_id=" in text_lower

@@ -118,7 +118,7 @@ def test_endpoint_uses_fresh_capability_and_preserves_other_tenants(monkeypatch)
         assert result.headers['cache-control']=='no-store' and 'set-cookie' not in result.headers
         assert TOKEN not in result.text and 'new-verified-cookie' not in result.text
         assert SessionManager(sid).load_cookies()=={'PHPSESSID':'new-verified-cookie'}
-        assert SessionManager(sid).load_metadata()=={'source':'unisport_id_token','user_name':'Synthetic Student','ilias_account_key':KEY}
+        assert SessionManager(sid).load_metadata()=={'source':'unisport_id_token','user_name':'Synthetic Student','ilias_account_key':KEY,'user_agent':settings.user_agent}
         assert body['renewed'] is False
         assert old.load_cookies()=={'PHPSESSID':'old-cookie'}
         assert client.post('/api/unisport/ilias-connection').status_code==401
@@ -151,7 +151,7 @@ def test_failed_or_replaced_connection_cannot_persist_new_credentials(monkeypatc
 def test_same_account_reuses_capability_and_preserves_metadata(monkeypatch, legacy):
     _,_,_,headers=connection()
     old=SessionManager('existing-tenant')
-    meta={'user_name':'Different display name','source':'extension','draft_marker':'keep'}
+    meta={'user_name':'Different display name','source':'extension','draft_marker':'keep','user_agent':'old-browser-agent'}
     if not legacy:meta.update(source='unisport_id_token',ilias_account_key=KEY)
     old.save_cookies({'PHPSESSID':'old-cookie'},metadata=meta)
     async def verified(*args):return {'PHPSESSID':'renewed-cookie'},'Synthetic Student',KEY
@@ -166,6 +166,7 @@ def test_same_account_reuses_capability_and_preserves_metadata(monkeypatch, lega
     assert result.json()['session_id']==old.session_id
     assert old.load_cookies()=={'PHPSESSID':'renewed-cookie'}
     assert old.load_metadata()['draft_marker']=='keep'
+    assert old.load_metadata()['user_agent']==settings.user_agent
     assert len(list(settings.sessions_path.glob('*.json')))==1
 
 

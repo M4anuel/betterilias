@@ -274,6 +274,7 @@ def test_app_renewal_preserves_request_scope_and_correction_file_cache(workflow_
     page.route('**/api/unisport/availability',lambda route:route.fulfill(content_type='application/json',body='{"enabled":false}'))
     page.evaluate('''async()=>{
       const {cache}=await import('/src/lib/cache.ts');window.renewalCache=cache;cache.setSessionId('p'.repeat(43));
+      localStorage.setItem('betterilias_ilias_source','unisport');
       window.renewalScope=cache.getRequestScope();window.authChecks=0;
       localStorage.setItem('ilias_materials_cache_previous','synthetic draft');
       const {feedbackFilesCache}=await import('/src/lib/feedbackFilesCache.ts');window.renewalFiles=feedbackFilesCache;
@@ -286,9 +287,36 @@ def test_app_renewal_preserves_request_scope_and_correction_file_cache(workflow_
     page.wait_for_function('authChecks>0')
     page.evaluate('''()=>{
       window.previousChecks=authChecks;
-      document.dispatchEvent(new CustomEvent('BETTERILIAS_SESSION_SYNCED',{detail:{sessionId:'p'.repeat(43),renewed:true}}));
+      document.dispatchEvent(new CustomEvent('BETTERILIAS_SESSION_SYNCED',{detail:{sessionId:'p'.repeat(43),source:'unisport',renewed:true}}));
     }''')
     page.wait_for_function('authChecks>previousChecks')
     assert page.evaluate('renewalCache.getRequestScope().key===renewalScope.key && !renewalScope.signal.aborted')
     assert page.evaluate("localStorage.getItem('ilias_materials_cache_previous')")=='synthetic draft'
     assert page.evaluate("renewalFiles.read('synthetic-resource',()=>{throw new Error('Renewal discarded correction cache');}).then(r=>r.files[0].title)")=='Correction.pdf'
+    page.evaluate('''()=>{
+      localStorage.setItem('betterilias_session_id','obsolete-companion-session');
+      document.dispatchEvent(new CustomEvent('BETTERILIAS_SESSION_SYNCED',{detail:{sessionId:'obsolete-companion-session'}}));
+      postMessage({type:'BETTERILIAS_SESSION_SYNCED',sessionId:'obsolete-companion-session'},location.origin);
+    }''')
+    page.wait_for_timeout(100)
+    assert page.evaluate('renewalCache.getSessionId()')=='p'*43
+    assert page.evaluate("localStorage.getItem('betterilias_session_id')")=='p'*43
+    assert page.evaluate("localStorage.getItem('ilias_materials_cache_previous')")=='synthetic draft'
+    assert page.evaluate('renewalCache.getRequestScope().key===renewalScope.key && !renewalScope.signal.aborted')
+
+
+def test_unibe_selection_survives_legacy_companion_before_cache_initialization(workflow_page):
+    result=workflow_page.evaluate('''async()=>{
+      localStorage.setItem('betterilias_ilias_source','unisport');
+      localStorage.setItem('betterilias_cache_owner','p'.repeat(43));
+      localStorage.setItem('betterilias_session_id','obsolete-companion-session');
+      localStorage.setItem('ilias_materials_cache_previous','synthetic draft');
+      const {cache}=await import('/src/lib/cache.ts?legacy-companion-startup');
+      const selected=cache.getSessionId(),stored=localStorage.getItem('betterilias_session_id');
+      const ignored=!cache.acceptSessionSync('obsolete-companion-session');
+      const draft=localStorage.getItem('ilias_materials_cache_previous');
+      localStorage.removeItem('betterilias_ilias_source');
+      const manual=cache.acceptSessionSync('manual-companion-session');
+      return {selected,stored,ignored,draft,manual,afterManual:cache.getSessionId()};
+    }''')
+    assert result=={'selected':'p'*43,'stored':'p'*43,'ignored':True,'draft':'synthetic draft','manual':True,'afterManual':'manual-companion-session'}

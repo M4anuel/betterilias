@@ -38,7 +38,7 @@ export function UnisportIliasConnection({ credential, scope, affiliation }: { cr
       setUser(result.user_name);
       // Verified renewals retain the same cache owner; actual account switches
       // keep the existing isolation path. Provider credentials stay server-side.
-      document.dispatchEvent(new CustomEvent('BETTERILIAS_SESSION_SYNCED', { detail: { sessionId: result.session_id, renewed: result.renewed === true } }));
+      document.dispatchEvent(new CustomEvent('BETTERILIAS_SESSION_SYNCED', { detail: { sessionId: result.session_id, source: 'unisport', renewed: result.renewed === true } }));
     } catch (failure) {
       if (sequence === generation.current) setError(failure instanceof Error && !(failure instanceof DOMException) && !(failure instanceof TypeError)
         ? failure.message : t('unisport.ilias_connect_failed'));
