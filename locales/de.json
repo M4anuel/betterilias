@@ -2450,5 +2450,12 @@
   "unisport.website_login_hint": "Die Zugehörigkeit für die native API meldet dich nicht auf der ZSSW-Website an. Wähle auf der offiziellen SWITCH-Seite die passende Organisation oder Identität. Passwort und Identitätsauswahl bleiben dort.",
   "unisport.website_login_waiting": "Schliesse die Identitätsauswahl im geöffneten Tab ab. BetterIlias fährt nach der Rückkehr zu ZSSW fort.",
   "unisport.website_login_returned": "Von der Website-Anmeldung zurückgekehrt. Der Zugriff wird beim Öffnen jeder Teilnahmeliste geprüft.",
-  "unisport.website_login_cancelled": "Die Website-Anmeldung wurde geschlossen oder ist abgelaufen. Du kannst sie erneut starten."
+  "unisport.website_login_cancelled": "Die Website-Anmeldung wurde geschlossen oder ist abgelaufen. Du kannst sie erneut starten.",
+  "unisport.ilias_connect": "ILIAS mit dieser Anmeldung verbinden",
+  "unisport.ilias_connect_hint": "Prototyp: Verwende diese UniBE-Anmeldung und Zugehörigkeit für eine separate ILIAS-Verbindung. Bei fehlgeschlagener Prüfung bleiben bestehende Zugangsdaten erhalten. Die erste SWITCH-Anmeldung nutzt weiterhin den Companion.",
+  "unisport.ilias_replace_confirm": "Nach erfolgreicher Prüfung wechselt BetterIlias zum ILIAS-Konto dieser UniBE-Anmeldung. Die Caches des bisherigen Kontos werden geleert. Fortfahren?",
+  "unisport.ilias_context_changed": "Die aktive Verbindung hat sich während der Anmeldung geändert. Deine aktuelle ILIAS-Verbindung bleibt erhalten. Versuche es mit dem gewünschten Konto erneut.",
+  "unisport.ilias_connect_failed": "Die ILIAS-Verbindung konnte nicht bestätigt werden. Deine aktuelle Verbindung bleibt erhalten. Prüfe UniBE-Anmeldung und Zugehörigkeit oder verwende den Companion für ILIAS.",
+  "unisport.ilias_connect_pending": "ILIAS-Verbindung wird erstellt und geprüft…",
+  "unisport.ilias_connect_success": "ILIAS als {name} bestätigt."
 }

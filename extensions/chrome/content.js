@@ -43,8 +43,17 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     return false;
   });
 
-  function applySessionToPage(sessionId) {
+  function applySessionToPage(sessionId, manual = false) {
     if (!sessionId) return;
+
+    // A server-created UniBE-token connection is an explicit per-instance
+    // choice. Startup/automatic cookie sync must not silently select another
+    // account. Only a manual Companion sync switches back to browser cookies.
+    try {
+      const pageStorage = window.wrappedJSObject?.localStorage || window.localStorage;
+      if (manual) pageStorage.removeItem('betterilias_ilias_source');
+      else if (pageStorage.getItem('betterilias_ilias_source') === 'unisport') return;
+    } catch (_) { return; }
 
     // 1. Write to webpage localStorage
     try {
@@ -80,7 +89,7 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
   browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message && message.type === 'BETTERILIAS_SESSION_SYNCED' && message.sessionId) {
       try {
-        applySessionToPage(message.sessionId);
+        applySessionToPage(message.sessionId, message.manual === true);
         sendResponse({ success: true });
       } catch (err) {
         sendResponse({ success: false, error: err.message });

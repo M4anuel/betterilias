@@ -35,7 +35,26 @@ The companion observes the native login callback in its own login tab and sends
 the authorization code to your configured BetterIlias instance. It reads neither
 passwords nor OTP/login form inputs. The instance exchanges the code with SWITCH,
 verifies the ID token and uses it with `api.uniapp-backend.unibe.ch` to retrieve
-your affiliations and, on request, registrations. This is separate from ILIAS.
+your affiliations and, on request, registrations. Its credentials remain separate
+from ILIAS session storage.
+
+From 1.8.0, **Connect ILIAS with this login** optionally sends the server-held
+UniBE ID token and selected affiliation to the fixed UniBE ILIAS mobile-auth
+entry/alias over HTTPS. A separate request verifies the resulting ILIAS cookies
+against the authenticated personal dashboard before a fresh isolated ILIAS
+connection is saved. The ID token is not saved in that ILIAS session file or
+sent to the page. The page receives only the new BetterIlias capability and
+verified display name, using the existing account-switch/cache-clearing flow.
+Existing credentials remain intact on failure. The new ILIAS connection follows
+normal ILIAS session retention; disconnect UniSport and log out ILIAS separately.
+Initial SWITCH login still uses the Companion. No browser cookie export is
+needed for this optional ILIAS exchange.
+
+Companion 1.3.0 respects the page's `betterilias_ilias_source=unisport` preference
+in localStorage so automatic/cached cookie sync does not replace that selection.
+Manual Companion sync or a successfully claimed connection handoff clears this
+preference. It contains no token or additional credential and is separate for
+each BetterIlias origin.
 
 The page stores a random UniSport connection capability in localStorage. Pending
 companion state is held in browser session storage for at most ten minutes of
@@ -124,7 +143,29 @@ Anmelde-Tab und übermittelt den Autorisierungscode an deine konfigurierte
 BetterIlias-Instanz. Er liest keine Passwörter, Einmalcodes oder Eingaben in
 Anmeldeformularen. Die Instanz tauscht den Code bei SWITCH ein, prüft das ID-Token
 und verwendet es gegenüber `api.uniapp-backend.unibe.ch`, um Zugehörigkeiten und
-auf Anfrage deine Anmeldungen abzurufen. Diese Verbindung ist unabhängig von ILIAS.
+auf Anfrage deine Anmeldungen abzurufen. Die Zugangsdaten werden getrennt von
+den ILIAS-Sitzungen gespeichert.
+
+Ab 1.8.0 übermittelt **ILIAS mit dieser Anmeldung verbinden** auf Wunsch das
+serverseitige UniBE-ID-Token und die gewählte Zugehörigkeit über HTTPS an den
+festen UniBE-ILIAS-Mobile-Auth-Einstieg bzw. dessen Alias. Ein separater Abruf
+prüft die entstandenen ILIAS-Cookies anhand der angemeldeten persönlichen
+Startseite, bevor eine neue isolierte ILIAS-Verbindung gespeichert wird. Das
+ID-Token wird weder in dieser ILIAS-Sitzungsdatei gespeichert noch an die
+Webseite gesendet. Die Webseite erhält nur die neue BetterIlias-Kennung und den
+bestätigten Anzeigenamen und verwendet den bestehenden Kontowechsel mit
+Cache-Löschung. Bei einem Fehler bleiben bisherige Zugangsdaten erhalten.
+Die neue ILIAS-Verbindung unterliegt der normalen Aufbewahrung von
+ILIAS-Sitzungen; UniSport trennen und ILIAS abmelden erfolgt separat. Die erste
+SWITCH-Anmeldung verwendet weiterhin den Companion. Für diesen optionalen
+ILIAS-Austausch müssen keine Browser-Cookies exportiert werden.
+
+Companion 1.3.0 berücksichtigt die localStorage-Einstellung
+`betterilias_ilias_source=unisport`, damit automatische oder gespeicherte
+Cookie-Synchronisation diese Auswahl nicht ersetzt. Manuelles Synchronisieren
+im Companion oder ein erfolgreich eingelöster Verbindungscode entfernt diese
+Einstellung. Sie enthält kein Token und keine zusätzliche Zugangskennung und
+gilt getrennt je BetterIlias-Ursprung.
 
 Die Webseite speichert eine zufällige UniSport-Verbindungskennung in localStorage.
 Ausstehende Companion-Anmeldungen liegen im Browser-Sitzungsspeicher und sind

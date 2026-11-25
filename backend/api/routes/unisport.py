@@ -1,6 +1,10 @@
 """Independent capability-authenticated UniSport prototype endpoints."""
 import re
 import hmac
+import asyncio
+import json
+import time
+import httpx
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, Path
@@ -8,10 +12,15 @@ from pydantic import BaseModel, Field, SecretStr
 
 from backend.config import settings
 from backend.i18n import t, current_language
+from backend.observability import audit
 from backend.services import unisport_auth as auth
 from backend.services import unisport_catalogue as public
 from backend.services import unisport_booking as booking
 from backend.services import unisport_applications as private_lists
+from backend.services import unisport_ilias
+from backend.auth.session import SessionManager
+from backend.scrapers.dumper import ScrapingParsingError
+from backend.outbound_targets import OutboundTargetRejected
 from backend.coordination import CoordinationBusy
 from backend.outbound_budget import OutboundUnavailable
 from backend.services.unisport_client import UnisportAccount, UnisportClient, UnisportReadError
@@ -174,6 +183,32 @@ def unchanged(owner, state, data):
     current = auth.record(owner)
     if not current or current[0] != state or current[1].get('affiliation') != data['affiliation']:
         raise connection_changed()
+
+
+@router.post('/ilias-connection')
+@audit('auth_sync')
+async def connect_ilias(owner: Owner, x_unisport_scope: Scope, x_unisport_affiliation: AffiliationHeader):
+    state, data = private_account(owner, x_unisport_scope, x_unisport_affiliation)
+    def validate():
+        current = auth.record(owner)
+        if not current or current != (state, data):
+            raise connection_changed()
+    account = UnisportAccount(data['subject'], SecretStr(data['token']), data['affiliation'])
+    try:
+        async with asyncio.timeout(60):
+            cookies, user = await unisport_ilias.exchange(account, owner, validate)
+        # Serialize the final connection check against disconnect/replacement.
+        # Always create a fresh capability; never select an ambient/default tenant.
+        with auth.database() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT state,expires,data FROM connections WHERE owner=?', (owner,)).fetchone()
+            if not row or row[0] != state or row[1] <= time.time() or json.loads(row[2]) != data:
+                raise connection_changed()
+            sid = SessionManager.generate_session_id()
+            SessionManager(sid).save_cookies(cookies, metadata={'source': 'unisport_id_token', 'user_name': user})
+        return {'authenticated': True, 'session_id': sid, 'user_name': user}
+    except (unisport_ilias.ExchangeFailed, ScrapingParsingError, httpx.HTTPError, OutboundUnavailable, OutboundTargetRejected, CoordinationBusy, TimeoutError):
+        raise HTTPException(502, t('unisport.ilias_connect_failed'), headers={'Cache-Control': 'no-store'}) from None
 
 
 @router.get('/catalogue')

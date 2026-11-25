@@ -33,8 +33,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   independent and never reuse personal-list caches across account generations.
 - [ ] Upgrade UniSport to direct web login without the companion: obtain an
   approved SWITCH client/HTTPS callback for BetterIlias and verify that UniApp
-  accepts tokens issued to that client. Keep token exchange and credentials on
-  the backend, preserving PKCE/state/nonce checks and independent UniSport
+  and ILIAS mobile-auth accept tokens issued to that client. Keep token exchange
+  and credentials on the backend, preserving PKCE/state/nonce checks and independent UniSport
   sessions. Replace the native-callback bridge only after the web flow works.
 - [x] Add manual native-API registration, dynamic questions/file answers and
   cancellation with provider confirmation (1.5.0). Verify outcomes against fresh
@@ -55,6 +55,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   and resume participant-list loading after its return (1.7.1, Companion 1.2.1).
 - [x] Hide UniSport navigation, sidebar customisation and the direct view unless
   the server explicitly enables `UNISPORT_ENABLED` (1.7.2).
+- [x] Add explicit UniBE ID-token exchange into a freshly verified, isolated
+  ILIAS connection (1.8.0), with account-switch confirmation and stale-result
+  guards. Initial SWITCH login continues to use the Companion.
+- [ ] Verify the mobile-auth exchange with a real logged-in UniBE account;
+  synthetic tests and anonymous/invalid-token probes do not prove acceptance.
 - [ ] Add explicitly armed, one-occurrence client-timed registration. Autologin/session renewal,
   recurring subscriptions and browser-closed scheduling remain later features.
 

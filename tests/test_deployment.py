@@ -34,7 +34,7 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
         else:
             assert 'https://app.example.com' in (root / 'popup.html').read_text()
             assert 'https://app.example.com' in (root / 'content.js').read_text()
-            assert manifest['version'] == '1.2.1'
+            assert manifest['version'] == '1.3.0'
             assert manifest['content_scripts'][1]['matches'] == ['https://login.eduid.ch/*']
             assert manifest['content_scripts'][1]['js'] == ['unisport-callback.js']
             assert 'https://login.eduid.ch/*' in manifest['host_permissions']

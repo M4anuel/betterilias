@@ -2450,5 +2450,12 @@
   "unisport.website_login_hint": "The native API affiliation does not sign you into the ZSSW website. Select the matching organisation or identity on the official SWITCH page. Passwords and identity selection stay there.",
   "unisport.website_login_waiting": "Complete identity selection in the opened tab. BetterIlias will resume when ZSSW returns.",
   "unisport.website_login_returned": "Returned from the website login. Access to each participant list is checked when opening it.",
-  "unisport.website_login_cancelled": "Website login was closed or timed out. You can start it again."
+  "unisport.website_login_cancelled": "Website login was closed or timed out. You can start it again.",
+  "unisport.ilias_connect": "Connect ILIAS with this login",
+  "unisport.ilias_connect_hint": "Prototype: use this UniBE login and affiliation to create a separate ILIAS connection. Existing credentials stay untouched if verification fails. Initial SWITCH login still uses the Companion.",
+  "unisport.ilias_replace_confirm": "After verification, BetterIlias will switch to the ILIAS account belonging to this UniBE login. Current account caches will be cleared. Continue?",
+  "unisport.ilias_context_changed": "The active connection changed while signing in. Your current ILIAS connection was kept. Try again with the intended account.",
+  "unisport.ilias_connect_failed": "The ILIAS connection could not be verified. Your current connection was kept. Check the UniBE login and affiliation, or use the Companion for ILIAS.",
+  "unisport.ilias_connect_pending": "Creating and verifying the ILIAS connection…",
+  "unisport.ilias_connect_success": "ILIAS verified as {name}."
 }

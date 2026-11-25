@@ -69,7 +69,7 @@ async function fetchCookies() {
   return Object.fromEntries(cookies);
 }
 
-async function notifyTabs(frontendUrl, sessionId) {
+async function notifyTabs(frontendUrl, sessionId, manual = false) {
   if (!sessionId) return;
   try {
     const tabs = await browserAPI.tabs.query({});
@@ -86,7 +86,7 @@ async function notifyTabs(frontendUrl, sessionId) {
           try {
             await browserAPI.tabs.sendMessage(tab.id, {
               type: 'BETTERILIAS_SESSION_SYNCED',
-              sessionId,
+              sessionId, manual,
             });
           } catch (_) {
             // Tab might not be ready or has closed
@@ -171,7 +171,7 @@ async function checkAndAutoSync(force = false) {
 
       if (superseded()) return { status: 'superseded' };
       updateBadge('synced');
-      await notifyTabs(settings.frontendUrl, data.session_id);
+      await notifyTabs(settings.frontendUrl, data.session_id, force);
 
       return {
         status: 'synced',

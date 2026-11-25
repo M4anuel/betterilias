@@ -1,6 +1,7 @@
 """Mocked Chromium UI coverage; no real SWITCH account or bookings."""
 import json
 import os
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -47,6 +48,13 @@ def shot(page, name):
     directory = ROOT / 'scratch/unisport-checks'; directory.mkdir(parents=True, exist_ok=True)
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.screenshot(path=str(directory / (name + '.png')), full_page=True)
+
+
+def wait_routes(page, routes, count):
+    deadline=time.monotonic()+5
+    while len(routes)<count and time.monotonic()<deadline:
+        page.wait_for_timeout(20)
+    assert len(routes)==count
 
 
 @pytest.mark.parametrize('width,height', [(320,740),(390,844),(430,844),(768,850),(1280,900),(844,390)])
@@ -156,3 +164,78 @@ def test_app_hides_unisport_until_server_explicitly_enables_it(workflow_page,wid
     # The hidden feature must not remain available in sidebar customisation.
     assert page.locator('[data-nav-card=unisport]').count()==(1 if mode=='enabled' else 0)
     shot(page,f'availability-{mode}-{width}-de-dark')
+
+
+@pytest.mark.parametrize('width,height',[(320,740),(390,844),(430,844),(768,850),(1280,900),(844,390)])
+@pytest.mark.parametrize('code,scheme',[('en','light'),('de','dark'),('en','dark'),('de','light')])
+def test_ilias_exchange_confirmation_pending_failure_and_activation(workflow_page,width,height,code,scheme):
+    page=workflow_page;page.set_viewport_size({'width':width,'height':height});tr=language(page,code,scheme)
+    requests=[]
+    page.route('**/api/unisport/ilias-connection',lambda route:requests.append(route))
+    page.evaluate('''async()=>{
+      const {cache}=await import('/src/lib/cache.ts');window.iliasCache=cache;
+      cache.setSessionId('previous-ilias-capability');window.activations=[];
+      localStorage.setItem('ilias_materials_cache_previous','synthetic old draft');
+      document.addEventListener('BETTERILIAS_SESSION_SYNCED',e=>activations.push(e.detail));
+      const {UnisportIliasConnection}=await import('/src/components/UnisportIliasConnection.tsx');
+      window.bridgeComponent=UnisportIliasConnection;
+      window.bridgeProps={credential:'x'.repeat(43),scope:'a'.repeat(64),affiliation:'student'};
+      mountAudit(bridgeComponent,bridgeProps);
+    }''')
+    action=page.get_by_role('button',name=tr['unisport.ilias_connect'],exact=True)
+    action.click();modal=page.locator('dialog[open]')
+    modal.get_by_text(tr['unisport.ilias_replace_confirm'],exact=True).wait_for()
+    assert requests==[]
+    modal.get_by_role('button',name=tr['Abbrechen'],exact=True).click()
+    assert requests==[] and page.evaluate('iliasCache.getSessionId()')=='previous-ilias-capability'
+    action.click()
+    modal.get_by_role('button',name=tr['unisport.ilias_connect'],exact=True).click()
+    wait_routes(page,requests,1)
+    assert requests[0].request.method=='POST'
+    headers=requests[0].request.headers
+    assert headers['x-unisport-session']=='x'*43 and headers['x-unisport-scope']=='a'*64 and headers['x-unisport-affiliation']=='student'
+    assert 'x-session-id' not in headers and 'cookie' not in headers and 'authorization' not in headers
+    page.get_by_text(tr['unisport.ilias_connect_pending'],exact=True).wait_for()
+    assert action.is_disabled() and action.locator('svg.animate-spin').count()==1
+    page.set_viewport_size({'width':1280 if width<768 else 390,'height':844})
+    assert action.is_disabled()
+    page.set_viewport_size({'width':width,'height':height})
+    shot(page,f'ilias-exchange-pending-{width}-{height}-{code}-{scheme}')
+    requests[0].fulfill(status=502,content_type='application/json',body=json.dumps({'detail':tr['unisport.ilias_connect_failed']}))
+    page.get_by_text(tr['unisport.ilias_connect_failed'],exact=True).wait_for()
+    assert page.evaluate('iliasCache.getSessionId()')=='previous-ilias-capability'
+    assert page.evaluate("localStorage.getItem('ilias_materials_cache_previous')")=='synthetic old draft'
+    assert page.evaluate('activations')==[]
+    assert page.evaluate("localStorage.getItem('betterilias_ilias_source')") is None
+    action.click();page.locator('dialog[open]').get_by_role('button',name=tr['unisport.ilias_connect'],exact=True).click()
+    wait_routes(page,requests,2)
+    requests[1].fulfill(content_type='application/json',body=json.dumps({'authenticated':True,'session_id':'n'*43,'user_name':'Synthetic Student'}))
+    page.wait_for_function('activations.length===1')
+    assert page.evaluate('activations[0].sessionId')=='n'*43
+    assert page.evaluate("localStorage.getItem('betterilias_ilias_source')")=='unisport'
+    page.get_by_text(tr['unisport.ilias_connect_success'].replace('{name}','Synthetic Student'),exact=True).wait_for()
+
+
+@pytest.mark.parametrize('change',['ilias-account','unisport-affiliation','unmount','network'])
+def test_ilias_exchange_ignores_stale_results_after_account_changes(workflow_page,change):
+    page=workflow_page;tr=language(page,'en','light');requests=[]
+    page.route('**/api/unisport/ilias-connection',lambda route:requests.append(route))
+    page.evaluate('''async()=>{
+      const {cache}=await import('/src/lib/cache.ts');window.iliasCache=cache;cache.setSessionId(null);window.activations=[];
+      document.addEventListener('BETTERILIAS_SESSION_SYNCED',e=>activations.push(e.detail));
+      const {UnisportIliasConnection}=await import('/src/components/UnisportIliasConnection.tsx');
+      window.bridgeComponent=UnisportIliasConnection;window.bridgeProps={credential:'x'.repeat(43),scope:'a'.repeat(64),affiliation:'student'};
+      mountAudit(bridgeComponent,bridgeProps);
+    }''')
+    page.get_by_role('button',name=tr['unisport.ilias_connect'],exact=True).click()
+    wait_routes(page,requests,1)
+    if change=='ilias-account':page.evaluate("iliasCache.setSessionId('newer-ilias-capability')")
+    elif change=='unisport-affiliation':page.evaluate("mountAudit(bridgeComponent,{...bridgeProps,affiliation:'staff'})")
+    elif change=='unmount':page.evaluate('mountAudit(()=>null,{})')
+    if change=='network':
+        requests[0].abort()
+        page.get_by_text(tr['unisport.ilias_connect_failed'],exact=True).wait_for()
+    else:requests[0].fulfill(content_type='application/json',body=json.dumps({'authenticated':True,'session_id':'n'*43,'user_name':'Synthetic Student'}))
+    page.wait_for_timeout(100)
+    assert page.evaluate('activations')==[]
+    assert page.evaluate('iliasCache.getSessionId()')==('newer-ilias-capability' if change=='ilias-account' else None)

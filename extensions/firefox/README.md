@@ -75,7 +75,7 @@ production hostname before publishing a production extension. Use development
 mode for a local HTTP backend, and same-origin HTTPS for the deployed app/API.
 See [deployment security](../../docs/DEPLOYMENT_SECURITY.md) for exact requirements.
 
-## UniSport participant lists (Companion 1.2.1)
+## UniSport participant lists (Companion 1.3.0)
 
 Reload/install this extension version, accept access to `www.zssw.unibe.ch` and
 reload BetterIlias. Participant lists open inside BetterIlias with live search
@@ -85,3 +85,9 @@ and website login remain separate. Use a regular window without Firefox
 containers; private/container windows retain the official-page fallback.
 The Firefox declaration includes website content and identifying information
 for names displayed locally in BetterIlias. No browser-store publication is implied.
+
+App 1.8.0 also offers **Connect ILIAS with this login** after saving the UniSport
+affiliation. Reload Companion 1.3.0 before using it: startup/automatic cookie sync
+will preserve the explicitly selected token-created ILIAS connection. Manual
+Companion sync switches back to browser cookies. No provider token is sent to
+extension storage; the initial SWITCH login still uses this Companion.

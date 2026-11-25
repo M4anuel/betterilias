@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try { appTab = new URL(tab.url).origin === new URL(frontendUrl()).origin; } catch (_) {}
         if (!appTab) continue;
         try {
-          const reply = await browserAPI.tabs.sendMessage(tab.id, { type: 'BETTERILIAS_SESSION_SYNCED', sessionId: data.session_id });
+          const reply = await browserAPI.tabs.sendMessage(tab.id, { type: 'BETTERILIAS_SESSION_SYNCED', sessionId: data.session_id, manual });
           if (reply?.success) continue;
         } catch (_) { /* Reloaded extensions may have no content script in an existing tab. */ }
         if (manual) {
