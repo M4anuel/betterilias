@@ -1,5 +1,11 @@
 # Unisport companion prototype
 
+Since BetterIlias 1.9.0 / Companion 1.4.0, the primary shared login and affiliation
+selection live in the Companion: see [UNIBE_LOGIN.md](UNIBE_LOGIN.md).
+The historical page-first and browser-cookie workflows are documented as
+deprecated in [LEGACY_ILIAS_LOGIN.md](LEGACY_ILIAS_LOGIN.md), including recovery.
+The protocol evidence and feature history below remain available for reference.
+
 Version 1.3.0 adds an opt-in companion-assisted SWITCH login, independent
 connection/disconnection, explicit affiliation selection and read-only personal
 registrations. Default Unisport navigation is available in every semester.

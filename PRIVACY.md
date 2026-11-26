@@ -13,6 +13,10 @@ The **BetterIlias Project** is responsible for data processing in accordance wit
 * **Source Code:** `https://github.com/M4anuel/betterilias`
 
 ### 2. Data Processed by the BetterIlias Companion Browser Extension
+Chrome/Firefox shared-login processing is described in section 5. The cookie-export
+details below apply only to the explicitly selected deprecated fallback; Safari
+retains that browser-cookie workflow.
+
 The **BetterIlias Companion** extension (for Chrome, Firefox and Safari) only accesses and processes data strictly necessary to connect your authenticated University of Bern ILIAS session (`https://ilias.unibe.ch`) with BetterIlias (`https://betterilias.ch`):
 
 * **Authentication Information (`cookies` on `https://ilias.unibe.ch`):** When you sign in to `ilias.unibe.ch` or trigger synchronization, the extension reads your active ILIAS session cookies (`PHPSESSID` and `ilClientId`) from `https://ilias.unibe.ch` and transmits them over encrypted HTTPS (TLS) to `https://betterilias.ch/api/auth/sync` so BetterIlias can retrieve your lectures, course materials, and exercises on your behalf.
@@ -21,7 +25,7 @@ The **BetterIlias Companion** extension (for Chrome, Firefox and Safari) only ac
 
 ### 3. What Is Not Collected
 * **No Passwords:** Neither the extension nor BetterIlias ever reads, collects, or stores your University of Bern / Switch edu-ID password.
-* **No Browsing History or Analytics:** The extension accesses ILIAS, the configured BetterIlias instance and, for the opt-in UniSport prototype in Chrome/Firefox, SWITCH login completion at `https://login.eduid.ch`. It does not collect browsing history or use advertising trackers.
+* **No Browsing History or Advertising Trackers:** The extension accesses ILIAS, the configured BetterIlias instance and, for the opt-in UniSport prototype in Chrome/Firefox, SWITCH login completion at `https://login.eduid.ch`. It does not collect browsing history or use advertising trackers.
 * **No Third-Party Sharing or Sale:** User data is never sold, rented, or transferred to third parties, and is never used for advertising or creditworthiness assessment.
 
 ### 4. Server Processing, Retention & Deletion
@@ -29,43 +33,43 @@ The **BetterIlias Companion** extension (for Chrome, Firefox and Safari) only ac
 * **Hosting Location:** The server is hosted in an ISO-27001-certified datacenter in Nuremberg, Germany (EU), with end-to-end TLS encryption.
 * **Deletion:** Use the relevant connection's **Disconnect / Log out** action in BetterIlias to remove its server-side credentials. Uninstalling the extension does not itself revoke server-side sessions.
 
-### 5. Optional UniSport Prototype (Chrome / Firefox)
-When explicitly connecting UniSport, you sign in directly on SWITCH's website.
-The companion observes the native login callback in its own login tab and sends
-the authorization code to your configured BetterIlias instance. It reads neither
-passwords nor OTP/login form inputs. The instance exchanges the code with SWITCH,
-verifies the ID token and uses it with `api.uniapp-backend.unibe.ch` to retrieve
-your affiliations and, on request, registrations. Its credentials remain separate
-from ILIAS session storage.
+When the instance has an enabled administrator dashboard, actual authenticated app use records a verified account identifier, display name and last-use timestamp in a private server-side usage index. The identifier is an instance-specific keyed hash of the verified SWITCH issuer, client and subject; raw subjects and provider tokens are not stored in this index. Administrators can see distinct-account totals and explicitly open/search the names. This counts accounts, not guaranteed individual people; legacy cookie-only connections are not attributed. Names and usage records expire 30 days after the last app use. Cleanup runs on access and every five minutes while the backend runs. Login/status polling does not extend retention. The Companion shows this purpose and retention before login when collection is enabled. No names enter diagnostic events, public endpoints or persistent browser analytics storage. The index is bounded to 10,000 most recently used accounts; older rows can be removed earlier at that limit.
 
-From 1.8.0, **Connect ILIAS with this login** optionally sends the server-held
-UniBE ID token and selected affiliation to the fixed UniBE ILIAS mobile-auth
-entry/alias over HTTPS. A separate request verifies the resulting ILIAS cookies
-against the authenticated personal dashboard before a fresh isolated ILIAS
-connection is saved. The ID token is not saved in that ILIAS session file or
-sent to the page. The page receives only the new BetterIlias capability and
-verified display name, using the existing account-switch/cache-clearing flow.
-Existing credentials remain intact on failure. The new ILIAS connection follows
-normal ILIAS session retention; disconnect UniSport and log out ILIAS separately.
-Initial SWITCH login still uses the Companion. No browser cookie export is
-needed for this optional ILIAS exchange.
+### 5. Shared UniBE Login (Chrome / Firefox)
+Companion 1.4.0 / BetterIlias 1.9.0 use one UniBE login for ILIAS and optional
+UniSport. You sign in directly on SWITCH's website. The Companion observes only
+the native callback in its own login tab and sends the authorization code to
+your configured BetterIlias instance. It reads no passwords, MFA codes or login
+form inputs. The backend verifies the signed ID token, retains its bounded name
+and expiry, and reads affiliations from `api.uniapp-backend.unibe.ch`.
 
-Companion 1.3.0 respects the page's `betterilias_ilias_source=unisport` preference
-in localStorage so automatic/cached cookie sync does not replace that selection.
-Manual Companion sync or a successfully claimed connection handoff clears this
-preference. It contains no token or additional credential and is separate for
-each BetterIlias origin.
+The Companion shows your verified name and affiliation choices while connected.
+Only the domain after `@` is displayed; the full affiliation is submitted to the
+backend when you confirm. On request, the server sends its token and affiliation
+only to the fixed UniBE ILIAS mobile-auth entry/exact alias. Cookie-only own-profile
+verification proves the unique ILIAS account before credentials are saved.
+Verified same-account renewal preserves caches; different/unmatched accounts
+require confirmation and isolated cache ownership. Failure keeps existing ILIAS
+credentials intact. Initial SWITCH login still requires the Companion.
 
-The page stores a random UniSport connection capability in localStorage. Pending
-companion state is held in browser session storage for at most ten minutes of
-validity. The server stores a capability hash, pending PKCE/nonce state and then
-the ID token, account subject and selected affiliation in a private database.
-No refresh token is retained. Server connections expire at token expiry or after
-one hour; expired records are removed on access or the next login start.
-Disconnect removes the connection immediately. Closing the browser or removing
-the companion does not delete an established server connection or log out SWITCH.
-Safari does not include this prototype. These practices may be updated as the
-prototype develops; this policy will be updated when data use changes.
+Provider ID/refresh tokens are not stored in the extension or webpage; no refresh
+token is retained by the backend. Extension local storage contains configured
+instance settings, per-instance BetterIlias capabilities and display metadata.
+The page stores its random connection capability in localStorage. Pending callback
+state/tab ownership is in browser session storage for at most ten minutes of
+validity. The private backend database contains a capability hash, pending PKCE/
+nonce state, and then the ID token, subject, verified name, affiliation and expiry.
+UniBE connections expire at token expiry or after one hour, whichever comes first.
+Disconnect deletes that login; an established ILIAS session is independent and
+can be logged out separately. Closing/uninstalling the extension does not revoke
+backend sessions or log out SWITCH. Safari does not include shared UniBE login.
+
+Browser-cookie export is deprecated and disabled in the default shared mode.
+The explicit advanced fallback still processes ILIAS auth cookies and selects a
+separate verified browser connection. The per-origin source preference and
+cache-owner checks prevent automatic cookie sync replacing the UniBE selection.
+The previous protocol and recovery details are preserved in
+[legacy login documentation](docs/LEGACY_ILIAS_LOGIN.md).
 
 UniSport public catalogue data, derived sport types and offer details are cached
 on the server and in browser IndexedDB without account credentials or personal
@@ -120,6 +124,10 @@ Verantwortlich für die Datenverarbeitung im Sinne des Schweizer Datenschutzgese
 * **Quellcode:** `https://github.com/M4anuel/betterilias`
 
 ### 2. Verarbeitete Daten durch die Browser-Erweiterung (BetterIlias Companion)
+Die gemeinsame Chrome-/Firefox-Anmeldung wird in Abschnitt 5 beschrieben. Die
+folgenden Angaben zum Cookie-Export gelten nur für den ausdrücklich gewählten,
+veralteten Ersatzweg. Safari verwendet weiterhin diese Cookie-Anmeldung.
+
 Die Browser-Erweiterung **BetterIlias Companion** (für Chrome, Firefox und Safari) verarbeitet ausschliesslich Daten, die technisch zwingend erforderlich sind, um deine aktive ILIAS-Sitzung der Universität Bern (`https://ilias.unibe.ch`) mit BetterIlias (`https://betterilias.ch`) zu verbinden:
 
 * **Authentifizierungsdaten (`cookies` auf `https://ilias.unibe.ch`):** Bei der Anmeldung auf `ilias.unibe.ch` oder beim Klick auf Synchronisieren liest die Erweiterung deine aktiven ILIAS-Sitzungscookies (`PHPSESSID` und `ilClientId`) von `https://ilias.unibe.ch` und überträgt diese verschlüsselt über HTTPS (TLS) an `https://betterilias.ch/api/auth/sync`, damit BetterIlias deine Vorlesungen, Materialien und Übungen in deinem Auftrag abrufen kann.
@@ -136,48 +144,47 @@ Die Browser-Erweiterung **BetterIlias Companion** (für Chrome, Firefox und Safa
 * **Serverstandort:** Der Server wird in einem ISO-27001-zertifizierten Rechenzentrum in Nürnberg, Deutschland (EU) betrieben.
 * **Löschung:** Trenne die jeweilige Verbindung in BetterIlias, um ihre Zugangsdaten auf dem Server zu entfernen. Das Deinstallieren der Erweiterung widerruft serverseitige Sitzungen nicht automatisch.
 
-### 5. Optionaler UniSport-Prototyp (Chrome / Firefox)
-Beim ausdrücklichen Verbinden mit UniSport meldest du dich direkt auf der
-SWITCH-Webseite an. Der Companion erkennt die native Anmeldeantwort im eigenen
-Anmelde-Tab und übermittelt den Autorisierungscode an deine konfigurierte
-BetterIlias-Instanz. Er liest keine Passwörter, Einmalcodes oder Eingaben in
-Anmeldeformularen. Die Instanz tauscht den Code bei SWITCH ein, prüft das ID-Token
-und verwendet es gegenüber `api.uniapp-backend.unibe.ch`, um Zugehörigkeiten und
-auf Anfrage deine Anmeldungen abzurufen. Die Zugangsdaten werden getrennt von
-den ILIAS-Sitzungen gespeichert.
+Wenn das Administrator-Dashboard der Instanz aktiviert ist, werden bei tatsächlicher authentifizierter App-Nutzung eine verifizierte Kontokennung, der Anzeigename und der letzte Nutzungszeitpunkt in einem privaten serverseitigen Nutzungsindex gespeichert. Die Kennung ist ein instanzspezifischer HMAC aus verifiziertem SWITCH-Aussteller, Client und Subject; rohe Subjects und Anbieter-Tokens werden dort nicht gespeichert. Administratoren sehen die Anzahl verschiedener Konten und können die Namen ausdrücklich öffnen und durchsuchen. Gezählt werden Konten, nicht zwingend einzelne Personen; alte reine Cookie-Verbindungen werden nicht zugeordnet. Namen und Nutzungseinträge werden 30 Tage nach der letzten App-Nutzung gelöscht. Die Bereinigung erfolgt bei Zugriffen und alle fünf Minuten während des Backend-Betriebs. Anmeldung und Statusabfragen verlängern diese Frist nicht. Der Companion zeigt Zweck und Frist vor der Anmeldung an, wenn die Erfassung aktiviert ist. Namen erscheinen weder in Diagnoseereignissen noch in öffentlichen Endpunkten oder einem dauerhaften Browser-Analysespeicher. Der Index ist auf die 10'000 zuletzt genutzten Konten begrenzt; am Limit können ältere Einträge früher entfernt werden.
 
-Ab 1.8.0 übermittelt **ILIAS mit dieser Anmeldung verbinden** auf Wunsch das
-serverseitige UniBE-ID-Token und die gewählte Zugehörigkeit über HTTPS an den
-festen UniBE-ILIAS-Mobile-Auth-Einstieg bzw. dessen Alias. Ein separater Abruf
-prüft die entstandenen ILIAS-Cookies anhand der angemeldeten persönlichen
-Startseite, bevor eine neue isolierte ILIAS-Verbindung gespeichert wird. Das
-ID-Token wird weder in dieser ILIAS-Sitzungsdatei gespeichert noch an die
-Webseite gesendet. Die Webseite erhält nur die neue BetterIlias-Kennung und den
-bestätigten Anzeigenamen und verwendet den bestehenden Kontowechsel mit
-Cache-Löschung. Bei einem Fehler bleiben bisherige Zugangsdaten erhalten.
-Die neue ILIAS-Verbindung unterliegt der normalen Aufbewahrung von
-ILIAS-Sitzungen; UniSport trennen und ILIAS abmelden erfolgt separat. Die erste
-SWITCH-Anmeldung verwendet weiterhin den Companion. Für diesen optionalen
-ILIAS-Austausch müssen keine Browser-Cookies exportiert werden.
+### 5. Gemeinsame UniBE-Anmeldung (Chrome / Firefox)
+Companion 1.4.0 / BetterIlias 1.9.0 verwenden eine UniBE-Anmeldung für ILIAS und
+optional UniSport. Du meldest dich direkt auf der SWITCH-Webseite an. Der
+Companion erkennt nur die native Anmeldeantwort im eigenen Anmelde-Tab und sendet
+den Autorisierungscode an deine konfigurierte BetterIlias-Instanz. Er liest keine
+Passwörter, MFA-Codes oder Eingaben in Anmeldeformularen. Das Backend prüft das
+signierte ID-Token, speichert den begrenzten Anzeigenamen und die Ablaufzeit und
+ruft Zugehörigkeiten bei `api.uniapp-backend.unibe.ch` ab.
 
-Companion 1.3.0 berücksichtigt die localStorage-Einstellung
-`betterilias_ilias_source=unisport`, damit automatische oder gespeicherte
-Cookie-Synchronisation diese Auswahl nicht ersetzt. Manuelles Synchronisieren
-im Companion oder ein erfolgreich eingelöster Verbindungscode entfernt diese
-Einstellung. Sie enthält kein Token und keine zusätzliche Zugangskennung und
-gilt getrennt je BetterIlias-Ursprung.
+Der Companion zeigt deinen bestätigten Namen und die verfügbaren Zugehörigkeiten.
+Sichtbar ist nur die Domain nach `@`; beim Bestätigen wird die vollständige
+Zugehörigkeit verwendet. Auf Wunsch sendet der Server Token und Zugehörigkeit
+ausschliesslich an den festen UniBE-ILIAS-Mobile-Auth-Einstieg bzw. dessen exakten
+Alias. Ein separater Abruf des eigenen Profils mit Cookies prüft das eindeutige
+ILIAS-Konto vor dem Speichern. Beim Erneuern desselben bestätigten Kontos bleiben
+Caches erhalten. Ein anderes oder nicht sicher zugeordnetes Konto erfordert eine
+Bestätigung und getrennte Cache-Zuordnung. Fehler ersetzen keine bestehenden
+ILIAS-Zugangsdaten. Die erste SWITCH-Anmeldung benötigt weiterhin den Companion.
 
-Die Webseite speichert eine zufällige UniSport-Verbindungskennung in localStorage.
-Ausstehende Companion-Anmeldungen liegen im Browser-Sitzungsspeicher und sind
-höchstens zehn Minuten gültig. Der Server speichert einen Hash der Kennung,
-ausstehende PKCE-/Nonce-Daten und anschliessend das ID-Token, die Kontokennung und
-die gewählte Zugehörigkeit in einer privaten Datenbank. Es wird kein Refresh-Token
-aufbewahrt. Verbindungen laufen mit dem Token, spätestens nach einer Stunde ab.
-Abgelaufene Einträge werden beim Zugriff oder dem nächsten Anmeldestart entfernt.
-Das Trennen der Verbindung löscht sie sofort. Das Schliessen des Browsers oder
-Entfernen des Companions löscht keine bestehende Serververbindung und meldet dich
-nicht bei SWITCH ab. Safari enthält diesen Prototyp nicht. Bei Änderungen der
-Datenverwendung wird diese Erklärung aktualisiert.
+Provider-ID-/Refresh-Tokens werden weder in der Erweiterung noch auf der Webseite
+gespeichert; auch das Backend behält kein Refresh-Token. Der lokale
+Erweiterungsspeicher enthält Instanz-Einstellungen, instanzbezogene zufällige
+BetterIlias-Zugangskennungen und Anzeigedaten. Die Webseite speichert ihre
+zufällige Verbindungskennung in localStorage. Ausstehende Anmeldedaten und
+Tab-Zuordnungen liegen höchstens zehn Minuten gültig im Browser-Sitzungsspeicher.
+Die private Backend-Datenbank enthält einen Kennungs-Hash, PKCE-/Nonce-Daten und
+anschliessend ID-Token, Kontokennung, bestätigten Namen, Zugehörigkeit und Ablauf.
+UniBE-Verbindungen laufen mit dem Token, spätestens nach einer Stunde ab. Trennen
+löscht diese Anmeldung; eine bestehende ILIAS-Sitzung bleibt unabhängig und kann
+separat abgemeldet werden. Schliessen oder Deinstallieren des Companions widerruft
+keine Backend-Sitzung und meldet nicht bei SWITCH ab. Safari unterstützt diese
+gemeinsame UniBE-Anmeldung nicht.
+
+Der Browser-Cookie-Export ist veraltet und im gemeinsamen Standardmodus inaktiv.
+Der ausdrücklich gewählte erweiterte Rückfallweg verarbeitet weiterhin
+ILIAS-Anmelde-Cookies und wählt eine separat bestätigte Browser-Verbindung.
+Quellenauswahl und Cache-Zuordnung verhindern, dass automatische Cookie-Synchronisation
+die UniBE-Auswahl ersetzt. Protokoll und Wiederherstellung stehen in der
+[Dokumentation zur veralteten Anmeldung](docs/LEGACY_ILIAS_LOGIN.md).
 
 Öffentliche Unisport-Angebote, daraus abgeleitete Sportarten und Angebotsdetails
 werden auf dem Server und im Browser in IndexedDB gespeichert, ohne Zugangsdaten

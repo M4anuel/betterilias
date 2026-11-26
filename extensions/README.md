@@ -1,9 +1,10 @@
 # BetterIlias browser companions
 
-Chrome and Firefox source version 1.1.0 includes the opt-in UniSport login
-prototype. Reload the extension and BetterIlias tab, then follow
-[the prototype setup](../docs/UNISPORT_INTEGRATION.md#try-it-locally).
-Published store versions may not contain it yet. Safari does not support it.
+Chrome and Firefox source version 1.4.0 uses shared UniBE login in the Companion
+for ILIAS and optional UniSport. Reload the extension and app tab after updating.
+See [shared login](../docs/UNIBE_LOGIN.md). Browser-cookie sync is deprecated;
+its protocol and recovery steps remain in [legacy login](../docs/LEGACY_ILIAS_LOGIN.md).
+Published store versions may be older. Safari retains its existing cookie flow.
 
 - [Chrome, Edge and Brave](chrome/README.md): load `extensions/chrome/`.
 - [Firefox](firefox/README.md): load `extensions/firefox/manifest.json`.

@@ -316,3 +316,27 @@ including **17 focused logging regressions**, plus the frontend build and launch
 syntax check. An isolated smoke check verified actual JSON console output and
 filtered read-only CLI inspection. Browser/device checks were not repeated for
 this backend-only logging extension.
+
+## Verified account usage (1.9.0)
+
+With an administrator key configured, actual authenticated ILIAS/UniSport API use
+updates a private account index in `activity.sqlite3`. Login, connection/status,
+admin and diagnostic requests do not count. Shared UniBE login supplies the
+server-verified issuer/client/subject; an instance-secret HMAC deduplicates browsers
+without persisting the raw subject. Names are display values, never identity keys.
+Legacy cookie-only sessions are not backfilled or guessed from names.
+
+The dashboard shows distinct-account counts for five minutes, 24 hours and the
+retained window. Names are fetched only after explicit expansion through the
+admin-only `POST /api/admin/accounts/query`; search stays in the JSON body, not
+URLs/logs. Responses use `no-store`. Names remain in component memory and clear
+on collapse, search replacement, error, logout and session expiry.
+
+Named rows expire **30 days after last actual app use**. Pruning runs on reads,
+writes, startup and every five minutes while running, with SQLite secure deletion.
+The index retains at most 10,000 most recently used accounts (32 MiB database cap).
+Totals are consequently bounded and exclude anonymous/legacy-only accounts.
+Existing per-connection usage keeps its separate 24-hour retention. Disabling the
+admin key stops new named collection; existing rows still age out. The Companion
+discloses collection and retention before login when enabled. Diagnostic events
+continue to omit names, identity hashes and provider tokens.

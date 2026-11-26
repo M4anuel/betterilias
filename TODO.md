@@ -4,6 +4,15 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Complete shared UniBE login in Companion 1.4.0 / BetterIlias 1.9.0:
+  verified status/name, domain-only affiliation labels, explicit shared connection
+  and cache-safe activation. Archive the deprecated browser-cookie protocol and
+  rollback details; cover Chrome/Firefox and responsive layouts with regressions.
+- [x] Add admin-only distinct verified account counts and searchable display names
+  (1.9.0), retained for 30 days after last actual app use. Deduplicate browsers
+  with an instance-keyed verified identity; exclude login/status polling, disclose
+  collection before login and keep names out of diagnostic events and URLs.
+
 - [x] Add a read-only UniApp transport for offer details and complete application
   lists, using separate supplied Unisport credentials and the shared egress/budget
   infrastructure. It does not implement login or verify supplied token ownership.
