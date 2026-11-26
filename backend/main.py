@@ -1,7 +1,8 @@
 import httpx
+import asyncio
 import logging
 import sqlite3
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -25,9 +26,20 @@ from backend.diagnostic_metadata import APP_VERSION, register_routes
 from backend import activity
 from backend.api.routes import feature_requests
 from backend.api.routes import unisport
+from backend.api.routes import unibe
 
 configure_logging()
 logger = logging.getLogger("ilias.main")
+
+
+async def activity_maintenance():
+    while True:
+        await asyncio.sleep(300)
+        if (settings.observability_path / 'activity.sqlite3').exists():
+            try:
+                await asyncio.to_thread(activity.prune)
+            except (OSError, sqlite3.Error) as exc:
+                emit('runtime.error', component='server', error=exc)
 
 
 @asynccontextmanager
@@ -39,9 +51,13 @@ async def lifespan(app):
             activity.prune()
         except (OSError, sqlite3.Error) as exc:
             emit('runtime.error', component='server', error=exc)
+    maintenance = asyncio.create_task(activity_maintenance())
     try:
         yield
     finally:
+        maintenance.cancel()
+        with suppress(asyncio.CancelledError):
+            await maintenance
         emit('worker.stopped')
         shutdown()
 
@@ -186,6 +202,7 @@ async def httpx_network_handler(request: Request, exc: httpx.NetworkError):
 # Register API Routes
 app.include_router(auth.router, prefix="/api")
 app.include_router(unisport.router, prefix="/api")
+app.include_router(unibe.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(materials.router, prefix="/api")
 app.include_router(exercises.router, prefix="/api")

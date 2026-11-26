@@ -35,13 +35,22 @@ def availability(response: Response):
     return {'enabled': settings.unisport_enabled}
 
 
-def owner(response: Response, x_unisport_session: Annotated[str | None, Header()] = None):
+def owner(response: Response, request: Request, x_unisport_session: Annotated[str | None, Header()] = None):
     response.headers['Cache-Control'] = 'no-store'
     if not settings.unisport_enabled:
         raise HTTPException(404, t('unisport.disabled'))
     if not x_unisport_session or not re.fullmatch(r'[A-Za-z0-9_-]{43}', x_unisport_session):
         raise HTTPException(401, t('unisport.connection_required'))
-    return auth.digest(x_unisport_session)
+    identity = auth.digest(x_unisport_session)
+    tail = request.url.path.removeprefix('/api/unisport/')
+    if tail not in ('connection', 'affiliation', 'affiliations', 'ilias-connection') and not tail.startswith('auth/'):
+        current = auth.record(identity)
+        if current and current[1].get('phase') == 'connected':
+            from backend import activity
+            key = activity.account_key(auth.ISSUER, auth.CLIENT, current[1]['subject'])
+            if key:
+                activity.record('unisport:' + identity, account=key, name=current[1].get('name'))
+    return identity
 
 
 Owner = Annotated[str, Depends(owner)]
@@ -209,6 +218,8 @@ async def connect_ilias(owner: Owner, x_unisport_scope: Scope, x_unisport_affili
                 except (unisport_ilias.ExchangeFailed, ScrapingParsingError, httpx.HTTPError, OutboundUnavailable, OutboundTargetRejected):
                     old_key = None
             renewed = bool(snapshot.get('cookies') and old_key and hmac.compare_digest(old_key, account_key))
+        from backend import activity
+        usage_key = activity.account_key(auth.ISSUER, auth.CLIENT, data['subject'])
         # Serialize the final connection check against disconnect/replacement.
         # Reuse the capability only after proving the same unique ILIAS login.
         with auth.database() as db:
@@ -217,7 +228,8 @@ async def connect_ilias(owner: Owner, x_unisport_scope: Scope, x_unisport_affili
             if not row or row[0] != state or row[1] <= time.time() or json.loads(row[2]) != data:
                 raise connection_changed()
             metadata = {'source': 'unisport_id_token', 'user_name': user,
-                'ilias_account_key': account_key, 'user_agent': settings.user_agent}
+                'ilias_account_key': account_key, 'user_agent': settings.user_agent,
+                'usage_account_key': usage_key}
             if renewed:
                 if not previous.replace_unchanged(snapshot, cookies, metadata):
                     raise connection_changed()

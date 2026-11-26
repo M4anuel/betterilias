@@ -25,6 +25,8 @@ TOKEN = 'synthetic-private-id-token'
 def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, 'coordination_dir', str(tmp_path/'coordination'))
     monkeypatch.setattr(settings, 'sessions_dir', str(tmp_path/'sessions'))
+    monkeypatch.setattr(settings, 'observability_dir', str(tmp_path/'observability'))
+    monkeypatch.setattr(settings, 'admin_api_key', '')
     monkeypatch.setattr(settings, 'unisport_enabled', True)
     monkeypatch.setattr(settings, 'ilias_base_url', bridge.ORIGIN)
 
@@ -118,7 +120,7 @@ def test_endpoint_uses_fresh_capability_and_preserves_other_tenants(monkeypatch)
         assert result.headers['cache-control']=='no-store' and 'set-cookie' not in result.headers
         assert TOKEN not in result.text and 'new-verified-cookie' not in result.text
         assert SessionManager(sid).load_cookies()=={'PHPSESSID':'new-verified-cookie'}
-        assert SessionManager(sid).load_metadata()=={'source':'unisport_id_token','user_name':'Synthetic Student','ilias_account_key':KEY,'user_agent':settings.user_agent}
+        assert SessionManager(sid).load_metadata()=={'source':'unisport_id_token','user_name':'Synthetic Student','ilias_account_key':KEY,'user_agent':settings.user_agent,'usage_account_key':None}
         assert body['renewed'] is False
         assert old.load_cookies()=={'PHPSESSID':'old-cookie'}
         assert client.post('/api/unisport/ilias-connection').status_code==401
