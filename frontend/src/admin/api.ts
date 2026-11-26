@@ -19,6 +19,7 @@ export interface ActivitySummary {
 }
 export interface AdminSummary {
   activity?: ActivitySummary;
+  accounts?: { active: number; last_24_hours: number; retained: number; retention_days: number; as_of: number };
   event_catalogue: Record<string, string>;
   diagnostics: {
     worker: string; queue_depth: number; dropped: number; storage_errors: number;
@@ -28,6 +29,10 @@ export interface AdminSummary {
     retained_request_metrics: { count: number; mean_ms: number | null; max_ms: number | null; server_errors: number | null };
   };
   outbound: { requests: number; rejected: number; queue_wait_seconds: number; throttles: number; cooldown_until: number; queued: number };
+}
+export interface AccountPage {
+  accounts: { id: string; name: string; last_seen: number }[];
+  total: number; offset: number; limit: number; retention_days: number;
 }
 export class AdminError extends Error {
   status: number;
