@@ -57,7 +57,7 @@ def test_popup_recovers_tabs_without_content_scripts(local_site, directory, lang
             issued.append(token)
             route.fulfill(content_type='application/json', body=json.dumps(dict(handoff_token=token, expires_in=60)))
         page.route('**/api/auth/mobile-session', issue)
-        page.goto(f'{local_site}/{directory}/popup.html')
+        page.goto(f'{local_site}/{directory}/legacy-popup.html')
         pw.expect(page.locator('#feedback-box')).to_have_text(tr['extension.page_connection_needed'])
         assert not issued  # Opening a popup must not navigate app tabs automatically.
         page.locator('#sync-btn').click()
@@ -137,7 +137,7 @@ def test_language_switch_is_live_persisted_and_sent_to_backend(local_site):
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.route('**/api/**', respond)
-        page.goto(local_site)
+        page.goto(local_site + '/?semester=HS2026')
         page.get_by_role('button', name='Appearance & settings', exact=True).click()
         page.get_by_label('Language', exact=True).select_option('de')
         playwright.expect(page.locator('html')).to_have_attribute('lang', 'de')
@@ -178,7 +178,7 @@ def test_extension_language_selection_and_safe_sync_feedback(local_site, directo
             request_languages.append(route.request.headers.get('accept-language'))
             route.fulfill(status=200, content_type='application/json', body=json.dumps(dict(success=True, authenticated=True, session_id='test-key', user_name='<b>Anna</b>')))
         page.route('**/api/auth/sync', sync)
-        page.goto(f'{local_site}/{directory}/popup.html')
+        page.goto(f'{local_site}/{directory}/legacy-popup.html')
         playwright.expect(page.locator('#sync-btn')).to_have_text('Sync session with BetterIlias')
         page.get_by_label('Language', exact=True).select_option('de')
         playwright.expect(page.locator('#sync-btn')).to_have_text('Sitzung mit BetterIlias synchronisieren')
@@ -250,7 +250,7 @@ def test_connection_panel_resizes_without_losing_address(local_site, language, s
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
             page.screenshot(path=str(artifacts / f'{language}-{scheme}-{width}-{height}.png'))
         # Removing manual login leaves extension instructions as the sole login UI.
-        page.get_by_text(tr['Browser-Erweiterung'], exact=True).click()
+        panel.get_by_text(tr['Browser-Erweiterung'], exact=True).click()
         pw.expect(page.get_by_role('heading', name=tr['BetterIlias Companion'], exact=True)).to_be_visible()
         assert page.locator('.app-overlay').filter(has=page.get_by_role('heading', name=tr['BetterIlias Companion'], exact=True)).locator('input').count() == 0
         assert 'PHPSESSID' not in page.locator('body').inner_text()
@@ -287,7 +287,7 @@ def test_extension_checking_invalid_recovery_and_unavailable(local_site, directo
             elif mode[0]=='valid':route.fulfill(content_type='application/json',body=json.dumps(dict(success=True,authenticated=True,session_id='fresh-session',user_name='Anna')))
             else:route.fulfill(status=503,content_type='application/json',body='{}')
         page.route('**/api/auth/sync',respond)
-        page.goto(f'{local_site}/{directory}/popup.html')
+        page.goto(f'{local_site}/{directory}/legacy-popup.html')
         badge=page.locator('#ilias-status-badge')
         pw.expect(badge).to_have_text(tr('Prüfe...'))
         pw.expect(badge).to_have_class('status-badge badge-warning')

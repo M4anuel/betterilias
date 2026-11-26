@@ -1,5 +1,8 @@
 // background.js - BetterIlias Companion Background Service Worker / Script
 if (typeof importScripts === 'function') importScripts('i18n.js', 'toolbar.js', 'request.js');
+if (typeof importScripts === 'function') importScripts('unisport.js');
+if (typeof importScripts === 'function') importScripts('unibe.js');
+if (typeof importScripts === 'function') importScripts('unisport-participants.js');
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 let syncDebounceTimeout = null;
@@ -21,6 +24,7 @@ async function getStoredSettings() {
       'serverUrl',
       'frontendUrl',
       'autoSyncEnabled',
+      'authMethod',
       'sessionId',
       'lastSyncSignature',
       'lastSyncTime',
@@ -29,7 +33,8 @@ async function getStoredSettings() {
     return {
       serverUrl: (stored.serverUrl || 'http://localhost:8000').replace(/\/+$/, ''),
       frontendUrl: (stored.frontendUrl || 'http://localhost:5173').replace(/\/+$/, ''),
-      autoSyncEnabled: stored.autoSyncEnabled !== false,
+      autoSyncEnabled: stored.authMethod === 'legacy' && stored.autoSyncEnabled !== false,
+      authMethod: stored.authMethod || 'unibe',
       sessionId: stored.sessionId || null,
       lastSyncSignature: stored.lastSyncSignature || null,
       lastSyncTime: stored.lastSyncTime || 0,
@@ -40,7 +45,8 @@ async function getStoredSettings() {
     return {
       serverUrl: 'http://localhost:8000',
       frontendUrl: 'http://localhost:5173',
-      autoSyncEnabled: true,
+      autoSyncEnabled: false,
+      authMethod: 'unibe',
       sessionId: null,
       lastSyncSignature: null,
       lastSyncTime: 0,
@@ -116,6 +122,7 @@ async function checkAndAutoSync(force = false) {
     const settings = await getStoredSettings();
     if (superseded()) return { status: 'superseded' };
     BetterIliasI18n.setLanguage(settings.language);
+    if (settings.authMethod !== 'legacy') return { status: 'unibe' };
     if (!settings.autoSyncEnabled && !force) {
       updateBadge('disabled');
       return { status: 'disabled' };

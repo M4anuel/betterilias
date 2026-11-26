@@ -17,7 +17,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 (async()=>{
   let cookie='old',cookieListener,messageListener,id=0;
   const timers=new Map(),requests=[],deliveries=[],badges=[],notified=[];
-  const stored={serverUrl:'https://backend.invalid',frontendUrl:'https://frontend.invalid',autoSyncEnabled:true};
+  const stored={serverUrl:'https://backend.invalid',frontendUrl:'https://frontend.invalid',autoSyncEnabled:true,authMethod:'legacy'};
   const noop={addListener(){}};
   const api={storage:{local:{get:async()=>({...stored}),set:async value=>Object.assign(stored,value)}},
     cookies:{getAll:async()=>[{name:'PHPSESSID',value:cookie}],onChanged:{addListener:fn=>cookieListener=fn}},
@@ -72,7 +72,7 @@ const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/
 const writes=[], events=[];
 let storageListener, runtimeListener, cloned=0;
 const page={location:{origin:'http://localhost:5173'},localStorage:{getItem:()=>null,removeItem:()=>{},setItem:(_,value)=>writes.push(value)},postMessage:()=>{},addEventListener:()=>{}};
-const api={storage:{local:{get:async keys=>keys.includes('sessionId')?{sessionId:'initial'}:{}},
+const api={storage:{local:{get:async keys=>keys.includes('sessionId')?{sessionId:'initial',authMethod:'legacy'}:{}},
   onChanged:{addListener:fn=>storageListener=fn}},
   runtime:{sendMessage:async()=>new Promise(()=>{}),onMessage:{addListener:fn=>runtimeListener=fn}}};
 const context=vm.createContext({browser:api,URL,console,window:page,
@@ -158,7 +158,7 @@ const source=fs.readFileSync(process.argv[1],'utf8');
     const writes=[], messages=[], listeners=[];
     let sessionReads=0;
     const api={storage:{local:{get:async keys=>{
-      if(keys.includes('sessionId')){sessionReads++;return {sessionId:'test-session'};}
+      if(keys.includes('sessionId')){sessionReads++;return {sessionId:'test-session',authMethod:'legacy'};}
       return {frontendUrl:'http://localhost:9123/app',serverUrl:'http://127.0.0.1:9124/'};
     }}},runtime:{sendMessage:(_,callback)=>callback({}),onMessage:{addListener:fn=>listeners.push(fn)}}};
     const context=vm.createContext({chrome:api,URL,console,
@@ -185,7 +185,7 @@ def test_background_verification_controls_toolbar_status(directory):
         pytest.skip('Node is required for the extension background harness')
     script = r'''
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
-const state = {}, badge = {}, events = {};
+const state = {authMethod:'legacy'}, badge = {}, events = {};
 let cookies = [{name:'PHPSESSID',value:'stale'}, {name:'_shibsession_test',value:'stale'}];
 let response = {success:true,authenticated:true,session_id:'test-session'}, status = 200, fail = false, hold;
 const api = {

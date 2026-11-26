@@ -23,7 +23,7 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin) return;
     const message = event.data;
-    if (!['UNISPORT_START', 'UNISPORT_PING', 'UNISPORT_CANCEL', 'UNISPORT_PARTICIPANTS_CONTEXT', 'UNISPORT_PARTICIPANTS_READ', 'UNISPORT_PARTICIPANTS_LOGIN'].includes(message?.type) || typeof message.requestId !== 'string' || message.requestId.length > 80) return;
+    if (!['UNISPORT_START', 'UNISPORT_PING', 'UNISPORT_CANCEL', 'UNISPORT_PARTICIPANTS_CONTEXT', 'UNISPORT_PARTICIPANTS_READ', 'UNISPORT_PARTICIPANTS_LOGIN', 'UNIBE_OPEN_FROM_PAGE'].includes(message?.type) || typeof message.requestId !== 'string' || message.requestId.length > 80) return;
     void (async () => {
       let result;
       try { result = await browserAPI.runtime.sendMessage(message); } catch (_) {}
@@ -87,6 +87,18 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
   // Register live updates before awaiting startup checks or background requests.
   browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    const pageStorage = window.wrappedJSObject?.localStorage || window.localStorage;
+    if (message?.type === 'UNIBE_CONTEXT') {
+      sendResponse({ credential: pageStorage.getItem('betterilias_unisport_session'),
+        sessionId: pageStorage.getItem('betterilias_unibe_selected_session') || (pageStorage.getItem('betterilias_ilias_source') === 'unisport'
+          ? pageStorage.getItem('betterilias_cache_owner') : pageStorage.getItem('betterilias_session_id')) });
+      return false;
+    }
+    if (message?.type === 'UNIBE_SELECTED') {
+      applyUnibe(message);
+      sendResponse({ success: true });
+      return false;
+    }
     if (message && message.type === 'BETTERILIAS_SESSION_SYNCED' && message.sessionId) {
       try {
         applySessionToPage(message.sessionId, message.manual === true);
@@ -98,6 +110,23 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     return false;
   });
 
+  function applyUnibe(message) {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(message?.credential || '') || !/^[A-Za-z0-9_-]{43}$/.test(message?.sessionId || '')) return;
+    const pageStorage = window.wrappedJSObject?.localStorage || window.localStorage;
+    pageStorage.setItem('betterilias_unisport_session', message.credential);
+    pageStorage.setItem('betterilias_ilias_source', 'unisport');
+    const detail = { sessionId: message.sessionId, source: 'unisport' };
+    // Existing apps select synchronously. On document_start there may be no
+    // listener yet, so persist the verified selection before React initializes.
+    // Leave an old owner in place so cache initialization clears different-account data.
+    pageStorage.setItem('betterilias_session_id', message.sessionId);
+    pageStorage.setItem('betterilias_unibe_selected_session', message.sessionId);
+    document.dispatchEvent(new CustomEvent('BETTERILIAS_SESSION_SYNCED', {
+      detail: typeof cloneInto === 'function' ? cloneInto(detail, window) : detail,
+    }));
+    window.postMessage({ type: 'UNIBE_CONNECTION_SELECTED' }, location.origin);
+  }
+
   browserAPI.storage.onChanged?.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.sessionId?.newValue) {
       applySessionToPage(changes.sessionId.newValue);
@@ -106,9 +135,12 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
   try {
     // 1. Sync session from extension storage to web app localStorage if available
-    const data = await browserAPI.storage.local.get(['sessionId']);
-    if (data && data.sessionId) {
+    const data = await browserAPI.storage.local.get(['sessionId', 'authMethod']);
+    if (data.authMethod === 'legacy' && data.sessionId) {
       applySessionToPage(data.sessionId);
+    } else {
+      const unibe = await browserAPI.runtime.sendMessage({ type: 'UNIBE_PAGE_CONNECTION' });
+      if (unibe?.success && unibe.data?.sessionId) applyUnibe(unibe.data);
     }
   } catch (e) {
     // Ignore context errors

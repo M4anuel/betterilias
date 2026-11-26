@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '1', reason='Opt-in Chromium emulation')
 
 
-def mount(page, connected=False):
+def mount(page, connected=False, legacy=True):
     state = {'phase': 'connected' if connected else 'disconnected', 'affiliation': None, 'scope': 'a' * 64 if connected else None}
     writes = []
     def api(route):
@@ -32,6 +32,7 @@ def mount(page, connected=False):
             data = dict(state)
         route.fulfill(content_type='application/json', body=json.dumps(data))
     page.route('**/api/unisport/**', api)
+    if legacy:page.evaluate("history.replaceState(null,'','?legacy-unisport-login=1')")
     page.evaluate('''async()=>{
       localStorage.setItem('betterilias_session_id','must-not-be-forwarded');
       window.addEventListener('message',event=>{
@@ -113,7 +114,7 @@ def test_app_navigation_and_history_without_ilias_login(workflow_page, width):
       const {App}=await import('/src/App.tsx');mountAudit(App,{});
     }''')
     page.get_by_role('heading',name=tr['unisport.title'],exact=True).wait_for()
-    page.get_by_role('button',name=tr['unisport.connect'],exact=True).wait_for()
+    page.get_by_role('button',name=tr['unibe.login'],exact=True).wait_for()
     assert page.locator('dialog[open]').count()==0
     if width<768: page.get_by_role('button',name=tr['Sidebar umschalten'],exact=True).click()
     nav=page.get_by_role('button',name=tr['unisport.title'],exact=True)
@@ -320,3 +321,24 @@ def test_unibe_selection_survives_legacy_companion_before_cache_initialization(w
       return {selected,stored,ignored,draft,manual,afterManual:cache.getSessionId()};
     }''')
     assert result=={'selected':'p'*43,'stored':'p'*43,'ignored':True,'draft':'synthetic draft','manual':True,'afterManual':'manual-companion-session'}
+
+
+@pytest.mark.parametrize('code,scheme',[('en','light'),('de','dark')])
+@pytest.mark.parametrize('connected',[False,True])
+def test_primary_unisport_login_opens_companion_without_page_first_form(workflow_page,code,scheme,connected):
+    page=workflow_page;page.set_viewport_size({'width':320,'height':740});tr=language(page,code,scheme)
+    _,writes=mount(page,connected=connected,legacy=False)
+    page.evaluate('''()=>{
+      window.openedSharedLogin=[];
+      addEventListener('message',e=>{
+        if(e.data?.type==='UNIBE_OPEN_FROM_PAGE'){
+          openedSharedLogin.push(e.data);
+          postMessage({type:'UNISPORT_REPLY',requestId:e.data.requestId,success:true},location.origin);
+        }
+      });
+    }''')
+    button=page.get_by_role('button',name=tr['unibe.manage' if connected else 'unibe.login'],exact=True)
+    button.click();page.wait_for_function('openedSharedLogin.length===1')
+    assert page.locator('#unisport-affiliation').count()==0
+    assert not any(path.endswith('/auth/start') for path,_,_ in writes)
+    shot(page,f'primary-companion-login-{connected}-{code}-{scheme}')

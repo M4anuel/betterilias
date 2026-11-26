@@ -1,6 +1,7 @@
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 const { t, languages, getLanguage, setLanguage } = BetterIliasI18n;
 document.addEventListener('DOMContentLoaded', async () => {
+  await browserAPI.storage.local.set({ authMethod: 'legacy' });
   const byId = id => document.getElementById(id);
   const badge = byId('ilias-status-badge'), subtitle = byId('ilias-status-sub');
   const autoSyncBadge = byId('auto-sync-badge');

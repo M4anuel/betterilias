@@ -17,9 +17,24 @@ type Application = { id?: number; title?: string; status?: number; registration?
 
 /** UniSport owns its capability, loading/error state and explicit affiliation draft. */
 export function UnisportView() {
+  const legacyLogin = new URLSearchParams(location.search).has('legacy-unisport-login');
   const language = useLanguage();
-  const [credential] = useState(unisportCredential);
+  const [credential, setCredential] = useState(unisportCredential);
   const [connection, setConnection] = useState<Connection>({ phase: 'disconnected', affiliation: null });
+  useEffect(() => {
+    const selected = (event: MessageEvent) => {
+      if (event.source === window && event.origin === location.origin && event.data?.type === 'UNIBE_CONNECTION_SELECTED') {
+        const selected = unisportCredential();
+        if (selected !== credential) {
+          ++generation.current;
+          clearPrivate();setConnection({ phase: 'disconnected', affiliation: null });
+          setChoices([]);setChoice('');setApplications(null);setCredential(selected);
+        }
+      }
+    };
+    window.addEventListener('message', selected);
+    return () => window.removeEventListener('message', selected);
+  }, [credential]);
   const [choices, setChoices] = useState<string[]>([]);
   const [choice, setChoice] = useState('');
   const [applications, setApplications] = useState<Application[] | null>(null);
@@ -82,10 +97,12 @@ export function UnisportView() {
     if (!mounted.current || sequence !== generation.current) return;
     setConnection(next);
     if (next.phase === 'connected') {
-      const result = await unisportFetch<{ affiliations: string[] }>('/affiliations', credential);
-      if (!mounted.current || sequence !== generation.current) return;
-      setChoices(result.affiliations);
-      setChoice(previous => previous && result.affiliations.includes(previous) ? previous : next.affiliation || '');
+      if (legacyLogin) {
+        const result = await unisportFetch<{ affiliations: string[] }>('/affiliations', credential);
+        if (!mounted.current || sequence !== generation.current) return;
+        setChoices(result.affiliations);
+        setChoice(previous => previous && result.affiliations.includes(previous) ? previous : next.affiliation || '');
+      }
     } else { setChoices([]); setChoice(''); setApplications(null); }
   }
 
@@ -112,7 +129,7 @@ export function UnisportView() {
     const changed = () => { void run(sequence => refresh(sequence)); };
     window.addEventListener('unisport-connection-changed', changed);
     return () => { mounted.current = false; ++generation.current; window.removeEventListener('message', listener); window.removeEventListener('unisport-connection-changed', changed); };
-  }, [credential, language]);
+  }, [credential, language, legacyLogin]);
 
   useEffect(() => {
     if (!waiting) return;
@@ -154,7 +171,14 @@ export function UnisportView() {
         {(waiting || busy) && <LoaderCircle size={18} aria-hidden="true" className="shrink-0 animate-spin motion-reduce:animate-none" />}
         {t(waiting ? 'unisport.waiting' : connection.phase === 'connected' ? 'unisport.connected' : 'unisport.disconnected')}
       </p>
-      <p className="text-sm text-slate-600 dark:text-slate-400">{t('unisport.login_hint')}</p>
+      <p className="text-sm text-slate-600 dark:text-slate-400">{legacyLogin ? t('unisport.login_hint') : t('unibe.extension_hint')}</p>
+      {!legacyLogin && <div className="space-y-2">
+        {connection.affiliation && <p className="text-sm">{t('unisport.affiliation')}: {connection.affiliation.slice(connection.affiliation.lastIndexOf('@') + 1)}</p>}
+        <Button loading={busy} onClick={() => void run(async () => { await unisportCompanion({ type: 'UNIBE_OPEN_FROM_PAGE' }); })}>
+          {connection.phase === 'connected' ? t('unibe.manage') : t('unibe.login')}
+        </Button>
+      </div>}
+      {legacyLogin && <>
       <div className="flex flex-wrap gap-2">
         {!waiting && <Button variant="primary" loading={busy} onClick={connect}>{t(connection.phase === 'connected' ? 'unisport.reconnect' : 'unisport.connect')}</Button>}
         {(waiting || connection.phase === 'connected') && <Button disabled={busy} onClick={disconnect}>{t(waiting ? 'unisport.cancel' : 'unisport.disconnect')}</Button>}
@@ -172,7 +196,7 @@ export function UnisportView() {
           <select id="unisport-affiliation" name="affiliation" required value={choice} onChange={event => setChoice(event.target.value)}
             className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base font-normal focus-visible:outline-2 focus-visible:outline-teal-500 dark:border-slate-600 dark:bg-slate-950">
             <option value="">{t('unisport.choose_affiliation')}</option>
-            {choices.map(value => <option key={value} value={value}>{value}</option>)}
+            {choices.map(value => <option key={value} value={value}>{value.includes('@') ? value.slice(value.lastIndexOf('@') + 1) : value}</option>)}
           </select>
         </div>
         {!choices.length && <p className="text-sm">{t('unisport.no_affiliations')}</p>}
@@ -180,6 +204,7 @@ export function UnisportView() {
       </form>}
       {connection.phase === 'connected' && connection.scope && connection.affiliation && <UnisportIliasConnection
         credential={credential} scope={connection.scope} affiliation={connection.affiliation} />}
+      </>}
       {connection.phase === 'connected' && connection.scope && connection.affiliation && <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-700">
         <h2 className="font-semibold">{t('unisport.website_login_title')}</h2>
         <UnisportWebsiteLogin scope={connection.scope} affiliation={connection.affiliation} />

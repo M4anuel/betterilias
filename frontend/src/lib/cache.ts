@@ -102,6 +102,8 @@ export const cache = {
       // Older installed Companions can overwrite the storage key at document
       // startup. Keep the explicit UniBE selection before any cache renders.
       if (localStorage.getItem('betterilias_ilias_source') === 'unisport') {
+        const selected = localStorage.getItem('betterilias_unibe_selected_session');
+        if (selected && /^[A-Za-z0-9_-]{43}$/.test(selected)) return selected;
         const owner = localStorage.getItem('betterilias_cache_owner');
         if (owner) return owner;
       }
@@ -140,6 +142,7 @@ export const cache = {
       } else {
         localStorage.removeItem(SESSION_ID_KEY);
       }
+      localStorage.removeItem('betterilias_unibe_selected_session');
     } catch (e) {
       console.error('Failed to update session ID');
     }

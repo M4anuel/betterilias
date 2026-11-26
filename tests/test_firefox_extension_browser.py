@@ -187,7 +187,7 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
         archive.writestr('harness.js', '''(async () => {
           await browser.storage.local.set({language: %s, autoSyncEnabled: false, serverUrl: %s, frontendUrl: %s});
           await browser.cookies.set({url:'https://ilias.unibe.ch/', name:'PHPSESSID', value:'synthetic-firefox-cookie', secure:true});
-          location.href='popup.html';
+          location.href='legacy-popup.html';
         })().catch(error => { document.body.textContent=error.message; });''' % (json.dumps(language), json.dumps(server_url), json.dumps(server_url)))
 
     client = None
@@ -204,7 +204,7 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
                 with client.using_context('chrome'):
                     client.execute_script('gBrowser.selectedBrowser.loadURI(Services.io.newURI(arguments[0]), {triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()});', script_args=[url])
                 if not url.endswith('/harness.html'):
-                    wait_for('return location.href.split(/[?#]/)[0] === ' + json.dumps(url) + ' && document.readyState === "complete";')
+                    wait_for('return location.href.split(/[?#]/)[0] === ' + json.dumps(url.split('?',1)[0].split('#',1)[0]) + ' && document.readyState === "complete";')
 
             def wait_for(script, timeout=10):
                 deadline = time.monotonic() + timeout
@@ -244,14 +244,14 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
             retry()
             expect_status('Synchronisiert')
             # Actual content script, Firefox Xray boundaries and native storage.
-            navigate(server_url + '/')
+            navigate(server_url + '/?semester=HS2026')
             if not bridge_available:
-                wait_for('return document.body.innerText.includes(' + json.dumps(tr['Sitzung nicht aktiv:']) + ');')
+                wait_for('return Boolean(document.querySelector("[data-connection-notice]"));')
                 assert None in course_credentials
                 app_handle = client.current_window_handle
                 popup_handle = client.open(type='tab', focus=True)['handle']
                 client.switch_to_window(popup_handle)
-                navigate(f'moz-extension://{uuid}/popup.html')
+                navigate(f'moz-extension://{uuid}/legacy-popup.html')
                 expect_status('Synchronisiert')
                 retry()
                 expect_status('Synchronisiert')
@@ -262,7 +262,7 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
             popup_handle = client.open(type='tab', focus=True)['handle']
             client.switch_to_window(popup_handle)
             session_id[0] = 'rotated-firefox-session'
-            navigate(f'moz-extension://{uuid}/popup.html')
+            navigate(f'moz-extension://{uuid}/legacy-popup.html')
             expect_status('Synchronisiert')
             if not bridge_available:
                 retry()
@@ -272,7 +272,7 @@ def test_native_firefox_sync_errors_timeout_retry_and_handoff(tmp_path, language
             wait_for('return localStorage.getItem("betterilias_cache_owner") === "rotated-firefox-session";')
             wait_for('return document.body.innerText.includes("Firefox live sync course");')
             assert 'rotated-firefox-session' in course_credentials
-            assert tr['Sitzung nicht aktiv:'] not in client.execute_script('return document.body.innerText;')
+            wait_for('return document.querySelector("[data-connection-notice]") === null;')
             assert client.execute_script('return document.documentElement.lang;') == language
             if not bridge_available:
                 assert len(claimed_handoffs) == 2

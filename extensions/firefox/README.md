@@ -1,5 +1,20 @@
 # BetterIlias Companion — Firefox Extension
 
+
+Seit Companion 1.4.0 ist die gemeinsame UniBE-Anmeldung der Standard: Companion
+öffnen, bei SWITCH edu-ID anmelden, Zugehörigkeit wählen und ILIAS/UniSport
+verbinden. Name und Domain-Auswahl erscheinen bei gültiger Anmeldung; bei
+abgelaufenem Token erscheint die Anmeldeschaltfläche. Nach einem Quellcode-Update
+die Erweiterung und den BetterIlias-Tab neu laden. Store-Versionen können älter sein.
+
+[Aktuelle Anleitung](../../docs/UNIBE_LOGIN.md) ·
+[Veraltete Browser-Cookie-Anmeldung und Wiederherstellung](../../docs/LEGACY_ILIAS_LOGIN.md)
+
+## Veralteter Browser-Cookie-Rückfallweg
+
+Die folgenden bisherigen Hinweise beschreiben den ausdrücklich auswählbaren
+Rückfallweg unter den erweiterten Einstellungen, nicht den Standard-Login.
+
 Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzung (via SWITCH edu-ID) in Mozilla Firefox mit nur einem Klick sicher an BetterIlias zu übermitteln.
 
 Das Backend ersetzt gespeicherte Zugangsdaten erst nach einer erfolgreichen

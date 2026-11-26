@@ -309,6 +309,18 @@
     .settings-group input:focus {
       border-color: var(--accent);
     }
+
+    html.full-page { width: 100%; }
+    html.full-page body { max-width: 32rem; margin-inline: auto; }
+    h2 { font-size: 1rem; }
+    .account-name { font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+    button, .settings-group input, select { font: inherit; font-size: 1rem; min-height: 48px; }
+    select { width: 100%; padding: .5rem; margin-block: .25rem .5rem; color: var(--input-text); background: var(--input-bg); border: 1px solid var(--input-border); border-radius: .5rem; }
+    #affiliation-form { margin-block: 1rem; }
+    #affiliation-hint, #confirm-message { margin-block-end: .75rem; }
+    .btn { min-height: 48px; overflow-wrap: anywhere; }
+    .settings-group input:focus-visible, :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
 </head>
 <body>
@@ -316,51 +328,40 @@
     <img src="logo.png" alt="BetterIlias Logo" class="logo" />
     <div class="title-area">
       <h1><span class="brand-better">Better</span><span class="brand-ilias">Ilias</span> Companion</h1>
-      <span data-i18n="Sichere Sitzungs-Synchronisation"></span>
+      <span data-i18n="unibe.login_description"></span>
     </div>
   </div>
 
-  <div class="status-card">
-    <div class="status-row">
-      <span class="status-label" data-i18n="ILIAS-Sitzung im Browser:"></span>
-      <span id="ilias-status-badge" role="status" class="status-badge badge-warning" data-i18n="Prüfe..."></span>
-    </div>
-    <div id="ilias-status-sub" class="info-sub" data-i18n="Lade Cookies für ilias.unibe.ch..."></div>
-    <div class="status-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border-color);">
-      <span class="status-label" data-i18n="Automatische Synchronisation:"></span>
-      <span id="auto-sync-badge" class="status-badge badge-neutral" data-i18n="Aktiv"></span>
-    </div>
-  </div>
-
-  <div id="feedback-box" class="feedback" aria-live="polite"></div>
-
-  <a id="login-btn" class="btn btn-primary" href="https://ilias.unibe.ch/" target="_blank" rel="noopener noreferrer" hidden data-i18n="Bei ILIAS anmelden"></a>
-
-  <button id="sync-btn" class="btn btn-primary">
-    <span data-i18n="Sitzung mit BetterIlias synchronisieren"></span>
-  </button>
-
-  <button id="open-app-btn" class="btn btn-secondary">
-    <span data-i18n="BetterIlias öffnen"></span>
-  </button>
-
-  <div class="settings-group"><label for="language" data-i18n="Language"></label><select id="language" style="width:100%;padding:6px;background:var(--input-bg);color:var(--input-text);border:1px solid var(--input-border);border-radius:6px"></select></div>
-  <details>
-    <summary data-i18n="Erweiterte Server-Einstellungen"></summary>
-    <div class="settings-group">
-      <label for="server-url" data-i18n="Backend API URL:"></label>
-      <input type="text" id="server-url" value="http://localhost:8000" />
-
-      <label for="frontend-url" data-i18n="Frontend Web URL:"></label>
-      <input type="text" id="frontend-url" value="http://localhost:5173" />
-
-      <button id="save-settings-btn" class="btn btn-secondary" style="padding: 5px 10px; font-size: 11px; margin-bottom: 0;" data-i18n="Einstellungen speichern"></button>
-    </div>
+  <section class="status-card" aria-labelledby="account-heading">
+    <div class="status-row"><h2 id="account-heading" data-i18n="unibe.account"></h2><span id="account-state" role="status" class="status-badge badge-warning"></span></div>
+    <p id="account-name" class="account-name"></p>
+    <p id="account-description" class="info-sub" role="status"></p>
+  </section>
+  <p id="usage-notice" class="info-sub" hidden></p>
+  <p id="feedback-box" class="feedback" role="status" aria-live="polite"></p>
+  <button id="login-btn" type="button" class="btn btn-primary" hidden data-i18n="unibe.login"></button>
+  <button id="retry-btn" type="button" class="btn btn-secondary" hidden data-i18n="Erneut versuchen"></button>
+  <form id="affiliation-form" action="/api/auth/unibe/affiliation" method="post" aria-labelledby="account-heading" hidden>
+    <label id="affiliation-label" for="affiliation" data-i18n="unisport.affiliation"></label>
+    <select id="affiliation" name="affiliation" required aria-describedby="affiliation-hint"></select>
+    <p id="affiliation-hint" class="info-sub" data-i18n="unibe.affiliation_hint"></p>
+    <button id="connect-btn" type="submit" class="btn btn-primary" data-i18n="unibe.connect"></button>
+  </form>
+  <section id="confirm-switch" class="status-card" hidden aria-labelledby="confirm-title">
+    <h2 id="confirm-title" data-i18n="unibe.switch_title"></h2><p id="confirm-message"></p>
+    <button id="confirm-btn" type="button" class="btn btn-primary" data-i18n="unibe.switch_confirm"></button>
+    <button id="cancel-switch-btn" type="button" class="btn btn-secondary" data-i18n="Abbrechen"></button>
+  </section>
+  <button id="disconnect-btn" type="button" class="btn btn-secondary" hidden data-i18n="unibe.disconnect"></button>
+  <button id="open-app-btn" type="button" class="btn btn-secondary" data-i18n="BetterIlias öffnen"></button>
+  <div class="settings-group"><label for="language" data-i18n="Language"></label><select id="language" name="language"></select></div>
+  <details><summary data-i18n="Erweiterte Server-Einstellungen"></summary>
+    <form id="settings-form" class="settings-group" action="/" method="post">
+      <label for="server-url" data-i18n="Backend API URL:"></label><input type="url" id="server-url" name="server" value="http://localhost:8000" required autocapitalize="none" autocorrect="off" spellcheck="false">
+      <label for="frontend-url" data-i18n="Frontend Web URL:"></label><input type="url" id="frontend-url" name="frontend" value="http://localhost:5173" required autocapitalize="none" autocorrect="off" spellcheck="false">
+      <button type="submit" class="btn btn-secondary" data-i18n="Einstellungen speichern"></button>
+    </form>
+    <button id="legacy-btn" type="button" class="btn btn-secondary" data-i18n="unibe.legacy"></button>
   </details>
-
-  <script src="i18n.js"></script>
-  <script src="toolbar.js"></script>
-  <script src="request.js"></script>
-  <script src="popup.js"></script>
-</body>
-</html>
+  <script src="i18n.js"></script><script src="toolbar.js"></script><script src="unibe-popup.js"></script>
+</body></html>

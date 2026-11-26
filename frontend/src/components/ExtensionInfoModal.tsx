@@ -101,9 +101,9 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
                 2
               </span>
               <div>
-                <p className="font-semibold text-slate-900 dark:text-white">{t("Bei ILIAS einloggen & synchronisieren")}</p>
+                <p className="font-semibold text-slate-900 dark:text-white">{t('unibe.login')}</p>
                 <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
-                  {t("Logge dich auf")} <a href="https://ilias.unibe.ch" target="_blank" rel="noreferrer" className="text-[#0AACA5] underline">{t("ilias.unibe.ch")}</a> {t("ein und klicke im Browser auf das BetterIlias-Icon >")} <em>{t("Sitzung synchronisieren")}</em>.
+                  {t('unibe.extension_hint')}
                 </p>
               </div>
             </div>
@@ -113,17 +113,7 @@ export const ExtensionInfoModal: React.FC<ExtensionInfoModalProps> = ({
 
         {/* Footer */}
         <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-3.5 dark:border-slate-800 dark:bg-slate-800/80 flex-wrap gap-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <a
-              href="https://ilias.unibe.ch"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
-            >
-              <span>{t("ILIAS Login")}</span>
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </div>
+          <p className="max-w-sm text-xs text-slate-600 dark:text-slate-400">{t('unibe.legacy_hint')}</p>
           <button
             onClick={onClose}
             className="min-h-11 rounded-xl bg-slate-200 px-4 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600 transition cursor-pointer"
