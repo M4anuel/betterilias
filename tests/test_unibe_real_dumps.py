@@ -6,15 +6,30 @@ from backend.scrapers.semester import parse_semester_courses
 from backend.scrapers.submissions import parse_exercise_overview
 
 FIXTURES_UNIBE = Path(__file__).parent / "fixtures" / "unibe"
+HTML_DUMP_DIRECTORIES = (
+    FIXTURES_UNIBE,
+    Path(__file__).resolve().parents[1] / 'htmlfromilias',
+    Path(r'C:\Users\manue\OneDrive\Dokumente\_Uni\IliasAlternative\htmlfromilias'),
+)
 
 def find_html_dump(pattern: str):
-    import glob
-    matches = glob.glob(f"**/*{pattern}*.html", recursive=True)
-    if not matches:
-        alt_dir = Path(r"C:\Users\manue\OneDrive\Dokumente\_Uni\IliasAlternative\htmlfromilias")
-        if alt_dir.exists():
-            matches = [str(p) for p in alt_dir.rglob(f"*{pattern}*.html")]
-    return matches
+    # Diagnostic timestamps and packaged/scratch pages are not course fixtures.
+    for directory in HTML_DUMP_DIRECTORIES:
+        if directory.exists():
+            matches = sorted(str(path) for path in directory.rglob(f'*{pattern}*.html'))
+            if matches:
+                return matches
+    return []
+
+
+def test_html_dump_lookup_does_not_select_diagnostic_timestamp(tmp_path, monkeypatch):
+    diagnostics = tmp_path / 'logs';diagnostics.mkdir()
+    (diagnostics / 'failed_html_dump_20261127_124131_586040.html').write_text('Unrelated diagnostic')
+    fixtures = tmp_path / 'htmlfromilias';fixtures.mkdir()
+    actual = fixtures / 'Content_5860_HS2025.html';actual.write_text('Course fixture')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setitem(globals(), 'HTML_DUMP_DIRECTORIES', (fixtures,))
+    assert find_html_dump('5860') == [str(actual)]
 
 
 
