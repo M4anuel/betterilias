@@ -172,6 +172,32 @@ def test_same_account_reuses_capability_and_preserves_metadata(monkeypatch, lega
     assert len(list(settings.sessions_path.glob('*.json')))==1
 
 
+def test_same_account_switches_affiliation_without_replacement_warning(monkeypatch):
+    owner,state,data,headers=connection()
+    old=SessionManager('existing-tenant')
+    old.save_cookies({'PHPSESSID':'unibe-cookie'},metadata={'source':'unisport_id_token','ilias_account_key':KEY,'user_name':'Synthetic Student'})
+    async def verified(account,*args):
+        assert account.affiliation=='staff@other.edu'
+        return {'PHPSESSID':'switched-affiliation-cookie'},'Synthetic Student',KEY
+    monkeypatch.setattr(bridge,'exchange',verified)
+    async def choices(*args):return ['student','staff@other.edu']
+    monkeypatch.setattr(auth,'affiliations',choices)
+    with TestClient(app) as client:
+        put_resp=client.put('/api/auth/unibe/affiliation',headers={'X-Unisport-Session':'x'*43,'X-Unisport-Scope':headers['X-Unisport-Scope']},json={'affiliation':'staff@other.edu'})
+        assert put_resp.status_code==200
+        result=client.post('/api/auth/unibe/ilias-connection',headers={**headers,'X-Unisport-Affiliation':'staff@other.edu','X-Session-Id':old.session_id})
+    assert result.status_code==200
+    body=result.json()
+    assert body['renewed'] is True and body['session_id']==old.session_id
+    assert old.load_cookies()=={'PHPSESSID':'switched-affiliation-cookie'}
+
+
+def test_profile_identity_accepts_non_hidden_ne_un_input():
+    html=HTML.replace('type="hidden"','type="text" readonly')
+    identity=bridge.profile_identity(html)
+    assert identity == ('Synthetic Student', KEY)
+
+
 @pytest.mark.parametrize('change',['logout','cookies','identity'])
 def test_renewal_cannot_resurrect_or_overwrite_changed_session(monkeypatch,change):
     _,_,_,headers=connection()

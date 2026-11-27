@@ -2,6 +2,7 @@
 (() => {
   const api = typeof browser !== 'undefined' ? browser : chrome;
   const valid = value => typeof value === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value);
+  const isUnibeAffiliation = value => typeof value === 'string' && value.slice(value.lastIndexOf('@') + 1).toLowerCase() === 'unibe.ch';
   let operations = Promise.resolve(); // Serialization only; all connection state is persisted.
 
   async function instance() {
@@ -46,13 +47,22 @@
     const credentials = [...new Set(contexts.map(row => row.credential).filter(valid))];
     const sessions = [...new Set(contexts.map(row => row.sessionId).filter(Boolean))];
     if (credentials.length > 1 || sessions.length > 1) throw new Error('context');
-    if (!value.loggedOut && credentials.length === 1 && credentials[0] !== value.credential)
-      value = { credential: credentials[0], active: false };
+    if (!value.loggedOut && credentials.length === 1 && credentials[0] !== value.credential) {
+      value = { credential: credentials[0], active: false, previousSession: value.previousSession || value.sessionId };
+    }
     if (!value.loggedOut && sessions.length === 1) value.previousSession = sessions[0];
+    else if (!value.loggedOut && !value.previousSession && valid(value.sessionId)) value.previousSession = value.sessionId;
     if (!value.credential) value.credential = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
       .replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
     await save(config, value);
     return value;
+  }
+  function validCandidate(value, current) {
+    const candidate = value?.candidate;
+    if (!candidate || !valid(candidate.sessionId)) return null;
+    if (!current || current.phase !== 'connected' || !current.scope || !current.affiliation) return null;
+    if (candidate.scope !== current.scope || candidate.affiliation !== current.affiliation) return null;
+    return candidate;
   }
   async function status(config, value) {
     const availability = await call(config, {}, '/availability');
@@ -60,9 +70,17 @@
     if (!availability.enabled) return { phase: 'unsupported' };
     const result = await call(config, value, '/connection');
     if (!['connected','disconnected','pending','exchanging'].includes(result?.phase)) throw new Error('connection');
+    const candidate = validCandidate(value, result);
+    if (value.candidate && !candidate) {
+      value = { ...value, candidate: null };
+      await save(config, value);
+    }
+    const nominated = value.previousSession || value.sessionId;
+    const confirmation = Boolean(candidate && nominated && nominated !== candidate.sessionId);
     return { ...result, usage_retention_days: availability.usage_retention_days,
-      ilias_connected: Boolean(value.sessionId) && value.scope === result.scope,
-      user_name: result.user_name || (value.scope === result.scope ? value.userName : null) || null };
+      ilias_connected: Boolean(value.sessionId) && value.scope === result.scope && value.affiliation === result.affiliation,
+      confirmation,
+      user_name: (candidate?.userName || result.user_name || (value.scope === result.scope ? value.userName : null) || null) };
   }
   async function notify(config, value) {
     if (!valid(value.sessionId) || !valid(value.credential)) return;
@@ -71,6 +89,58 @@
         if (![config.frontend, config.backend].includes(new URL(tab.url).origin)) continue;
         await api.tabs.sendMessage(tab.id, { type: 'UNIBE_SELECTED', credential: value.credential, sessionId: value.sessionId });
       } catch (_) { /* Reopening the app will use the stored explicit selection. */ }
+    }
+  }
+  async function connectIlias(config, value, current) {
+    const nominated = value.previousSession || value.sessionId;
+    const result = await call(config, value, '/ilias-connection', 'POST', undefined, {
+      'X-Unisport-Scope': current.scope, 'X-Unisport-Affiliation': current.affiliation,
+      ...(nominated ? { 'X-Session-Id': nominated } : {}),
+    });
+    if (!result.authenticated || !valid(result.session_id)) throw new Error('connection');
+    const candidate = { sessionId: result.session_id, userName: result.user_name, scope: current.scope, affiliation: current.affiliation };
+    const confirmation = Boolean(nominated && nominated !== result.session_id && !result.renewed);
+    value = { ...value, candidate };
+    await save(config, value);
+    return { value, candidate, confirmation, user_name: result.user_name };
+  }
+  async function activateCandidate(config, value, current) {
+    const candidate = validCandidate(value, current);
+    if (!candidate) throw new Error('context');
+    value = { ...value, ...candidate, previousSession: candidate.sessionId, candidate: null, active: true, loggedOut: false };
+    await save(config, value);
+    await api.storage.local.set({ authMethod: 'unibe', logoutPaused: false });
+    await notify(config, value);
+    await globalThis.BetterIliasToolbar?.setStatus('synced');
+    return value;
+  }
+  async function autoCompleteUnibe(config, value, current) {
+    if (value.loggedOut || current.phase !== 'connected' || !current.scope || current.affiliation) return { value, status: current };
+    if (value.autoAttemptedScope === current.scope) return { value, status: current };
+    const unibeChoice = (current.affiliations || []).find(isUnibeAffiliation);
+    if (!unibeChoice) return { value, status: current };
+    value = { ...value, autoAttemptedScope: current.scope, autoErrorScope: null, candidate: null };
+    await save(config, value);
+    try {
+      await call(config, value, '/affiliation', 'PUT', { affiliation: unibeChoice }, { 'X-Unisport-Scope': current.scope });
+      const updated = await status(config, value);
+      if (updated.phase !== 'connected' || updated.scope !== current.scope || updated.affiliation !== unibeChoice) return { value, status: updated };
+      const connected = await connectIlias(config, value, updated);
+      value = connected.value;
+      if (!connected.confirmation) {
+        const verified = await status(config, value);
+        if (verified.phase === 'connected' && verified.scope === updated.scope && verified.affiliation === updated.affiliation) {
+          value = await activateCandidate(config, value, verified);
+        }
+      }
+      return { value, status: await status(config, value) };
+    } catch (error) {
+      const latest = await record(config);
+      if (!latest.loggedOut && latest.credential === value.credential) {
+        value = { ...latest, autoAttemptedScope: current.scope, autoErrorScope: current.scope };
+        await save(config, value);
+      }
+      throw error;
     }
   }
   async function operate(message, sender) {
@@ -91,7 +161,7 @@
       if (message.sessionId && value.previousSession && message.sessionId !== value.previousSession) throw new Error('context');
       // Pause restoration before any network wait. A failed remote logout must
       // never make startup/automatic cookie sync sign the user back in.
-      await save(config,{...value,active:false,loggedOut:true});
+      await save(config,{...value,active:false,loggedOut:true,candidate:null,pendingState:null});
       await api.storage.local.set({autoSyncEnabled:false,logoutPaused:true});
       let nativeConfirmed = true;
       if (sid) {
@@ -123,15 +193,36 @@
       await api.action.openPopup();
       return { opened: true };
     }
+    if (message.type === 'UNIBE_COMPLETE_AUTO') {
+      if (sender?.internal !== true || value.loggedOut || message.backend !== config.backend || message.credential !== value.credential || message.state !== value.pendingState) return {};
+      value = await context(config, value);
+      if (value.loggedOut || message.state !== value.pendingState) return {};
+      const current = await status(config, value);
+      if (current.phase === 'connected' && !current.affiliation) {
+        await autoCompleteUnibe(config, value, current);
+      }
+      return {};
+    }
     if (sender.url?.split('?')[0] !== expected) throw new Error('sender');
     value = await context(config, value);
     if (message.type === 'UNIBE_STATUS') {
-      const result = await status(config, value);
+      let result = await status(config, value);
+      if (result.phase === 'connected' && !result.affiliation && value.pendingState && value.autoAttemptedScope !== result.scope) {
+        try {
+          const auto = await autoCompleteUnibe(config, value, result);
+          value = auto.value;
+          result = auto.status;
+        } catch (_) {
+          value = await record(config);
+          result = await status(config, value);
+        }
+      }
+      const autoError = Boolean(result.phase === 'connected' && result.scope && value.autoErrorScope === result.scope);
       await globalThis.BetterIliasToolbar?.setStatus(result.phase === 'connected' ? 'synced' : result.phase === 'disconnected' ? 'unauthenticated' : 'checking');
-      return result;
+      return { ...result, ...(autoError ? { auto_error: true } : {}) };
     }
     if (message.type === 'UNIBE_LOGIN' || message.type === 'UNIBE_OPEN_LOGIN') {
-      value.loggedOut=false;
+      value = { ...value, loggedOut: false, candidate: null, autoAttemptedScope: null, autoErrorScope: null };
       const transaction = await call(config, value, '/start', 'POST');
       await save(config, { ...value, pendingState: transaction.state });
       const [active] = await api.tabs.query({ active: true, currentWindow: true });
@@ -141,37 +232,30 @@
     if (message.type === 'UNIBE_AFFILIATION') {
       if (typeof message.affiliation !== 'string' || !/^[a-f0-9]{64}$/.test(message.scope || '')) throw new Error('affiliation');
       await call(config, value, '/affiliation', 'PUT', { affiliation: message.affiliation }, { 'X-Unisport-Scope': message.scope });
-      await save(config, { ...value, candidate: null });
+      value = { ...value, candidate: null, autoAttemptedScope: message.scope, autoErrorScope: null };
+      await save(config, value);
       return await status(config, value);
     }
     if (message.type === 'UNIBE_CONNECT') {
       const current = await status(config, value);
       if (current.phase !== 'connected' || !current.scope || !current.affiliation) throw new Error('affiliation');
       if (message.scope !== current.scope || message.affiliation !== current.affiliation) throw new Error('context');
-      const result = await call(config, value, '/ilias-connection', 'POST', undefined, {
-        'X-Unisport-Scope': current.scope, 'X-Unisport-Affiliation': current.affiliation,
-        ...(value.previousSession || value.sessionId ? { 'X-Session-Id': value.previousSession || value.sessionId } : {}),
-      });
-      if (!result.authenticated || !valid(result.session_id)) throw new Error('connection');
-      const candidate = { sessionId: result.session_id, userName: result.user_name, scope: current.scope, affiliation: current.affiliation };
-      await save(config, { ...value, candidate });
-      return { confirmation: Boolean(value.previousSession && value.previousSession !== result.session_id), user_name: result.user_name };
+      const connected = await connectIlias(config, value, current);
+      return { confirmation: connected.confirmation, user_name: connected.user_name };
     }
     if (message.type === 'UNIBE_ACTIVATE') {
-      const candidate = value.candidate;
-      if (!candidate || !valid(candidate.sessionId)) throw new Error('context');
       const current = await status(config, value);
-      if (candidate.scope !== current.scope || candidate.affiliation !== current.affiliation) throw new Error('context');
-      value = { ...value, ...candidate, previousSession: candidate.sessionId, candidate: null, active: true, loggedOut:false };
-      await save(config, value);
-      await api.storage.local.set({ authMethod: 'unibe',logoutPaused:false });
-      await notify(config, value);
-      await globalThis.BetterIliasToolbar?.setStatus('synced');
+      value = await activateCandidate(config, value, current);
       return { connected: true, user_name: value.userName };
+    }
+    if (message.type === 'UNIBE_CANCEL_CANDIDATE') {
+      value = { ...value, candidate: null };
+      await save(config, value);
+      return { cancelled: true };
     }
     if (message.type === 'UNIBE_DISCONNECT') {
       await call(config, value, '/connection', 'DELETE');
-      await save(config, { ...value, candidate: null, pendingState: null });
+      await save(config, { ...value, candidate: null, pendingState: null, autoAttemptedScope: null, autoErrorScope: null });
       return { phase: 'disconnected' };
     }
     if (message.type === 'UNIBE_OPEN_APP') {
@@ -183,14 +267,19 @@
     throw new Error('message');
   }
   globalThis.BetterIliasUnibe = {
-    async completed(pending) {
+    async completed(pending, success = true) {
       const config = await instance(), value = await record(config);
       if (pending.backend !== config.backend || pending.credential !== value.credential || pending.state !== value.pendingState) return;
+      if (success && !value.loggedOut) {
+        const action = operations.catch(() => {}).then(() => operate({ type: 'UNIBE_COMPLETE_AUTO', backend: pending.backend, credential: pending.credential, state: pending.state }, { internal: true }));
+        operations = action.then(() => {}, () => {});
+        await action.catch(() => {});
+      }
       await api.runtime.sendMessage({ type: 'UNIBE_UPDATED' }).catch(() => {});
     },
   };
   api.runtime.onMessage.addListener((message, sender, respond) => {
-    if (!['UNIBE_STATUS', 'UNIBE_LOGOUT', 'UNIBE_OPEN_LOGIN', 'UNIBE_OPEN_FROM_PAGE', 'UNIBE_LOGIN', 'UNIBE_AFFILIATION', 'UNIBE_CONNECT', 'UNIBE_ACTIVATE', 'UNIBE_DISCONNECT', 'UNIBE_OPEN_APP', 'UNIBE_PAGE_CONNECTION'].includes(message?.type)) return false;
+    if (!['UNIBE_STATUS', 'UNIBE_LOGOUT', 'UNIBE_OPEN_LOGIN', 'UNIBE_OPEN_FROM_PAGE', 'UNIBE_LOGIN', 'UNIBE_AFFILIATION', 'UNIBE_CONNECT', 'UNIBE_ACTIVATE', 'UNIBE_CANCEL_CANDIDATE', 'UNIBE_DISCONNECT', 'UNIBE_OPEN_APP', 'UNIBE_PAGE_CONNECTION'].includes(message?.type)) return false;
     const action = operations.catch(() => {}).then(() => operate(message, sender));
     operations = action.then(() => {}, () => {});
     void action.then(data => respond({ success: true, data }), error => respond({ success: false,

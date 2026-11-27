@@ -7,11 +7,13 @@ import test from 'node:test';
 function harness(directory) {
   const stored={serverUrl:'http://localhost:8000',frontendUrl:'http://localhost:5173'},listeners=[],calls=[],tabs=[],notified=[];
   let connected={phase:'connected',scope:'a'.repeat(64),affiliation:'private@unibe.ch',affiliations:['private@unibe.ch'],user_name:'Synthetic Student',expires_at:9999999999};
+  let iliasResult={authenticated:true,session_id:'n'.repeat(43),user_name:'Synthetic Student',renewed:false};
+  let iliasStatus=200;
   const api={storage:{local:{get:async keys=>typeof keys==='string'?{[keys]:stored[keys]}:Object.fromEntries(keys.map(k=>[k,stored[k]])),set:async values=>Object.assign(stored,values)}},
-    runtime:{getURL:path=>'chrome-extension://synthetic/'+path,onMessage:{addListener:fn=>listeners.push(fn)},sendMessage:async()=>{}},
+    runtime:{getURL:path=>'chrome-extension://synthetic/'+path,onMessage:{addListener:fn=>listeners.push(fn)},sendMessage:async msg=>notified.push({runtimeMessage:msg})},
     action:{openPopup:async()=>notified.push({popup:true})},
     tabs:{query:async()=>tabs,create:async options=>notified.push(options),sendMessage:async(id,message)=>{
-      if(message.type==='UNIBE_CONTEXT')return {sessionId:'p'.repeat(43),credential:'c'.repeat(43)};
+      if(message.type==='UNIBE_CONTEXT')return tabs.find(t=>t.id===id)?.context || {sessionId:'p'.repeat(43),credential:'c'.repeat(43)};
       notified.push({id,message});return {};
     }}};
   const context=vm.createContext({chrome:api,crypto:webcrypto,TextEncoder,URL,AbortSignal,btoa,
@@ -22,13 +24,23 @@ function harness(directory) {
     fetch:async(url,init)=>{
       calls.push({url,init});
       if(url.endsWith('/connection') && init.method==='DELETE')connected={phase:'disconnected'};
+      if(url.endsWith('/affiliation') && init.method==='PUT') {
+        const body=JSON.parse(init.body);
+        connected={...connected,affiliation:body.affiliation};
+      }
+      if(url.endsWith('/start') && init.method==='POST') {
+        return {ok:true,status:200,json:async()=>({state:'s'.repeat(43),authorization_url:'https://login.eduid.ch/idp/profile/oidc/authorize'})};
+      }
+      if(url.endsWith('/ilias-connection') && iliasStatus!==200) {
+        return {ok:false,status:iliasStatus,json:async()=>({authenticated:false,detail:'Failed'})};
+      }
       let data=url.endsWith('/availability')?{enabled:true}:url.endsWith('/connection')?connected:
-        url.endsWith('/ilias-connection')?{authenticated:true,session_id:'n'.repeat(43),user_name:'Synthetic Student'}:{};
-      return {ok:true,json:async()=>structuredClone(data)};
+        url.endsWith('/ilias-connection')?iliasResult:{};
+      return {ok:true,status:200,json:async()=>structuredClone(data)};
     }});
   vm.runInContext('globalThis.BetterIliasRequest=async(url,init)=>{const response=await fetch(url,init);return {response,data:await response.json()};};',context);
   vm.runInContext(fs.readFileSync(`extensions/${directory}/unibe.js`,'utf8'),context);
-  return {stored,calls,tabs,notified,setConnected:value=>{connected=value;},
+  return {stored,calls,tabs,notified,context,setConnected:value=>{connected=value;},setIliasResult:(value,status=200)=>{iliasResult=value;iliasStatus=status;},
     message:(message,sender={url:api.runtime.getURL('popup.html'),tab:{id:99}})=>new Promise(resolve=>{
       if(!listeners[0](message,sender,resolve))resolve(undefined);
     })};
@@ -53,6 +65,94 @@ for(const directory of ['chrome','firefox']) {
     assert.equal(h.notified[0].message.sessionId,'n'.repeat(43));
     const record=Object.entries(h.stored).find(([key])=>key.startsWith('unibe.connection.'))[1];
     assert.equal(record.active,true);assert.ok(!('token' in record));
+  });
+  test(`${directory}: auto-selects and activates unibe.ch affiliation on login completion even without open popup`,async()=>{
+    const h=harness(directory);h.tabs.push({id:1,url:'http://localhost:5173/'});
+    h.setIliasResult({authenticated:true,session_id:'p'.repeat(43),user_name:'Synthetic Student',renewed:true});
+    await h.message({type:'UNIBE_LOGIN'});
+    h.setConnected({phase:'connected',scope:'a'.repeat(64),affiliation:null,affiliations:['other@example.edu','member@UniBE.ch'],user_name:'Synthetic Student',expires_at:9999999999});
+    await h.context.BetterIliasUnibe.completed({backend:'http://localhost:8000',credential:'c'.repeat(43),state:'s'.repeat(43)},true);
+    const affiliation=h.calls.find(c=>c.url?.endsWith('/affiliation') && c.init.method==='PUT');
+    assert.ok(affiliation);
+    assert.equal(JSON.parse(affiliation.init.body).affiliation,'member@UniBE.ch');
+    assert.ok(h.calls.some(c=>c.url?.endsWith('/ilias-connection')));
+    assert.ok(h.notified.some(n=>n.message?.type==='UNIBE_SELECTED' && n.message.sessionId==='p'.repeat(43)));
+    const status=await h.message({type:'UNIBE_STATUS'});
+    assert.equal(status.data.affiliation,'member@UniBE.ch');
+    assert.equal(status.data.ilias_connected,true);
+    assert.equal(status.data.confirmation,false);
+    // Duplicate completion or subsequent status poll must not re-run auto-connect
+    const callCount=h.calls.filter(c=>c.url?.endsWith('/ilias-connection')).length;
+    await h.context.BetterIliasUnibe.completed({backend:'http://localhost:8000',credential:'c'.repeat(43),state:'s'.repeat(43)},true);
+    await h.message({type:'UNIBE_STATUS'});
+    assert.equal(h.calls.filter(c=>c.url?.endsWith('/ilias-connection')).length,callCount);
+  });
+  test(`${directory}: auto-connect with different unverified account leaves confirmation pending without auto-activating`,async()=>{
+    const h=harness(directory);h.tabs.push({id:1,url:'http://localhost:5173/'});
+    h.setIliasResult({authenticated:true,session_id:'n'.repeat(43),user_name:'Different Student',renewed:false});
+    await h.message({type:'UNIBE_LOGIN'});
+    h.setConnected({phase:'connected',scope:'a'.repeat(64),affiliation:null,affiliations:['member@unibe.ch'],user_name:'Different Student',expires_at:9999999999});
+    await h.context.BetterIliasUnibe.completed({backend:'http://localhost:8000',credential:'c'.repeat(43),state:'s'.repeat(43)},true);
+    assert.ok(!h.notified.some(n=>n.message?.type==='UNIBE_SELECTED'));
+    const status=await h.message({type:'UNIBE_STATUS'});
+    assert.equal(status.data.affiliation,'member@unibe.ch');
+    assert.equal(status.data.confirmation,true);
+    assert.equal(status.data.ilias_connected,false);
+    // Cancelling candidate clears confirmation
+    await h.message({type:'UNIBE_CANCEL_CANDIDATE'});
+    const afterCancel=await h.message({type:'UNIBE_STATUS'});
+    assert.equal(afterCancel.data.confirmation,false);
+  });
+  test(`${directory}: no unibe.ch affiliation leaves manual selection and does not invent an affiliation`,async()=>{
+    const h=harness(directory);h.tabs.push({id:1,url:'http://localhost:5173/'});
+    await h.message({type:'UNIBE_LOGIN'});
+    h.setConnected({phase:'connected',scope:'a'.repeat(64),affiliation:null,affiliations:['member@other.edu'],user_name:'Synthetic Student',expires_at:9999999999});
+    await h.context.BetterIliasUnibe.completed({backend:'http://localhost:8000',credential:'c'.repeat(43),state:'s'.repeat(43)},true);
+    assert.ok(!h.calls.some(c=>c.url?.endsWith('/affiliation')));
+    assert.ok(!h.calls.some(c=>c.url?.endsWith('/ilias-connection')));
+    const status=await h.message({type:'UNIBE_STATUS'});
+    assert.equal(status.data.affiliation,null);
+  });
+  test(`${directory}: explicit manual affiliation switch to another organisation is preserved and not overridden back to unibe.ch`,async()=>{
+    const h=harness(directory);h.tabs.push({id:1,url:'http://localhost:5173/'});
+    h.setIliasResult({authenticated:true,session_id:'p'.repeat(43),user_name:'Synthetic Student',renewed:true});
+    await h.message({type:'UNIBE_LOGIN'});
+    h.setConnected({phase:'connected',scope:'a'.repeat(64),affiliation:null,affiliations:['member@unibe.ch','member@other.edu'],user_name:'Synthetic Student',expires_at:9999999999});
+    await h.context.BetterIliasUnibe.completed({backend:'http://localhost:8000',credential:'c'.repeat(43),state:'s'.repeat(43)},true);
+    // User manually switches to member@other.edu on the same verified account (even without open app tab)
+    h.tabs.length=0;
+    await h.message({type:'UNIBE_AFFILIATION',affiliation:'member@other.edu',scope:'a'.repeat(64)});
+    const connect=await h.message({type:'UNIBE_CONNECT',scope:'a'.repeat(64),affiliation:'member@other.edu'});
+    assert.equal(connect.data.confirmation,false);
+    const lastExchange=h.calls.filter(c=>c.url?.endsWith('/ilias-connection')).at(-1);
+    assert.equal(lastExchange.init.headers['X-Session-Id'],'p'.repeat(43));
+    await h.message({type:'UNIBE_ACTIVATE'});
+    const status=await h.message({type:'UNIBE_STATUS'});
+    assert.equal(status.data.affiliation,'member@other.edu');
+    assert.equal(status.data.ilias_connected,true);
+  });
+  test(`${directory}: failed automatic ILIAS verification sets auto_error without retrying and preserves manual retry`,async()=>{
+    const h=harness(directory);h.tabs.push({id:1,url:'http://localhost:5173/'});
+    h.setIliasResult({authenticated:false},422);
+    await h.message({type:'UNIBE_LOGIN'});
+    h.setConnected({phase:'connected',scope:'a'.repeat(64),affiliation:null,affiliations:['member@unibe.ch'],user_name:'Synthetic Student',expires_at:9999999999});
+    await h.context.BetterIliasUnibe.completed({backend:'http://localhost:8000',credential:'c'.repeat(43),state:'s'.repeat(43)},true);
+    const attempts=h.calls.filter(c=>c.url?.endsWith('/ilias-connection')).length;
+    assert.equal(attempts,1);
+    const status=await h.message({type:'UNIBE_STATUS'});
+    assert.equal(status.data.affiliation,'member@unibe.ch');
+    assert.equal(status.data.auto_error,true);
+    assert.equal(status.data.ilias_connected,false);
+    assert.equal(h.calls.filter(c=>c.url?.endsWith('/ilias-connection')).length,1);
+  });
+  test(`${directory}: logout mid-login prevents late completion from auto-connecting`,async()=>{
+    const h=harness(directory);h.tabs.push({id:1,url:'http://localhost:5173/'});
+    await h.message({type:'UNIBE_LOGIN'});
+    await h.message({type:'UNIBE_LOGOUT'});
+    h.setConnected({phase:'connected',scope:'a'.repeat(64),affiliation:null,affiliations:['member@unibe.ch'],user_name:'Synthetic Student',expires_at:9999999999});
+    const before=h.calls.length;
+    await h.context.BetterIliasUnibe.completed({backend:'http://localhost:8000',credential:'c'.repeat(43),state:'s'.repeat(43)},true);
+    assert.equal(h.calls.length,before);
   });
   test(`${directory}: a replaced or expired login cannot activate an earlier exchange`,async()=>{
     const h=harness(directory);await h.message({type:'UNIBE_CONNECT',scope:'a'.repeat(64),affiliation:'private@unibe.ch'});

@@ -4,6 +4,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Fix Chrome native callback form interception, automatically select and
+  connect `unibe.ch` affiliations in the background on login completion, and
+  preserve session/identity continuity across organisation switches on the same
+  verified ILIAS account without false replacement warnings (1.11.1 / Companion 1.7.0).
+
 - [x] Stabilise Companion retries/Firefox sizing and add paired logout (1.11.0 /
   Companion 1.6.0). Prefer UniBE affiliations, compact labels/status, move named
   usage disclosure into app privacy, clear private caches and block stale sync

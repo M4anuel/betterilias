@@ -67,13 +67,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     byId('connect-btn').textContent = t(busy ? 'Synchronisiere...' : 'unibe.connect');
     settingsState();
   }
-  async function apply(next) {
+  async function apply(next, showAutoFeedback = true) {
+    const previousScope = scope, previousAffiliation = state.affiliation, wasIliasConnected = Boolean(state.ilias_connected);
     if (next.scope !== scope) {
-      scope = next.scope || null;draft = next.affiliation || next.affiliations?.find(value=>value.slice(value.lastIndexOf('@')+1).toLowerCase()==='unibe.ch') || '';confirmation=false;
+      scope = next.scope || null;draft = next.affiliation || next.affiliations?.find(value=>value.slice(value.lastIndexOf('@')+1).toLowerCase()==='unibe.ch') || '';confirmation=Boolean(next.confirmation);
       if (scope && sessionStorage) { const row = (await sessionStorage.get('companionAffiliationDraft')).companionAffiliationDraft; if (row?.scope === scope) draft=row.value; }
+    } else {
+      if (next.affiliation && next.affiliation !== previousAffiliation) {
+        draft = next.affiliation;
+        if (sessionStorage) await sessionStorage.remove('companionAffiliationDraft').catch(() => {});
+      }
+      if (typeof next.confirmation === 'boolean') confirmation = next.confirmation;
+      else if (next.phase !== 'connected' || next.affiliation !== previousAffiliation) confirmation = false;
     }
     if (draft && !next.affiliations?.includes(draft)) draft=next.affiliation || '';
-    state=next;unverified=false;render();clearTimeout(expiry);clearTimeout(poll);
+    state=next;unverified=false;
+    if (showAutoFeedback) {
+      if (next.auto_error) feedback(t('unisport.ilias_connect_failed'), true);
+      else if (next.ilias_connected && (previousScope !== next.scope || !wasIliasConnected)) {
+        if (!byId('feedback-box').classList.contains('error')) feedback(t('unibe.connected_success'));
+      }
+    }
+    render();clearTimeout(expiry);clearTimeout(poll);
     if (next.phase==='connected' && Number.isFinite(next.expires_at)) expiry=setTimeout(() => { state={phase:'disconnected',usage_retention_days:state.usage_retention_days};confirmation=false;render(); },Math.max(0,next.expires_at*1000-Date.now()));
     else if (['pending','exchanging'].includes(next.phase)) poll=setTimeout(() => void refresh(),2000);
   }
@@ -111,18 +126,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (state.phase==='connected') await apply(await BetterIliasLegacy.check(saved.serverUrl,saved.frontendUrl,getLanguage(),true));
     else { await browserAPI.storage.local.set({logoutPaused:false,autoSyncEnabled:true});const tab=(await browserAPI.tabs.query({})).find(tab=>tab.url?.startsWith('https://ilias.unibe.ch/')); if(tab)await browserAPI.tabs.update(tab.id,{active:true});else await browserAPI.tabs.create({url:'https://ilias.unibe.ch/'}); }
   }));
-  byId('affiliation').addEventListener('change',async event => { draft=event.target.value;if(sessionStorage)await sessionStorage.set({companionAffiliationDraft:{scope,value:draft}}); });
+  byId('affiliation').addEventListener('change',async event => {
+    draft=event.target.value;
+    if (confirmation) { confirmation=false; void send('UNIBE_CANCEL_CANDIDATE').catch(() => {}); render(); }
+    if(sessionStorage)await sessionStorage.set({companionAffiliationDraft:{scope,value:draft}});
+  });
   byId('affiliation-form').addEventListener('submit',event => {
     event.preventDefault();void run(async () => {
-      await apply(await send('UNIBE_AFFILIATION',{affiliation:draft,scope:state.scope}));
+      await apply(await send('UNIBE_AFFILIATION',{affiliation:draft,scope:state.scope}), false);
       const result=await send('UNIBE_CONNECT',{scope:state.scope,affiliation:state.affiliation});
       state.user_name=result.user_name || state.user_name;
       if (result.confirmation) { confirmation=true; }
-      else { await send('UNIBE_ACTIVATE');await apply(await send('UNIBE_STATUS'));feedback(t('unibe.connected_success')); }
+      else { await send('UNIBE_ACTIVATE');await apply(await send('UNIBE_STATUS'), false);feedback(t('unibe.connected_success')); }
     }).then(() => { if(confirmation)byId('confirm-btn').focus(); });
   });
-  byId('confirm-btn').addEventListener('click',() => void run(async () => { await send('UNIBE_ACTIVATE');confirmation=false;await apply(await send('UNIBE_STATUS'));feedback(t('unibe.connected_success')); }));
-  byId('cancel-switch-btn').addEventListener('click',() => { confirmation=false;render();byId('affiliation').focus(); });
+  byId('confirm-btn').addEventListener('click',() => void run(async () => { await send('UNIBE_ACTIVATE');confirmation=false;await apply(await send('UNIBE_STATUS'), false);feedback(t('unibe.connected_success')); }));
+  byId('cancel-switch-btn').addEventListener('click',() => { confirmation=false;void send('UNIBE_CANCEL_CANDIDATE').catch(() => {});render();byId('affiliation').focus(); });
   byId('disconnect-btn').addEventListener('click',() => void run(async () => {
     const result=await send('UNIBE_LOGOUT',{authMethod:legacy()?'legacy':'unibe'});await apply(result);warning(null);
     feedback(t(result.native_logout_confirmed===false ? 'companion.logout_partial' : 'companion.logged_out'),result.native_logout_confirmed===false);

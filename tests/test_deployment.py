@@ -34,7 +34,7 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
         else:
             assert 'https://app.example.com' in (root / 'popup.html').read_text()
             assert 'https://app.example.com' in (root / 'content.js').read_text()
-            assert manifest['version'] == '1.6.0'
+            assert manifest['version'] == '1.7.0'
             assert 'http://localhost/*' in manifest['host_permissions']
             assert 'http://localhost/*' in manifest['content_scripts'][0]['matches']
             assert "'http://'+'localhost:8000'" in (root/'unibe-popup.js').read_text()
@@ -42,7 +42,10 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
             assert (root / 'unibe.js').is_file() and (root / 'unibe-popup.js').is_file()
             assert (root / 'legacy-popup.html').is_file()
             assert manifest['content_scripts'][1]['matches'] == ['https://login.eduid.ch/*']
-            assert manifest['content_scripts'][1]['js'] == ['unisport-callback.js']
+            assert manifest['content_scripts'][1]['js'] == ['unisport-callback-page.js']
+            assert manifest['content_scripts'][1]['world'] == 'MAIN'
+            assert manifest['content_scripts'][2]['matches'] == ['https://login.eduid.ch/*']
+            assert manifest['content_scripts'][2]['js'] == ['unisport-callback.js']
             assert 'https://login.eduid.ch/*' in manifest['host_permissions']
             assert 'webRequest' in manifest['permissions']
             assert (root / 'unisport.js').is_file()

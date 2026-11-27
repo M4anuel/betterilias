@@ -40,7 +40,7 @@ def profile_identity(html):
     action = httpx.URL(ORIGIN).join(form.get('action', ''))
     if not profile_target(action, form=True):
         return None
-    logins = form.select('input[name="ne_un"][type="hidden"]')
+    logins = form.select('input[name="ne_un"]')
     if len(logins) != 1 or not (login := logins[0].get('value', '').strip()) or len(login) > 512:
         return None
     first = form.select_one('input[name="usr_firstname"]')

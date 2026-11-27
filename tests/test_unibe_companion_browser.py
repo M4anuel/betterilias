@@ -29,6 +29,7 @@ def mount(page,site,code='en',scheme='light',phase='connected'):
             if(message.type==='UNIBE_AFFILIATION'){mockState.affiliation=message.affiliation;return {success:true,data:structuredClone(mockState)};}
             if(message.type==='UNIBE_CONNECT')return {success:true,data:{confirmation:needsConfirmation,user_name:mockState.user_name}};
             if(message.type==='UNIBE_ACTIVATE'){activations++;return {success:true,data:{connected:true}};}
+            if(message.type==='UNIBE_CANCEL_CANDIDATE'){return {success:true,data:{cancelled:true}};}
             if(message.type==='UNIBE_DISCONNECT'){mockState={phase:'disconnected'};return {success:true,data:mockState};}
             if(message.type==='UNIBE_LOGOUT'){mockState={phase:'disconnected',native_logout_confirmed:true};return {success:true,data:mockState};}
             if(message.type==='UNIBE_LOGIN')return window.failLogin?{success:false,code:'rejected',status:400}:{success:true,data:{phase:'pending'}};
@@ -111,6 +112,26 @@ def test_rejected_login_does_not_claim_backend_is_offline(workflow_page,workflow
     page.get_by_text(tr['unisport.login_failed'],exact=True).wait_for()
     assert page.locator('#backend-warning').is_hidden()
     assert page.locator('#login-btn').is_visible() and page.locator('#login-btn').is_enabled()
+
+
+def test_same_account_organisation_change_skips_confirmation_and_changing_affiliation_clears_stale_warning(workflow_page,workflow_site):
+    page=workflow_page;tr=mount(page,workflow_site)
+    select=page.get_by_label(tr['unisport.affiliation'],exact=True)
+    page.evaluate('needsConfirmation=false')
+    select.select_option('private-member@other.edu')
+    page.get_by_role('button',name=tr['unibe.connect'],exact=True).click()
+    page.get_by_text(tr['unibe.connected_success'],exact=True).wait_for()
+    assert page.locator('#confirm-switch').is_hidden()
+    assert page.evaluate('activations')==1
+    # Now simulate an unverified different-account confirmation, then change affiliation dropdown to verify stale warning clears
+    page.evaluate('needsConfirmation=true')
+    select.select_option('private-member@unibe.ch')
+    page.get_by_role('button',name=tr['unibe.connect'],exact=True).click()
+    page.locator('#confirm-switch').wait_for(state='visible')
+    # When confirmation is visible, affiliation-form is hidden; clicking Cancel returns to affiliation-form and clears candidate
+    page.get_by_role('button',name=tr['Abbrechen'],exact=True).click()
+    assert page.locator('#confirm-switch').is_hidden()
+    assert page.evaluate("calls.some(c=>c.type==='UNIBE_CANCEL_CANDIDATE')")
 
 
 @pytest.mark.parametrize('code,scheme',[('en','light'),('de','dark')])

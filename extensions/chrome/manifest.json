@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BetterIlias Companion",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "__MSG_description__",
   "permissions": [
     "cookies",
@@ -56,6 +56,16 @@
         "content.js"
       ],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://login.eduid.ch/*"
+      ],
+      "js": [
+        "unisport-callback-page.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
     },
     {
       "matches": [

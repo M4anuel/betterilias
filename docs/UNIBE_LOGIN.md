@@ -1,4 +1,4 @@
-# Shared UniBE login — BetterIlias 1.11.0 / Companion 1.6.0
+# Shared UniBE login — BetterIlias 1.11.1 / Companion 1.7.0
 
 Chrome and Firefox use one SWITCH/UniBE login for ILIAS and UniSport. Reload the
 updated extension and BetterIlias tab when testing source installations. Store
@@ -145,3 +145,7 @@ Both popup login modes and app logout revoke paired credentials, clear private
 content, cancel pending provider logins and prevent automatic re-sync. The app
 and Companion must both be updated; refresh app tabs after reloading the add-on.
 See [release notes](RELEASE_NOTES_1.11.0.md#logout) for upstream logout and SSO scope.
+
+## 1.11.1 / Companion 1.7.0
+
+Chrome and Firefox intercept the exact native callback POST form (`ch.unibe.campusapp://campusapp.unibe.ch`) before navigation, preventing Chrome's insecure-form interstitial and native protocol launch while delivering the callback once from the isolated content script. When a new SWITCH login completes and a `unibe.ch` affiliation is available, the background controller automatically persists that full affiliation, verifies ILIAS and activates the connection even if the popup was closed; an explicit later organisation selection is preserved. Same-account organisation changes retain the verified ILIAS capability and caches without showing an account-switch warning, while genuinely different or unverifiable accounts still require confirmation.

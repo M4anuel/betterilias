@@ -1,6 +1,6 @@
 # BetterIlias Companion store notes
 
-Updated 2026-11-27. Companion 1.6.0 is a prototype source update; this document
+Updated 2026-11-27. Companion 1.7.0 is a prototype source update; this document
 does not mean it has been submitted or approved in either browser store.
 
 ## Store listing
@@ -129,7 +129,17 @@ Only language codes cross this bridge; no auth cookies are used for it. Pending
 transactions remain in session storage while the action popup closes. Store
 submission/signing and updated public screenshots remain separate.
 
-## Companion 1.6.0
+## Companion 1.7.0 (2026-11-27)
+
+Prevent native callback form navigation on `https://login.eduid.ch/*` so Chrome
+completes login without the non-HTTPS custom-scheme form interstitial, while
+keeping callback validation and backend exchange in the isolated/background
+extension contexts. Automatically select, verify and connect an available
+`unibe.ch` affiliation in the background on new login completion while preserving
+manual organisation selection and later switches. Retain verified ILIAS session
+continuity across organisation switches for the same account without false
+replacement warnings. No new permissions or host access. Store submission is
+separate.
 
 Stable backend warnings/retries and bounded Firefox popup width, default UniBE
 affiliation, shorter labels and automatic-sync information. Both auth modes offer

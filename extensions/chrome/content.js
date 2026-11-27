@@ -142,9 +142,12 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     }
     const pageStorage = window.wrappedJSObject?.localStorage || window.localStorage;
     if (message?.type === 'UNIBE_CONTEXT') {
+      const selected = pageStorage.getItem('betterilias_unibe_selected_session');
+      const owner = pageStorage.getItem('betterilias_cache_owner');
+      const activeSession = pageStorage.getItem('betterilias_session_id');
       sendResponse({ credential: pageStorage.getItem('betterilias_unisport_session'),
-        sessionId: pageStorage.getItem('betterilias_unibe_selected_session') || (pageStorage.getItem('betterilias_ilias_source') === 'unisport'
-          ? pageStorage.getItem('betterilias_cache_owner') : pageStorage.getItem('betterilias_session_id')) });
+        sessionId: selected || (pageStorage.getItem('betterilias_ilias_source') === 'unisport'
+          ? (owner || activeSession) : (activeSession || owner)) });
       return false;
     }
     if (message?.type === 'UNIBE_SELECTED') {

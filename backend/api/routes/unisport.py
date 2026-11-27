@@ -204,6 +204,8 @@ async def connect_ilias(owner: Owner, x_unisport_scope: Scope, x_unisport_affili
         if not current or current != (state, data):
             raise connection_changed()
     account = UnisportAccount(data['subject'], SecretStr(data['token']), data['affiliation'])
+    from backend import activity
+    usage_key = activity.account_key(auth.ISSUER, auth.CLIENT, data['subject'])
     # Only an explicit capability may nominate the existing cache/session owner.
     previous = SessionManager(x_session_id) if x_session_id and re.fullmatch(r'[A-Za-z0-9_-]{1,256}', x_session_id) and x_session_id != 'default' else None
     snapshot = previous._read_data() if previous else {}
@@ -211,15 +213,17 @@ async def connect_ilias(owner: Owner, x_unisport_scope: Scope, x_unisport_affili
         async with asyncio.timeout(60):
             cookies, user, account_key = await unisport_ilias.exchange(account, owner, validate)
             old_meta = snapshot.get('metadata', {})
-            old_key = old_meta.get('ilias_account_key') if old_meta.get('source') == 'unisport_id_token' else None
-            if snapshot.get('cookies') and not old_key:
+            old_source = old_meta.get('source') == 'unisport_id_token'
+            old_key = old_meta.get('ilias_account_key') if old_source else None
+            old_usage_key = old_meta.get('usage_account_key') if old_source else None
+            if snapshot.get('cookies') and not old_key and not (old_usage_key and usage_key):
                 try:
                     _, old_key = await unisport_ilias.existing_identity(snapshot['cookies'], owner, validate)
                 except (unisport_ilias.ExchangeFailed, ScrapingParsingError, httpx.HTTPError, OutboundUnavailable, OutboundTargetRejected):
                     old_key = None
-            renewed = bool(snapshot.get('cookies') and old_key and hmac.compare_digest(old_key, account_key))
-        from backend import activity
-        usage_key = activity.account_key(auth.ISSUER, auth.CLIENT, data['subject'])
+            same_ilias = bool(old_key and hmac.compare_digest(old_key, account_key))
+            same_subject = bool(not old_key and old_usage_key and usage_key and hmac.compare_digest(old_usage_key, usage_key))
+            renewed = bool(snapshot.get('cookies') and (same_ilias or same_subject))
         # Serialize the final connection check against disconnect/replacement.
         # Reuse the capability only after proving the same unique ILIAS login.
         with auth.database() as db:

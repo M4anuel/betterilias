@@ -44,6 +44,7 @@ form inputs. The backend verifies the signed ID token, retains its bounded name
 and expiry, and reads affiliations from `api.uniapp-backend.unibe.ch`.
 
 The Companion shows your verified name and affiliation choices while connected.
+When a `unibe.ch` affiliation is available on a new login, the Companion automatically selects it and connects ILIAS; you can switch to another available affiliation at any time.
 Only the domain after `@` is displayed; the full affiliation is submitted to the
 backend when you confirm. On request, the server sends its token and affiliation
 only to the fixed UniBE ILIAS mobile-auth entry/exact alias. Cookie-only own-profile
@@ -156,6 +157,7 @@ signierte ID-Token, speichert den begrenzten Anzeigenamen und die Ablaufzeit und
 ruft Zugehörigkeiten bei `api.uniapp-backend.unibe.ch` ab.
 
 Der Companion zeigt deinen bestätigten Namen und die verfügbaren Zugehörigkeiten.
+Ist bei einer neuen Anmeldung eine `unibe.ch`-Zugehörigkeit vorhanden, wählt der Companion diese automatisch aus und verbindet ILIAS; du kannst jederzeit zu einer anderen verfügbaren Zugehörigkeit wechseln.
 Sichtbar ist nur die Domain nach `@`; beim Bestätigen wird die vollständige
 Zugehörigkeit verwendet. Auf Wunsch sendet der Server Token und Zugehörigkeit
 ausschliesslich an den festen UniBE-ILIAS-Mobile-Auth-Einstieg bzw. dessen exakten
