@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 
 import pytest
 from tests.test_state_machine_browser import workflow_site, workflow_browser, workflow_page, language
+from tests.test_unisport_catalogue_browser import offer
 
 ROOT = Path(__file__).resolve().parents[1]
 pytestmark = pytest.mark.skipif(os.environ.get('BETTERILIAS_BROWSER_TESTS') != '1', reason='Opt-in Chromium emulation')
@@ -26,6 +27,7 @@ def mount(page, connected=False, legacy=True):
         elif path.endswith('/affiliations'): data = {'affiliations': ['student@example.edu', 'staff@example.edu']}
         elif path.endswith('/affiliation'):
             state['affiliation'] = request.post_data_json['affiliation']; data = {'affiliation': state['affiliation']}
+        elif path.endswith('/bookmarks'): data = {'items': []}
         elif path.endswith('/applications'): data = [{'id': 1, 'title': 'Volleyball', 'registration': 'Confirmed', 'offerNextDate': {'begin': '2026-12-01 18:00'}}]
         else:
             if request.method == 'DELETE': state.update(phase='disconnected', affiliation=None)
@@ -74,7 +76,7 @@ def test_affiliation_explicit_save_registrations_disconnect(workflow_page, width
     page.set_viewport_size({'width':width,'height':height})
     shot(page,f'affiliation-{width}-{height}-{code}-{scheme}')
     select.focus(); page.keyboard.press('Tab'); page.keyboard.press('Enter')
-    page.get_by_role('button',name=tr['unisport.load_applications'],exact=True).click()
+    page.get_by_role('navigation', name=tr['unisport.title']).get_by_role('button', name=tr['unisport.my_sport'], exact=True).click()
     page.get_by_role('heading',name='Volleyball',exact=True).wait_for()
     assert state['affiliation'] == 'student@example.edu'
     shot(page,f'registrations-{width}-{height}-{code}-{scheme}')
@@ -105,6 +107,11 @@ def test_login_pending_cancel_failure_and_retry(workflow_page):
 def test_app_navigation_and_history_without_ilias_login(workflow_page, width):
     page=workflow_page; page.set_viewport_size({'width':width,'height':844}); tr=language(page,'en','light')
     mount(page)
+    page.route('**/api/unisport/catalogue', lambda route: route.fulfill(
+        content_type='application/json', body=json.dumps({
+            'items': [offer()], 'sports': ['Ball sports'], 'fetched_at': time.time(), 'stale': False,
+        }),
+    ))
     page.route('**/api/unisport/availability', lambda route: route.fulfill(content_type='application/json',body='{"enabled":true}'))
     page.evaluate('''async()=>{
       const {api}=await import('/src/lib/api.ts');
@@ -126,6 +133,16 @@ def test_app_navigation_and_history_without_ilias_login(workflow_page, width):
     page.get_by_role('heading',name=tr['unisport.title'],exact=True).wait_for()
     page.go_back(); page.wait_for_function('!location.search.includes("view=unisport")')
     page.go_forward(); page.get_by_role('heading',name=tr['unisport.title'],exact=True).wait_for()
+    sports = page.get_by_role('navigation', name=tr['unisport.title'])
+    sports.get_by_role('button', name=tr['unisport.explore'], exact=True).click()
+    page.get_by_role('button', name='Ball sports', exact=True).click()
+    page.get_by_role('heading', name='Ball sports', exact=True).wait_for()
+    assert 'sportView=explore&sport=Ball+sports' in page.url
+    page.go_back()
+    page.get_by_label(tr['unisport.search_sports'], exact=True).wait_for()
+    assert 'sportView=explore' in page.url and 'sport=' not in page.url
+    page.go_forward()
+    page.get_by_role('heading', name='Ball sports', exact=True).wait_for()
     # The mobile drawer remains mounted while hidden; it still has one selection.
     assert page.locator('aside button[aria-current="page"]').count()==1
     page.mouse.move(width-5, 80)
@@ -337,7 +354,7 @@ def test_primary_unisport_login_opens_companion_without_page_first_form(workflow
         }
       });
     }''')
-    button=page.get_by_role('button',name=tr['unibe.manage' if connected else 'unibe.login'],exact=True)
+    button=page.get_by_role('button',name=tr['unisport.account_action' if connected else 'unibe.login'],exact=True)
     button.click();page.wait_for_function('openedSharedLogin.length===1')
     assert page.locator('#unisport-affiliation').count()==0
     assert not any(path.endswith('/auth/start') for path,_,_ in writes)

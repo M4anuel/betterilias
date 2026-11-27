@@ -8,6 +8,7 @@ import asyncio
 from contextlib import contextmanager
 import json
 import os
+import re
 import sqlite3
 import time
 from urllib.parse import urlsplit
@@ -57,14 +58,28 @@ def present_offer(raw, *, detail=False):
     def nested(key, field):
         value = raw.get(key)
         return text(value.get(field)) if isinstance(value, dict) else ''
+    phases = raw.get('datePhase')
+    phase_values = phases.get('phase') if isinstance(phases, dict) else None
+    date_range = text(raw.get('dateString'))
+    recurring = isinstance(phase_values, list) and any(value in ('1', '2', '3', '4', '5') for value in phase_values)
+    # A date range describes an offer, but only offerNextDate supplies a
+    # confirmed occurrence. Do not expand the range into bookable sessions.
+    offer_type = 'training' if recurring else 'date_range' if re.search(r'\d\.\s*[–-]\s*\d', date_range) else 'dated' if date_range else None
     result = dict(id=raw['id'], title=text(raw['title']), sport=text(raw.get('sportName')),
         begin=nested('offerNextDate', 'begin'), end=nested('offerNextDate', 'end'),
         opens=nested('registrationTimeSlot', 'begin'), closes=nested('registrationTimeSlot', 'end'),
         level=nested('performanceLevel', 'title'), location=nested('location', 'title'),
         address=nested('location', 'subtitle'), status=text(raw.get('registration')),
+        registration_state=raw['status'] if type(raw.get('status')) is int and 1 <= raw['status'] <= 10 else None,
+        requires_confirmation=raw.get('requiresConfirmation') if type(raw.get('requiresConfirmation')) is bool else None,
+        schedule_day=text(raw.get('day')), schedule_time=text(raw.get('time')), date_range=date_range,
+        offer_type=offer_type,
         free_places=text(raw.get('freePlaces')), cancelled=bool(raw.get('outage')),
         url=public_url(nested('moreInfo', 'url')))
     if detail:
+        sport = raw.get('offerSportDetail')
+        sport_link = sport.get('moreInfo') if isinstance(sport, dict) else None
+        result['sport_url'] = public_url(sport_link.get('url')) if isinstance(sport_link, dict) else None
         infos = raw.get('generalInfos')
         result['infos'] = [dict(title=text(item.get('title')), content=plain_html(text(item['content'])))
             for item in (infos[:40] if isinstance(infos, list) else [])

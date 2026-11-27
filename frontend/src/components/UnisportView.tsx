@@ -1,24 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Dumbbell, LoaderCircle, RefreshCw } from 'lucide-react';
+import { CalendarDays, Compass, Dumbbell, Heart, LayoutGrid, LoaderCircle, RefreshCw, UserRound } from 'lucide-react';
 import { t, useLanguage } from '../lib/i18n';
 import { unisportCompanion, unisportCredential, unisportFetch } from '../lib/unisport';
 import { Button, IconButton } from './ui/Button';
 import { ErrorNotice } from './ErrorNotice';
 import { UnisportCatalogue } from './UnisportCatalogue';
 import { clearPrivate, readPrivate, writePrivate } from '../lib/unisportCache';
-import { UnisportOffer, unisportDate } from '../lib/unisportOffers';
-import { UnisportBooking } from './UnisportBooking';
+import { applicationStart, instant, type SportRoute, type SportView, type UnisportApplication as Application, UnisportOffer, unisportDate } from '../lib/unisportOffers';
+import { RegistrationAction } from './UnisportSession';
+import { navigationGuard } from '../lib/navigationGuard';
 import { UnisportParticipants } from './UnisportParticipants';
 import { UnisportWebsiteLogin } from './UnisportWebsiteLogin';
 import { UnisportIliasConnection } from './UnisportIliasConnection';
 
 type Connection = { phase: 'disconnected' | 'pending' | 'exchanging' | 'connected'; affiliation: string | null; scope?: string | null };
-type Application = { id?: number; title?: string; status?: number; registration?: string; begin?: string; end?: string; offerNextDate?: { begin?: string; end?: string } };
+const views = [
+  ['overview', LayoutGrid], ['explore', Compass], ['schedule', CalendarDays], ['my_sport', Heart],
+] as const;
 
 /** UniSport owns its capability, loading/error state and explicit affiliation draft. */
-export function UnisportView() {
+export function UnisportView({ route, onNavigate }: { route?: SportRoute; onNavigate?: (route: SportRoute) => void }) {
   const legacyLogin = new URLSearchParams(location.search).has('legacy-unisport-login');
   const language = useLanguage();
+  const [localRoute, setLocalRoute] = useState<SportRoute>({ view: 'overview' });
+  const { view, selection } = route ?? localRoute;
+  const navigate = onNavigate ?? setLocalRoute;
+  const setView = (view: SportView) => navigate({ view });
   const [credential, setCredential] = useState(unisportCredential);
   const [connection, setConnection] = useState<Connection>({ phase: 'disconnected', affiliation: null });
   useEffect(() => {
@@ -45,6 +52,9 @@ export function UnisportView() {
   const [applications, setApplications] = useState<Application[] | null>(null);
   const [applicationsScope, setApplicationsScope] = useState('');
   const [applicationsAt, setApplicationsAt] = useState<number | null>(null);
+  const [applicationError, setApplicationError] = useState('');
+  const [applicationLoading, setApplicationLoading] = useState(false);
+  const [applicationRefresh, setApplicationRefresh] = useState(0);
   const [applicationsChanged, setApplicationsChanged] = useState(false);
   const [catalogueOffers, setCatalogueOffers] = useState<UnisportOffer[]>([]);
   const [error, setError] = useState('');
@@ -58,28 +68,12 @@ export function UnisportView() {
   const previousAccount = useRef<string | null>(null);
   const officialOffers = useMemo(() => new Map(catalogueOffers.map(offer => [offer.id, offer.url])), [catalogueOffers]);
 
-  async function loadApplications(sequence: number, force = false) {
-    const cached = connection.scope && connection.affiliation && !force
-      ? readPrivate<Application[]>(connection.scope, connection.affiliation, 'applications', locale) : null;
-    const result = cached ? { items: cached.data, fetched_at: cached.fetched_at }
-      : await unisportFetch<Application[] | { items: Application[]; fetched_at: number }>('/applications?metadata=true' + (force ? '&refresh=true' : ''),
-        credential, 'GET', undefined, undefined, connection.scope || undefined, connection.affiliation || undefined);
-    // Accept older instance responses without changing the legacy list endpoint.
-    const snapshot = Array.isArray(result) ? { items: result, fetched_at: Date.now() / 1000 } : result;
-    if (mounted.current && sequence === generation.current) {
-      setApplications(snapshot.items); setApplicationsScope(personalScope);
-      setApplicationsChanged(false);
-      setApplicationsAt(connection.scope && connection.affiliation
-        ? writePrivate(connection.scope, connection.affiliation, 'applications', locale, snapshot.items, snapshot.fetched_at) : snapshot.fetched_at);
-    }
-  }
-
   useEffect(() => {
     const listener = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (detail?.scope !== connection.scope || detail?.affiliation !== connection.affiliation) return;
       // Preserve the mounted cancellation dialog and its confirmation/draft.
-      // The user explicitly refreshes the list once the operation is finished.
+      // Confirmed operations refresh after the dialog closes.
       setApplicationsAt(null); setApplicationsChanged(true);
     };
     window.addEventListener('unisport-booking-changed', listener);
@@ -89,13 +83,33 @@ export function UnisportView() {
   useEffect(() => {
     if (previousAccount.current && connection.scope && previousAccount.current !== connection.scope) clearPrivate();
     previousAccount.current = connection.scope || null;
-    setApplications(null); setApplicationsAt(null); setApplicationsScope(personalScope);
-    setApplicationsChanged(false);
-    if (connection.scope && connection.affiliation) {
-      const cached = readPrivate<Application[]>(connection.scope, connection.affiliation, 'applications', locale);
-      if (cached && Array.isArray(cached.data)) { setApplications(cached.data); setApplicationsAt(cached.fetched_at); }
-    }
   }, [personalScope]);
+
+  useEffect(() => {
+    const scope = connection.scope, affiliation = connection.affiliation;
+    if (connection.phase !== 'connected' || !scope || !affiliation) return;
+    const controller = new AbortController();
+    setApplicationError('');
+    setApplicationLoading(true);
+    const cached = !applicationRefresh ? readPrivate<Application[]>(scope, affiliation, 'applications', locale) : null;
+    const read = cached ? Promise.resolve({ items: cached.data, fetched_at: cached.fetched_at })
+      : unisportFetch<Application[] | { items: Application[]; fetched_at: number }>(
+        '/applications?metadata=true' + (applicationRefresh ? '&refresh=true' : ''), credential, 'GET',
+        undefined, controller.signal, scope, affiliation,
+      );
+    void read.then(result => {
+      if (controller.signal.aborted) return;
+      const snapshot = Array.isArray(result) ? { items: result, fetched_at: Date.now() / 1000 } : result;
+      if (!Array.isArray(snapshot.items)) throw new Error(t('unisport.read_failed'));
+      setApplications(snapshot.items);
+      setApplicationsScope(personalScope);
+      setApplicationsChanged(false);
+      setApplicationsAt(writePrivate(scope, affiliation, 'applications', locale, snapshot.items, snapshot.fetched_at));
+    }).catch(failure => {
+      if (!controller.signal.aborted) setApplicationError(failure instanceof Error ? failure.message : t('unisport.read_failed'));
+    }).finally(() => { if (!controller.signal.aborted) setApplicationLoading(false); });
+    return () => controller.abort();
+  }, [personalScope, credential, connection.phase, applicationRefresh]);
 
   async function refresh(sequence = generation.current) {
     const next = await unisportFetch<Connection>('/connection', credential);
@@ -165,24 +179,82 @@ export function UnisportView() {
     setConnection({ phase: 'disconnected', affiliation: null });
   });
 
-  return <section className="mx-auto w-full max-w-4xl space-y-5 p-4 text-slate-800 sm:p-6 dark:text-slate-100" aria-labelledby="unisport-title">
-    <header className="space-y-2">
-      <h1 id="unisport-title" className="flex items-center gap-3 text-2xl font-bold"><Dumbbell aria-hidden="true" />{t('unisport.title')}</h1>
-      <p className="text-sm text-slate-600 dark:text-slate-400">{t('unisport.prototype')}</p>
+  const refreshApplications = () => setApplicationRefresh(value => value + 1);
+  const registrations = connection.phase === 'connected' && connection.affiliation ? <section className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+    <div className="flex items-center justify-between gap-2">
+      <h2 className="text-lg font-bold">{t('unisport.applications')}</h2>
+      <IconButton label={t('unisport.refresh_applications')} loading={applicationLoading} onClick={refreshApplications}><RefreshCw size={18} aria-hidden="true" /></IconButton>
+    </div>
+    {applicationError && <ErrorNotice message={applicationError} connectionInline onRetry={refreshApplications} retryDisabled={applicationLoading} />}
+    {applicationLoading && !visibleApplications && <p role="status" className="text-sm">{t('unisport.loading_applications')}</p>}
+    {applicationsChanged && <p role="status" className="text-sm">{t('unisport.applications_changed')}</p>}
+    {visibleApplications && applicationsAt && <p className="text-xs text-slate-500 dark:text-slate-400">{t('unisport.cached_at', {
+      time: unisportDate(new Date(applicationsAt * 1000).toISOString(), locale),
+    })}</p>}
+    {visibleApplications?.length === 0 && <p className="text-sm">{t('unisport.no_applications')}</p>}
+    {visibleApplications && [false, true].map(past => {
+      const items = visibleApplications.filter(item => past === (instant(item.end || item.offerNextDate?.end || applicationStart(item)) < Date.now()))
+        .sort((first, second) => (instant(applicationStart(first)) - instant(applicationStart(second))) * (past ? -1 : 1));
+      if (!items.length) return null;
+      return <section key={String(past)} className="space-y-2">
+        <h3 className="font-semibold">{t(past ? 'unisport.past_activities' : 'unisport.current_registrations')}</h3>
+        <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+          {items.map((item, index) => {
+            const begin = applicationStart(item);
+            return <li key={JSON.stringify([item.id, begin, index])} className="space-y-1 break-words py-2">
+              <h4 className="font-semibold">{item.title || t('unisport.offer')}</h4>
+              {begin && <p className="text-sm">{unisportDate(begin, locale)}</p>}
+              <p className="text-sm">{item.registration || t(item.status === 4 ? 'unisport.user_cancelled' : 'unisport.on_registration_list')}</p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                {!past && item.id && item.status === 8 && <RegistrationAction offer={{
+                  id: item.id, title: item.title || t('unisport.offer'), begin, end: '', sport: '', opens: '', closes: '',
+                  level: '', location: '', address: '', status: '', free_places: '', cancelled: false, url: null,
+                }} actions={{
+                  account: { credential, scope: connection.scope, affiliation: connection.affiliation },
+                  now: Date.now(), registered: true, canCancel: true, favourite: false, reminded: false,
+                  toggleFavourite: () => {}, toggleReminder: () => {}, onBookingClosed: refreshApplications,
+                }} />}
+                {item.id && item.status !== 4 && connection.scope && <UnisportParticipants
+                  offerUrl={officialOffers.get(item.id)} scope={connection.scope} affiliation={connection.affiliation!} />}
+              </div>
+            </li>;
+          })}
+        </ul>
+      </section>;
+    })}
+  </section> : null;
+
+  return <section className="mx-auto w-full min-w-0 max-w-7xl space-y-4 p-3 text-slate-800 sm:p-6 dark:text-slate-100" aria-labelledby="unisport-title">
+    <header className="space-y-2 !p-0">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 id="unisport-title" className="flex items-center gap-2 text-2xl font-bold"><Dumbbell aria-hidden="true" />{t('unisport.title')}</h1>
+        {!legacyLogin && <Button loading={busy}
+          aria-label={t(connection.phase === 'connected' ? 'unisport.account_action' : 'unibe.login')}
+          onClick={() => void run(async () => { await unisportCompanion({ type: 'UNIBE_OPEN_FROM_PAGE' }); })}>
+          <UserRound size={16} aria-hidden="true" />
+          {t(connection.phase === 'connected' ? 'unisport.account' : 'unisport.sign_in')}
+        </Button>}
+      </div>
+
+      <nav aria-label={t('unisport.title')} className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 min-[540px]:flex dark:bg-slate-800">
+        {views.map(([name, Icon]) => <Button key={name} variant={view === name ? 'primary' : 'ghost'}
+          aria-current={view === name ? 'page' : undefined} onClick={() => {
+            if (view !== name) void navigationGuard.confirmNavigation().then(allowed => { if (allowed) setView(name); });
+          }} className="!shrink !px-1.5 max-[539px]:!justify-start">
+          <Icon size={17} className="shrink-0" aria-hidden="true" />{t(`unisport.${name}`)}
+        </Button>)}
+      </nav>
     </header>
     {error && <ErrorNotice message={error} connectionInline onRetry={() => void run(sequence => refresh(sequence))} retryDisabled={busy} />}
-    <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+    {(view === 'my_sport' || legacyLogin) && <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
       <p role="status" className="flex items-center gap-2 font-semibold">
         {(waiting || busy) && <LoaderCircle size={18} aria-hidden="true" className="shrink-0 animate-spin motion-reduce:animate-none" />}
         {t(waiting ? 'unisport.waiting' : connection.phase === 'connected' ? 'unisport.connected' : 'unisport.disconnected')}
       </p>
       <p className="text-sm text-slate-600 dark:text-slate-400">{legacyLogin ? t('unisport.login_hint') : t('unibe.extension_hint')}</p>
-      {!legacyLogin && <div className="space-y-2">
-        {connection.affiliation && <p className="text-sm">{t('unisport.affiliation')}: {connection.affiliation.slice(connection.affiliation.lastIndexOf('@') + 1)}</p>}
-        <Button loading={busy} onClick={() => void run(async () => { await unisportCompanion({ type: 'UNIBE_OPEN_FROM_PAGE' }); })}>
-          {connection.phase === 'connected' ? t('unibe.manage') : t('unibe.login')}
-        </Button>
-      </div>}
+      {!legacyLogin && connection.affiliation && <p className="text-sm">
+        {t('unisport.affiliation')}: {connection.affiliation.slice(connection.affiliation.lastIndexOf('@') + 1)}
+      </p>}
       {legacyLogin && <>
       <div className="flex flex-wrap gap-2">
         {!waiting && <Button variant="primary" loading={busy} onClick={connect}>{t(connection.phase === 'connected' ? 'unisport.reconnect' : 'unisport.connect')}</Button>}
@@ -214,29 +286,10 @@ export function UnisportView() {
         <h2 className="font-semibold">{t('unisport.website_login_title')}</h2>
         <UnisportWebsiteLogin scope={connection.scope} affiliation={connection.affiliation} />
       </div>}
-    </div>
-    <UnisportCatalogue credential={credential} scope={connection.phase === 'connected' ? connection.scope : null} affiliation={connection.affiliation} onOffersLoaded={setCatalogueOffers} />
-    {connection.phase === 'connected' && connection.affiliation && <div className="space-y-3">
-      <h2 className="text-lg font-bold">{t('unisport.applications')}</h2>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button loading={busy} onClick={() => void run(loadApplications)}>{t('unisport.load_applications')}</Button>
-        <IconButton label={t('unisport.refresh_applications')} disabled={busy} onClick={() => void run(sequence => loadApplications(sequence, true))}><RefreshCw size={18} aria-hidden="true" /></IconButton>
-      </div>
-      {applicationsChanged && <p role="status" className="text-sm">{t('unisport.applications_changed')}</p>}
-      {visibleApplications !== null && applicationsAt && <p className="text-xs text-slate-500 dark:text-slate-400">{t('unisport.cached_at', { time: unisportDate(new Date(applicationsAt * 1000).toISOString(), locale) })}</p>}
-      {visibleApplications !== null && (visibleApplications.length ? <ul className="space-y-2">{visibleApplications.map((item, index) => <li key={`${item.id}-${index}`}
-        className="space-y-1 break-words rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-        <h3 className="font-semibold">{item.title || t('unisport.offer')}</h3>
-        {(item.begin || item.offerNextDate?.begin) && <p className="text-sm">{unisportDate(item.begin || item.offerNextDate?.begin || '', locale)}</p>}
-        {typeof item.registration === 'string' && item.registration && <p className="text-sm">{item.registration}</p>}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        {item.id && (item.begin || item.offerNextDate?.begin) && connection.scope && <UnisportBooking
-          key={JSON.stringify([connection.scope, connection.affiliation, item.id, item.begin || item.offerNextDate?.begin])}
-          credential={credential} scope={connection.scope} affiliation={connection.affiliation!} offerId={item.id}
-          begin={item.begin || item.offerNextDate?.begin || ''} kind="cancel" />}
-        {item.id && item.status !== 4 && connection.scope && <UnisportParticipants offerUrl={officialOffers.get(item.id)} scope={connection.scope} affiliation={connection.affiliation!} />}
-        </div>
-      </li>)}</ul> : <p className="text-sm">{t('unisport.no_applications')}</p>)}
     </div>}
+    <UnisportCatalogue credential={credential} scope={connection.phase === 'connected' ? connection.scope : null}
+      affiliation={connection.affiliation} onOffersLoaded={setCatalogueOffers} view={view} onNavigate={setView}
+      focused={selection} onSelectSport={selection => navigate({ view: 'explore', selection })}
+      applications={visibleApplications} registrations={registrations} onBookingClosed={refreshApplications} />
   </section>;
 }

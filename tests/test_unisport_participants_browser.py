@@ -78,15 +78,15 @@ def test_cached_scraped_dialog_live_filter_resizing_and_registrations(workflow_p
         if path.endswith('/connection'):data={'phase':'connected','affiliation':'student','scope':'a'*64}
         elif path.endswith('/affiliations'):data={'affiliations':['student']}
         elif path.endswith('/catalogue'):data={'items':items,'sports':['Ball sports','Yoga'],'fetched_at':time.time(),'stale':False}
+        elif path.endswith('/bookmarks'):data={'items':[]}
         elif path.endswith('/applications'):data={'items':[{'id':item['id'],'title':item['title'],'begin':item['begin'],'status':4 if item['id']==28029 else 8} for item in items],'fetched_at':fetched_at}
         else:raise AssertionError('No per-registration offer fetch is needed: '+path)
         route.fulfill(content_type='application/json',body=json.dumps(data))
     page.route('**/api/unisport/**',handle)
     page.evaluate('''async()=>{const {UnisportView}=await import('/src/components/UnisportView.tsx');mountAudit(UnisportView,{})}''')
-    page.get_by_role('button',name=tr['unisport.load_applications'],exact=True).click()
+    page.get_by_role('navigation', name=tr['unisport.title']).get_by_role('button', name=tr['unisport.my_sport'], exact=True).click()
     action=page.get_by_role('button',name=tr['unisport.participants'],exact=True)
     action.wait_for();assert action.count()==1
-    page.get_by_role('button',name=tr['unisport.load_applications'],exact=True).click()
     assert calls.count('/api/unisport/applications')==1
     stamps=page.evaluate("Object.keys(sessionStorage).filter(key=>key.includes('applications')).map(key=>JSON.parse(sessionStorage.getItem(key)).fetched_at)")
     assert stamps==[fetched_at]

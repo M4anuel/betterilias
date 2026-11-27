@@ -231,6 +231,16 @@ def view(intent, data):
     return {**data, 'intent': intent}
 
 
+def quick_registration(offer):
+    """Only routine free training with a positive provider signal skips review."""
+    if (offer['requires_confirmation'] is not False or offer['offer_type'] != 'training'
+            or offer['important'] or offer['special']):
+        return False
+    costs = [info['content'].strip().casefold() for info in offer['infos']
+             if info['title'].strip().casefold() in ('costs', 'kosten')]
+    return len(costs) == 1 and costs[0] in ('none', 'keine')
+
+
 async def prepare(owner, state, data, offer_id, begin, kind, locale):
     account = account_for(data)
     async with UnisportClient(account) as client:
@@ -304,7 +314,8 @@ async def operate(owner, state, data, intent, step=None, supplied=None):
                 await reconcile(client, value)
             elif step is not None and value['phase'] in ('ready', 'form', 'confirmation'):
                 expected = {'ready': 'start', 'form': 'answers', 'confirmation': 'confirm'}[value['phase']]
-                if step != expected:
+                quick = step == 'quick' and expected == 'start' and value['kind'] == 'apply'
+                if step != expected and not quick:
                     return view(intent, value)
                 if time.time() > value['expires_at']:
                     raise BookingError('intent_expired')
@@ -317,8 +328,12 @@ async def operate(owner, state, data, intent, step=None, supplied=None):
                         # This once-only step completes the owned provider form;
                         # an application may already exist provisionally.
                         raise BookingError('booking_unavailable')
-                    if step == 'start':
+                    if step == 'start' or quick:
                         current_offer = present_offer(raw, detail=True)
+                        if quick and not quick_registration(current_offer):
+                            value['offer'] = current_offer
+                            put(intent, owner, state, context, value)
+                            return view(intent, value)
                         if any(current_offer[key] != value['offer'][key] for key in ('title', 'infos', 'important', 'special')):
                             raise BookingError('offer_changed')
                 except BookingError:
@@ -360,7 +375,7 @@ async def operate(owner, state, data, intent, step=None, supplied=None):
                             value['phase'] = 'uncertain'
                         else:
                             value['phase'] = 'uncertain'
-                    elif step == 'start' and result.get('formComponents'):
+                    elif (step == 'start' or quick) and result.get('formComponents'):
                         value.update(phase='form', fields=schema(result['formComponents']))
                     else:
                         # The native repository parses the root registration

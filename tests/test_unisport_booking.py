@@ -94,6 +94,26 @@ async def test_apply_is_explicit_fresh_and_readback_verified(native):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('changed_cost', [None, 'CHF 20'])
+async def test_quick_registration_only_submits_verified_free_training(native, changed_cost):
+    control = native[3]
+    control['raw'].update(requiresConfirmation=False, datePhase={'phase': ['-', '2']})
+    intent = await prepare(native)
+    if changed_cost:
+        control['raw']['generalInfos'][0]['content'] = changed_cost
+    control.update(result={'status': 'success'}, after=lambda: registered(control))
+    result = await submit(native, intent['intent'], 'quick')
+    if changed_cost:
+        assert result['phase'] == 'ready'
+        assert result['offer']['infos'][0]['content'] == changed_cost
+        assert control['calls'] == []
+    else:
+        assert result['phase'] == 'confirmed'
+        assert await submit(native, intent['intent'], 'quick') == result
+        assert control['calls'] == [('apply', 42, None)]
+
+
+@pytest.mark.asyncio
 async def test_native_dynamic_form_payload_and_double_start_do_not_resubmit(native):
     control = native[3]
     intent = await prepare(native)

@@ -21,12 +21,19 @@ type Operation = {
 };
 type Props = {
   credential: string; scope: string; affiliation: string; offerId: number; begin: string;
-  kind?: 'auto' | 'cancel'; onChanged?: () => void;
+  kind?: 'auto' | 'apply' | 'cancel'; quick?: boolean; onChanged?: () => void; onBookingClosed?: () => void;
 };
 const control = 'min-h-12 w-full rounded-xl border border-slate-400 bg-white px-3 text-base focus-visible:outline-2 focus-visible:outline-teal-500 dark:border-slate-500 dark:bg-slate-950';
+const profileFields: Record<string, string> = {
+  'first name': 'given-name', vorname: 'given-name',
+  'last name': 'family-name', surname: 'family-name', nachname: 'family-name',
+  'full name': 'name', 'vollständiger name': 'name',
+  email: 'email', 'e-mail': 'email', 'e-mail-adresse': 'email',
+  'phone number': 'tel', telefonnummer: 'tel', mobilnummer: 'tel',
+};
 
 /** One mounted instance owns its form draft and exact account/occurrence receipt. */
-export function UnisportBooking({ credential, scope, affiliation, offerId, begin, kind = 'auto', onChanged }: Props) {
+export function UnisportBooking({ credential, scope, affiliation, offerId, begin, kind = 'auto', quick = false, onChanged, onBookingClosed }: Props) {
   const language = useLanguage();
   const prefix = useId();
   const [operation, setOperation] = useState<Operation | null>(null);
@@ -39,7 +46,8 @@ export function UnisportBooking({ credential, scope, affiliation, offerId, begin
   const [needsCheck, setNeedsCheck] = useState(false);
   const pending = useRef(false), alive = useRef(false);
   const dialog = useRef<HTMLDialogElement>(null);
-  const key = 'betterilias_unisport_booking:' + JSON.stringify([scope, affiliation, offerId, begin]);
+  const key = 'betterilias_unisport_booking:' + JSON.stringify(kind === 'cancel'
+    ? [scope, affiliation, offerId, begin, kind] : [scope, affiliation, offerId, begin]);
   const [receipt, setReceipt] = useState(() => {
     try { return sessionStorage.getItem(key); } catch { return null; }
   });
@@ -62,9 +70,10 @@ export function UnisportBooking({ credential, scope, affiliation, offerId, begin
       onChanged?.();
     }
   }
-  async function run(action: () => Promise<Operation>) {
+  async function run(action: () => Promise<Operation>, showWhilePending = true) {
     if (pending.current) return;
-    pending.current = true; setBusy(true); setError(''); setOpen(true);
+    pending.current = true; setBusy(true); setError('');
+    if (showWhilePending) setOpen(true);
     try {
       const next = await action();
       if (alive.current) receive(next);
@@ -73,13 +82,23 @@ export function UnisportBooking({ credential, scope, affiliation, offerId, begin
         setError(failure instanceof Error ? failure.message : t('unisport.read_failed'));
         setNeedsCheck(true);
       }
-    } finally { pending.current = false; if (alive.current) setBusy(false); }
+    } finally {
+      pending.current = false;
+      if (alive.current) { setBusy(false); setOpen(true); }
+    }
   }
   const check = () => void run(() => request(`/bookings/${operation?.intent || receipt}`));
   const start = () => {
     if (operation) { setOpen(true); return; }
     if (receipt) { check(); return; }
-    void run(() => request(`/offers/${offerId}/booking`, 'POST', { kind, begin }));
+    void run(async () => {
+      const prepared = await request(`/offers/${offerId}/booking`, 'POST', { kind, begin });
+      if (!quick || !alive.current || prepared.phase !== 'ready') return prepared;
+      // Save the receipt before dispatch so a lost response can be checked
+      // without entering another write path.
+      receive(prepared);
+      return request(`/bookings/${prepared.intent}`, 'POST', { step: 'quick' });
+    }, !quick);
   };
   const phase = operation?.phase;
   const canSubmit = operation && ['ready', 'form', 'confirmation'].includes(operation.phase) && !needsCheck;
@@ -132,14 +151,20 @@ export function UnisportBooking({ credential, scope, affiliation, offerId, begin
           <p id={id + '-hint'} className="text-xs text-slate-600 dark:text-slate-400">{t('unisport.file_limit')}</p>
           {selected.length > 0 && <p className="break-words text-sm">{t('unisport.selected_file', { name: filenames[field.id] || '' })}</p>}
         </> : <input id={id} name={id} type={field.kind === 'dateType' ? 'date' : 'text'} className={control}
+          autoComplete={field.kind === 'textField' ? profileFields[field.title.trim().toLowerCase()] : undefined}
           maxLength={8000} required={field.required} value={selected[0] || ''} onChange={event => set(field.id, [event.target.value])} />}
     </div>;
   }
 
   return <>
-    <Button loading={busy && !open} onClick={start}>{t(kind === 'cancel' ? 'unisport.cancel_registration' : 'unisport.manage_registration')}</Button>
+    <Button variant={quick ? 'primary' : 'outline'} loading={busy && !open} onClick={start}>
+      {t(kind === 'cancel' ? 'unisport.cancel_registration' : quick ? 'unisport.register_now' : 'unisport.manage_registration')}
+    </Button>
     {open && <DialogShell ref={dialog} title={t(operation?.kind === 'cancel' ? 'unisport.cancel_registration' : 'unisport.manage_registration')}
-      closeDisabled={busy} onRequestClose={() => setOpen(false)} description={operation?.offer.title}>
+      closeDisabled={busy} onRequestClose={() => {
+        setOpen(false);
+        if (operation?.phase === 'confirmed') onBookingClosed?.();
+      }} description={operation?.offer.title} className="unisport-booking-dialog">
       <div className="space-y-4">
         {busy && <p role="status">{t('unisport.booking_pending')}</p>}
         {error && <ErrorNotice message={error} connectionInline />}

@@ -70,7 +70,7 @@ class BookingPreparation(BaseModel):
 
 
 class BookingSubmission(BaseModel):
-    step: str = Field(pattern=r'^(start|answers|confirm)$')
+    step: str = Field(pattern=r'^(start|quick|answers|confirm)$')
     answers: dict[str, list[str]] = Field(default_factory=dict, max_length=80)
 
 

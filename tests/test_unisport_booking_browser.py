@@ -146,6 +146,7 @@ def test_personal_list_invalidation_preserves_the_open_cancellation_dialog(workf
         if path.endswith('/connection'):data={'phase':'connected','affiliation':'student','scope':'a'*64}
         elif path.endswith('/affiliations'):data={'affiliations':['student']}
         elif path.endswith('/catalogue'):data={'items':[offer()],'sports':['Ball sports'],'fetched_at':time.time(),'stale':False}
+        elif path.endswith('/bookmarks'):data={'items':[]}
         elif path.endswith('/applications'):
             control['apps']+=1
             data=[] if control['cancelled'] else [{'id':1,'title':'Volleyball','begin':offer()['begin'],'status':8}]
@@ -159,7 +160,7 @@ def test_personal_list_invalidation_preserves_the_open_cancellation_dialog(workf
         route.fulfill(content_type='application/json',body=json.dumps(data))
     page.route('**/api/unisport/**',handle)
     page.evaluate('''async()=>{const {UnisportView}=await import('/src/components/UnisportView.tsx');mountAudit(UnisportView,{})}''')
-    page.get_by_role('button',name=tr['unisport.load_applications'],exact=True).click()
+    page.get_by_role('navigation', name=tr['unisport.title']).get_by_role('button', name=tr['unisport.my_sport'], exact=True).click()
     page.get_by_role('button',name=tr['unisport.cancel_registration'],exact=True).click()
     page.get_by_role('button',name=tr['unisport.confirm_cancellation'],exact=True).click()
     page.get_by_text('Confirm cancellation fee.',exact=True).wait_for()
@@ -168,7 +169,34 @@ def test_personal_list_invalidation_preserves_the_open_cancellation_dialog(workf
     page.get_by_text(tr['unisport.cancellation_confirmed'],exact=True).wait_for()
     assert control['apps']==1 and control['writes']==2
     page.get_by_role('button',name=tr['Schliessen'],exact=True).click()
-    page.get_by_text(tr['unisport.applications_changed'],exact=True).wait_for()
-    page.get_by_role('button',name=tr['unisport.load_applications'],exact=True).click()
     page.get_by_text(tr['unisport.no_applications'],exact=True).wait_for()
     assert control['apps']==2
+
+
+def test_quick_registration_uses_one_click_and_confirms_readback(workflow_page):
+    page = workflow_page
+    tr = language(page, 'en', 'light')
+    selected = offer()
+    calls = []
+    receipt = dict(intent='i' * 43, phase='ready', kind='apply', offer=selected, begin=selected['begin'],
+                   fields=[], confirmation='', provider_status='', expires_at=time.time()+600)
+
+    def handle(route):
+        assert route.request.method == 'POST'
+        path = urlsplit(route.request.url).path
+        calls.append(route.request.post_data_json)
+        if '/bookings/' in path:
+            assert route.request.post_data_json == {'step': 'quick'}
+            assert page.evaluate("Object.values(sessionStorage).includes('i'.repeat(43))")
+            receipt.update(phase='confirmed', provider_status='Registered')
+        route.fulfill(content_type='application/json', body=json.dumps(receipt))
+
+    page.route('**/api/unisport/**', handle)
+    page.evaluate('''async begin => {
+      const {UnisportBooking} = await import('/src/components/UnisportBooking.tsx');
+      mountAudit(UnisportBooking, {credential:'x'.repeat(43), scope:'a'.repeat(64), affiliation:'student',
+        offerId:1, begin, kind:'apply', quick:true});
+    }''', selected['begin'])
+    page.get_by_role('button', name=tr['unisport.register_now'], exact=True).click()
+    page.get_by_text(tr['unisport.registration_confirmed'], exact=True).wait_for()
+    assert calls == [{'kind': 'apply', 'begin': selected['begin']}, {'step': 'quick'}]

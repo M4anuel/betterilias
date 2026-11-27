@@ -57,61 +57,56 @@ def shot(page,name):
 def test_cached_catalogue_filter_details_focus_and_bookmarks(workflow_page,width,height,code,scheme):
     page=workflow_page;page.set_viewport_size({'width':width,'height':height});tr=language(page,code,scheme)
     calls,control=mock(page);mount(page)
-    page.get_by_role('button',name='Volleyball',exact=True).wait_for()
-    assert calls==['/api/unisport/catalogue']
-    query=page.get_by_label(tr['unisport.search'],exact=True);query.fill('Yoga')
-    sport=page.get_by_label(tr['unisport.sport_type'],exact=True);sport.select_option('Yoga')
-    page.set_viewport_size({'width':1280 if width<768 else 390,'height':844})
-    assert query.input_value()=='Yoga' and sport.input_value()=='Yoga'
-    page.set_viewport_size({'width':width,'height':height})
-    page.get_by_role('button',name=tr['unisport.filter'],exact=True).click()
-    page.get_by_role('button',name='Yoga 2',exact=True).wait_for()
-    assert page.get_by_role('button',name='Volleyball',exact=True).count()==0 and len(calls)==1
-    shot(page,f'filters-{width}-{height}-{code}-{scheme}')
-    page.get_by_role('button',name=tr['unisport.show_more'],exact=True).click()
-    page.get_by_role('button',name='Yoga 25',exact=True).wait_for()
-    assert len(calls)==1
-    target=page.get_by_role('button',name='Yoga 2',exact=True);target.click()
-    page.get_by_role('heading',name='Yoga 2',exact=True).wait_for()
-    page.get_by_role('heading',name='Equipment',exact=True).wait_for()
+    yoga = page.get_by_role('button', name='Yoga', exact=True)
+    ball = page.get_by_role('button', name='Ball sports', exact=True)
+    ball.wait_for()
+    assert calls == ['/api/unisport/catalogue']
+    query = page.get_by_label(tr['unisport.search_sports'], exact=True)
+    query.fill('Yoga 2')
+    yoga.wait_for()
+    assert not ball.is_visible()
+    page.set_viewport_size({'width': 1280 if width < 768 else 390, 'height': 844})
+    assert query.input_value() == 'Yoga 2'
+    page.set_viewport_size({'width': width, 'height': height})
+    shot(page, f'filters-{width}-{height}-{code}-{scheme}')
+    yoga.click()
+    page.get_by_role('heading',name='Yoga',exact=True).wait_for()
+    page.get_by_role('button',name='Yoga 2',exact=True).click()
+    page.get_by_text('Equipment',exact=True).click()
     assert page.evaluate('window.unisportInjected') is None
-    assert page.get_by_text('Shoes and water. <script>window.unisportInjected=true</script>',exact=True).count()==1
+    assert page.get_by_text('Shoes and water. <script>window.unisportInjected=true</script>',exact=True).is_visible()
     shot(page,f'detail-{width}-{height}-{code}-{scheme}')
-    page.get_by_role('button',name=tr['unisport.back_to_offers'],exact=True).click()
-    assert target.evaluate('(element)=>document.activeElement===element')
-    assert query.input_value()=='Yoga'
-    target.click();page.get_by_role('heading',name='Equipment',exact=True).wait_for()
-    assert calls.count('/api/unisport/offers/2')==1
-    page.get_by_role('button',name=tr['unisport.back_to_offers'],exact=True).click()
-    query.fill('');sport.select_option('');page.get_by_label(tr['unisport.saved_only'],exact=True).check()
-    page.get_by_role('button',name=tr['unisport.filter'],exact=True).click()
-    page.get_by_role('button',name='Volleyball',exact=True).wait_for()
-    assert page.get_by_text('OLD PERSONAL TITLE',exact=True).count()==0
-    page.get_by_role('button',name=tr['unisport.filter'],exact=True).click()
-    assert calls.count('/api/unisport/bookmarks')==1
-    shot(page,f'saved-{width}-{height}-{code}-{scheme}')
+    page.get_by_role('button',name=tr['unisport.back_to_sports'],exact=True).click()
+    assert yoga.evaluate('(element)=>document.activeElement===element')
+    assert query.input_value()=='Yoga 2'
+    query.fill('')
+    page.get_by_role('button',name=tr['unisport.favourite_named'].format(name='Yoga'),exact=True).click()
+    assert page.get_by_role('listitem').first.get_by_role('button',name='Yoga',exact=True).is_visible()
+    yoga.click()
+    page.get_by_role('button',name='Yoga 2',exact=True).click()
+    page.get_by_text('Equipment',exact=True).wait_for()
+    assert calls.count('/api/unisport/offers/2') == 1
 
 
 def test_refresh_failure_keeps_cache_and_new_account_rejects_old_response(workflow_page):
     page=workflow_page;tr=language(page,'en','light');calls,control=mock(page);mount(page)
-    page.get_by_role('button',name='Volleyball',exact=True).wait_for()
+    page.get_by_role('button',name='Ball sports',exact=True).wait_for()
     control['fail']=True;page.get_by_role('button',name=tr['unisport.refresh'],exact=True).click()
     page.get_by_role('alert').filter(has_text='Synthetic refresh unavailable').wait_for()
-    assert page.get_by_role('button',name='Volleyball',exact=True).count()==1
+    assert page.get_by_role('button',name='Ball sports',exact=True).count()==1
     control.update(fail=False,delay_saved=True)
-    page.get_by_label(tr['unisport.saved_only'],exact=True).check()
-    page.get_by_role('button',name=tr['unisport.filter'],exact=True).click()
+    page.evaluate("mountAudit(catalogueComponent,{...catalogueProps,view:'my_sport'})")
     page.wait_for_timeout(200);assert control['deferred'] is not None
-    page.evaluate("mountAudit(catalogueComponent,{...catalogueProps,scope:'b'.repeat(64),affiliation:'staff'})")
+    page.evaluate("mountAudit(catalogueComponent,{...catalogueProps,scope:'b'.repeat(64),affiliation:null,view:'my_sport'})")
     control['deferred'].fulfill(content_type='application/json',body=json.dumps({'items':[{'id':1,'title':'OLD ACCOUNT'}]}))
     page.wait_for_timeout(150)
-    assert page.get_by_role('button',name='Volleyball',exact=True).count()==0
+    assert page.get_by_role('button',name='Ball sports',exact=True).count()==0
     assert page.get_by_text('OLD ACCOUNT',exact=True).count()==0
 
 
 def test_indexeddb_survives_remount_and_explicit_refresh_bypasses_it(workflow_page):
     page=workflow_page;tr=language(page,'en','light');calls,control=mock(page);mount(page,scope=None)
-    page.get_by_role('button',name='Volleyball',exact=True).wait_for()
+    page.get_by_role('button',name='Ball sports',exact=True).wait_for()
     page.wait_for_function('''()=>new Promise(resolve=>{
       const request=indexedDB.open('betterilias-unisport-public-v1');request.onsuccess=()=>{
         const read=request.result.transaction('public').objectStore('public').get('catalogue:en');
@@ -129,7 +124,7 @@ def test_indexeddb_survives_remount_and_explicit_refresh_bypasses_it(workflow_pa
           window.mountAudit=(Component,props)=>auditRoot.render(R.createElement(Component,props));
     }''')
     mount(page,scope=None)
-    page.get_by_role('button',name='Volleyball',exact=True).wait_for()
+    page.get_by_role('button',name='Ball sports',exact=True).wait_for()
     assert calls==['/api/unisport/catalogue']
     page.get_by_role('button',name=tr['unisport.refresh'],exact=True).click()
     page.wait_for_timeout(150)

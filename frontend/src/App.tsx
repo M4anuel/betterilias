@@ -13,6 +13,7 @@ import { SemesterView } from './components/SemesterView';
 import { LandingView } from './components/LandingView';
 import { LegalModal } from './components/LegalModal';
 import { UnisportView } from './components/UnisportView';
+import { readSportRoute, type SportRoute } from './lib/unisportOffers';
 import { FeatureRequestsView } from './components/FeatureRequestsView';
 import { CalendarView } from './components/CalendarView';
 import { CourseView } from './components/CourseView';
@@ -50,6 +51,7 @@ export interface NavigationState {
   repositoryId?: string | null;
   isCalendarOpen?: boolean;
   isUnisportOpen?: boolean;
+  sportRoute?: SportRoute;
   isRequestsOpen?: boolean;
   requestId?: string | null;
   myCourses?: boolean;
@@ -61,6 +63,12 @@ export function stateToUrl(state: NavigationState): string {
   if (state.isUnisportOpen) {
     params.set('view', 'unisport');
     if (state.semester) params.set('semester', state.semester);
+    const route = state.sportRoute;
+    if (route && route.view !== 'overview') params.set('sportView', route.view);
+    if (route?.view === 'explore' && route.selection) {
+      params.set('sport', route.selection.sport);
+      if (route.selection.offerId) params.set('offer', String(route.selection.offerId));
+    }
   } else if (state.isRequestsOpen) {
     params.set('view', 'feature-requests');
     if (state.requestId) params.set('request', state.requestId);
@@ -123,6 +131,7 @@ export function parseStateFromUrl(defaultSemester: string): NavigationState {
     repositoryId,
     isCalendarOpen,
     isUnisportOpen,
+    sportRoute: isUnisportOpen ? readSportRoute(params) : undefined,
     isRequestsOpen,
     requestId,
     myCourses,
@@ -219,6 +228,7 @@ export const App: React.FC = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(() => !isLandingOpen && !initialRepositoryParam && !initialParams.get('course') && initialViewParam === 'calendar');
   const [isRequestsOpen, setIsRequestsOpen] = useState(initialViewParam === 'feature-requests');
   const [isUnisportOpen, setIsUnisportOpen] = useState(initialViewParam === 'unisport');
+  const [sportRoute, setSportRoute] = useState(() => readSportRoute(new URLSearchParams(location.search)));
   const [requestSaved, setRequestSaved] = useState(false);
   const [requestId, setRequestId] = useState<string | null>(initialParams.get('request'));
   const initialSemesterParam = initialParams.get('semester');
@@ -281,6 +291,7 @@ export const App: React.FC = () => {
     repositoryId,
     isCalendarOpen,
     isUnisportOpen,
+    sportRoute,
     isRequestsOpen,
     requestId,
     myCourses,
@@ -296,12 +307,13 @@ export const App: React.FC = () => {
       repositoryId,
       isCalendarOpen,
       isUnisportOpen,
+      sportRoute,
       isRequestsOpen,
       requestId,
       myCourses,
       isLandingOpen,
     };
-  }, [selectedSemester, selectedCourseId, currentContainerId, activeExerciseRefId, activeExerciseTab, repositoryId, isUnisportOpen, isRequestsOpen, requestId, isCalendarOpen, myCourses, isLandingOpen]);
+  }, [selectedSemester, selectedCourseId, currentContainerId, activeExerciseRefId, activeExerciseTab, repositoryId, isUnisportOpen, sportRoute, isRequestsOpen, requestId, isCalendarOpen, myCourses, isLandingOpen]);
   const activeContainerRef = useRef<string | null>(
     initialFolderParam || initialCourseParam || null
   );
@@ -590,7 +602,7 @@ export const App: React.FC = () => {
       }
       if (isUnisportOpen) {
         setSelectedSemester(semId); cache.setSelectedSemester(semId);
-        const state: NavigationState = { semester: semId, courseId: null, containerId: null, exerciseId: null, isUnisportOpen: true };
+        const state: NavigationState = { semester: semId, courseId: null, containerId: null, exerciseId: null, isUnisportOpen: true, sportRoute };
         pushAppHistory(state, '', stateToUrl(state));
         return;
       }
@@ -619,7 +631,7 @@ export const App: React.FC = () => {
       };
       pushAppHistory(nextState, '', stateToUrl(nextState));
     },
-    [isLandingOpen, myCourses, repositoryId, isUnisportOpen, isRequestsOpen, requestId, isCalendarOpen, selectedSemester, selectedCourseId, activeExerciseRefId, loadSemesters]
+    [isLandingOpen, myCourses, repositoryId, isUnisportOpen, sportRoute, isRequestsOpen, requestId, isCalendarOpen, selectedSemester, selectedCourseId, activeExerciseRefId, loadSemesters]
   );
 
   // --- Course Selection Handler ---
@@ -939,6 +951,7 @@ export const App: React.FC = () => {
       myCourses,
       isCalendarOpen,
       isUnisportOpen,
+      sportRoute,
       isRequestsOpen,
       requestId,
       semester: selectedSemester,
@@ -1039,6 +1052,9 @@ export const App: React.FC = () => {
       const state: NavigationState =
         (event.state as NavigationState) || parseStateFromUrl(cache.getSelectedSemester());
 
+      setSportRoute(state.sportRoute ?? { view: 'overview' });
+      const current = currentNavStateRef.current;
+      if (state.isUnisportOpen && current.isUnisportOpen && state.semester === current.semester) return;
       setIsRequestsOpen(Boolean(state.isRequestsOpen)); setIsUnisportOpen(Boolean(state.isUnisportOpen));
       setRequestId(state.requestId || null);
       setIsLandingOpen(Boolean(state.isLandingOpen));
@@ -1219,12 +1235,18 @@ export const App: React.FC = () => {
   };
   const navigateUnisport = async () => {
     if (!unisportEnabled || !await navigationGuard.confirmNavigation()) return;
+    setSportRoute({ view: 'overview' });
     setIsUnisportOpen(true); setIsRequestsOpen(false); setIsLandingOpen(false);
     setMyCourses(false); setRepositoryId(null); setIsCalendarOpen(false);
     setSelectedCourseId(null); setCurrentContainerId(null); setActiveExerciseRefId(null); setActiveExerciseTab(null);
     ++materialsRequestSeq.current; activeContainerRef.current = null;
     const state: NavigationState = { semester: selectedSemester, courseId: null, containerId: null, exerciseId: null, isUnisportOpen: true };
     pushAppHistory(state, '', stateToUrl(state)); setMobileNavigationOpen(false);
+  };
+  const navigateSportRoute = (sportRoute: SportRoute) => {
+    setSportRoute(sportRoute);
+    const state: NavigationState = { semester: selectedSemester, courseId: null, containerId: null, exerciseId: null, isUnisportOpen: true, sportRoute };
+    pushAppHistory(state, '', stateToUrl(state));
   };
   const sidebar = <Sidebar
     onSelectUnisport={unisportEnabled ? () => { void navigateUnisport(); } : undefined} isUnisportSelected={unisportEnabled && isUnisportOpen}
@@ -1283,7 +1305,7 @@ export const App: React.FC = () => {
         <div className="flex min-w-0 flex-1 flex-col">
         <main ref={workspaceRef} className={`@container/workspace min-w-0 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50 ${workspaceWidth < 768 ? 'workspace-compact' : ''}`}>
           <WorkspaceWidth.Provider value={workspaceWidth}>
-          {isUnisportOpen && unisportEnabled ? <UnisportView /> : isRequestsOpen ? <FeatureRequestsView key={requestId || 'board'} initialSuccess={requestSaved} selectedId={requestId} onSelect={navigateRequests} /> : isLandingOpen || isUnisportOpen ? (
+          {isUnisportOpen && unisportEnabled ? <UnisportView route={sportRoute} onNavigate={navigateSportRoute} /> : isRequestsOpen ? <FeatureRequestsView key={requestId || 'board'} initialSuccess={requestSaved} selectedId={requestId} onSelect={navigateRequests} /> : isLandingOpen || isUnisportOpen ? (
             <LandingView
               onOpenApp={handleOpenApp}
               onOpenExtensionInfo={() => setIsExtensionModalOpen(true)}

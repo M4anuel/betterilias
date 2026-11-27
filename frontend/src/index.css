@@ -4,6 +4,16 @@
 .ui-dialog > header { min-height: 0; padding: 1rem; }
 .ui-dialog:modal { overscroll-behavior: contain; }
 .ui-dialog::backdrop { overflow: hidden; overscroll-behavior: contain; }
+@media (max-width: 639px) {
+  .ui-dialog.unisport-booking-dialog {
+    margin: auto 0 max(env(safe-area-inset-bottom), calc(100dvh - var(--visible-height, 100dvh)));
+    width: 100%;
+    max-width: none;
+    max-height: min(92dvh, var(--visible-height, 100dvh));
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
 
 /* The board can live beside the app sidebar or inside the admin dashboard. */
 .request-board { container-type: inline-size; }

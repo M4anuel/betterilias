@@ -25,6 +25,41 @@ Version 1.7.1 makes the separate website identity login an explicit connection
 step, with Companion 1.2.1 resuming participant reads after the official return.
 Version 1.8.0 adds an explicit server-side UniBE-token-to-ILIAS-session prototype.
 
+## Unisport workspace (1.12.0)
+
+Overview brings together current registrations, opening times, favourite sports
+and available offers. Explore supports search, alphabetical sorting, sport
+categories and offer types. Desktop keeps the catalogue beside the selected
+sport. Compact layouts open a dedicated detail view with a back control. Sports
+and offers can be linked from within BetterIlias.
+
+Schedule displays dated sessions in a daily agenda and an hourly week grid in
+Bern local time. An optional overlay uses the connected ILIAS account's saved
+timetable and marks overlaps with timed academic events. My Sport keeps
+registrations, participant lists, past activities and official bookmarks
+together. BetterIlias favourites and registration reminders are separate
+browser preferences scoped to the Unisport connection and affiliation.
+Reminder downloads include a calendar alarm five minutes before opening.
+
+Public catalogue and offer detail reads confirmed the provider fields
+`offerNextDate`, `registrationTimeSlot`, `datePhase`, `dateString` and
+`requiresConfirmation`. The UI shows the published training pattern or full
+date range and schedules the next dated occurrence. The public offer response
+provides one structured registration window. Each booking keeps its provider
+offer ID and occurrence, including for a multi-date course. Registration
+eligibility is checked for the connected affiliation.
+
+A false confirmation flag also occurs on paid offers. Before accepting a
+one-click request the backend checks fresh ownership, offer state and terms.
+Only regular training with an explicit no-cost section, no reported extra terms
+and a false confirmation flag can skip the review. Paid or ambiguous offers
+retain the review. If the provider returns required questions, BetterIlias
+opens the existing form editor. Recognisable profile fields support browser
+autofill. Results use the existing durable receipt and readback checks.
+Waiting-list signup and background availability alerts require additional
+provider support. Chromium browser regressions use synthetic timetable and
+booking responses. Live bookings and physical devices need separate acceptance.
+
 ## Try it locally
 
 1. Install the updated backend requirements (`python -m pip install -r requirements.txt`

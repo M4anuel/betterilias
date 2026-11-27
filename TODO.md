@@ -14,6 +14,14 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Add the Overview, Explore, Schedule and My Sport workspace (1.12.0).
+  Include responsive sport details, sport and offer favourites, daily and
+  weekly scheduling with timetable conflicts, registration countdowns,
+  calendar reminders, and one-click registration for verified free training.
+- [ ] Confirm live booking, cancellation and registration windows for multiple
+  affiliations. Add waitlist, availability alerts or further session dates when
+  the provider exposes a reliable source for them.
+
 - [x] Fix Chrome native callback form interception, automatically select and
   connect `unibe.ch` affiliations in the background on login completion, and
   preserve session/identity continuity across organisation switches on the same
