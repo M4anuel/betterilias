@@ -2,6 +2,16 @@
 
 Unchecked items are unfinished; completed work is listed separately below. Current behavior and limitations are also recorded in [`docs/ILIAS_SUPPORT_MATRIX.md`](docs/ILIAS_SUPPORT_MATRIX.md) and [`docs/COURSE_MANAGEMENT_SPECIFICATION.md`](docs/COURSE_MANAGEMENT_SPECIFICATION.md).
 
+## Reviewed audit follow-ups
+
+- [ ] Address the 16 retained backend/frontend items in
+  [`docs/AUDIT_FINDINGS_TO_VERIFY.md`](docs/AUDIT_FINDINGS_TO_VERIFY.md).
+  Reviewed on 2026-11-24: all 10 backend risks remain relevant; six frontend
+  action items remain after removing three unsupported/outdated claims and
+  merging one duplicate. The document distinguishes reproduced behavior,
+  code-supported risks and optional engineering work. Prioritise tenant
+  isolation, revocation, identifier validation and verified grading outcomes.
+
 ## Unisport integration (in progress)
 
 - [x] Fix Chrome native callback form interception, automatically select and

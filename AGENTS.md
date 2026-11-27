@@ -13,28 +13,35 @@ Multiple AI agents collaborate on this codebase asynchronously. Follow this bran
   * Google Agent (Antigravity / Gemini): `agents/google`
   * OpenAI Codex CLI: `agents/codex`
   * Feature-specific tasks: `feat/<feature-name>` or `fix/<fix-name>`
-* **Do not commit or push directly to `main` without testing and merging upstream first.**
+* **`develop` is the integration branch.** Agents publish completed, tested work there from their designated branches. The user chooses when accumulated patches/features are released to `main`.
+* **Do not merge or push to `main`, create release tags, or publish a production release unless the user explicitly requests that release.** Finishing an implementation task authorizes integration into `develop`, not a production release.
 
 ### 1.2 Upstream Sync & Merge Before Push
-Whenever you prepare to push your work or merge into `main`:
+Whenever you prepare to publish completed work to `develop`:
 1. **Fetch the latest upstream commits:**
    ```bash
    git fetch origin
    ```
-2. **Merge upstream `origin/main` into your working branch:**
+2. **Merge upstream `origin/develop` into your working branch:**
    ```bash
-   git merge origin/main
+   git merge origin/develop
    ```
 3. **Resolve any merge conflicts cleanly:**
    * Never blindly overwrite or discard work implemented by other agents or the human developer.
    * Preserve all existing features, tests, and comments.
-4. **Never force-push (`git push --force`)** to `main` or any shared remote branches.
+4. Verify the combined result, push your designated branch, then fast-forward `develop` to that tested commit using the repository's permitted workflow. If `develop` advances, fetch and merge it again; rerun checks affected by the new changes rather than blindly repeating every check.
+5. If `develop` does not exist yet, initialise it from the current `origin/main` without rewriting existing history. Never reset an existing integration branch to an older release.
+6. **Never force-push (`git push --force`)** to `main`, `develop` or any shared remote branches.
+
+When the user explicitly requests a release, reconcile the accumulated `develop` changes with the latest `origin/main`, verify the exact release candidate and publish through the permitted merge workflow. Do not release unrelated unfinished work automatically.
 
 ---
 
 ## 2. Mandatory Verification Protocol
 
-Before committing and pushing any changes, you **must** run and pass all verification checks.
+Use verification proportional to the change. During implementation, run focused tests for the affected behavior. Before integrating an application change into `develop`, run the full applicable verification below **once on the final combined code**. Reuse successful results for unchanged code; repeat checks only after relevant edits, upstream changes, failures or an unresolved concern. Do not run a full suite after every small edit or commit.
+
+Documentation-only changes require reviewing the diff and checking formatting/links as applicable, not backend tests, frontend builds or browser runs. Test-only changes require the affected tests. Never bypass a failing required check.
 
 ### 2.1 Backend Tests
 Run the test suite to ensure no scrapers, endpoints, or session logic broke:
@@ -54,13 +61,20 @@ cd frontend
 npm run build
 cd ..
 ```
-The build must succeed with zero errors.
+The build must succeed with zero errors. Run locale validation when strings change. For user-facing changes, run focused browser regressions for the changed workflows and required responsive layouts; avoid unrelated browser suites unless shared infrastructure or a failure justifies them.
 
 ### 2.3 Smoke Test Launcher
 Ensure that the launcher script runs without syntax or import errors:
 ```bash
 python start.py --help  # or verify python start.py syntax
 ```
+
+### 2.4 CI and Usage Discipline
+* Prefer one final verification run over repeated broad runs. Avoid editing frontend sources during browser tests, which can trigger hot reload and invalidate test setup.
+* `develop` pushes run verification without publishing production images. Do not additionally dispatch the same workflow for an unchanged commit that already has a pending or successful run.
+* Check CI at useful milestones, generally no more than once per minute while waiting; do not repeatedly retrieve unchanged logs or enumerate completed jobs. Keep progress updates concise and communicate new findings or blockers.
+* Once local checks pass, report the commit and CI link/status. Do not keep a task running solely to poll CI unless the user requests monitoring or a dependent merge/release requires the result. Report pending checks honestly; do not call them passed.
+* A release candidate already verified on `develop` need not repeat identical local checks merely because it is being promoted. Required release CI and branch protections still apply, and merged code changes must be checked.
 
 ---
 
@@ -135,14 +149,14 @@ Write clear, structured commit messages following Conventional Commits:
 
 ### 4.3 Complete the Commit, Merge & Push Workflow
 * Put completed changes into sensible, focused commits, each covering one coherent change. Separate unrelated work and use the Conventional Commit messages above; do not accumulate an entire session into one large commit.
-* Once the task is ready and the required checks pass, finish the workflow in Sections 1 and 2: fetch upstream, merge `origin/main` into your designated branch, resolve conflicts while preserving others' work, and verify the combined result. Push your branch, then merge and push the tested changes to `main` using the repository's permitted workflow.
-* Treat committing and publishing completed work as part of finishing the task, unless the user explicitly requests local-only work or a repository restriction prevents publication. Do not leave finished changes uncommitted or unpushed without explaining the concrete blocker.
+* Once the task is ready and the required checks pass, finish the workflow in Sections 1 and 2: fetch upstream, merge `origin/develop` into your designated branch, preserve others' work and verify the combined result. Push your branch, then integrate the tested changes into `develop` using the repository's permitted workflow.
+* Treat committing and publishing completed work to `develop` as part of finishing the task, unless the user explicitly requests local-only work or a repository restriction prevents publication. Publishing to `main` is a separate, user-requested release; do not merge it automatically or open an unsolicited release PR after every task.
 * Never bypass failing checks, branch protections, or the prohibition on force-pushing. Report the resulting branch and commit IDs, verification results, and any remaining blockers.
 
 ### 4.4 Version Meaningful GitHub Updates
 
 * **Before pushing a meaningful application change to GitHub, bump the application version.** This includes new features, substantial refactors, and bug fixes that change runtime behavior, including frontend-only changes. Documentation-only, formatting-only, or test-only changes do not require a version bump.
-* Use semantic versions (`MAJOR.MINOR.PATCH`): increment PATCH for fixes, MINOR for backward-compatible features, and MAJOR for breaking changes. Coordinate against the latest upstream version before publishing; never reuse an existing released version for different application behavior.
+* Use semantic versions (`MAJOR.MINOR.PATCH`): increment PATCH for fixes, MINOR for backward-compatible features, and MAJOR for breaking changes. Coordinate against the latest `develop` and `main` versions before publishing; never reuse an existing released version for different application behavior. Development updates still need identifiable diagnostic versions even when several updates will be bundled into one production release.
 * The current application version source is `APP_VERSION` in `backend/diagnostic_metadata.py`, which supplies API and diagnostic/error-sharing metadata. Update that source and any other application release metadata that consumes the version. Browser extension versions follow their separate release requirements.
-* Identify each meaningful published update with its version in the release notes or push summary, briefly describe the changes, and include the exact commit ID. Create and push the matching immutable Git tag (`vMAJOR.MINOR.PATCH`) for the tested release commit when publishing to `main`. Never move or overwrite a published release tag.
+* Identify each meaningful published update with its version in the release notes or push summary, briefly describe the changes, and include the exact commit ID. Only during an explicitly requested release to `main`, create and push the matching immutable Git tag (`vMAJOR.MINOR.PATCH`) for the tested release commit. Do not create release tags for routine `develop` updates. Never move or overwrite a published release tag.
 * **Local-instance error reports must identify the version/patch on which the error occurred.** Preserve the existing `app_version` and `build` metadata throughout diagnostic collection, sharing, storage and administrator views. Keep the automatic build fingerprint alongside the version for exact-build investigation; it does not replace a version bump.
