@@ -79,6 +79,7 @@ export function setLanguage(value: string): void {
   language = resolveLanguage(value, languages);
   try { localStorage.setItem(STORAGE_KEY, language); } catch { /* Keep the in-memory preference. */ }
   document.documentElement.lang = language;
+  document.dispatchEvent(new CustomEvent('BETTERILIAS_LANGUAGE_CHANGED'));
   for (const listener of listeners) listener();
 }
 function subscribe(listener: () => void) {
@@ -89,6 +90,9 @@ export function useLanguage(): Language {
   return useSyncExternalStore(subscribe, getLanguage, () => 'en');
 }
 document.documentElement.lang = language;
+document.addEventListener('BETTERILIAS_LANGUAGE_APPLY', () => {
+  try { const value = localStorage.getItem(STORAGE_KEY); if (value && Object.hasOwn(languages, value)) setLanguage(value); } catch { /* Storage can be unavailable. */ }
+});
 window.addEventListener('storage', (event) => {
   if (event.key === STORAGE_KEY) setLanguage(event.newValue || navigator.language);
 });

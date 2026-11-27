@@ -13,7 +13,7 @@ for (const directory of ['extensions/chrome', 'extensions/firefox', 'extensions/
   if (fs.existsSync(sharedPopup)) for (const key of jsKeys(sharedPopup)) keys.add(key);
   for (const name of ['popup.html', 'legacy-popup.html']) {
     const file = path.join(root, directory, name);
-    if (fs.existsSync(file)) for (const match of fs.readFileSync(file, 'utf8').matchAll(/data-i18n="([^"]+)"/g)) keys.add(match[1]);
+    if (fs.existsSync(file)) for (const match of fs.readFileSync(file, 'utf8').matchAll(/data-i18n(?:-aria)?="([^"]+)"/g)) keys.add(match[1]);
   }
   const subset = Object.fromEntries(Object.entries(catalogues).map(([code, catalogue]) => [code,
     Object.fromEntries([...keys].filter(key => catalogue[key]).map(key => [key, catalogue[key]]))]));

@@ -77,7 +77,7 @@ const api={storage:{local:{get:async keys=>keys.includes('sessionId')?{sessionId
   runtime:{sendMessage:async()=>new Promise(()=>{}),onMessage:{addListener:fn=>runtimeListener=fn}}};
 const context=vm.createContext({browser:api,URL,console,window:page,
   cloneInto:(data,target)=>{assert.equal(target,page);cloned++;return {...data,pageReadable:true};},
-  document:{dispatchEvent:event=>events.push(event)},
+  document:{addEventListener:()=>{},dispatchEvent:event=>events.push(event),readyState:'loading',documentElement:{lang:'en'}},
   CustomEvent:class {constructor(type,options){this.type=type;this.detail=options.detail;}}});
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),context);
 (async()=>{
@@ -163,13 +163,14 @@ const source=fs.readFileSync(process.argv[1],'utf8');
     }}},runtime:{sendMessage:(_,callback)=>callback({}),onMessage:{addListener:fn=>listeners.push(fn)}}};
     const context=vm.createContext({chrome:api,URL,console,
       window:{location:{origin},localStorage:{getItem:()=>null,removeItem:()=>{},setItem:(...args)=>writes.push(args)},postMessage:data=>messages.push(data),addEventListener:()=>{}},
-      document:{dispatchEvent:()=>{}},CustomEvent:class {}});
+      document:{addEventListener:()=>{},dispatchEvent:()=>{},readyState:'loading',documentElement:{lang:'en'}},CustomEvent:class {}});
     await vm.runInContext(source,context);
     assert.equal(sessionReads,allowed?1:0,origin);
-    assert.equal(writes.length,allowed?1:0,origin);
+    const selected=['http://localhost:9123','http://127.0.0.1:9124'].includes(origin);
+    assert.equal(writes.length,selected?1:0,origin);
     // Independent ILIAS session and UniSport completion listeners.
-    assert.equal(listeners.length,allowed?2:0,origin);
-    assert.equal(messages.length,allowed?2:0,origin);
+    assert.equal(listeners.length,allowed?3:0,origin);
+    assert.equal(messages.length,allowed?(selected?2:1):0,origin);
   }
 })().catch(error=>{console.error(error);process.exitCode=1});
 '''

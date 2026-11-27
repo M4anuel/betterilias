@@ -2491,5 +2491,18 @@
   "admin.accounts_empty": "No matching verified accounts.",
   "admin.accounts_previous": "Previous",
   "admin.accounts_next": "Next",
-  "unibe.usage_notice": "This instance records verified names and last app activity for its admins, retained for {days} days since last use."
+  "unibe.usage_notice": "This instance records verified names and last app activity for its admins, retained for {days} days since last use.",
+  "companion.tagline": "One UniBE login for ILIAS and UniSport.",
+  "companion.switch": "SWITCH edu-ID",
+  "companion.backend_warning": "Backend unavailable. Check the server address and connection.",
+  "companion.check_failed": "Connection could not be verified. Check the backend version and server settings.",
+  "companion.online": "Online mode",
+  "companion.local": "Local mode",
+  "companion.presets": "Connection presets",
+  "companion.legacy_mode": "Use browser cookies (deprecated)",
+  "companion.legacy_title": "ILIAS session in browser",
+  "companion.unsaved": "Unsaved changes",
+  "companion.saved": "Settings saved",
+  "companion.unknown": "Not verified",
+  "companion.signed_in": "Signed in"
 }

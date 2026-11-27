@@ -1,119 +1,144 @@
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 const { t, languages, getLanguage, setLanguage } = BetterIliasI18n;
+
 document.addEventListener('DOMContentLoaded', async () => {
   const byId = id => document.getElementById(id);
-  const fullPage = new URL(location.href).searchParams.has('login');
-  document.documentElement.classList.toggle('full-page', fullPage);
-  let state = { phase: 'checking' }, busy = false, draft = '', scope = null, timer, confirmation = false, focusAffiliation = false;
-  const stored = await browserAPI.storage.local.get(['serverUrl', 'frontendUrl', 'language']).catch(() => ({}));
-  if (stored.language) setLanguage(stored.language);
-  for (const [key, id] of [['serverUrl', 'server-url'], ['frontendUrl', 'frontend-url']]) if (stored[key]) byId(id).value = stored[key];
+  let state = { phase: 'checking' }, busy = false, draft = '', scope = null, expiry, poll, savedTimer, confirmation = false;
+  let saved = await browserAPI.storage.local.get(['serverUrl','frontendUrl','language','authMethod']);
+  saved = { serverUrl: 'http://localhost:8000', frontendUrl: 'http://localhost:5173', authMethod: 'unibe', ...saved };
+  const sessionStorage = browserAPI.storage.session;
+  const pending = sessionStorage ? (await sessionStorage.get(['companionSettingsDraft'])).companionSettingsDraft : null;
+  const values = pending || saved;
+  byId('server-url').value = values.serverUrl;byId('frontend-url').value = values.frontendUrl;
+  byId('legacy-mode').checked = values.authMethod === 'legacy';
+  const legacy = () => byId('legacy-mode').checked;
+  const settings = () => ({ serverUrl: byId('server-url').value.trim(), frontendUrl: byId('frontend-url').value.trim(), authMethod: legacy() ? 'legacy' : 'unibe' });
+  const changed = () => Object.entries(settings()).some(([key,value]) => value !== saved[key]);
+  function settingsState(success = false) {
+    const dirty = changed(), button = byId('save-settings');
+    button.classList.toggle('dirty', dirty);button.classList.toggle('saved', success && !dirty);
+    byId('save-label').textContent = t(success && !dirty ? 'companion.saved' : 'Einstellungen speichern');
+    byId('save-status').textContent = dirty ? t('companion.unsaved') : '';
+    for (const [id,server,frontend] of [['preset-online','https://betterilias.ch','https://betterilias.ch'],['preset-local','http://'+'localhost:8000','http://'+'localhost:5173']])
+      byId(id).setAttribute('aria-pressed', String(settings().serverUrl === server && settings().frontendUrl === frontend));
+  }
   async function send(type, extra = {}) {
     const reply = await browserAPI.runtime.sendMessage({ type, ...extra });
-    if (!reply?.success) throw new Error(reply?.code === 'context' ? t('unisport.ilias_context_changed') : t('unibe.unavailable'));
+    if (!reply?.success) {
+      const error = new Error(t(reply?.code === 'context' ? 'unisport.ilias_context_changed' : reply?.code === 'unreachable' ? 'companion.backend_warning' : 'companion.check_failed'));
+      error.connection = true;throw error;
+    }
     return reply.data;
   }
+  function warning(message) { byId('backend-warning').hidden = !message;byId('warning-message').textContent = message || ''; }
   function feedback(message, error = false) {
-    const node = byId('feedback-box');node.textContent = message;node.className = 'feedback visible ' + (error ? 'error' : 'success');
-    node.setAttribute('role', error ? 'alert' : 'status');
+    byId('feedback-box').textContent = message;
+    byId('feedback-box').className = 'feedback visible ' + (error ? 'error' : 'success');
+    byId('feedback-box').setAttribute('role',error ? 'alert' : 'status');
   }
   function render() {
     document.documentElement.lang = getLanguage();
     document.querySelectorAll('[data-i18n]').forEach(node => { node.textContent = t(node.dataset.i18n); });
-    const connected = state.phase === 'connected', pending = ['pending', 'exchanging'].includes(state.phase);
-    const badge = byId('account-state');
-    badge.textContent = connected ? t('unisport.connected') : pending ? t('unisport.waiting') : state.phase === 'checking' ? t('Prüfe...') : t('Nicht angemeldet');
-    badge.className = 'status-badge ' + (connected ? 'badge-success' : 'badge-warning');
-    byId('account-name').textContent = connected ? state.user_name || t('Benutzer') : '';
-    byId('usage-notice').hidden = !state.usage_retention_days;
-    byId('usage-notice').textContent = state.usage_retention_days ? t('unibe.usage_notice', { days: state.usage_retention_days }) : '';
-    byId('account-description').textContent = connected ? t('unibe.connected_hint') : pending ? t('unisport.waiting') : state.phase === 'error' ? t('unibe.unavailable') : state.phase === 'unsupported' ? t('unibe.unsupported') : t('unibe.login_description');
-    byId('login-btn').hidden = state.phase !== 'disconnected';
-    byId('retry-btn').hidden = state.phase !== 'error';
-    byId('affiliation-form').hidden = !connected || confirmation;
-    byId('disconnect-btn').hidden = !(connected || pending);
+    document.querySelectorAll('[data-i18n-aria]').forEach(node => node.setAttribute('aria-label',t(node.dataset.i18nAria)));
+    byId('language').value = getLanguage();
+    const connected = state.phase === 'connected', pending = ['pending','exchanging'].includes(state.phase);
+    byId('account-heading').textContent = t(legacy() ? 'companion.legacy_title' : 'companion.switch');
+    byId('account-state').textContent = t(connected ? 'companion.signed_in' : pending ? 'unisport.waiting' : state.phase === 'checking' ? 'Prüfe...' : state.phase === 'error' ? 'companion.unknown' : 'Nicht angemeldet');
+    byId('account-state').className = 'status-badge ' + (connected ? 'badge-success' : 'badge-warning');
+    byId('account-name').textContent = connected ? state.user_name || '' : '';
+    byId('usage-notice').hidden = legacy() || !state.usage_retention_days;
+    byId('usage-notice').textContent = state.usage_retention_days ? t('unibe.usage_notice',{days:state.usage_retention_days}) : '';
+    byId('login-btn').hidden = legacy() || state.phase !== 'disconnected';
+    byId('legacy-action').hidden = !legacy() || !['connected','disconnected'].includes(state.phase);
+    byId('legacy-action').textContent = t(connected ? 'Sitzung mit BetterIlias synchronisieren' : 'Bei ILIAS anmelden');
+    byId('affiliation-form').hidden = legacy() || !connected || confirmation;
+    byId('disconnect-btn').hidden = legacy() || !(connected || pending);
     byId('confirm-switch').hidden = !confirmation;
-    byId('confirm-message').textContent = t('unisport.ilias_replace_confirm', { name: state.user_name || t('Benutzer') });
+    byId('confirm-message').textContent = t('unisport.ilias_replace_confirm',{name:state.user_name || t('Benutzer')});
     const select = byId('affiliation'), choices = state.affiliations || [];
-    if (select.dataset.choices !== JSON.stringify([getLanguage(), choices])) {
+    if (select.dataset.choices !== JSON.stringify([getLanguage(),choices])) {
       select.replaceChildren();
-      for (const value of ['', ...choices]) {
-        const option = document.createElement('option');option.value = value;
-        option.textContent = value ? value.slice(value.lastIndexOf('@') + 1) : t('unisport.choose_affiliation');select.append(option);
-      }
-      select.dataset.choices = JSON.stringify([getLanguage(), choices]);
+      for (const value of ['',...choices]) { const option = document.createElement('option');option.value=value;option.textContent=value ? value.slice(value.lastIndexOf('@')+1) : t('unisport.choose_affiliation');select.append(option); }
+      select.dataset.choices=JSON.stringify([getLanguage(),choices]);
     }
     select.value = draft;
-    for (const node of document.querySelectorAll('button, select, input')) node.disabled = busy;
-    byId('connect-btn').textContent = busy ? t('Synchronisiere...') : t('unibe.connect');
+    for (const node of document.querySelectorAll('button,select,input')) node.disabled = busy;
+    byId('connect-btn').textContent = t(busy ? 'Synchronisiere...' : 'unibe.connect');
+    settingsState();
   }
-  function apply(next) {
-    if (['pending', 'exchanging'].includes(state.phase) && next.phase === 'connected') focusAffiliation = true;
-    if (next.scope !== scope) { scope = next.scope || null;draft = next.affiliation || '';confirmation = false; }
-    if (draft && !next.affiliations?.includes(draft)) draft = next.affiliation || '';
-    state = next;render();clearTimeout(timer);
-    if (next.phase === 'connected' && Number.isFinite(next.expires_at)) {
-      timer = setTimeout(() => { state = { phase: 'disconnected' };confirmation = false;render(); }, Math.max(0, next.expires_at * 1000 - Date.now()));
-    } else if (['pending', 'exchanging'].includes(next.phase)) timer = setTimeout(() => void refresh(), 2000);
+  async function apply(next) {
+    if (next.scope !== scope) {
+      scope = next.scope || null;draft = next.affiliation || '';confirmation=false;
+      if (scope && sessionStorage) { const row = (await sessionStorage.get('companionAffiliationDraft')).companionAffiliationDraft; if (row?.scope === scope) draft=row.value; }
+    }
+    if (draft && !next.affiliations?.includes(draft)) draft=next.affiliation || '';
+    state=next;render();clearTimeout(expiry);clearTimeout(poll);
+    if (next.phase==='connected' && Number.isFinite(next.expires_at)) expiry=setTimeout(() => { state={phase:'disconnected',usage_retention_days:state.usage_retention_days};confirmation=false;render(); },Math.max(0,next.expires_at*1000-Date.now()));
+    else if (['pending','exchanging'].includes(next.phase)) poll=setTimeout(() => void refresh(),2000);
   }
   async function run(action) {
     if (busy) return;
-    busy = true;render();byId('feedback-box').className = 'feedback';
+    busy=true;render();byId('feedback-box').className='feedback';
     try { await action(); }
-    catch (error) { feedback(error.message || t('unibe.unavailable'), true); }
-    finally {
-      busy = false;render();
-      if (focusAffiliation && state.phase === 'connected' && document.hasFocus()) {
-        focusAffiliation = false;byId('affiliation').focus();
-      }
-    }
+    catch (error) { if (error.connection) warning(error.message);else feedback(error.message || t('companion.check_failed'),true); }
+    finally { busy=false;render(); }
   }
   async function refresh() {
-    if (busy) return;
     await run(async () => {
-      try { apply(await send('UNIBE_STATUS')); }
-      catch (error) { state = { phase: 'error' };throw error; }
+      try {
+        const next = legacy() ? await BetterIliasLegacy.check(saved.serverUrl,saved.frontendUrl,getLanguage()) : await send('UNIBE_STATUS');
+        await apply(next);warning(next.phase==='unsupported' ? t('unibe.unsupported') : null);
+      } catch (error) { state={phase:'error'};if(!error.connection)error.message=t('companion.backend_warning');error.connection=true;throw error; }
     });
   }
-  async function refreshAfterAction() { apply(await send('UNIBE_STATUS')); }
-  byId('language').replaceChildren();
-  for (const [code, definition] of Object.entries(languages)) {
-    const option = document.createElement('option');option.value = code;option.textContent = definition.name;byId('language').append(option);
-  }
-  byId('language').value = getLanguage();
-  byId('language').addEventListener('change', async event => {
-    setLanguage(event.target.value);await browserAPI.storage.local.set({ language: getLanguage() });render();void refresh();
+  for (const [code,definition] of Object.entries(languages)) { const option=document.createElement('option');option.value=code;option.textContent=definition.name;byId('language').append(option); }
+  const initial=await browserAPI.runtime.sendMessage({type:'COMPANION_LANGUAGE_INIT'}).catch(() => null);
+  if (initial?.language || saved.language) setLanguage(initial?.language || saved.language);
+  byId('language').addEventListener('change',async event => {
+    setLanguage(event.target.value);render();
+    const reply=await browserAPI.runtime.sendMessage({type:'COMPANION_LANGUAGE_SET',language:getLanguage()}).catch(() => null);
+    if (!reply?.language) await browserAPI.storage.local.set({language:getLanguage()});
   });
-  byId('login-btn').addEventListener('click', () => void run(async () => {
-    if (fullPage) apply(await send('UNIBE_LOGIN'));
-    else { await send('UNIBE_OPEN_LOGIN');window.close(); }
+  browserAPI.storage.onChanged?.addListener((changes,area) => {
+    if (area==='local' && changes.language?.newValue && Object.hasOwn(languages,changes.language.newValue)) { setLanguage(changes.language.newValue);render(); }
+  });
+  byId('login-btn').addEventListener('click',() => void run(async () => { await apply(await send('UNIBE_LOGIN')); }));
+  byId('retry-btn').addEventListener('click',() => void refresh());
+  byId('legacy-action').addEventListener('click',() => void run(async () => {
+    if (state.phase==='connected') await apply(await BetterIliasLegacy.check(saved.serverUrl,saved.frontendUrl,getLanguage(),true));
+    else { const tab=(await browserAPI.tabs.query({})).find(tab=>tab.url?.startsWith('https://ilias.unibe.ch/')); if(tab)await browserAPI.tabs.update(tab.id,{active:true});else await browserAPI.tabs.create({url:'https://ilias.unibe.ch/'}); }
   }));
-  byId('retry-btn').addEventListener('click', () => void refresh());
-  byId('affiliation').addEventListener('change', event => { draft = event.target.value; });
-  byId('affiliation-form').addEventListener('submit', event => {
+  byId('affiliation').addEventListener('change',async event => { draft=event.target.value;if(sessionStorage)await sessionStorage.set({companionAffiliationDraft:{scope,value:draft}}); });
+  byId('affiliation-form').addEventListener('submit',event => {
     event.preventDefault();void run(async () => {
-      apply(await send('UNIBE_AFFILIATION', { affiliation: draft, scope: state.scope }));
-      const result = await send('UNIBE_CONNECT', { scope: state.scope, affiliation: state.affiliation });state.user_name = result.user_name || state.user_name;
-      if (result.confirmation) { confirmation = true;render(); }
-      else { await send('UNIBE_ACTIVATE');await refreshAfterAction();feedback(t('unibe.connected_success')); }
-    }).then(() => { if (confirmation) byId('confirm-btn').focus(); });
+      await apply(await send('UNIBE_AFFILIATION',{affiliation:draft,scope:state.scope}));
+      const result=await send('UNIBE_CONNECT',{scope:state.scope,affiliation:state.affiliation});
+      state.user_name=result.user_name || state.user_name;
+      if (result.confirmation) { confirmation=true; }
+      else { await send('UNIBE_ACTIVATE');await apply(await send('UNIBE_STATUS'));feedback(t('unibe.connected_success')); }
+    }).then(() => { if(confirmation)byId('confirm-btn').focus(); });
   });
-  byId('confirm-btn').addEventListener('click', () => void run(async () => {
-    await send('UNIBE_ACTIVATE');confirmation = false;await refreshAfterAction();feedback(t('unibe.connected_success'));
-  }));
-  byId('cancel-switch-btn').addEventListener('click', () => { confirmation = false;render();byId('affiliation').focus(); });
-  byId('disconnect-btn').addEventListener('click', () => void run(async () => { apply(await send('UNIBE_DISCONNECT')); }));
-  byId('open-app-btn').addEventListener('click', () => void run(async () => { await send('UNIBE_OPEN_APP'); }));
-  byId('legacy-btn').addEventListener('click', () => void browserAPI.tabs.create({ url: browserAPI.runtime.getURL('legacy-popup.html') }));
-  byId('settings-form').addEventListener('submit', event => {
-    event.preventDefault();void run(async () => {
-      await browserAPI.storage.local.set({ serverUrl: byId('server-url').value, frontendUrl: byId('frontend-url').value });
-      confirmation = false;scope = null;state = { phase: 'checking' };await refreshAfterAction();feedback(t('Einstellungen gespeichert.'));
-    });
+  byId('confirm-btn').addEventListener('click',() => void run(async () => { await send('UNIBE_ACTIVATE');confirmation=false;await apply(await send('UNIBE_STATUS'));feedback(t('unibe.connected_success')); }));
+  byId('cancel-switch-btn').addEventListener('click',() => { confirmation=false;render();byId('affiliation').focus(); });
+  byId('disconnect-btn').addEventListener('click',() => void run(async () => { await apply(await send('UNIBE_DISCONNECT')); }));
+  byId('open-app-btn').addEventListener('click',() => void run(async () => { await send('UNIBE_OPEN_APP'); }));
+  async function edit() { clearTimeout(savedTimer);settingsState();if(sessionStorage)await sessionStorage.set({companionSettingsDraft:settings()}); }
+  for(const id of ['server-url','frontend-url']) byId(id).addEventListener('input',() => void edit());
+  byId('legacy-mode').addEventListener('change',() => { void edit();confirmation=false;state={phase:'checking'};render();void refresh(); });
+  for(const [id,server,frontend] of [['preset-online','https://betterilias.ch','https://betterilias.ch'],['preset-local','http://'+'localhost:8000','http://'+'localhost:5173']])
+    byId(id).addEventListener('click',() => { byId('server-url').value=server;byId('frontend-url').value=frontend;void edit(); });
+  byId('settings-form').addEventListener('submit',event => {
+    event.preventDefault();void (async () => {
+      const next=settings();
+      for(const value of [next.serverUrl,next.frontendUrl]) { const url=new URL(value);if(url.username||url.password||url.search||url.hash||url.pathname!=='/'||!(url.protocol==='https:'||url.protocol==='http:'&&['localhost','127.0.0.1'].includes(url.hostname))) { feedback(t('companion.check_failed'),true);return; } }
+      await browserAPI.storage.local.set(next);saved=next;
+      if(sessionStorage)await sessionStorage.remove('companionSettingsDraft');
+      confirmation=false;scope=null;await refresh();settingsState(true);
+      savedTimer=setTimeout(() => settingsState(),1400);
+    })().catch(() => feedback(t('companion.check_failed'),true));
   });
-  browserAPI.runtime.onMessage.addListener(message => { if (message?.type === 'UNIBE_UPDATED') void refresh(); });
-  window.addEventListener('focus', () => void refresh());
-  window.addEventListener('pagehide', () => clearTimeout(timer));
+  browserAPI.runtime.onMessage.addListener(message => { if(message?.type==='UNIBE_UPDATED')void refresh(); });
+  window.addEventListener('focus',() => void refresh());
+  window.addEventListener('pagehide',() => {clearTimeout(expiry);clearTimeout(poll);clearTimeout(savedTimer);});
   render();await refresh();
-  if (fullPage && state.phase === 'disconnected') await run(async () => { apply(await send('UNIBE_LOGIN')); });
 });

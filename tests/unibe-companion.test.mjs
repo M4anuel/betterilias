@@ -9,6 +9,7 @@ function harness(directory) {
   let connected={phase:'connected',scope:'a'.repeat(64),affiliation:'private@unibe.ch',affiliations:['private@unibe.ch'],user_name:'Synthetic Student',expires_at:9999999999};
   const api={storage:{local:{get:async keys=>typeof keys==='string'?{[keys]:stored[keys]}:Object.fromEntries(keys.map(k=>[k,stored[k]])),set:async values=>Object.assign(stored,values)}},
     runtime:{getURL:path=>'chrome-extension://synthetic/'+path,onMessage:{addListener:fn=>listeners.push(fn)},sendMessage:async()=>{}},
+    action:{openPopup:async()=>notified.push({popup:true})},
     tabs:{query:async()=>tabs,create:async options=>notified.push(options),sendMessage:async(id,message)=>{
       if(message.type==='UNIBE_CONTEXT')return {sessionId:'p'.repeat(43),credential:'c'.repeat(43)};
       notified.push({id,message});return {};
@@ -82,6 +83,14 @@ for(const directory of ['chrome','firefox']) {
     assert.equal((await h.message({type:'UNIBE_OPEN_FROM_PAGE'},{url:'https://other.invalid/',frameId:0,tab:{id:1}})).success,false);
     assert.equal(h.notified.length,0);
     assert.equal((await h.message({type:'UNIBE_OPEN_FROM_PAGE'},{url:'http://localhost:5173/',frameId:0,tab:{id:1}})).success,true);
-    assert.equal(h.notified[0].url,'chrome-extension://synthetic/popup.html?login=1');
+    assert.equal(h.notified[0].popup,true);
+  });
+  test(`${directory}: action popup login starts the provider without opening a Companion tab`,async()=>{
+    const h=harness(directory);h.tabs.push({id:5,url:'http://localhost:5173/'});
+    const reply=await h.message({type:'UNIBE_LOGIN'},{url:'chrome-extension://synthetic/popup.html'});
+    assert.equal(reply.success,true);assert.equal(reply.data.phase,'pending');
+    const bridge=h.calls.find(call=>call.bridge).bridge;
+    assert.equal(bridge[2],5);assert.equal(bridge[3],'unibe');
+    assert.equal(h.notified.length,0);
   });
 }

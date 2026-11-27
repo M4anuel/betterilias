@@ -116,14 +116,14 @@ def package(origin, output, browser='all'):
         path = target / 'manifest.json'
         manifest = json.loads(path.read_text(encoding='utf-8'))
         pattern = origin + '/*'
-        manifest['host_permissions'] = [item for item in manifest['host_permissions']
-                                        if item not in ('http://localhost/*', 'http://127.0.0.1/*')]
-        manifest['host_permissions'].append(pattern)
+        # Both presets remain usable; bridges validate the configured origin.
+        if pattern not in manifest['host_permissions']:
+            manifest['host_permissions'].append(pattern)
         for script in manifest['content_scripts']:
             # Provider callback scripts must retain their pinned provider host.
             # Only the BetterIlias page bridge follows the deployment origin.
             if 'content.js' in script.get('js', []):
-                script['matches'] = [pattern]
+                script['matches'] = list(dict.fromkeys([pattern, 'https://betterilias.ch/*', 'http://localhost/*', 'http://127.0.0.1/*']))
         path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         _write_unix_zip(target, output / f'betterilias-{browser}.zip')
     return output

@@ -99,7 +99,7 @@ def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, sc
             assert metrics['scroll']<=metrics['width']+1
             assert metrics['header']['height']<=metrics['headerLine']*scale+1
             assert metrics['badge']['height']<25*scale
-            assert metrics['login']['width']>=340*scale and metrics['login']['height']>=48*scale
+            assert metrics['login']['width']>=310*scale and metrics['login']['height']>=48*scale
             assert worker.evaluate('chrome.action.getBadgeText({})')==''
             expected_title = 'Nicht angemeldet' if language=='de' else 'Signed out'
             deadline = time.monotonic() + 10

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BetterIlias Companion",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "__MSG_description__",
   "browser_specific_settings": {
     "gecko": {
@@ -31,7 +31,8 @@
     "http://localhost/*",
     "http://127.0.0.1/*",
     "https://login.eduid.ch/*",
-    "https://www.zssw.unibe.ch/*"
+    "https://www.zssw.unibe.ch/*",
+    "https://betterilias.ch/*"
   ],
   "background": {
     "scripts": [
@@ -41,6 +42,7 @@
       "background.js",
       "unisport.js",
       "unisport-participants.js",
+      "language.js",
       "unibe.js"
     ]
   },
@@ -72,7 +74,8 @@
     {
       "matches": [
         "http://localhost/*",
-        "http://127.0.0.1/*"
+        "http://127.0.0.1/*",
+        "https://betterilias.ch/*"
       ],
       "js": [
         "content.js"

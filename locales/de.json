@@ -2491,5 +2491,18 @@
   "admin.accounts_empty": "Keine passenden bestätigten Konten.",
   "admin.accounts_previous": "Zurück",
   "admin.accounts_next": "Weiter",
-  "unibe.usage_notice": "Diese Instanz erfasst bestätigte Namen und die letzte App-Aktivität für ihre Admins. Die Daten bleiben {days} Tage seit der letzten Nutzung gespeichert."
+  "unibe.usage_notice": "Diese Instanz erfasst bestätigte Namen und die letzte App-Aktivität für ihre Admins. Die Daten bleiben {days} Tage seit der letzten Nutzung gespeichert.",
+  "companion.tagline": "Eine UniBE-Anmeldung für ILIAS und UniSport.",
+  "companion.switch": "SWITCH edu-ID",
+  "companion.backend_warning": "Backend nicht erreichbar. Prüfe die Server-Adresse und Verbindung.",
+  "companion.check_failed": "Verbindung konnte nicht geprüft werden. Prüfe die Backend-Version und Server-Einstellungen.",
+  "companion.online": "Online-Modus",
+  "companion.local": "Lokaler Modus",
+  "companion.presets": "Verbindungsvorlagen",
+  "companion.legacy_mode": "Browser-Cookies verwenden (veraltet)",
+  "companion.legacy_title": "ILIAS-Sitzung im Browser",
+  "companion.unsaved": "Ungespeicherte Änderungen",
+  "companion.saved": "Einstellungen gespeichert",
+  "companion.unknown": "Nicht geprüft",
+  "companion.signed_in": "Angemeldet"
 }

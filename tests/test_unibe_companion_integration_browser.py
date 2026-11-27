@@ -96,11 +96,17 @@ def test_installed_companion_performs_shared_login_and_preserves_app_selection(t
                 popup=context.new_page();popup.goto(await_settings)
                 popup.locator('#login-btn').wait_for(state='visible')
                 with context.expect_page() as opened:popup.locator('#login-btn').click()
-                login=opened.value
+                provider=opened.value
+                assert not provider.url.startswith(('chrome-extension:','moz-extension:'))
+                login=popup
                 try:login.locator('#account-name').filter(has_text='Synthetic Student').wait_for(timeout=15000)
                 except Exception:
                     pytest.fail(json.dumps({'calls':[path for path,_ in calls],'body':login.locator('body').inner_text(),'pages':[page.url for page in context.pages]}))
                 assert login.locator('#login-btn').is_hidden()
+                app.evaluate("localStorage.setItem('betterilias_language','de');document.dispatchEvent(new CustomEvent('BETTERILIAS_LANGUAGE_CHANGED'))")
+                login.wait_for_function("document.documentElement.lang==='de'")
+                login.locator('#language').select_option('en')
+                app.wait_for_function("localStorage.getItem('betterilias_language')==='en'")
                 tr=json.loads((ROOT/'locales/en.json').read_text(encoding='utf-8'))
                 assert login.locator('#affiliation option').all_text_contents()==[tr['unisport.choose_affiliation'],'unibe.ch']
                 login.locator('#affiliation').select_option('private-member@unibe.ch')
@@ -152,8 +158,17 @@ def native_firefox(extension,tmp_path,origin,connections,calls):
             wait('return location.href==='+json.dumps(url)+' && document.readyState==="complete";')
         navigate(f'moz-extension://{uuid}/setup.html');wait('return document.documentElement.dataset.ready==="1";')
         app=client.open(type='tab',focus=True)['handle'];client.switch_to_window(app);navigate(origin+'/app')
-        login=client.open(type='tab',focus=True)['handle'];client.switch_to_window(login);navigate(f'moz-extension://{uuid}/popup.html?login=1')
+        login=client.open(type='tab',focus=True)['handle'];client.switch_to_window(login);navigate(f'moz-extension://{uuid}/popup.html')
+        wait('return document.getElementById("login-btn")?.hidden===false;')
+        client.execute_script('document.getElementById("login-btn").click();')
         wait('return document.getElementById("account-name")?.textContent==="Synthetic Student";')
+        client.switch_to_window(app)
+        client.execute_script("localStorage.setItem('betterilias_language','de');document.dispatchEvent(new CustomEvent('BETTERILIAS_LANGUAGE_CHANGED'));")
+        client.switch_to_window(login);wait('return document.documentElement.lang==="de";')
+        client.execute_script('const select=document.getElementById("language");select.value="en";select.dispatchEvent(new Event("change",{bubbles:true}));')
+        client.switch_to_window(app);wait('return localStorage.getItem("betterilias_language")==="en";')
+        client.switch_to_window(login)
+        wait('return document.documentElement.lang==="en" && document.getElementById("connect-btn")?.disabled===false;')
         client.execute_script('const field=document.getElementById("affiliation");field.value="private-member@unibe.ch";field.dispatchEvent(new Event("change",{bubbles:true}));document.getElementById("connect-btn").click();')
         wait('return document.getElementById("feedback-box")?.textContent==="ILIAS and UniSport are connected.";')
         client.switch_to_window(app)

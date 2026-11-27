@@ -20,7 +20,7 @@ for (const browser of ['chrome', 'firefox']) {
     } };
     const context = vm.createContext({ window: page, location: page.location, URL, console,
       chrome: api, ...(browser === 'firefox' ? { browser: api } : {}),
-      document: { dispatchEvent() {} }, CustomEvent: class {}, cloneInto: value => value });
+      document: { addEventListener() {}, dispatchEvent() {}, documentElement: { lang: 'en' } }, CustomEvent: class {}, cloneInto: value => value });
     vm.runInContext(fs.readFileSync(new URL(`../extensions/${browser}/content.js`, import.meta.url), 'utf8'), context);
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(values.get('betterilias_session_id'), 'token-session');

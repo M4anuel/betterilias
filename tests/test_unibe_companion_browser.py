@@ -76,6 +76,42 @@ def test_expired_token_shows_login_but_network_error_offers_retry(workflow_page,
     page=workflow_page;mount(page,workflow_site)
     page.evaluate("mockState.expires_at=Date.now()/1000+.1;dispatchEvent(new Event('focus'))")
     page.locator('#login-btn').wait_for(state='visible')
+
+
+@pytest.mark.parametrize('code,scheme',[('en','light'),('de','dark')])
+def test_settings_presets_dirty_save_feedback_and_legacy_card(workflow_page,workflow_site,code,scheme):
+    page=workflow_page;tr=mount(page,workflow_site,code,scheme,phase='disconnected')
+    page.set_viewport_size({'width':320,'height':740})
+    assert page.locator('.title-area > span').inner_text()==tr['companion.tagline']
+    assert page.locator('.status-card #login-btn').is_visible()
+    assert page.locator('#account-description').count()==0
+    page.locator('summary').click()
+    page.locator('#preset-online').click()
+    assert page.locator('#server-url').input_value()=='https://betterilias.ch'
+    assert page.locator('#frontend-url').input_value()=='https://betterilias.ch'
+    assert 'dirty' in page.locator('#save-settings').get_attribute('class')
+    page.locator('#save-settings').click()
+    page.wait_for_function("document.querySelector('#save-settings').classList.contains('saved')")
+    assert page.locator('#save-icon').is_visible()
+    page.wait_for_function("!document.querySelector('#save-settings').classList.contains('saved')")
+    page.locator('#preset-local').click()
+    assert page.locator('#server-url').input_value()=='http://localhost:8000'
+    assert page.locator('#frontend-url').input_value()=='http://localhost:5173'
+    page.evaluate("BetterIliasLegacy.check=async()=>({phase:'disconnected',cookiePresent:false})")
+    page.locator('#legacy-mode').check()
+    page.locator('#legacy-action').wait_for(state='visible')
+    assert page.locator('#login-btn').is_hidden()
+    assert page.locator('#account-heading').inner_text()==tr['companion.legacy_title']
+    assert page.locator('#legacy-action').inner_text()==tr['Bei ILIAS anmelden']
+    page.evaluate("BetterIliasLegacy.check=async()=>({phase:'connected',cookiePresent:true,user_name:'Synthetic Student'})")
+    page.locator('#save-settings').click()
+    page.wait_for_function("document.querySelector('#account-name').textContent==='Synthetic Student'")
+    assert page.locator('#legacy-action').inner_text()==tr['Sitzung mit BetterIlias synchronisieren']
+    page.locator('#legacy-mode').uncheck()
+    page.locator('#login-btn').wait_for(state='visible')
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    folder=ROOT/'scratch/companion-redesign-review';folder.mkdir(parents=True,exist_ok=True)
+    page.screenshot(path=str(folder/f'settings-{code}-{scheme}.png'),full_page=True)
     assert page.locator('#account-name').inner_text()==''
     page.evaluate("failStatus=true;dispatchEvent(new Event('focus'))")
     page.locator('#retry-btn').wait_for(state='visible')

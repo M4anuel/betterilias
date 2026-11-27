@@ -20,12 +20,15 @@
   async function record(config) { return (await api.storage.local.get(config.key))[config.key] || {}; }
   async function save(config, value) { await api.storage.local.set({ [config.key]: value }); }
   async function call(config, value, path, method = 'GET', body, headers = {}) {
-    const { response, data: result } = await globalThis.BetterIliasRequest(config.backend + '/api/auth/unibe' + path, {
+    let reply;
+    try { reply = await globalThis.BetterIliasRequest(config.backend + '/api/auth/unibe' + path, {
       method, credentials: 'omit', redirect: 'error', cache: 'no-store',
       headers: { 'Content-Type': 'application/json', 'Accept-Language': config.settings.language || 'de',
         ...(value.credential ? { 'X-Unisport-Session': value.credential } : {}), ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
-    }, 'connection', path === '/ilias-connection' ? 65000 : 20000);
+    }, 'connection', path === '/ilias-connection' ? 65000 : 20000); }
+    catch (_) { throw new Error('unreachable'); }
+    const { response, data: result } = reply;
     if (!response.ok) throw new Error(typeof result?.detail === 'string' ? result.detail : 'connection');
     return result;
   }
@@ -80,26 +83,21 @@
     if (message.type === 'UNIBE_OPEN_FROM_PAGE') {
       if (!await globalThis.BetterIliasUnisportPage(sender)) throw new Error('sender');
       await context(config, value);
-      await api.tabs.create({ url: expected + '?login=1', active: true });
+      await api.action.openPopup();
       return { opened: true };
     }
     if (sender.url?.split('?')[0] !== expected) throw new Error('sender');
-    if (message.type === 'UNIBE_OPEN_LOGIN') {
-      value = await context(config, value);
-      await api.tabs.create({ url: expected + '?login=1', active: true });
-      return { opened: true };
-    }
     value = await context(config, value);
     if (message.type === 'UNIBE_STATUS') {
       const result = await status(config, value);
       await globalThis.BetterIliasToolbar?.setStatus(result.phase === 'connected' ? 'synced' : result.phase === 'disconnected' ? 'unauthenticated' : 'checking');
       return result;
     }
-    if (message.type === 'UNIBE_LOGIN') {
-      if (!sender.tab?.id) throw new Error('login_page');
+    if (message.type === 'UNIBE_LOGIN' || message.type === 'UNIBE_OPEN_LOGIN') {
       const transaction = await call(config, value, '/start', 'POST');
       await save(config, { ...value, pendingState: transaction.state });
-      await globalThis.BetterIliasUnisportStart({ ...transaction, credential: value.credential }, config.backend, sender.tab.id, 'unibe');
+      const [active] = await api.tabs.query({ active: true, currentWindow: true });
+      await globalThis.BetterIliasUnisportStart({ ...transaction, credential: value.credential }, config.backend, sender.tab?.id || active?.id || null, 'unibe');
       return { phase: 'pending' };
     }
     if (message.type === 'UNIBE_AFFILIATION') {
@@ -139,7 +137,9 @@
       return { phase: 'disconnected' };
     }
     if (message.type === 'UNIBE_OPEN_APP') {
-      await api.tabs.create({ url: config.frontend });
+      const tab = (await api.tabs.query({})).find(tab => { try { return new URL(tab.url).origin === config.frontend; } catch (_) { return false; } });
+      if (tab) await api.tabs.update(tab.id, { active: true });
+      else await api.tabs.create({ url: config.frontend });
       return { opened: true };
     }
     throw new Error('message');
@@ -155,7 +155,7 @@
     if (!['UNIBE_STATUS', 'UNIBE_OPEN_LOGIN', 'UNIBE_OPEN_FROM_PAGE', 'UNIBE_LOGIN', 'UNIBE_AFFILIATION', 'UNIBE_CONNECT', 'UNIBE_ACTIVATE', 'UNIBE_DISCONNECT', 'UNIBE_OPEN_APP', 'UNIBE_PAGE_CONNECTION'].includes(message?.type)) return false;
     const action = operations.catch(() => {}).then(() => operate(message, sender));
     operations = action.then(() => {}, () => {});
-    void action.then(data => respond({ success: true, data }), error => respond({ success: false, code: ['configuration', 'context', 'affiliation', 'login_page'].includes(error.message) ? error.message : 'connection' }));
+    void action.then(data => respond({ success: true, data }), error => respond({ success: false, code: ['unreachable', 'configuration', 'context', 'affiliation', 'login_page'].includes(error.message) ? error.message : 'connection' }));
     return true;
   });
 })();
