@@ -85,9 +85,11 @@
     }
 
     /* Extension popup width must be intrinsic, not derived from its own viewport. */
-    html { width: 380px; max-width: 100%; }
+    html { width: 380px; max-width: 100%; min-width: 0; }
     body {
-      width: 100%;
+      width: 380px;
+      max-width: 100%;
+      min-width: 0;
       padding: 14px;
       background-color: var(--bg-body);
       color: var(--text-main);
@@ -338,6 +340,12 @@
     @keyframes saved-check { from { opacity:0; transform:scale(.6); } to { opacity:1; transform:scale(1); } }
     @media(prefers-reduced-motion:reduce) { * { animation:none!important; } }
     @media(prefers-color-scheme:dark) { #save-settings.dirty { background:#431407; color:#fdba74; border-color:#f97316; } }
+
+    .status-card, form, details, .settings-group, select, input, .header { min-inline-size:0; max-inline-size:100%; }
+    .backend-warning { display:grid; grid-template-columns:20px minmax(0,1fr) auto; gap:8px; align-items:center; }
+    .backend-warning > span { min-width:0; overflow-wrap:anywhere; }
+    .backend-warning button { display:inline-flex; align-items:center; justify-content:center; align-self:center; margin:0; padding:8px 10px; line-height:1.2; font-size:12px; }
+    #auto-sync-info { margin-block:8px 12px; }
   </style>
 </head>
 <body>
@@ -358,8 +366,9 @@
     <p id="account-name" class="account-name"></p>
 
   <p id="feedback-box" class="feedback" role="status" aria-live="polite"></p>
-  <button id="login-btn" type="button" class="btn btn-primary" hidden data-i18n="unibe.login"></button>
+  <button id="login-btn" type="button" class="btn btn-primary" hidden data-i18n="companion.login"></button>
   <button id="legacy-action" type="button" class="btn btn-primary" hidden></button>
+  <p id="auto-sync-info" class="info-sub" hidden></p>
   <form id="affiliation-form" action="/api/auth/unibe/affiliation" method="post" aria-labelledby="account-heading" hidden>
     <label id="affiliation-label" for="affiliation" data-i18n="unisport.affiliation"></label>
     <select id="affiliation" name="affiliation" required aria-describedby="affiliation-hint"></select>
@@ -371,11 +380,10 @@
     <button id="confirm-btn" type="button" class="btn btn-primary" data-i18n="unibe.switch_confirm"></button>
     <button id="cancel-switch-btn" type="button" class="btn btn-secondary" data-i18n="Abbrechen"></button>
   </section>
-  <button id="disconnect-btn" type="button" class="btn btn-secondary" hidden data-i18n="unibe.disconnect"></button>
+  <button id="disconnect-btn" type="button" class="btn btn-secondary" hidden data-i18n="companion.logout"></button>
   </section>
   <button id="open-app-btn" type="button" class="btn btn-secondary" data-i18n="BetterIlias öffnen"></button>
   <div class="settings-group"><label for="language" data-i18n="Language"></label><select id="language" name="language"></select></div>
-  <p id="usage-notice" class="info-sub" hidden></p>
   <details><summary data-i18n="Erweiterte Server-Einstellungen"></summary>
     <form id="settings-form" class="settings-group" action="/" method="post">
       <div class="presets" role="group" data-i18n-aria="companion.presets">

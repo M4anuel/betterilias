@@ -2,6 +2,7 @@ import { t, useLanguage } from './lib/i18n';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ConnectionNotice } from './components/ConnectionNotice';
 import { ErrorNotice } from './components/ErrorNotice';
+import { FeedbackBanner } from './components/ui/FeedbackBanner';
 import { useConnectionRetry } from './lib/connection';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -267,6 +268,8 @@ export const App: React.FC = () => {
   });
   const [isRevalidatingMaterials, setIsRevalidatingMaterials] = useState(false);
   const [semesterError, setSemesterError] = useState<string | null>(null);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [loadMaterialsError, setLoadMaterialsError] = useState<string | null>(null);
   const materialsRequestSeq = useRef<number>(0);
   const currentNavStateRef = useRef<NavigationState>({
@@ -1101,11 +1104,13 @@ export const App: React.FC = () => {
 
   // --- Logout Handler ---
   const handleLogout = async () => {
+    if(loggingOut)return;
+    setLogoutError(null);setLoggingOut(true);
     try {
       await api.logout();
     } catch (err: any) {
-      console.error('Logout error', err);
-    }
+      setLogoutError(err instanceof Error ? err.message : t('companion.logout_failed'));
+    } finally {setLoggingOut(false);}
   };
 
   useConnectionRetry(() => {
@@ -1261,6 +1266,8 @@ export const App: React.FC = () => {
       />
 
       {/* Main Workspace Layout */}
+      {logoutError && <FeedbackBanner tone="error" message={logoutError} />}
+      {loggingOut && <FeedbackBanner tone="info" message={t('companion.logging_out')} />}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Left Sidebar */}
         {isMobile ? <dialog ref={mobileNavigation} id="course-navigation" aria-label={t("Meine Vorlesungen")}

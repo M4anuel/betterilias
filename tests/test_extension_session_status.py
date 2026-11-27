@@ -228,6 +228,9 @@ const check = ()=>vm.runInContext('checkAndAutoSync(true)',context);
   // A valid PHP session is verified even without an accompanying Shibboleth cookie.
   cookies=[{name:'PHPSESSID',value:'fresh'}]; response={success:true,authenticated:true,session_id:'fresh'};
   await check(); assert.equal(badge.text,'✓');
+  state.logoutPaused=true;fail=true;
+  assert.equal((await check()).status,'signed_out');assert.equal(badge.text,'!');
+  state.logoutPaused=false;fail=false;
   events.cookie({cookie:{name:'PHPSESSID'}}); assert.equal(badge.text,'…');
   assert.equal(state.lastSyncTime,0);
 })().catch(error=>{console.error(error);process.exitCode=1});

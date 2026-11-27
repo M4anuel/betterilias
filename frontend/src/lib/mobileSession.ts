@@ -48,6 +48,7 @@ export async function importSessionFromUrl() {
   if (!/^[a-zA-Z0-9_-]{1,256}$/.test(data.session_id) || data.session_id === 'default') throw new Error(t('auth.handoff_expired'));
   // A successfully claimed connection is another explicit source selection.
   try { localStorage.removeItem('betterilias_ilias_source'); } catch { /* Storage is optional. */ }
+  localStorage.removeItem('betterilias_logout_paused');
   if (cache.getSessionId() !== data.session_id) cache.clearSessionContent();
   cache.setSessionId(data.session_id);
 }

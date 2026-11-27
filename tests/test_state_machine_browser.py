@@ -206,10 +206,10 @@ def test_logout_cancels_pending_reads_and_publishes_inactive(workflow_page):
       window.fetch=async()=>await new Promise(resolve=>deliveries.push(()=>resolve(new Response('{}'))));
       const old=sessionFetch('/api/old').catch(e=>e.name);const logout=api.logout();
       const during=sessionFetch('/api/during').catch(e=>e.name);
-      deliveries[1]();await logout;deliveries[0]();deliveries[2]();
-      return {old:await old,during:await during,events,key:cache.getSessionId()};
+      deliveries[1]();await logout;deliveries[0]();
+      return {old:await old,during:await during,events,key:cache.getSessionId(),requests:deliveries.length};
     }''')
-    assert result == {'old': 'AbortError', 'during': 'AbortError', 'events': [False], 'key': 'owner'}
+    assert result == {'old': 'AbortError', 'during': 'AbortError', 'events': [False], 'key': 'owner', 'requests':2}
 
 
 def test_completed_download_does_not_mask_active_duplicate(workflow_page):

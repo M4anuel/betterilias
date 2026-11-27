@@ -2,6 +2,7 @@
 if (typeof importScripts === 'function') importScripts('i18n.js', 'toolbar.js', 'request.js');
 if (typeof importScripts === 'function') importScripts('unisport.js');
 if (typeof importScripts === 'function') importScripts('language.js');
+if (typeof importScripts === 'function') importScripts('logout.js');
 if (typeof importScripts === 'function') importScripts('unibe.js');
 if (typeof importScripts === 'function') importScripts('unisport-participants.js');
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
@@ -29,7 +30,8 @@ async function getStoredSettings() {
       'sessionId',
       'lastSyncSignature',
       'lastSyncTime',
-      'language'
+      'language',
+      'logoutPaused'
     ]);
     return {
       serverUrl: (stored.serverUrl || 'http://localhost:8000').replace(/\/+$/, ''),
@@ -40,6 +42,7 @@ async function getStoredSettings() {
       lastSyncSignature: stored.lastSyncSignature || null,
       lastSyncTime: stored.lastSyncTime || 0,
       language: stored.language || 'de',
+      logoutPaused: stored.logoutPaused === true,
     };
   } catch (error) {
     console.warn('[BetterIlias Background] Could not read settings:', error);
@@ -123,6 +126,7 @@ async function checkAndAutoSync(force = false) {
     const settings = await getStoredSettings();
     if (superseded()) return { status: 'superseded' };
     BetterIliasI18n.setLanguage(settings.language);
+    if(settings.logoutPaused) { updateBadge('unauthenticated');return {status:'signed_out'}; }
     if (settings.authMethod !== 'legacy') return { status: 'unibe' };
     if (!settings.autoSyncEnabled && !force) {
       updateBadge('disabled');

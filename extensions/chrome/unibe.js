@@ -29,7 +29,7 @@
     }, 'connection', path === '/ilias-connection' ? 65000 : 20000); }
     catch (_) { throw new Error('unreachable'); }
     const { response, data: result } = reply;
-    if (!response.ok) throw new Error(typeof result?.detail === 'string' ? result.detail : 'connection');
+    if (!response.ok) { const error=new Error('connection');error.status=response.status;throw error; }
     return result;
   }
   async function context(config, value) {
@@ -46,9 +46,9 @@
     const credentials = [...new Set(contexts.map(row => row.credential).filter(valid))];
     const sessions = [...new Set(contexts.map(row => row.sessionId).filter(Boolean))];
     if (credentials.length > 1 || sessions.length > 1) throw new Error('context');
-    if (credentials.length === 1 && credentials[0] !== value.credential)
+    if (!value.loggedOut && credentials.length === 1 && credentials[0] !== value.credential)
       value = { credential: credentials[0], active: false };
-    if (sessions.length === 1) value.previousSession = sessions[0];
+    if (!value.loggedOut && sessions.length === 1) value.previousSession = sessions[0];
     if (!value.credential) value.credential = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
       .replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
     await save(config, value);
@@ -56,8 +56,10 @@
   }
   async function status(config, value) {
     const availability = await call(config, {}, '/availability');
+    if (typeof availability?.enabled !== 'boolean') throw new Error('connection');
     if (!availability.enabled) return { phase: 'unsupported' };
     const result = await call(config, value, '/connection');
+    if (!['connected','disconnected','pending','exchanging'].includes(result?.phase)) throw new Error('connection');
     return { ...result, usage_retention_days: availability.usage_retention_days,
       ilias_connected: Boolean(value.sessionId) && value.scope === result.scope,
       user_name: result.user_name || (value.scope === result.scope ? value.userName : null) || null };
@@ -80,6 +82,41 @@
       return { credential: value.credential, sessionId: value.sessionId };
     }
     const expected = api.runtime.getURL('popup.html');
+    if (message.type === 'UNIBE_LOGOUT') {
+      if (sender.url?.split('?')[0] !== expected && !await globalThis.BetterIliasUnisportPage(sender)) throw new Error('sender');
+      value = await context(config, value);
+      const stored = await api.storage.local.get(['sessionId','legacyServer']);
+      const legacySid=stored.legacyServer===config.backend ? stored.sessionId : null;
+      const sid = message.sessionId || (message.authMethod==='legacy' ? legacySid : null) || value.previousSession || value.sessionId;
+      if (message.sessionId && value.previousSession && message.sessionId !== value.previousSession) throw new Error('context');
+      // Pause restoration before any network wait. A failed remote logout must
+      // never make startup/automatic cookie sync sign the user back in.
+      await save(config,{...value,active:false,loggedOut:true});
+      await api.storage.local.set({autoSyncEnabled:false,logoutPaused:true});
+      let nativeConfirmed = true;
+      if (sid) {
+        const result = await globalThis.BetterIliasRequest(config.backend + '/api/auth/logout', {
+          method:'POST',credentials:'omit',redirect:'error',cache:'no-store',
+          headers:{'X-Session-Id':sid,'X-ILIAS-Logout':'1'},
+        }, 'connection');
+        if (!result.response.ok && result.response.status !== 401) throw new Error('connection');
+        nativeConfirmed = result.data.ilias_logout_confirmed !== false;
+      }
+      await call(config, value, '/connection', 'DELETE');
+      await globalThis.BetterIliasCancelLogin?.(config.backend, value.credential);
+      await save(config, { loggedOut:true, active:false });
+      await api.storage.local.set({ sessionId:null,userName:null,lastSyncSignature:null,lastSyncTime:0,autoSyncEnabled:false,logoutPaused:true });
+      await globalThis.BetterIliasClearIliasCookies();
+      await globalThis.BetterIliasClearAppCookies(config.backend,config.frontend);
+      for (const tab of await api.tabs.query({})) {
+        try {
+          if (new URL(tab.url).origin !== config.frontend) continue;
+          await api.tabs.sendMessage(tab.id,{type:'BETTERILIAS_LOGGED_OUT',sessionId:sid});
+        } catch (_) {}
+      }
+      await globalThis.BetterIliasToolbar?.setStatus('unauthenticated');
+      return {phase:'disconnected',native_logout_confirmed:nativeConfirmed};
+    }
     if (message.type === 'UNIBE_OPEN_FROM_PAGE') {
       if (!await globalThis.BetterIliasUnisportPage(sender)) throw new Error('sender');
       await context(config, value);
@@ -94,6 +131,7 @@
       return result;
     }
     if (message.type === 'UNIBE_LOGIN' || message.type === 'UNIBE_OPEN_LOGIN') {
+      value.loggedOut=false;
       const transaction = await call(config, value, '/start', 'POST');
       await save(config, { ...value, pendingState: transaction.state });
       const [active] = await api.tabs.query({ active: true, currentWindow: true });
@@ -124,9 +162,9 @@
       if (!candidate || !valid(candidate.sessionId)) throw new Error('context');
       const current = await status(config, value);
       if (candidate.scope !== current.scope || candidate.affiliation !== current.affiliation) throw new Error('context');
-      value = { ...value, ...candidate, previousSession: candidate.sessionId, candidate: null, active: true };
+      value = { ...value, ...candidate, previousSession: candidate.sessionId, candidate: null, active: true, loggedOut:false };
       await save(config, value);
-      await api.storage.local.set({ authMethod: 'unibe' });
+      await api.storage.local.set({ authMethod: 'unibe',logoutPaused:false });
       await notify(config, value);
       await globalThis.BetterIliasToolbar?.setStatus('synced');
       return { connected: true, user_name: value.userName };
@@ -152,10 +190,11 @@
     },
   };
   api.runtime.onMessage.addListener((message, sender, respond) => {
-    if (!['UNIBE_STATUS', 'UNIBE_OPEN_LOGIN', 'UNIBE_OPEN_FROM_PAGE', 'UNIBE_LOGIN', 'UNIBE_AFFILIATION', 'UNIBE_CONNECT', 'UNIBE_ACTIVATE', 'UNIBE_DISCONNECT', 'UNIBE_OPEN_APP', 'UNIBE_PAGE_CONNECTION'].includes(message?.type)) return false;
+    if (!['UNIBE_STATUS', 'UNIBE_LOGOUT', 'UNIBE_OPEN_LOGIN', 'UNIBE_OPEN_FROM_PAGE', 'UNIBE_LOGIN', 'UNIBE_AFFILIATION', 'UNIBE_CONNECT', 'UNIBE_ACTIVATE', 'UNIBE_DISCONNECT', 'UNIBE_OPEN_APP', 'UNIBE_PAGE_CONNECTION'].includes(message?.type)) return false;
     const action = operations.catch(() => {}).then(() => operate(message, sender));
     operations = action.then(() => {}, () => {});
-    void action.then(data => respond({ success: true, data }), error => respond({ success: false, code: ['unreachable', 'configuration', 'context', 'affiliation', 'login_page'].includes(error.message) ? error.message : 'connection' }));
+    void action.then(data => respond({ success: true, data }), error => respond({ success: false,
+      code:error.status>=400 && error.status<500 && message.type!=='UNIBE_STATUS' ? 'rejected' : ['unreachable', 'configuration', 'context', 'affiliation', 'login_page'].includes(error.message) ? error.message : 'connection', status:error.status }));
     return true;
   });
 })();

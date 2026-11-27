@@ -33,7 +33,12 @@ export function UnisportView() {
       }
     };
     window.addEventListener('message', selected);
-    return () => window.removeEventListener('message', selected);
+    const loggedOut=()=>{
+      ++generation.current;clearPrivate();setConnection({phase:'disconnected',affiliation:null});
+      setChoices([]);setChoice('');setApplications(null);setCredential(unisportCredential());
+    };
+    window.addEventListener('betterilias-logged-out',loggedOut);
+    return () => {window.removeEventListener('message', selected);window.removeEventListener('betterilias-logged-out',loggedOut);};
   }, [credential]);
   const [choices, setChoices] = useState<string[]>([]);
   const [choice, setChoice] = useState('');

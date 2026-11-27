@@ -17,8 +17,11 @@ function harness(directory) {
   const context=vm.createContext({chrome:api,crypto:webcrypto,TextEncoder,URL,AbortSignal,btoa,
     BetterIliasUnisportPage:async sender=>sender.frameId===0&&sender.url?.startsWith('http://localhost:5173/')?'http://localhost:8000':null,
     BetterIliasUnisportStart:async(...args)=>calls.push({bridge:args}),
+    BetterIliasClearIliasCookies:async()=>calls.push({clearCookies:true}),
+    BetterIliasClearAppCookies:async()=>calls.push({clearApp:true}),
     fetch:async(url,init)=>{
       calls.push({url,init});
+      if(url.endsWith('/connection') && init.method==='DELETE')connected={phase:'disconnected'};
       let data=url.endsWith('/availability')?{enabled:true}:url.endsWith('/connection')?connected:
         url.endsWith('/ilias-connection')?{authenticated:true,session_id:'n'.repeat(43),user_name:'Synthetic Student'}:{};
       return {ok:true,json:async()=>structuredClone(data)};
@@ -92,5 +95,26 @@ for(const directory of ['chrome','firefox']) {
     const bridge=h.calls.find(call=>call.bridge).bridge;
     assert.equal(bridge[2],5);assert.equal(bridge[3],'unibe');
     assert.equal(h.notified.length,0);
+  });
+  test(`${directory}: logout revokes paired credentials, clears browser cookies and cannot restore cached selection`,async()=>{
+    const h=harness(directory);h.tabs.push({id:1,url:'http://localhost:5173/'});
+    assert.equal((await h.message({type:'UNIBE_LOGOUT'},{url:'https://other.invalid/',tab:{id:2},frameId:0})).success,false);
+    const result=await h.message({type:'UNIBE_LOGOUT'});
+    assert.equal(result.success,true);assert.equal(result.data.phase,'disconnected');
+    assert.ok(h.calls.some(call=>call.url?.endsWith('/auth/logout') && call.init.headers['X-Session-Id']==='p'.repeat(43)));
+    assert.ok(h.calls.some(call=>call.url?.endsWith('/connection') && call.init.method==='DELETE'));
+    assert.ok(h.calls.some(call=>call.clearCookies));assert.ok(h.calls.some(call=>call.clearApp));
+    assert.equal(h.stored.autoSyncEnabled,false);assert.equal(h.stored.logoutPaused,true);
+    assert.ok(h.notified.some(row=>row.message?.type==='BETTERILIAS_LOGGED_OUT'));
+    await h.message({type:'UNIBE_STATUS'});
+    const record=Object.entries(h.stored).find(([key])=>key.startsWith('unibe.connection.'))[1];
+    assert.equal(record.loggedOut,true);assert.equal(record.previousSession,undefined);assert.equal(record.active,false);
+    assert.equal((await h.message({type:'UNIBE_PAGE_CONNECTION'},{url:'http://localhost:5173/',tab:{id:1},frameId:0})).data.sessionId,undefined);
+  });
+  test(`${directory}: cookie-mode logout targets the verified cookie connection for this server`,async()=>{
+    const h=harness(directory);h.stored.sessionId='legacy-verified';h.stored.legacyServer='http://localhost:8000';
+    const reply=await h.message({type:'UNIBE_LOGOUT',authMethod:'legacy'});
+    assert.equal(reply.success,true);
+    assert.equal(h.calls.find(row=>row.url?.endsWith('/auth/logout')).init.headers['X-Session-Id'],'legacy-verified');
   });
 }

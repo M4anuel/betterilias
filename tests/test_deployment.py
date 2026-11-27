@@ -34,7 +34,7 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
         else:
             assert 'https://app.example.com' in (root / 'popup.html').read_text()
             assert 'https://app.example.com' in (root / 'content.js').read_text()
-            assert manifest['version'] == '1.5.0'
+            assert manifest['version'] == '1.6.0'
             assert 'http://localhost/*' in manifest['host_permissions']
             assert 'http://localhost/*' in manifest['content_scripts'][0]['matches']
             assert "'http://'+'localhost:8000'" in (root/'unibe-popup.js').read_text()

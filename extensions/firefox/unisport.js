@@ -89,6 +89,15 @@
     await api.tabs.update(tab.id, { url: url.href });
   }
   globalThis.BetterIliasUnisportStart = startBridge;
+  globalThis.BetterIliasCancelLogin = async (backend, credential) => {
+    const stored=await api.storage.session.get(null);
+    for(const [key,pending] of Object.entries(stored)) {
+      if(key.startsWith(PREFIX) && pending.backend===backend && pending.credential===credential) {
+        await api.storage.session.remove(key);
+        try { await api.tabs.remove(pending.tab); } catch (_) {}
+      }
+    }
+  };
 
   api.runtime.onMessage.addListener((message, sender, respond) => {
     if (!['UNISPORT_START', 'UNISPORT_CONTEXT', 'UNISPORT_CALLBACK', 'UNISPORT_PING', 'UNISPORT_CANCEL'].includes(message?.type)) return false;

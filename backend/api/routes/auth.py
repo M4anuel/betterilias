@@ -1,6 +1,12 @@
 from backend.observability import audit
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+import asyncio
+import httpx
+from backend.outbound_budget import OutboundUnavailable
+from backend.outbound_targets import OutboundTargetRejected
+from backend.services.session_logout import end_native_session
+from backend.scrapers.dumper import ScrapingParsingError
 from pydantic import BaseModel, Field
 from backend.i18n import t
 from backend.config import settings
@@ -132,8 +138,22 @@ async def sync_extension_cookies(payload: ExtensionSyncInput, response: Response
 
 @router.post('/logout')
 @audit('auth_logout')
-def logout(response: Response, manager: SessionManager = Depends(get_session_manager)):
-    cleared = manager.clear_session()
+async def logout(response: Response, manager: SessionManager = Depends(get_session_manager), x_ilias_logout: str = Header(default='')):
+    native_logout = None
+    try:
+        if x_ilias_logout == '1':
+            native_logout = False
+            try:
+                # Obtain the current rtoken from the authenticated account menu.
+                async with asyncio.timeout(10), manager.get_http_client() as client:
+                    native_logout = await end_native_session(client)
+            except (httpx.HTTPError, OutboundUnavailable, OutboundTargetRejected, ScrapingParsingError, TimeoutError):
+                pass
+    finally:
+        cleared = manager.clear_session()
+    if not cleared and manager.has_cookies():
+        raise HTTPException(503, detail=t('companion.logout_failed'))
     response.delete_cookie('betterilias_session', path='/api')
     response.headers['Cache-Control'] = 'no-store'
-    return {'success': True, 'message': t('Session cleared.') if cleared else t('No active session was found.')}
+    return {'success': True, 'ilias_logout_confirmed': native_logout,
+        'message': t('Session cleared.') if cleared else t('No active session was found.')}

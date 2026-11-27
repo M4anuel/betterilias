@@ -34,6 +34,7 @@ def test_installed_companion_performs_shared_login_and_preserves_app_selection(t
             path=urlsplit(self.path).path
             if path.endswith('/availability'):self.reply({'enabled':True});return
             if path.endswith('/connection'):
+                if connections.get('__delay_status__'):time.sleep(.8)
                 self.reply(connections.get(self.headers.get('X-Unisport-Session'),{'phase':'disconnected'}));return
             if path=='/idp/profile/oidc/authorize':
                 state=parse_qs(urlsplit(self.path).query)['state'][0]
@@ -52,6 +53,10 @@ def test_installed_companion_performs_shared_login_and_preserves_app_selection(t
                 self.reply({'state':state,'authorization_url':origin+'/idp/profile/oidc/authorize?'+urlencode(dict(
                     client_id='unibe-campusapp',redirect_uri=CALLBACK,response_type='code',response_mode='form_post',
                     code_challenge_method='S256',code_challenge=secrets.token_urlsafe(32),state=state))});return
+            if self.path.endswith('/auth/logout'):
+                assert self.headers['X-Session-Id']=='p'*43
+                assert self.headers['X-ILIAS-Logout']=='1'
+                self.reply({'success':True,'ilias_logout_confirmed':True});return
             if self.path.endswith('/complete'):
                 body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
                 assert body['callback'].startswith(CALLBACK+'?')
@@ -67,6 +72,8 @@ def test_installed_companion_performs_shared_login_and_preserves_app_selection(t
             body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
             assert body['affiliation']=='private-member@unibe.ch'
             connections[self.headers['X-Unisport-Session']]['affiliation']=body['affiliation'];self.reply(body)
+        def do_DELETE(self):
+            connections.pop(self.headers.get('X-Unisport-Session'),None);self.reply({'disconnected':True})
         def log_message(self,*args):pass
     server=ThreadingHTTPServer(('127.0.0.1',0),Handler)
     origin=f'http://127.0.0.1:{server.server_port}'
@@ -119,6 +126,12 @@ def test_installed_companion_performs_shared_login_and_preserves_app_selection(t
                 assert len(credential)==43 and connections[credential]['phase']=='connected'
                 assert [path for path,_ in calls]==['/api/auth/unibe/start','/api/auth/unibe/complete','/api/auth/unibe/ilias-connection']
                 assert all(cap==credential for _,cap in calls)
+                login.locator('#disconnect-btn').click()
+                login.locator('#login-btn').wait_for(state='visible')
+                app.wait_for_function("localStorage.getItem('betterilias_logout_paused')==='1'")
+                assert credential not in connections
+                login.reload();login.locator('#login-btn').wait_for(state='visible')
+                assert login.locator('#account-name').inner_text()==''
             finally:context.close()
     finally:server.shutdown();server.server_close()
 
@@ -130,6 +143,12 @@ def native_firefox(extension,tmp_path,origin,connections,calls):
     if not Path(binary).exists():pytest.skip('Native Firefox is not installed')
     (extension/'setup.html').write_text('<!doctype html><script src="setup.js"></script>')
     (extension/'setup.js').write_text('(async()=>{await browser.storage.local.set({serverUrl:'+json.dumps(origin)+',frontendUrl:'+json.dumps(origin)+',language:"en"});document.documentElement.dataset.ready="1";})();')
+    (extension/'native-popup-test.js').write_text('''
+      if(location.search==='?native-test')document.addEventListener('DOMContentLoaded',()=>{
+        const button=document.createElement('button');button.id='open-native-popup';button.textContent='Native popup test';
+        button.addEventListener('click',()=>browser.action.openPopup());document.body.append(button);
+      });''')
+    popup=extension/'popup.html';popup.write_text(popup.read_text(encoding='utf-8').replace('</body>','<script src="native-popup-test.js"></script></body>'),encoding='utf-8')
     package=tmp_path/'companion.xpi'
     with zipfile.ZipFile(package,'w') as archive:
         for path in extension.rglob('*'):
@@ -158,8 +177,8 @@ def native_firefox(extension,tmp_path,origin,connections,calls):
             wait('return location.href==='+json.dumps(url)+' && document.readyState==="complete";')
         navigate(f'moz-extension://{uuid}/setup.html');wait('return document.documentElement.dataset.ready==="1";')
         app=client.open(type='tab',focus=True)['handle'];client.switch_to_window(app);navigate(origin+'/app')
-        login=client.open(type='tab',focus=True)['handle'];client.switch_to_window(login);navigate(f'moz-extension://{uuid}/popup.html')
-        wait('return document.getElementById("login-btn")?.hidden===false;')
+        login=client.open(type='tab',focus=True)['handle'];client.switch_to_window(login);navigate(f'moz-extension://{uuid}/popup.html?native-test')
+        wait('return document.getElementById("login-btn")?.hidden===false && document.getElementById("login-btn")?.disabled===false;')
         client.execute_script('document.getElementById("login-btn").click();')
         wait('return document.getElementById("account-name")?.textContent==="Synthetic Student";')
         client.switch_to_window(app)
@@ -178,6 +197,40 @@ def native_firefox(extension,tmp_path,origin,connections,calls):
         credential=client.execute_script('return localStorage.getItem("betterilias_unisport_session");')
         assert connections[credential]['phase']=='connected'
         assert [path for path,_ in calls]==['/api/auth/unibe/start','/api/auth/unibe/complete','/api/auth/unibe/ilias-connection']
+        client.switch_to_window(login)
+        wait('return document.getElementById("open-native-popup")?.disabled===false;')
+        connections['__delay_status__']=True
+        client.find_element('id','open-native-popup').click()
+        def popup_bounds():
+            with client.using_context('chrome'):
+                return client.execute_script('''
+                  function browsers(root){let result=[];for(const n of root.querySelectorAll('*')){
+                    if(n.localName==='browser')result.push(n);if(n.shadowRoot)result.push(...browsers(n.shadowRoot));}return result;}
+                  return browsers(document).filter(n=>n.getAttribute('webextension-view-type')==='popup'||n.classList.contains('webextension-popup-browser')).map(n=>{
+                    const b=n.getBoundingClientRect(),panel=n.closest('panel'),p=panel?.getBoundingClientRect();
+                    return {width:b.width,height:b.height,panelWidth:p?.width,panelState:panel?.state};}).filter(b=>b.width>0&&b.height>0&&b.panelState==='open');
+                ''')
+        deadline=time.monotonic()+10;bounds=[]
+        while time.monotonic()<deadline:
+            bounds=popup_bounds()
+            if bounds:break
+            time.sleep(.05)
+        assert bounds,'No native Firefox action popup found'
+        initial=bounds[0]
+        time.sleep(2)
+        final=popup_bounds()[0]
+        assert 360<=final['width']<=410,(initial,final)
+        assert 360<=final['panelWidth']<=430,(initial,final)
+        assert abs(initial['width']-final['width'])<=2,(initial,final)
+        folder=ROOT/'scratch/companion-followup-review';folder.mkdir(parents=True,exist_ok=True)
+        with client.using_context('chrome'):(folder/'firefox-native-toolbar.png').write_bytes(client.screenshot(format='binary'))
+        connections.pop('__delay_status__',None)
+        client.switch_to_window(app);client.switch_to_window(login)
+        wait('return document.getElementById("disconnect-btn")?.disabled===false;')
+        client.execute_script('document.getElementById("disconnect-btn").click();')
+        wait('return document.getElementById("login-btn")?.hidden===false;')
+        client.switch_to_window(app);wait('return localStorage.getItem("betterilias_logout_paused")==="1";')
+        assert credential not in connections
     finally:
         if client:
             try:client.quit()

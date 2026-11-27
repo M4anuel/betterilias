@@ -24,6 +24,9 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     if (area !== 'local') return;
     for (const key of ['serverUrl','frontendUrl']) if (changes[key]) settings[key] = changes[key].newValue;
   });
+  const markInstalled=()=>{if(configured() && document.documentElement?.dataset)document.documentElement.dataset.betteriliasCompanion='1';};
+  markInstalled();document.addEventListener('DOMContentLoaded',markInstalled,{once:true});
+  let authGeneration=0;
 
   const supportedLanguage = value => typeof value === 'string' && ['de', 'en'].includes(value) ? value : null;
   const appLanguage = () => {
@@ -60,13 +63,13 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== location.origin) return;
     const message = event.data;
-    if (!['UNISPORT_START', 'UNISPORT_PING', 'UNISPORT_CANCEL', 'UNISPORT_PARTICIPANTS_CONTEXT', 'UNISPORT_PARTICIPANTS_READ', 'UNISPORT_PARTICIPANTS_LOGIN', 'UNIBE_OPEN_FROM_PAGE'].includes(message?.type) || typeof message.requestId !== 'string' || message.requestId.length > 80) return;
+    if (!['UNISPORT_START', 'UNISPORT_PING', 'UNISPORT_CANCEL', 'UNISPORT_PARTICIPANTS_CONTEXT', 'UNISPORT_PARTICIPANTS_READ', 'UNISPORT_PARTICIPANTS_LOGIN', 'UNIBE_OPEN_FROM_PAGE','UNIBE_LOGOUT'].includes(message?.type) || typeof message.requestId !== 'string' || message.requestId.length > 80) return;
     void (async () => {
       let result;
       try { result = await browserAPI.runtime.sendMessage(message); } catch (_) {}
       const participant = message.type.startsWith('UNISPORT_PARTICIPANTS_');
       window.postMessage({ type: 'UNISPORT_REPLY', requestId: message.requestId, success: result?.success === true,
-        ...(participant ? { data: result?.data, code: result?.code } : {}) }, location.origin);
+        ...(participant || message.type==='UNIBE_LOGOUT' ? { data: result?.data, code: result?.code } : {}) }, location.origin);
     })();
   });
   browserAPI.runtime.onMessage.addListener(message => {
@@ -88,6 +91,8 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     // account. Only a manual Companion sync switches back to browser cookies.
     try {
       const pageStorage = window.wrappedJSObject?.localStorage || window.localStorage;
+      if(manual)pageStorage.removeItem('betterilias_logout_paused');
+      else if(pageStorage.getItem('betterilias_logout_paused')==='1')return;
       if (manual) pageStorage.removeItem('betterilias_ilias_source');
       else if (pageStorage.getItem('betterilias_ilias_source') === 'unisport') return;
     } catch (_) { return; }
@@ -125,6 +130,16 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
   // Register live updates before awaiting startup checks or background requests.
   browserAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!configured()) return false;
+    if(message?.type==='BETTERILIAS_LOGGED_OUT') {
+      ++authGeneration;
+      const storage=window.wrappedJSObject?.localStorage || localStorage;
+      const current=storage.getItem('betterilias_session_id');
+      if(message.sessionId && current && message.sessionId!==current)return false;
+      storage.setItem('betterilias_logout_paused','1');
+      for(const key of ['betterilias_unisport_session','betterilias_ilias_source','betterilias_unibe_selected_session'])storage.removeItem(key);
+      document.dispatchEvent(new CustomEvent('BETTERILIAS_LOGGED_OUT'));
+      sendResponse({success:true});return false;
+    }
     const pageStorage = window.wrappedJSObject?.localStorage || window.localStorage;
     if (message?.type === 'UNIBE_CONTEXT') {
       sendResponse({ credential: pageStorage.getItem('betterilias_unisport_session'),
@@ -152,6 +167,7 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     if (!configured()) return;
     if (!/^[A-Za-z0-9_-]{43}$/.test(message?.credential || '') || !/^[A-Za-z0-9_-]{43}$/.test(message?.sessionId || '')) return;
     const pageStorage = window.wrappedJSObject?.localStorage || window.localStorage;
+    pageStorage.removeItem('betterilias_logout_paused');
     pageStorage.setItem('betterilias_unisport_session', message.credential);
     pageStorage.setItem('betterilias_ilias_source', 'unisport');
     const detail = { sessionId: message.sessionId, source: 'unisport' };
@@ -178,8 +194,9 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
     if (data.authMethod === 'legacy' && data.sessionId) {
       applySessionToPage(data.sessionId);
     } else {
+      const generation=authGeneration;
       const unibe = await browserAPI.runtime.sendMessage({ type: 'UNIBE_PAGE_CONNECTION' });
-      if (unibe?.success && unibe.data?.sessionId) applyUnibe(unibe.data);
+      if (generation===authGeneration && unibe?.success && unibe.data?.sessionId) applyUnibe(unibe.data);
     }
   } catch (e) {
     // Ignore context errors
@@ -195,6 +212,6 @@ const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
   // 4. Inform web app that the companion extension is installed
   try {
-    window.postMessage({ type: 'BETTERILIAS_EXTENSION_INSTALLED', version: '1.0.0' }, '*');
+    window.postMessage({ type: 'BETTERILIAS_EXTENSION_INSTALLED', version: browserAPI.runtime.getManifest?.()?.version || 'unknown' }, '*');
   } catch (_) {}
 })();

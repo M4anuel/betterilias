@@ -189,6 +189,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                   <li>{t("legal.privacy_data_point3")}</li>
                   <li>{t("legal.privacy_data_point4")}</li>
                   <li>{t("legal.privacy_data_point5")}</li>
+                  <li>{t('legal.privacy_account_usage')}</li>
                 </ul>
               </div>
 
@@ -229,7 +230,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition cursor-pointer"
+            className="min-h-11 shrink-0 whitespace-nowrap px-4 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition cursor-pointer"
           >
             {t("Schliessen")}
           </button>

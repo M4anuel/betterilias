@@ -115,6 +115,7 @@ export const cache = {
 
   acceptSessionSync(sessionId: string, source?: 'unisport') {
     try {
+      if(localStorage.getItem('betterilias_logout_paused')==='1')return false;
       if (source !== 'unisport' && localStorage.getItem('betterilias_ilias_source') === 'unisport') {
         const selected = cache.getSessionId();
         if (selected) cache.setSessionId(selected);

@@ -8,6 +8,8 @@ globalThis.BetterIliasLegacy = (() => {
       credentials: 'omit', redirect: 'error', cache: 'no-store',
     }, 'connection');
     if (!health.response.ok) throw new Error('connection');
+    const preference=await api.storage.local.get(['logoutPaused']);
+    if(preference.logoutPaused && !manual)return {phase:'disconnected',cookiePresent:false};
     const cookies = {};
     for (const query of [{ url: 'https://ilias.unibe.ch/' }, { domain: 'ilias.unibe.ch' }, { domain: 'ilias.unibe.ch', firstPartyDomain: null }]) {
       try { for (const cookie of await api.cookies.getAll(query)) {
@@ -26,7 +28,7 @@ globalThis.BetterIliasLegacy = (() => {
     }, 'connection');
     if ([401,403].includes(response.status) || response.ok && !data.authenticated) return { phase: 'disconnected', cookiePresent: false };
     if (!response.ok || !data.success || !data.session_id) throw new Error('connection');
-    await api.storage.local.set({ sessionId: data.session_id, userName: data.user_name || null, lastSyncTime: Date.now() });
+    await api.storage.local.set({ sessionId: data.session_id, userName: data.user_name || null, lastSyncTime: Date.now(),legacyServer:server,logoutPaused:false });
     for (const tab of await api.tabs.query({})) {
       try {
         if (new URL(tab.url).origin !== new URL(frontend).origin) continue;
