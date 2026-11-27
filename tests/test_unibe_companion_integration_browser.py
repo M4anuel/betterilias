@@ -152,13 +152,13 @@ def test_installed_companion_performs_shared_login_and_preserves_app_selection(t
                 provider=opened.value
                 assert not provider.url.startswith(('chrome-extension:','moz-extension:'))
                 try:
-                    app.wait_for_function('activations.some(e=>e.source==="unisport")',timeout=15000)
+                    app.wait_for_function('()=>activations.some(e=>e.source==="unisport")',timeout=15000)
                 except Exception:
                     pytest.fail(json.dumps({'calls':[path for path,_ in calls],'provider_url':provider.url if not provider.is_closed() else 'closed','pages':[page.url for page in context.pages]}))
                 popup.close()
-                assert app.evaluate("localStorage.getItem('betterilias_session_id')")=='p'*43
-                assert app.evaluate("localStorage.getItem('ilias_materials_cache_example')")=='retained'
-                credential=app.evaluate("localStorage.getItem('betterilias_unisport_session')")
+                assert app.evaluate("()=>localStorage.getItem('betterilias_session_id')")=='p'*43
+                assert app.evaluate("()=>localStorage.getItem('ilias_materials_cache_example')")=='retained'
+                credential=app.evaluate("()=>localStorage.getItem('betterilias_unisport_session')")
                 assert len(credential)==43 and connections[credential]['phase']=='connected'
                 assert connections[credential]['affiliation']=='private-member@unibe.ch'
                 assert [path for path,_ in calls]==['/api/auth/unibe/start','/api/auth/unibe/complete','/api/auth/unibe/affiliation','/api/auth/unibe/ilias-connection']
@@ -169,10 +169,10 @@ def test_installed_companion_performs_shared_login_and_preserves_app_selection(t
                 assert login.locator('#login-btn').is_hidden()
                 assert login.locator('#confirm-switch').is_hidden()
                 assert login.locator('#affiliation').input_value()=='private-member@unibe.ch'
-                app.evaluate("localStorage.setItem('betterilias_language','de');document.dispatchEvent(new CustomEvent('BETTERILIAS_LANGUAGE_CHANGED'))")
-                login.wait_for_function("document.documentElement.lang==='de'")
+                app.evaluate("()=>{localStorage.setItem('betterilias_language','de');document.dispatchEvent(new CustomEvent('BETTERILIAS_LANGUAGE_CHANGED'));}")
+                login.wait_for_function("()=>document.documentElement.lang==='de'")
                 login.locator('#language').select_option('en')
-                app.wait_for_function("localStorage.getItem('betterilias_language')==='en'")
+                app.wait_for_function("()=>localStorage.getItem('betterilias_language')==='en'")
                 tr=json.loads((ROOT/'locales/en.json').read_text(encoding='utf-8'))
                 assert login.locator('#affiliation option').all_text_contents()==[tr['unisport.choose_affiliation'],'unibe.ch','other.edu']
                 # Switch to other.edu on the same verified account: no account-switch warning should appear!
@@ -181,11 +181,11 @@ def test_installed_companion_performs_shared_login_and_preserves_app_selection(t
                 login.get_by_text('ILIAS and UniSport are connected.',exact=True).wait_for()
                 assert login.locator('#confirm-switch').is_hidden()
                 assert connections[credential]['affiliation']=='private-member@other.edu'
-                assert app.evaluate("localStorage.getItem('betterilias_session_id')")=='p'*43
-                assert app.evaluate("localStorage.getItem('ilias_materials_cache_example')")=='retained'
+                assert app.evaluate("()=>localStorage.getItem('betterilias_session_id')")=='p'*43
+                assert app.evaluate("()=>localStorage.getItem('ilias_materials_cache_example')")=='retained'
                 login.locator('#disconnect-btn').click()
                 login.locator('#login-btn').wait_for(state='visible')
-                app.wait_for_function("localStorage.getItem('betterilias_logout_paused')==='1'")
+                app.wait_for_function("()=>localStorage.getItem('betterilias_logout_paused')==='1'")
                 assert credential not in connections
                 login.reload();login.locator('#login-btn').wait_for(state='visible')
                 assert login.locator('#account-name').inner_text()==''
@@ -280,7 +280,7 @@ def test_chrome_https_callback_delayed_context_duplicate_events_and_no_retry_on_
                 calls.clear()
                 mode['complete_status']=400;mode['form_mode']='error_callback'
                 with context.expect_page() as opened:
-                    popup.evaluate("document.getElementById('login-btn').hidden=false;document.getElementById('login-btn').disabled=false;document.getElementById('login-btn').click()")
+                    popup.evaluate("()=>{document.getElementById('login-btn').hidden=false;document.getElementById('login-btn').disabled=false;document.getElementById('login-btn').click();}")
                 failed_tab=opened.value
                 deadline=time.monotonic()+10
                 while [path for path,_ in calls].count('/api/auth/unibe/complete')<1 and time.monotonic()<deadline:
@@ -288,7 +288,7 @@ def test_chrome_https_callback_delayed_context_duplicate_events_and_no_retry_on_
                 time.sleep(.3)
                 assert [path for path,_ in calls].count('/api/auth/unibe/complete')==1
                 assert not failed_tab.is_closed()
-                assert failed_tab.evaluate('location.href').startswith(provider_origin+'/idp/profile/oidc/authorize')
+                assert failed_tab.evaluate('()=>location.href').startswith(provider_origin+'/idp/profile/oidc/authorize')
             finally:context.close()
     finally:
         server.shutdown();server.server_close()
