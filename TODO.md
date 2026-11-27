@@ -4,6 +4,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Redesign Companion 1.5.0 (BetterIlias 1.10.0): compact shared/legacy card,
+  backend warning, persistent two-way language sync, online/local presets and
+  draft/save feedback. Keep all Companion controls in the popup; document the
+  native callback form warning and test installed Chrome/Firefox flows.
+
 - [x] Complete shared UniBE login in Companion 1.4.0 / BetterIlias 1.9.0:
   verified status/name, domain-only affiliation labels, explicit shared connection
   and cache-safe activation. Archive the deprecated browser-cookie protocol and

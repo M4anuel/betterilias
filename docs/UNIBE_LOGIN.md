@@ -1,4 +1,4 @@
-# Shared UniBE login — BetterIlias 1.9.0 / Companion 1.4.0
+# Shared UniBE login — BetterIlias 1.10.0 / Companion 1.5.0
 
 Chrome and Firefox use one SWITCH/UniBE login for ILIAS and UniSport. Reload the
 updated extension and BetterIlias tab when testing source installations. Store
@@ -13,9 +13,10 @@ publication is separate; an older store package may still show browser-cookie sy
    Missing, expired or explicitly rejected tokens show **Sign in with SWITCH
    edu-ID**. Temporary server/network failures show **Retry**, without discarding
    credentials or pretending that the user is signed out.
-3. Sign-in opens a Companion page that remains available while a separate tab
-   displays the official SWITCH login. Passwords and MFA stay on SWITCH.
-4. After the native callback, the Companion page shows the verified display name
+3. Sign-in opens only the official SWITCH login tab. The action popup can close;
+   pending state is stored in the background/session store. Passwords and MFA
+   stay on SWITCH. Reopen the Companion after completing login.
+4. After the native callback, the Companion popup shows the verified display name
    and affiliation choices. Labels show the substring after the last `@`, such as
    `unibe.ch`; option values retain the entire provider-supplied affiliation.
 5. Choose an affiliation and submit **Use affiliation and connect**. Selecting an
@@ -71,8 +72,8 @@ Safari retains its existing browser-cookie workflow and has no shared UniBE logi
 
 ## Deprecated flow and recovery
 
-The previous browser-cookie login is available only through the Companion's
-advanced **Browser-cookie login (deprecated)** action. Automatic browser-cookie
+The previous browser-cookie login is available through the Companion's
+advanced **Use browser cookies (deprecated)** checkbox, inside the same popup. Automatic browser-cookie
 sync is disabled in the default shared-login mode. Full protocol, historical
 page-first flow and rollback instructions are preserved in
 [LEGACY_ILIAS_LOGIN.md](LEGACY_ILIAS_LOGIN.md).
@@ -112,3 +113,22 @@ Existing per-connection usage keeps its separate 24-hour retention. Disabling th
 admin key stops new named collection; existing rows still age out. The Companion
 discloses collection and retention before login when enabled. Diagnostic events
 continue to omit names, identity hashes and provider tokens.
+
+## Companion 1.5.0 preferences
+
+Online mode sets both origins to `https://betterilias.ch`. Local mode selects
+`http://localhost:8000` and `http://localhost:5173`. Presets edit drafts; save to
+apply them. Orange means unsaved; a green check briefly confirms persistence.
+The legacy-mode checkbox previews the matching card and is persisted on Save.
+Names and account scopes are never inferred from a language preference.
+
+First use prefers the configured app's saved language if accessible, otherwise
+the browser language. Both directions remain synchronized after first use and
+across popup reopenings. Unsupported languages are ignored. This uses the app's
+`betterilias_language` localStorage preference, not login cookies. Refresh app
+tabs after installing/reloading the extension to activate the page bridge.
+The background validates configured origins and shares only language codes.
+
+The native `form_post` callback may trigger a non-HTTPS form warning. See
+[1.10.0 release notes](RELEASE_NOTES_1.10.0.md#switch-form-warning) for evidence and
+the distinction between that callback and local backend transport.

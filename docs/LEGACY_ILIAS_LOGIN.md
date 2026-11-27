@@ -1,3 +1,8 @@
+> Companion 1.5.0 update: enable **Use browser cookies (deprecated)** in advanced
+> settings and Save. It swaps the popup's login card in place. Sign in opens the
+> official ILIAS site; manual sync appears only after a verified browser session.
+> The historical standalone popup/protocol below is retained for reference.
+
 # Deprecated ILIAS login workflows
 
 These workflows are retained for compatibility and recovery. The primary Chrome/

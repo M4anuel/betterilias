@@ -233,3 +233,20 @@ Listen des Kontos vor und nach dem Senden und Prüfen des Ergebnisses. Die
 Berechtigungs- und Buchungsprüfung ruft stets frische Daten ab. Abgelaufene
 Cache-Einträge werden beim nächsten Zugriff entfernt; das Trennen löscht die
 Cache-Einträge der Verbindung.
+
+### Companion 1.5.0 preference update / Aktualisierung der Einstellungen
+
+Chrome/Firefox synchronize the supported language preference between the
+Companion and configured BetterIlias tabs. They read `betterilias_language` from
+the app's localStorage, not authentication cookies. Only a supported language
+code is shared. Unsaved settings/affiliation drafts are kept in extension session
+storage until saved or the browser session ends. Login continues through the
+official provider tab; the Companion itself opens no extension page for this.
+
+Chrome/Firefox gleichen die unterstützte Sprache zwischen Companion und den
+konfigurierten BetterIlias-Tabs ab. Dafür lesen sie `betterilias_language` aus dem
+localStorage der App, keine Anmelde-Cookies. Übertragen wird nur ein unterstützter
+Sprachcode. Ungespeicherte Einstellungs- und Zugehörigkeitsentwürfe bleiben bis zum
+Speichern oder Browser-Sitzungsende im Sitzungsspeicher der Erweiterung. Die
+Anmeldung erfolgt weiterhin im offiziellen Anbieter-Tab; eine eigene
+Erweiterungsseite wird dafür nicht geöffnet.
