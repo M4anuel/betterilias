@@ -16,10 +16,12 @@ for (const directory of ['chrome','firefox']) {
       }});
     vm.runInContext(fs.readFileSync(`extensions/${directory}/legacy-login.js`,'utf8'),context);
     const check=()=>context.BetterIliasLegacy.check('http://localhost:8000/','http://localhost:5173','en',true);
-    assert.equal((await check()).phase,'disconnected');assert.equal(calls.length,0);
+    assert.equal((await check()).phase,'disconnected');assert.equal(calls.length,1);
+    assert.equal(calls[0].url,'http://localhost:8000/health');
+    assert.equal(calls.some(call=>call.url.endsWith('/auth/sync')),false);
     cookies=[{name:'PHPSESSID',value:'synthetic-cookie'}];
     assert.equal((await check()).phase,'connected');assert.equal(saved.sessionId,'verified');
-    assert.equal(calls[0].url,'http://localhost:8000/api/auth/sync');
+    assert.equal(calls.find(call=>call.url.endsWith('/auth/sync')).url,'http://localhost:8000/api/auth/sync');
     assert.equal(navigations.length,1);assert.equal(navigations[0].id,1);
     assert.ok(!navigations[0].url.includes('verified'));assert.ok(navigations[0].url.includes('single-use-code'));
     offline=true;await assert.rejects(check,/offline/);assert.equal(saved.sessionId,'verified');

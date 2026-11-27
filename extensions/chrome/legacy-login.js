@@ -3,6 +3,11 @@ globalThis.BetterIliasLegacy = (() => {
   const api = typeof browser !== 'undefined' ? browser : chrome;
   async function check(server, frontend, language, manual = false) {
     server = server.replace(/\/+$/, '');
+    // Check the backend even when there is no browser session to verify.
+    const health = await BetterIliasRequest(server + '/health', {
+      credentials: 'omit', redirect: 'error', cache: 'no-store',
+    }, 'connection');
+    if (!health.response.ok) throw new Error('connection');
     const cookies = {};
     for (const query of [{ url: 'https://ilias.unibe.ch/' }, { domain: 'ilias.unibe.ch' }, { domain: 'ilias.unibe.ch', firstPartyDomain: null }]) {
       try { for (const cookie of await api.cookies.getAll(query)) {
