@@ -33,7 +33,7 @@ The **BetterIlias Companion** extension (for Chrome, Firefox and Safari) only ac
 * **Hosting Location:** The server is hosted in an ISO-27001-certified datacenter in Nuremberg, Germany (EU), with end-to-end TLS encryption.
 * **Deletion:** Use the relevant connection's **Disconnect / Log out** action in BetterIlias to remove its server-side credentials. Uninstalling the extension does not itself revoke server-side sessions.
 
-When the instance has an enabled administrator dashboard, actual authenticated app use records a verified account identifier, display name and last-use timestamp in a private server-side usage index. The identifier is an instance-specific keyed hash of the verified SWITCH issuer, client and subject; raw subjects and provider tokens are not stored in this index. Administrators can see distinct-account totals and explicitly open/search the names. This counts accounts, not guaranteed individual people; legacy cookie-only connections are not attributed. Names and usage records expire 30 days after the last app use. Cleanup runs on access and every five minutes while the backend runs. Login/status polling does not extend retention. The Companion shows this purpose and retention before login when collection is enabled. No names enter diagnostic events, public endpoints or persistent browser analytics storage. The index is bounded to 10,000 most recently used accounts; older rows can be removed earlier at that limit.
+When the instance has an enabled administrator dashboard, actual authenticated app use records a verified account identifier, display name and last-use timestamp in a private server-side usage index. The identifier is an instance-specific keyed hash of the verified SWITCH issuer, client and subject; raw subjects and provider tokens are not stored in this index. Administrators can see distinct-account totals and explicitly open/search the names. This counts accounts, not guaranteed individual people; legacy cookie-only connections are not attributed. Names and usage records expire 30 days after the last app use. Cleanup runs on access and every five minutes while the backend runs. Login/status polling does not extend retention. The app privacy/data-usage dialog explains this purpose and retention. No names enter diagnostic events, public endpoints or persistent browser analytics storage. The index is bounded to 10,000 most recently used accounts; older rows can be removed earlier at that limit.
 
 ### 5. Shared UniBE Login (Chrome / Firefox)
 Companion 1.4.0 / BetterIlias 1.9.0 use one UniBE login for ILIAS and optional
@@ -144,7 +144,7 @@ Die Browser-Erweiterung **BetterIlias Companion** (für Chrome, Firefox und Safa
 * **Serverstandort:** Der Server wird in einem ISO-27001-zertifizierten Rechenzentrum in Nürnberg, Deutschland (EU) betrieben.
 * **Löschung:** Trenne die jeweilige Verbindung in BetterIlias, um ihre Zugangsdaten auf dem Server zu entfernen. Das Deinstallieren der Erweiterung widerruft serverseitige Sitzungen nicht automatisch.
 
-Wenn das Administrator-Dashboard der Instanz aktiviert ist, werden bei tatsächlicher authentifizierter App-Nutzung eine verifizierte Kontokennung, der Anzeigename und der letzte Nutzungszeitpunkt in einem privaten serverseitigen Nutzungsindex gespeichert. Die Kennung ist ein instanzspezifischer HMAC aus verifiziertem SWITCH-Aussteller, Client und Subject; rohe Subjects und Anbieter-Tokens werden dort nicht gespeichert. Administratoren sehen die Anzahl verschiedener Konten und können die Namen ausdrücklich öffnen und durchsuchen. Gezählt werden Konten, nicht zwingend einzelne Personen; alte reine Cookie-Verbindungen werden nicht zugeordnet. Namen und Nutzungseinträge werden 30 Tage nach der letzten App-Nutzung gelöscht. Die Bereinigung erfolgt bei Zugriffen und alle fünf Minuten während des Backend-Betriebs. Anmeldung und Statusabfragen verlängern diese Frist nicht. Der Companion zeigt Zweck und Frist vor der Anmeldung an, wenn die Erfassung aktiviert ist. Namen erscheinen weder in Diagnoseereignissen noch in öffentlichen Endpunkten oder einem dauerhaften Browser-Analysespeicher. Der Index ist auf die 10'000 zuletzt genutzten Konten begrenzt; am Limit können ältere Einträge früher entfernt werden.
+Wenn das Administrator-Dashboard der Instanz aktiviert ist, werden bei tatsächlicher authentifizierter App-Nutzung eine verifizierte Kontokennung, der Anzeigename und der letzte Nutzungszeitpunkt in einem privaten serverseitigen Nutzungsindex gespeichert. Die Kennung ist ein instanzspezifischer HMAC aus verifiziertem SWITCH-Aussteller, Client und Subject; rohe Subjects und Anbieter-Tokens werden dort nicht gespeichert. Administratoren sehen die Anzahl verschiedener Konten und können die Namen ausdrücklich öffnen und durchsuchen. Gezählt werden Konten, nicht zwingend einzelne Personen; alte reine Cookie-Verbindungen werden nicht zugeordnet. Namen und Nutzungseinträge werden 30 Tage nach der letzten App-Nutzung gelöscht. Die Bereinigung erfolgt bei Zugriffen und alle fünf Minuten während des Backend-Betriebs. Anmeldung und Statusabfragen verlängern diese Frist nicht. Der Datenschutz- und Datennutzungsdialog der App erläutert Zweck und Frist. Namen erscheinen weder in Diagnoseereignissen noch in öffentlichen Endpunkten oder einem dauerhaften Browser-Analysespeicher. Der Index ist auf die 10'000 zuletzt genutzten Konten begrenzt; am Limit können ältere Einträge früher entfernt werden.
 
 ### 5. Gemeinsame UniBE-Anmeldung (Chrome / Firefox)
 Companion 1.4.0 / BetterIlias 1.9.0 verwenden eine UniBE-Anmeldung für ILIAS und
@@ -250,3 +250,23 @@ Sprachcode. Ungespeicherte Einstellungs- und Zugehörigkeitsentwürfe bleiben bi
 Speichern oder Browser-Sitzungsende im Sitzungsspeicher der Erweiterung. Die
 Anmeldung erfolgt weiterhin im offiziellen Anbieter-Tab; eine eigene
 Erweiterungsseite wird dafür nicht geöffnet.
+
+### Companion 1.6.0 logout / Abmeldung
+
+Popup and in-app logout revoke the paired backend/UniBE credentials and request
+logout of the authenticated ILIAS server session. The Companion clears ILIAS auth
+cookies and the configured app session cookies, cancels pending login callbacks
+and pauses automatic syncing. Names/usage retention remains 30 days after last
+use and is described in the app privacy dialog. Native logout failures are
+reported; local logout cannot guarantee revocation on an unreachable server.
+SWITCH SSO and unrelated university services are not logged out globally.
+
+Die Abmeldung im Popup und in der App widerruft die verbundenen Backend- und
+UniBE-Zugangsdaten und fordert die Abmeldung der authentifizierten ILIAS-Sitzung
+an. Der Companion entfernt ILIAS-Anmelde-Cookies und Sitzungs-Cookies der
+konfigurierten App, bricht ausstehende Anmelderückgaben ab und pausiert die
+automatische Synchronisierung. Nutzungseinträge werden weiterhin 30 Tage nach
+letzter Nutzung gelöscht; die Erläuterung steht im Datenschutzdialog der App.
+Fehlgeschlagene native Abmeldungen werden angezeigt. Eine lokale Abmeldung kann
+keinen Widerruf auf einem nicht erreichbaren Server garantieren. SWITCH-SSO und
+andere Universitätsdienste werden nicht global abgemeldet.

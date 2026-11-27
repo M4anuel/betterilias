@@ -139,7 +139,7 @@ for configuration and verification details.
    [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/betterilias-companion/).
    For local development or self-hosted configuration, see the
    [Firefox development instructions](extensions/firefox/README.md).
-2. With BetterIlias running, open Companion 1.5.0 or later and choose **Sign in
+2. With BetterIlias running, open Companion 1.6.0 or later and choose **Sign in
    with SWITCH edu-ID**. Complete login/MFA on the official SWITCH page.
 3. Return to the Companion page, select your affiliation and choose **Use
    affiliation and connect**. One UniBE login supplies ILIAS and UniSport.

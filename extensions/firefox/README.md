@@ -1,7 +1,7 @@
 # BetterIlias Companion — Firefox Extension
 
 
-Seit Companion 1.5.0 ist die gemeinsame UniBE-Anmeldung der Standard: Companion
+Seit Companion 1.6.0 ist die gemeinsame UniBE-Anmeldung der Standard: Companion
 öffnen, bei SWITCH edu-ID anmelden, Zugehörigkeit wählen und ILIAS/UniSport
 verbinden. Name und Domain-Auswahl erscheinen bei gültiger Anmeldung; bei
 abgelaufenem Token erscheint die Anmeldeschaltfläche. Nach einem Quellcode-Update

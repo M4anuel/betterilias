@@ -1,4 +1,4 @@
-# Shared UniBE login — BetterIlias 1.10.0 / Companion 1.5.0
+# Shared UniBE login — BetterIlias 1.11.0 / Companion 1.6.0
 
 Chrome and Firefox use one SWITCH/UniBE login for ILIAS and UniSport. Reload the
 updated extension and BetterIlias tab when testing source installations. Store
@@ -30,8 +30,9 @@ publication is separate; an older store package may still show browser-cookie sy
 The current login's expiry is checked on the server. A fresh popup check also
 reads affiliations from UniApp, detecting explicitly rejected credentials. The
 visible expiry timer offers sign-in when the verified lifetime ends. It never
-automatically logs in or refreshes a provider token. Disconnecting the UniBE login
-does not revoke an already established ILIAS session; log out ILIAS in the app.
+automatically logs in or refreshes a provider token. The popup and app logout end both the paired ILIAS and UniBE connections and
+pause automatic restoration. The direct UniBE-only disconnect endpoint remains
+available for legacy tooling. Global SWITCH SSO remains independent.
 
 UniBE login works independently of the optional UniSport navigation flag.
 `UNISPORT_ENABLED` still controls UniSport frontend/navigation and offer APIs.
@@ -132,3 +133,15 @@ The background validates configured origins and shares only language codes.
 The native `form_post` callback may trigger a non-HTTPS form warning. See
 [1.10.0 release notes](RELEASE_NOTES_1.10.0.md#switch-form-warning) for evidence and
 the distinction between that callback and local backend transport.
+
+## 1.11.0 / Companion 1.6.0
+
+Retry retains the warning and card until a validated backend status succeeds.
+Rejected operations are distinct from connectivity failures. New affiliation
+drafts prefer `unibe.ch`, while existing edits/selections remain. The cookie card
+shows automatic-sync status under its action and no duplicate signed-in label.
+Named-usage information is in BetterIlias's privacy/data-usage dialog.
+Both popup login modes and app logout revoke paired credentials, clear private
+content, cancel pending provider logins and prevent automatic re-sync. The app
+and Companion must both be updated; refresh app tabs after reloading the add-on.
+See [release notes](RELEASE_NOTES_1.11.0.md#logout) for upstream logout and SSO scope.

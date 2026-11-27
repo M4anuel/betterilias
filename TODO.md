@@ -4,6 +4,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Stabilise Companion retries/Firefox sizing and add paired logout (1.11.0 /
+  Companion 1.6.0). Prefer UniBE affiliations, compact labels/status, move named
+  usage disclosure into app privacy, clear private caches and block stale sync
+  after popup/app logout; verify both auth modes and native Firefox panel bounds.
+
 - [x] Redesign Companion 1.5.0 (BetterIlias 1.10.0): compact shared/legacy card,
   backend warning, persistent two-way language sync, online/local presets and
   draft/save feedback. Keep all Companion controls in the popup; document the

@@ -1,6 +1,6 @@
 # BetterIlias Companion store notes
 
-Updated 2026-11-27. Companion 1.5.0 is a prototype source update; this document
+Updated 2026-11-27. Companion 1.6.0 is a prototype source update; this document
 does not mean it has been submitted or approved in either browser store.
 
 ## Store listing
@@ -128,3 +128,14 @@ accessible, otherwise browser language, then synchronizes in both directions.
 Only language codes cross this bridge; no auth cookies are used for it. Pending
 transactions remain in session storage while the action popup closes. Store
 submission/signing and updated public screenshots remain separate.
+
+## Companion 1.6.0
+
+Stable backend warnings/retries and bounded Firefox popup width, default UniBE
+affiliation, shorter labels and automatic-sync information. Both auth modes offer
+paired logout in the same popup. Existing cookie permission additionally removes
+ILIAS auth cookies and configured BetterIlias session cookies on explicit logout;
+SWITCH SSO cookies and unrelated-site cookies are not removed. No new host or API
+permission is added. Private app caches and pending callbacks clear on logout,
+and automatic restoration stays paused until an explicit new login. Named usage
+disclosure is in the app privacy/data-usage dialog. Store submission is separate.

@@ -337,6 +337,6 @@ writes, startup and every five minutes while running, with SQLite secure deletio
 The index retains at most 10,000 most recently used accounts (32 MiB database cap).
 Totals are consequently bounded and exclude anonymous/legacy-only accounts.
 Existing per-connection usage keeps its separate 24-hour retention. Disabling the
-admin key stops new named collection; existing rows still age out. The Companion
-discloses collection and retention before login when enabled. Diagnostic events
+admin key stops new named collection; existing rows still age out. The app privacy/data-usage dialog
+discloses collection and retention. Diagnostic events
 continue to omit names, identity hashes and provider tokens.
