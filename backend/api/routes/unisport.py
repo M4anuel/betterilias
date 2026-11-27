@@ -1,6 +1,10 @@
 """Independent capability-authenticated UniSport prototype endpoints."""
 import re
 import hmac
+import asyncio
+import json
+import time
+import httpx
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, Path
@@ -8,10 +12,15 @@ from pydantic import BaseModel, Field, SecretStr
 
 from backend.config import settings
 from backend.i18n import t, current_language
+from backend.observability import audit
 from backend.services import unisport_auth as auth
 from backend.services import unisport_catalogue as public
 from backend.services import unisport_booking as booking
 from backend.services import unisport_applications as private_lists
+from backend.services import unisport_ilias
+from backend.auth.session import SessionManager
+from backend.scrapers.dumper import ScrapingParsingError
+from backend.outbound_targets import OutboundTargetRejected
 from backend.coordination import CoordinationBusy
 from backend.outbound_budget import OutboundUnavailable
 from backend.services.unisport_client import UnisportAccount, UnisportClient, UnisportReadError
@@ -19,13 +28,29 @@ from backend.services.unisport_client import UnisportAccount, UnisportClient, Un
 router = APIRouter(prefix='/unisport', tags=['unisport'])
 
 
-def owner(response: Response, x_unisport_session: Annotated[str | None, Header()] = None):
+@router.get('/availability')
+def availability(response: Response):
+    """Public feature flag only; credentials and provider data stay private."""
+    response.headers['Cache-Control'] = 'no-store'
+    return {'enabled': settings.unisport_enabled}
+
+
+def owner(response: Response, request: Request, x_unisport_session: Annotated[str | None, Header()] = None):
     response.headers['Cache-Control'] = 'no-store'
     if not settings.unisport_enabled:
         raise HTTPException(404, t('unisport.disabled'))
     if not x_unisport_session or not re.fullmatch(r'[A-Za-z0-9_-]{43}', x_unisport_session):
         raise HTTPException(401, t('unisport.connection_required'))
-    return auth.digest(x_unisport_session)
+    identity = auth.digest(x_unisport_session)
+    tail = request.url.path.removeprefix('/api/unisport/')
+    if tail not in ('connection', 'affiliation', 'affiliations', 'ilias-connection') and not tail.startswith('auth/'):
+        current = auth.record(identity)
+        if current and current[1].get('phase') == 'connected':
+            from backend import activity
+            key = activity.account_key(auth.ISSUER, auth.CLIENT, current[1]['subject'])
+            if key:
+                activity.record('unisport:' + identity, account=key, name=current[1].get('name'))
+    return identity
 
 
 Owner = Annotated[str, Depends(owner)]
@@ -167,6 +192,58 @@ def unchanged(owner, state, data):
     current = auth.record(owner)
     if not current or current[0] != state or current[1].get('affiliation') != data['affiliation']:
         raise connection_changed()
+
+
+@router.post('/ilias-connection')
+@audit('auth_sync')
+async def connect_ilias(owner: Owner, x_unisport_scope: Scope, x_unisport_affiliation: AffiliationHeader,
+        response: Response, x_session_id: Annotated[str | None, Header()] = None):
+    state, data = private_account(owner, x_unisport_scope, x_unisport_affiliation)
+    def validate():
+        current = auth.record(owner)
+        if not current or current != (state, data):
+            raise connection_changed()
+    account = UnisportAccount(data['subject'], SecretStr(data['token']), data['affiliation'])
+    # Only an explicit capability may nominate the existing cache/session owner.
+    previous = SessionManager(x_session_id) if x_session_id and re.fullmatch(r'[A-Za-z0-9_-]{1,256}', x_session_id) and x_session_id != 'default' else None
+    snapshot = previous._read_data() if previous else {}
+    try:
+        async with asyncio.timeout(60):
+            cookies, user, account_key = await unisport_ilias.exchange(account, owner, validate)
+            old_meta = snapshot.get('metadata', {})
+            old_key = old_meta.get('ilias_account_key') if old_meta.get('source') == 'unisport_id_token' else None
+            if snapshot.get('cookies') and not old_key:
+                try:
+                    _, old_key = await unisport_ilias.existing_identity(snapshot['cookies'], owner, validate)
+                except (unisport_ilias.ExchangeFailed, ScrapingParsingError, httpx.HTTPError, OutboundUnavailable, OutboundTargetRejected):
+                    old_key = None
+            renewed = bool(snapshot.get('cookies') and old_key and hmac.compare_digest(old_key, account_key))
+        from backend import activity
+        usage_key = activity.account_key(auth.ISSUER, auth.CLIENT, data['subject'])
+        # Serialize the final connection check against disconnect/replacement.
+        # Reuse the capability only after proving the same unique ILIAS login.
+        with auth.database() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT state,expires,data FROM connections WHERE owner=?', (owner,)).fetchone()
+            if not row or row[0] != state or row[1] <= time.time() or json.loads(row[2]) != data:
+                raise connection_changed()
+            metadata = {'source': 'unisport_id_token', 'user_name': user,
+                'ilias_account_key': account_key, 'user_agent': settings.user_agent,
+                'usage_account_key': usage_key}
+            if renewed:
+                if not previous.replace_unchanged(snapshot, cookies, metadata):
+                    raise connection_changed()
+                sid = previous.session_id
+            else:
+                sid = SessionManager.generate_session_id()
+                SessionManager(sid).save_cookies(cookies, metadata=metadata)
+        return {'authenticated': True, 'session_id': sid, 'user_name': user, 'renewed': renewed}
+    except (unisport_ilias.ExchangeFailed, ScrapingParsingError, httpx.HTTPError, OutboundUnavailable, OutboundTargetRejected, CoordinationBusy, TimeoutError) as error:
+        # Report expected rejection as a completed audit outcome, with a fixed
+        # stage only. Never include provider bodies, URLs, cookies or tokens.
+        response.status_code = 422 if isinstance(error, (unisport_ilias.ExchangeFailed, ScrapingParsingError)) else 502
+        response.headers['X-ILIAS-Verification-Stage'] = error.stage if isinstance(error, unisport_ilias.ExchangeFailed) else 'upstream'
+        return {'authenticated': False, 'detail': t('unisport.ilias_connect_failed')}
 
 
 @router.get('/catalogue')

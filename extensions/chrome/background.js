@@ -1,6 +1,9 @@
 // background.js - BetterIlias Companion Background Service Worker / Script
 if (typeof importScripts === 'function') importScripts('i18n.js', 'toolbar.js', 'request.js');
 if (typeof importScripts === 'function') importScripts('unisport.js');
+if (typeof importScripts === 'function') importScripts('language.js');
+if (typeof importScripts === 'function') importScripts('logout.js');
+if (typeof importScripts === 'function') importScripts('unibe.js');
 if (typeof importScripts === 'function') importScripts('unisport-participants.js');
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
@@ -23,26 +26,31 @@ async function getStoredSettings() {
       'serverUrl',
       'frontendUrl',
       'autoSyncEnabled',
+      'authMethod',
       'sessionId',
       'lastSyncSignature',
       'lastSyncTime',
-      'language'
+      'language',
+      'logoutPaused'
     ]);
     return {
       serverUrl: (stored.serverUrl || 'http://localhost:8000').replace(/\/+$/, ''),
       frontendUrl: (stored.frontendUrl || 'http://localhost:5173').replace(/\/+$/, ''),
-      autoSyncEnabled: stored.autoSyncEnabled !== false,
+      autoSyncEnabled: stored.authMethod === 'legacy' && stored.autoSyncEnabled !== false,
+      authMethod: stored.authMethod || 'unibe',
       sessionId: stored.sessionId || null,
       lastSyncSignature: stored.lastSyncSignature || null,
       lastSyncTime: stored.lastSyncTime || 0,
       language: stored.language || 'de',
+      logoutPaused: stored.logoutPaused === true,
     };
   } catch (error) {
     console.warn('[BetterIlias Background] Could not read settings:', error);
     return {
       serverUrl: 'http://localhost:8000',
       frontendUrl: 'http://localhost:5173',
-      autoSyncEnabled: true,
+      autoSyncEnabled: false,
+      authMethod: 'unibe',
       sessionId: null,
       lastSyncSignature: null,
       lastSyncTime: 0,
@@ -71,7 +79,7 @@ async function fetchCookies() {
   return Object.fromEntries(cookies);
 }
 
-async function notifyTabs(frontendUrl, sessionId) {
+async function notifyTabs(frontendUrl, sessionId, manual = false) {
   if (!sessionId) return;
   try {
     const tabs = await browserAPI.tabs.query({});
@@ -88,7 +96,7 @@ async function notifyTabs(frontendUrl, sessionId) {
           try {
             await browserAPI.tabs.sendMessage(tab.id, {
               type: 'BETTERILIAS_SESSION_SYNCED',
-              sessionId,
+              sessionId, manual,
             });
           } catch (_) {
             // Tab might not be ready or has closed
@@ -118,6 +126,8 @@ async function checkAndAutoSync(force = false) {
     const settings = await getStoredSettings();
     if (superseded()) return { status: 'superseded' };
     BetterIliasI18n.setLanguage(settings.language);
+    if(settings.logoutPaused) { updateBadge('unauthenticated');return {status:'signed_out'}; }
+    if (settings.authMethod !== 'legacy') return { status: 'unibe' };
     if (!settings.autoSyncEnabled && !force) {
       updateBadge('disabled');
       return { status: 'disabled' };
@@ -173,7 +183,7 @@ async function checkAndAutoSync(force = false) {
 
       if (superseded()) return { status: 'superseded' };
       updateBadge('synced');
-      await notifyTabs(settings.frontendUrl, data.session_id);
+      await notifyTabs(settings.frontendUrl, data.session_id, force);
 
       return {
         status: 'synced',

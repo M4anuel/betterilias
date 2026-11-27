@@ -4,6 +4,25 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Stabilise Companion retries/Firefox sizing and add paired logout (1.11.0 /
+  Companion 1.6.0). Prefer UniBE affiliations, compact labels/status, move named
+  usage disclosure into app privacy, clear private caches and block stale sync
+  after popup/app logout; verify both auth modes and native Firefox panel bounds.
+
+- [x] Redesign Companion 1.5.0 (BetterIlias 1.10.0): compact shared/legacy card,
+  backend warning, persistent two-way language sync, online/local presets and
+  draft/save feedback. Keep all Companion controls in the popup; document the
+  native callback form warning and test installed Chrome/Firefox flows.
+
+- [x] Complete shared UniBE login in Companion 1.4.0 / BetterIlias 1.9.0:
+  verified status/name, domain-only affiliation labels, explicit shared connection
+  and cache-safe activation. Archive the deprecated browser-cookie protocol and
+  rollback details; cover Chrome/Firefox and responsive layouts with regressions.
+- [x] Add admin-only distinct verified account counts and searchable display names
+  (1.9.0), retained for 30 days after last actual app use. Deduplicate browsers
+  with an instance-keyed verified identity; exclude login/status polling, disclose
+  collection before login and keep names out of diagnostic events and URLs.
+
 - [x] Add a read-only UniApp transport for offer details and complete application
   lists, using separate supplied Unisport credentials and the shared egress/budget
   infrastructure. It does not implement login or verify supplied token ownership.
@@ -33,8 +52,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   independent and never reuse personal-list caches across account generations.
 - [ ] Upgrade UniSport to direct web login without the companion: obtain an
   approved SWITCH client/HTTPS callback for BetterIlias and verify that UniApp
-  accepts tokens issued to that client. Keep token exchange and credentials on
-  the backend, preserving PKCE/state/nonce checks and independent UniSport
+  and ILIAS mobile-auth accept tokens issued to that client. Keep token exchange
+  and credentials on the backend, preserving PKCE/state/nonce checks and independent UniSport
   sessions. Replace the native-callback bridge only after the web flow works.
 - [x] Add manual native-API registration, dynamic questions/file answers and
   cancellation with provider confirmation (1.5.0). Verify outcomes against fresh
@@ -53,6 +72,16 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
   regressions and the actual production container stack before publishing.
 - [x] Include the official ZSSW website identity login in the connection flow
   and resume participant-list loading after its return (1.7.1, Companion 1.2.1).
+- [x] Hide UniSport navigation, sidebar customisation and the direct view unless
+  the server explicitly enables `UNISPORT_ENABLED` (1.7.2).
+- [x] Fix UniBE ILIAS verification using the own-profile route (1.8.1), preserve
+  all caches for proven same-account renewal, confirm actual/unmatched account
+  switches and prevent background Companion sync from replacing that connection.
+- [x] Add explicit UniBE ID-token exchange into a freshly verified, isolated
+  ILIAS connection (1.8.0), with account-switch confirmation and stale-result
+  guards. Initial SWITCH login continues to use the Companion.
+- [ ] Verify the mobile-auth exchange with a real logged-in UniBE account;
+  synthetic tests and anonymous/invalid-token probes do not prove acceptance.
 - [ ] Add explicitly armed, one-occurrence client-timed registration. Autologin/session renewal,
   recurring subscriptions and browser-closed scheduling remain later features.
 

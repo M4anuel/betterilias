@@ -106,3 +106,14 @@
 .admin-code-stack ol { list-style: decimal inside; }.admin-event-actions { padding: 0 0 20px 88px; }@media(max-width:640px) { .admin-event-actions { padding-left: 0; } }
 .activity-totals, .activity-charts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin-bottom: 16px; }.activity-chart { min-width: 0; }.activity-chart h3 { font-weight: 650; font-size: 16px; }.activity-chart svg { display: block; width: 100%; height: auto; margin-top: 18px; }.activity-chart rect { fill: #0aaca5; }.activity-chart rect.activity-selected { fill: #033683; }.dark .activity-chart rect { fill: #3dbdb4; }.dark .activity-chart rect.activity-selected { fill: #98bdff; }.activity-axis { display: flex; justify-content: space-between; font-size: 12px; margin: 6px 0 18px; }.admin-shell .activity-range { display: block; width: 100%; min-height: 44px; padding: 0; accent-color: #0aaca5; }.activity-value { min-height: 44px; font-size: 13px; padding: 8px 0; }.activity-chart summary { min-height: 44px; cursor: pointer; font-size: 13px; padding: 12px 0; }.activity-table { max-height: 240px; overflow: auto; }.activity-table table { width: 100%; border-collapse: collapse; font-size: 12px; }.activity-table th, .activity-table td { text-align: left; padding: 10px 6px; border-bottom: 1px solid #cbd5e1; }.dark .activity-table th, .dark .activity-table td { border-color: #36445a; }
 @media(max-width:767px) { .activity-totals, .activity-charts { grid-template-columns: minmax(0,1fr); } }
+.account-usage-totals { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.account-usage .admin-button, .account-usage input { min-height:48px; }
+.account-usage-names { margin-top:18px; }
+.account-usage-search { display:flex; gap:8px; margin:6px 0 14px; }
+.account-usage-search input { flex:1; min-width:0; width:100%; font-size:16px; }
+.account-usage-list { list-style:none; padding:0; margin:12px 0; }
+.account-usage-list li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 18px; padding:14px 0; border-bottom:1px solid #cbd5e1; }
+.account-usage-list strong { overflow-wrap:anywhere; }
+.dark .account-usage-list li { border-color:#36445a; }
+.account-usage-pages { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; margin-top:12px; }
+@media(max-width:639px) { .account-usage-totals { grid-template-columns:minmax(0,1fr); } .account-usage-list li { grid-template-columns:minmax(0,1fr); } }

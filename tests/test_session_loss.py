@@ -97,6 +97,33 @@ def test_fixtures_do_not_trigger_false_positives():
 
 
 @pytest.mark.asyncio
+async def test_modern_account_menu_precedes_embedded_login_links():
+    html='''<ul class="il-maincontrols-metabar"><li><a href="/ilias.php?baseClass=ilDashboardGUI&amp;cmd=jumpToProfile">Profile</a></li></ul>
+    <a href="login.php?target=old-course&amp;cmd=force_login">Archived course login help</a>
+    <p>Kein Zugriffsrecht: archived course</p>'''
+    response=create_mock_response(text=html)
+    IliasClient()._check_response_for_session_loss(response,'https://ilias.unibe.ch/ilias.php')
+    manager=SessionManager('synthetic')
+    manager.has_cookies=MagicMock(return_value=True)
+    manager.load_metadata=MagicMock(return_value={'user_name':'Synthetic Student'})
+    mock_client=AsyncMock();mock_client.get=AsyncMock(return_value=response)
+    mock_client.__aenter__=AsyncMock(return_value=mock_client)
+    manager.get_http_client=MagicMock(return_value=mock_client)
+    assert await manager.verify_session()==(True,'Synthetic Student')
+
+
+@pytest.mark.parametrize('link',[
+    '<a href="/ilias.php?baseClass=ilDashboardGUI&amp;cmd=jumpToProfile">Content link</a>',
+    '<ul class="il-maincontrols-metabar"><a href="https://other.invalid/ilias.php?baseClass=ilDashboardGUI&amp;cmd=jumpToProfile">External</a></ul>',
+    '<ul class="il-maincontrols-metabar"><a href="/ilias.php?baseClass=ilpublicuserprofilegui&amp;cmd=getHTML&amp;user=123">Lecturer</a></ul>',
+])
+def test_generic_or_public_profile_links_do_not_override_login_prompt(link):
+    response=create_mock_response(text=link+'<a href="login.php?target=course">Login</a>')
+    with pytest.raises(SessionExpiredError):
+        IliasClient()._check_response_for_session_loss(response,'https://ilias.unibe.ch/ilias.php')
+
+
+@pytest.mark.asyncio
 async def test_session_manager_verify_session_expired():
     manager = SessionManager()
     manager.has_cookies = MagicMock(return_value=True)

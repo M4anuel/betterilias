@@ -36,6 +36,10 @@ class LoginError(Exception):
     """Never propagate provider bodies, codes, keys or claims to diagnostics."""
 
 
+class CredentialRejected(LoginError):
+    """The protected UniApp endpoint explicitly rejected these credentials."""
+
+
 def digest(value):
     return hashlib.sha256(value.encode()).hexdigest()
 
@@ -106,6 +110,8 @@ async def provider_json(url, owner, *, method='GET', data=None, headers=None, tr
         async with httpx.AsyncClient(transport=EgressTransport(policy=policy, inner=transport),
                 timeout=20, follow_redirects=False, trust_env=False) as client:
             async with client.stream(method, url, data=data, headers=headers) as response:
+                if origin == UNIAPP and response.status_code in (401, 403):
+                    raise CredentialRejected()
                 if response.status_code != 200:
                     raise LoginError()
                 body = bytearray()
@@ -188,10 +194,15 @@ async def complete(owner, callback):
             raise LoginError()
         keys = await provider_json(JWKS, owner)
         claims = validate_id_token(token, keys, data['nonce'])
-        connected = dict(phase='connected', token=token, subject=claims['sub'], affiliation=None)
+        name = claims.get('name')
+        if not isinstance(name, str) or not name.strip():
+            name = ' '.join(claims.get(key, '').strip() for key in ('given_name', 'family_name') if isinstance(claims.get(key), str))
+        expires_at = min(claims['exp'], time.time() + 3600)
+        connected = dict(phase='connected', token=token, subject=claims['sub'], affiliation=None,
+            name=name.strip()[:300] or None, expires_at=expires_at)
         with database() as db:
             changed = db.execute('UPDATE connections SET data=?, expires=? WHERE owner=? AND state=? AND expires>?',
-                (json.dumps(connected), min(claims['exp'], time.time() + 3600), owner, state, time.time())).rowcount
+                (json.dumps(connected), expires_at, owner, state, time.time())).rowcount
         if not changed:
             raise LoginError()
     except LoginError:
@@ -215,11 +226,13 @@ async def affiliations(owner, data):
     return choices
 
 
-async def select_affiliation(owner, choice):
+async def select_affiliation(owner, choice, expected_scope=None):
     current = record(owner)
     if not current or current[1]['phase'] != 'connected':
         raise LoginError()
     state, data = current
+    if expected_scope is not None and not hmac.compare_digest(expected_scope, digest(state + ':' + data['subject'])):
+        raise LoginError()
     if choice not in await affiliations(owner, data):
         raise LoginError()
     updated = {**data, 'affiliation': choice}

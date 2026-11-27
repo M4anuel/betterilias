@@ -62,7 +62,7 @@ jobs:
         env:
           BETTERILIAS_BROWSER_TESTS: '1'
           BETTERILIAS_BROWSER_CHANNEL: chromium
-        run: python -m pytest tests/test_unisport_participants_browser.py tests/test_unisport_participants_bridge_browser.py -q
+        run: python -m pytest tests/test_unisport_participants_browser.py tests/test_unisport_participants_bridge_browser.py tests/test_unisport_ui_browser.py tests/test_unibe_companion_browser.py tests/test_unibe_companion_integration_browser.py tests/test_extension_popup_browser.py tests/test_account_usage_browser.py tests/test_companion_logout_browser.py tests/test_state_machine_browser.py -q
       - name: Build images and smoke-test the actual production stack
         run: python scripts/smoke_containers.py --build
 

@@ -1,5 +1,7 @@
 import { feedbackFilesCache, feedbackFilesKey } from './feedbackFilesCache';
 import { t, getLanguage } from './i18n';
+import { unisportCompanionRequest } from './unisport';
+import { clearPrivate as clearUnisportPrivate } from './unisportCache';
 import {
   AuthStatus,
   AuthoringContext, AuthoringResult, FileLicense,
@@ -44,6 +46,14 @@ import { considerDiagnosticResponse, clientDiagnostic } from './diagnosticReport
 
 
 const API_BASE = '/api';
+document.addEventListener('BETTERILIAS_LOGGED_OUT', () => {
+  cache.invalidateSessionRequests();cache.clearSessionContent();
+  clearUnisportPrivate();
+  localStorage.setItem('betterilias_logout_paused','1');
+  window.dispatchEvent(new Event('unisport-connection-changed'));
+  window.dispatchEvent(new Event('betterilias-logged-out'));
+  reportAuthEvidence(false, ++requestSequence);
+});
 class ResponseFailure extends Error {}
 let requestSequence = 0;
 let lastAuthEvidence = 0;
@@ -61,6 +71,8 @@ export function apiError(error: { detail?: unknown }): string | undefined {
 
 // Protected API responses confirm the current session, including expiry.
 export async function sessionFetch(input: string, init?: RequestInit & { trackPending?: boolean }): Promise<Response> {
+  if(localStorage.getItem('betterilias_logout_paused')==='1' && !input.startsWith(`${API_BASE}/auth/`) && !input.startsWith(`${API_BASE}/diagnostics/`))
+    throw new DOMException(t('auth.session_required'),'AbortError');
   const sessionId = cache.getSessionId();
   const scope = cache.getRequestScope();
   const sequence = ++requestSequence;
@@ -298,6 +310,7 @@ export const api = {
     return res.json();
   },
   async getAuthStatus(): Promise<AuthStatus> {
+    if(localStorage.getItem('betterilias_logout_paused')==='1')return {authenticated:false,cookies_present:false};
     const res = await sessionFetch(`${API_BASE}/auth/status`);
     if (!res.ok) throw new Error(t("Failed to fetch auth status"));
     const data: AuthStatus = await res.json();
@@ -306,16 +319,39 @@ export const api = {
   },
 
   async logout(): Promise<void> {
+    localStorage.setItem('betterilias_logout_paused','1');
     cache.invalidateSessionRequests();
     const scope = cache.getRequestScope();
     try {
-      await sessionFetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+      let companionHandled=false;
+      if(document.documentElement.dataset.betteriliasCompanion==='1') {
+        try {
+          const result=await unisportCompanionRequest<{native_logout_confirmed?:boolean}>({type:'UNIBE_LOGOUT',sessionId:cache.getSessionId()},30000);
+          companionHandled=true;
+          if(result.native_logout_confirmed===false)throw new Error(t('companion.logout_partial'));
+        } catch(error) { if(companionHandled)throw error; }
+      }
+      if(!companionHandled) {
+        const result=await sessionFetch(`${API_BASE}/auth/logout`, { method: 'POST',headers:{'X-ILIAS-Logout':'1'} });
+        if(!result.ok && result.status!==401)throw new Error(t('companion.logout_failed'));
+        const credential=localStorage.getItem('betterilias_unisport_session');
+        if(credential && /^[A-Za-z0-9_-]{43}$/.test(credential)) {
+          const disconnected=await fetch(`${API_BASE}/auth/unibe/connection`,{method:'DELETE',credentials:'omit',headers:{'X-Unisport-Session':credential}});
+          if(!disconnected.ok)throw new Error(t('companion.logout_failed'));
+        }
+        const data=await result.json().catch(()=>({}));
+        if(data.ilias_logout_confirmed===false)throw new Error(t('companion.logout_partial'));
+      }
     } finally {
       // Retain the revoked key so a paired device cannot fall back to another
       // active/default desktop session on its next request.
       if (scope.key === cache.getRequestScope().key) {
         cache.invalidateSessionRequests();
         cache.clearSessionContent();
+        clearUnisportPrivate();
+        for(const key of ['betterilias_unisport_session','betterilias_ilias_source','betterilias_unibe_selected_session'])localStorage.removeItem(key);
+        window.dispatchEvent(new Event('unisport-connection-changed'));
+        window.dispatchEvent(new Event('betterilias-logged-out'));
         reportAuthEvidence(false, ++requestSequence);
       }
     }

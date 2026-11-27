@@ -1,5 +1,11 @@
 # Unisport companion prototype
 
+Since BetterIlias 1.9.0 / Companion 1.4.0, the primary shared login and affiliation
+selection live in the Companion: see [UNIBE_LOGIN.md](UNIBE_LOGIN.md).
+The historical page-first and browser-cookie workflows are documented as
+deprecated in [LEGACY_ILIAS_LOGIN.md](LEGACY_ILIAS_LOGIN.md), including recovery.
+The protocol evidence and feature history below remain available for reference.
+
 Version 1.3.0 adds an opt-in companion-assisted SWITCH login, independent
 connection/disconnection, explicit affiliation selection and read-only personal
 registrations. Default Unisport navigation is available in every semester.
@@ -17,6 +23,7 @@ Version 1.7.0 reads those lists through Companion 1.2.0 into a cached dialog wit
 live search, and caches native registration reads on both server and client.
 Version 1.7.1 makes the separate website identity login an explicit connection
 step, with Companion 1.2.1 resuming participant reads after the official return.
+Version 1.8.0 adds an explicit server-side UniBE-token-to-ILIAS-session prototype.
 
 ## Try it locally
 
@@ -24,9 +31,12 @@ step, with Companion 1.2.1 resuming participant reads after the official return.
    in the application's virtual environment; `uv pip install` also works).
 2. Set `UNISPORT_ENABLED=true` in the repository-root `.env` and restart the
    backend. The default is false, including in production.
+   From 1.7.2 the frontend hides UniSport navigation/customisation and its direct
+   view unless `/api/unisport/availability` explicitly reports `enabled: true`.
+   Reload the page after changing the server flag; no frontend build flag is needed.
 3. Reload the unpacked Chrome extension from `extensions/chrome/`, or temporarily
    load `extensions/firefox/manifest.json` in Firefox's `about:debugging`.
-   These folders contain Companion 1.2.1; the store releases may still be older.
+   These folders contain Companion 1.3.0; the store releases may still be older.
    Accept `login.eduid.ch` and `www.zssw.unibe.ch` access. Safari is not supported by
    this prototype.
 4. In Companion settings, set the backend and frontend addresses to match the
@@ -36,6 +46,10 @@ step, with Companion 1.2.1 resuming participant reads after the official return.
    SWITCH**. Complete login/consent directly on the real provider's page.
 6. Return to BetterIlias, choose and confirm an affiliation, then load personal
    registrations. No booking request is made.
+   To connect ILIAS without separately syncing browser cookies, choose
+   **Connect ILIAS with this login**. If an ILIAS connection is already active,
+   confirm the account switch. Only a positively verified exchange activates a
+   new ILIAS capability; initial SWITCH login still uses the Companion.
    For participant lists, use **Complete website login** below the affiliation
    selector. Select the matching organisation/identity on SWITCH for the
    university sport website. Saving a native API affiliation cannot select that
@@ -71,6 +85,100 @@ validates the participant table before displaying rows.
 
 See SWITCH's [identity chooser documentation](https://help.switch.ch/de/eduid/federation/login/chooser/):
 the chosen organisational identity is released to the requesting service.
+
+## Explicit ILIAS connection from the UniBE token (1.8.0)
+
+Static inspection of UniBE Mobile 3.4.0 recovered `IliasLinkWidget`, the ILIAS
+bottom-navigation route and `WebViewScreenState._resolveHeaders`. They use the
+shared stored ID token and selected affiliation with:
+
+```http
+GET https://ilias.unibe.ch/mobile-auth?redirect=<personal-dashboard>
+Authorization: <raw ID token>
+X-UNICAMPUS-AFFILIATION: <selected affiliation>
+```
+
+Unlike the UniApp API's Bearer header, the inspected WebView assigns the raw ID
+token directly. Anonymous live probes on 2026-11-25 confirmed the exact redirect
+to `/Customizing/global/plugins/Origins2/mobileauth.php`; the alias returns 401
+without authentication and routes an invalid synthetic token to an error page.
+A PHP session cookie issued on rejection is not evidence of authentication.
+
+`POST /api/unisport/ilias-connection` requires explicit UniSport capability,
+connection scope and affiliation headers. It accepts no client token/target.
+The server uses a fresh jar, pins the exact HTTPS UniBE ILIAS origin and confines
+token headers to the two fixed entry/alias URLs. Subsequent verification requests
+carry cookies only. Responses are bounded to 4 MB and the exchange to 60 seconds,
+without automatic login retries or sharing verification requests.
+
+Since 1.8.1, verification reads the fixed dashboard `jumpToProfile` command and
+follows only bounded, same-origin own-profile redirects. The server-selected
+`form_pd` editor must contain its unique, hidden `ne_un` login and the expected
+personal-profile action. Generic containers, public avatars and HTTP 200 alone
+are insufficient. A SHA-256 account key binds the native origin and unique login;
+names/initials are never used to match accounts. Archived-course access notices
+do not override positive identity. Before saving,
+a database transaction rechecks the original UniSport generation, affiliation,
+token/account data and expiry against disconnect/replacement. An explicit
+`X-Session-Id` may nominate an existing capability for renewal. If its stored
+verified account key matches, the same capability is retained, including when
+the old upstream cookies have expired. Legacy sessions without that key require
+a separate cookie-only own-profile proof. Unknown/different accounts get a new
+random capability; ambient cookies and default tenants never nominate a renewal.
+An atomic snapshot comparison prevents concurrent logout/account replacement
+from resurrecting or overwriting the nominated session. Only the verified ILIAS
+cookies, account-key digest, source and display name are saved. The UniBE
+token never enters an ILIAS session file, the page, URL or diagnostic response.
+
+Same-account renewal preserves the cache owner, all SID-scoped caches and server
+state, including the request scope and correction-file caches. Authentication
+refreshes without reloading the application. A different/unmatched account requires confirmation
+after verification, then uses the existing cache-clearing account-switch path.
+Cancelling keeps the current selection and caches. Native
+download cookies are bound by normal authenticated API/status responses. A late
+result after a frontend account/affiliation change is ignored. Failed exchange
+does not replace existing ILIAS credentials. The new ILIAS connection is
+independent: disconnect UniSport and log out ILIAS separately; existing ILIAS
+session expiry/cleanup and tenant isolation rules still apply.
+
+The first SWITCH authorization-code callback remains native-app-only, so this
+does not eliminate the Companion entirely. A read-only live local-account probe
+on 2026-11-26 confirmed valid-token exchange and cookie-only own-profile proof;
+it persisted no resulting credentials. This fixes the initial 502: the dashboard
+redirects through UniBE's semester plugin and no longer has the expected avatar.
+Verification now uses the own-profile route independently of those dashboard
+changes. Automated tests use synthetic tokens/cookies, isolated session files
+and mocked upstream HTTP. Browser tests
+cover both languages/themes and phone/tablet/desktop/short-landscape emulation.
+
+Companion 1.3.0 is required to retain this explicit source selection. The page
+stores `betterilias_ilias_source=unisport` only after verified exchange. Both
+Chrome and Firefox then ignore automatic/cached browser-cookie selections for
+that frontend origin, including content-script startup after reload. Manual
+Companion sync clears the preference, as does a successfully claimed handoff.
+This is a source preference, not an additional credential; no token is sent to
+extension storage. Other BetterIlias origins retain independent preferences.
+The frontend also pins that explicit selection to its cache owner before cache
+initialization and ignores unsolicited Companion sync events while UniBE is
+selected. This protects reloads with older installed Companion content scripts
+that still write the obsolete browser capability into localStorage. Only a
+verified UniBE activation carries the explicit UniBE source marker. A current
+Companion's manual sync removes the preference and retains normal account-switch
+behavior. Browser regressions cover both early storage writes and later DOM/
+window messages, including correction-cache preservation.
+The owner reported successful ILIAS connection after this selection fix on
+2026-11-26; this does not establish extension-free initial SWITCH login.
+Browser-cookie sync targeting a UniBE-renewed capability creates a separate
+capability instead of overwriting it, including when the old Companion still
+remembers that session ID. The existing manual-sync selection works in both
+Chrome and Firefox. Expected verification rejection returns 422 with a fixed
+`X-ILIAS-Verification-Stage`; transport failures remain 502. No provider body,
+identity value or token appears in the stage diagnostic.
+Token-created cookies always retain the exchange's User-Agent, including when
+renewing a capability previously populated by a different browser. Native page
+checks and authentication status share positive account-menu detection for the
+current ILIAS UI; the same-origin own-profile menu command takes precedence over
+login/help links embedded elsewhere. Public-profile/content links do not qualify.
 
 ## Catalogue and personal cache policy
 
@@ -178,7 +286,9 @@ store, saved credentials or private user data were read.
   offer ID plus start datetime, not offer ID alone.
 
 The API origin is `https://api.uniapp-backend.unibe.ch`. Keep provider and UniApp
-credentials isolated from ILIAS and restrict each credential to its destination.
+session storage isolated from ILIAS and restrict each credential to its
+destination; the explicit 1.8.0 exchange adds only UniBE ILIAS's fixed
+mobile-auth entry/alias as a permitted destination for that ID token.
 
 ## Web integration gap
 

@@ -94,6 +94,16 @@ def test_chromium_participants_cookie_session_fetch_bounds_and_trusted_sender(tm
                 result=invoke({'type':'UNISPORT_PARTICIPANTS_READ',**MESSAGE,'course':'3003','context':second['data']['context']})
                 assert not result['success'] and 'html' not in (result.get('data') or {})
             assert worker.evaluate('chrome.storage.session.get(null)')=={}
+            owner.evaluate("localStorage.setItem('betterilias_ilias_source','unisport');localStorage.setItem('betterilias_session_id','synthetic-token-session')")
+            worker.evaluate("chrome.storage.local.set({sessionId:'synthetic-browser-session'})")
+            owner.reload();owner.wait_for_timeout(100)
+            assert owner.evaluate("localStorage.getItem('betterilias_session_id')")=='synthetic-token-session'
+            tab_id=worker.evaluate('(url)=>chrome.tabs.query({}).then(tabs=>tabs.find(tab=>tab.url===url).id)',owner.url)
+            worker.evaluate('(tab)=>chrome.tabs.sendMessage(tab,{type:"BETTERILIAS_SESSION_SYNCED",sessionId:"synthetic-automatic-session"})',tab_id)
+            assert owner.evaluate("localStorage.getItem('betterilias_session_id')")=='synthetic-token-session'
+            worker.evaluate('(tab)=>chrome.tabs.sendMessage(tab,{type:"BETTERILIAS_SESSION_SYNCED",sessionId:"synthetic-manual-session",manual:true})',tab_id)
+            assert owner.evaluate("localStorage.getItem('betterilias_session_id')")=='synthetic-manual-session'
+            assert owner.evaluate("localStorage.getItem('betterilias_ilias_source')") is None
             # Website login is a real top-level SAML navigation, not a fetch of
             # the identity chooser or an API affiliation pretending to log in.
             control['mode']='redirect'

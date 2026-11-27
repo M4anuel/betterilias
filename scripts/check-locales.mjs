@@ -23,8 +23,13 @@ export function files(directory) {
 export function jsKeys(file) {
   const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
   const keys = [];
+  function argument(node) {
+    if (ts.isStringLiteral(node)) keys.push(node.text);
+    else if (ts.isConditionalExpression(node)) { argument(node.whenTrue); argument(node.whenFalse); }
+    else if (ts.isParenthesizedExpression(node)) argument(node.expression);
+  }
   function visit(node) {
-    if (ts.isCallExpression(node) && node.expression.getText(source) === 't' && node.arguments[0] && ts.isStringLiteral(node.arguments[0])) keys.push(node.arguments[0].text);
+    if (ts.isCallExpression(node) && node.expression.getText(source) === 't' && node.arguments[0]) argument(node.arguments[0]);
     ts.forEachChild(node, visit);
   }
   visit(source); return keys;
@@ -34,9 +39,12 @@ for (const file of files(path.join(root, 'frontend/src')).filter(f => /\.tsx?$/.
   for (const key of jsKeys(file)) keys.add(key);
 }
 for (const dir of ['extensions/chrome', 'extensions/firefox', 'extensions/safari']) {
-  for (const key of jsKeys(path.join(root, dir, 'popup.js'))) keys.add(key);
+  for (const name of ['popup.js', 'unibe-popup.js']) {
+    const file = path.join(root, dir, name);
+    if (fs.existsSync(file)) for (const key of jsKeys(file)) keys.add(key);
+  }
   const html = fs.readFileSync(path.join(root, dir, 'popup.html'), 'utf8');
-  for (const match of html.matchAll(/data-i18n="([^"]+)"/g)) keys.add(match[1]);
+  for (const match of html.matchAll(/data-i18n(?:-aria)?="([^"]+)"/g)) keys.add(match[1]);
 }
 for (const file of files(path.join(root, 'backend')).filter(f => f.endsWith('.py'))) {
   const source = fs.readFileSync(file, 'utf8');

@@ -139,11 +139,17 @@ for configuration and verification details.
    [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/betterilias-companion/).
    For local development or self-hosted configuration, see the
    [Firefox development instructions](extensions/firefox/README.md).
-2. Log into [Uni Bern ILIAS](https://ilias.unibe.ch) normally, including SWITCH
-   edu-ID/2FA when required.
-3. With BetterIlias running, open the extension and choose **Sync session with
-   BetterIlias** / **Sitzung mit BetterIlias synchronisieren**.
-4. Open the app. When the session expires, repeat the sync.
+2. With BetterIlias running, open Companion 1.6.0 or later and choose **Sign in
+   with SWITCH edu-ID**. Complete login/MFA on the official SWITCH page.
+3. Return to the Companion page, select your affiliation and choose **Use
+   affiliation and connect**. One UniBE login supplies ILIAS and UniSport.
+4. Open the app. The Companion shows your name and affiliation choices while the
+   token remains valid, and offers login again after expiry.
+
+See [shared UniBE login](docs/UNIBE_LOGIN.md) for configuration and test boundaries.
+Older store packages may not contain the new popup yet. The former browser-cookie
+method is deprecated; its explicit fallback, protocol and rollback reference are
+preserved in [legacy login documentation](docs/LEGACY_ILIAS_LOGIN.md).
 
 The app sends the resulting session ID with API requests. Both browser extensions
 support German/English and light/dark appearance. The Firefox store installation

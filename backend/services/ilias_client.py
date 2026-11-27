@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 import httpx
 
 from backend.auth.session import SessionManager, session_manager
+from backend.auth.indicators import authenticated_control
 from backend.config import settings
 from backend.services.assignment_multipart import encode_assignment_form
 from backend.services.authoring import AuthoringMixin
@@ -179,7 +180,7 @@ class IliasClient(ForumPageMixin, ForumMixin, AuthoringMixin, ManagementMixin):
         # 3. HTML text & link markers
         text_lower = response.text.lower()
         soup = BeautifulSoup(response.text, 'html.parser')
-        if soup.select_one('.il-maincontrols-metabar a.il-user-avatar, #il_mbt_usr, span.il-avatar-initials, a.il-user-avatar'):
+        if response.text.strip() and authenticated_control(response.text) is not None:
             return
 
         # Explicit force_login command or login prompt target in HTML

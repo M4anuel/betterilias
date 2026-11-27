@@ -23,6 +23,18 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, 'unisport_enabled', True)
 
 
+def test_public_availability_matches_opt_in_configuration(monkeypatch):
+    from backend.config import Settings
+    monkeypatch.delenv('UNISPORT_ENABLED', raising=False)
+    assert Settings(_env_file=None).unisport_enabled is False
+    with TestClient(app) as client:
+        for enabled in [False, True]:
+            monkeypatch.setattr(settings, 'unisport_enabled', enabled)
+            response=client.get('/api/unisport/availability')
+            assert response.status_code==200 and response.json()=={'enabled':enabled}
+            assert response.headers['cache-control']=='no-store'
+
+
 @pytest.fixture
 def signing():
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

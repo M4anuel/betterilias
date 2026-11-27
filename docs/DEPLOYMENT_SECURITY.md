@@ -29,7 +29,12 @@ privacy review remain unfinished; no student capability grants administrator acc
 
 ## Authentication
 
-Login is through the Chrome/Firefox companion only; the headed browser helper,
+Login uses the Chrome/Firefox companion, or the explicit verified UniBE ID-token
+exchange when the UniSport prototype is enabled. The exchange pins token headers
+to UniBE ILIAS's mobile-auth entry/alias, uses a fresh cookie jar and creates a
+new isolated ILIAS capability only after positive dashboard verification and a
+final source-connection check. Initial SWITCH login still uses the Companion.
+The headed browser helper,
 `login.py`, `/api/auth/login-browser`, manual cookie UI, and `/api/auth/cookies`
 are removed. Existing extensions keep refreshing their explicitly selected tenant.
 Incoming cookies are checked against ILIAS before replacing saved credentials.

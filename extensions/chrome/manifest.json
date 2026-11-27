@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BetterIlias Companion",
-  "version": "1.2.1",
+  "version": "1.6.0",
   "description": "__MSG_description__",
   "permissions": [
     "cookies",
@@ -15,7 +15,8 @@
     "http://localhost/*",
     "http://127.0.0.1/*",
     "https://login.eduid.ch/*",
-    "https://www.zssw.unibe.ch/*"
+    "https://www.zssw.unibe.ch/*",
+    "https://betterilias.ch/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -48,7 +49,8 @@
     {
       "matches": [
         "http://localhost/*",
-        "http://127.0.0.1/*"
+        "http://127.0.0.1/*",
+        "https://betterilias.ch/*"
       ],
       "js": [
         "content.js"

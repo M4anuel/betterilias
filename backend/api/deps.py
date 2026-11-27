@@ -40,7 +40,12 @@ def get_optional_session_manager(
         if (request.url.path.startswith('/api/') and request.method not in ('HEAD', 'OPTIONS')
                 and not request.url.path.startswith(('/api/auth/', '/api/admin/', '/api/diagnostics/'))):
             from backend.activity import record
-            record(manager.session_id)
+            metadata = manager.load_metadata()
+            if not isinstance(metadata, dict):
+                metadata = {}
+            record(manager.session_id,
+                account=metadata.get('usage_account_key') if metadata.get('source') == 'unisport_id_token' else None,
+                name=metadata.get('user_name'))
         return manager
     return None
 

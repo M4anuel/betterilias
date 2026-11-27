@@ -99,10 +99,31 @@ export const cache = {
   // --- Multi-Tenant Session ID ---
   getSessionId(): string | null {
     try {
+      // Older installed Companions can overwrite the storage key at document
+      // startup. Keep the explicit UniBE selection before any cache renders.
+      if (localStorage.getItem('betterilias_ilias_source') === 'unisport') {
+        const selected = localStorage.getItem('betterilias_unibe_selected_session');
+        if (selected && /^[A-Za-z0-9_-]{43}$/.test(selected)) return selected;
+        const owner = localStorage.getItem('betterilias_cache_owner');
+        if (owner) return owner;
+      }
       return localStorage.getItem(SESSION_ID_KEY) || inMemorySessionId;
     } catch {
       return inMemorySessionId;
     }
+  },
+
+  acceptSessionSync(sessionId: string, source?: 'unisport') {
+    try {
+      if(localStorage.getItem('betterilias_logout_paused')==='1')return false;
+      if (source !== 'unisport' && localStorage.getItem('betterilias_ilias_source') === 'unisport') {
+        const selected = cache.getSessionId();
+        if (selected) cache.setSessionId(selected);
+        return false;
+      }
+    } catch { /* Storage may be unavailable. */ }
+    cache.setSessionId(sessionId);
+    return true;
   },
 
   setSessionId(sessionId: string | null) {
@@ -122,6 +143,7 @@ export const cache = {
       } else {
         localStorage.removeItem(SESSION_ID_KEY);
       }
+      localStorage.removeItem('betterilias_unibe_selected_session');
     } catch (e) {
       console.error('Failed to update session ID');
     }
@@ -1431,7 +1453,9 @@ export const cache = {
 cache.setSessionId(cache.getSessionId());
 window.addEventListener('storage', event => {
   if (event.key === SESSION_ID_KEY) {
-    inMemorySessionId = event.newValue?.trim() || null;
+    const selected = cache.getSessionId();
+    if (selected === inMemorySessionId) return;
+    inMemorySessionId = selected;
     cache.invalidateSessionRequests();
   }
 });

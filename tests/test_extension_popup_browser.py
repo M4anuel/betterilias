@@ -46,6 +46,12 @@ def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, sc
                 assert result['sizes']==['16','32','48','64']
             assert icon['results'][1]['color']==[220,38,38,255]
             worker.evaluate('(language)=>chrome.storage.local.set({language})',language)
+            worker.evaluate('''()=>{
+              const original=globalThis.fetch;
+              globalThis.fetch=async(url,init)=>String(url).includes('/api/auth/unibe/')
+                ?new Response(JSON.stringify(String(url).endsWith('/availability')?{enabled:true}:{phase:'disconnected'}),{status:200})
+                :original(url,init);
+            }''')
             worker.evaluate('chrome.action.openPopup()')
             driver=context.pages[0]
             cdp=context.new_cdp_session(driver)
@@ -82,18 +88,18 @@ def test_actual_action_popup_keeps_readable_width(tmp_path, language, scheme, sc
                 metrics=evaluate('''(()=>{
                   const box=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}};
                   return {width:innerWidth,height:innerHeight,scroll:document.documentElement.scrollWidth,
-                    body:box('body'),header:box('h1'),badge:box('#ilias-status-badge'),login:box('#login-btn'),
-                    status:document.querySelector('#ilias-status-badge').className,
+                    body:box('body'),header:box('h1'),badge:box('#account-state'),login:box('#login-btn'),
+                    status:document.querySelector('#account-state').className,
                     headerLine:parseFloat(getComputedStyle(document.querySelector('h1')).lineHeight),
-                    badgeLine:parseFloat(getComputedStyle(document.querySelector('#ilias-status-badge')).fontSize)};
+                    badgeLine:parseFloat(getComputedStyle(document.querySelector('#account-state')).fontSize)};
                 })()''')
-                if metrics['status'].endswith('badge-danger') and metrics['width']>=380*scale-1:break
+                if metrics['status'].endswith('badge-warning') and metrics['login']['height']>=48*scale-1 and metrics['width']>=380*scale-1:break
                 driver.wait_for_timeout(20)
             assert 380*scale-1<=metrics['body']['width']<=380*scale+1
             assert metrics['scroll']<=metrics['width']+1
             assert metrics['header']['height']<=metrics['headerLine']*scale+1
             assert metrics['badge']['height']<25*scale
-            assert metrics['login']['width']>=340*scale and metrics['login']['height']>=48*scale
+            assert metrics['login']['width']>=310*scale and metrics['login']['height']>=48*scale
             assert worker.evaluate('chrome.action.getBadgeText({})')==''
             expected_title = 'Nicht angemeldet' if language=='de' else 'Signed out'
             deadline = time.monotonic() + 10

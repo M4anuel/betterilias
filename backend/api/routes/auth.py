@@ -1,6 +1,12 @@
 from backend.observability import audit
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+import asyncio
+import httpx
+from backend.outbound_budget import OutboundUnavailable
+from backend.outbound_targets import OutboundTargetRejected
+from backend.services.session_logout import end_native_session
+from backend.scrapers.dumper import ScrapingParsingError
 from pydantic import BaseModel, Field
 from backend.i18n import t
 from backend.config import settings
@@ -89,6 +95,14 @@ async def sync_extension_cookies(payload: ExtensionSyncInput, response: Response
     sid = payload.session_id
     if not valid_session_id(sid) or not SessionManager(sid).has_cookies():
         sid = SessionManager.generate_session_id()
+    snapshot = SessionManager(sid)._read_data()
+    # The Companion may still hold a capability subsequently renewed through
+    # UniBE. Give browser-cookie sync its own capability instead of silently
+    # replacing that connection with the browser's possibly different account.
+    protected = snapshot.get('metadata', {}).get('source') == 'unisport_id_token'
+    if protected:
+        sid = SessionManager.generate_session_id()
+        snapshot = {}
     metadata: Dict[str, Any] = {'source': payload.source or 'extension'}
     if payload.user_agent:
         metadata['user_agent'] = payload.user_agent
@@ -106,8 +120,15 @@ async def sync_extension_cookies(payload: ExtensionSyncInput, response: Response
         if previous_user and previous_user != user_or_msg:
             sid = SessionManager.generate_session_id()
         metadata['user_name'] = user_or_msg
-        SessionManager(sid).save_cookies(cookies, metadata=metadata)
-        if payload.session_id and valid_session_id(payload.session_id) and payload.session_id != sid:
+        manager = SessionManager(sid)
+        if snapshot and sid == payload.session_id:
+            if not manager.replace_unchanged(snapshot, cookies, metadata):
+                protected = True
+                sid = SessionManager.generate_session_id()
+                SessionManager(sid).save_cookies(cookies, metadata=metadata)
+        else:
+            manager.save_cookies(cookies, metadata=metadata)
+        if not protected and payload.session_id and valid_session_id(payload.session_id) and payload.session_id != sid:
             from backend.services.calendar_service import calendar_service
             calendar_service.migrate_tenant_state(payload.session_id, sid)
     return ExtensionSyncResponse(success=True, authenticated=is_valid,
@@ -117,8 +138,22 @@ async def sync_extension_cookies(payload: ExtensionSyncInput, response: Response
 
 @router.post('/logout')
 @audit('auth_logout')
-def logout(response: Response, manager: SessionManager = Depends(get_session_manager)):
-    cleared = manager.clear_session()
+async def logout(response: Response, manager: SessionManager = Depends(get_session_manager), x_ilias_logout: str = Header(default='')):
+    native_logout = None
+    try:
+        if x_ilias_logout == '1':
+            native_logout = False
+            try:
+                # Obtain the current rtoken from the authenticated account menu.
+                async with asyncio.timeout(10), manager.get_http_client() as client:
+                    native_logout = await end_native_session(client)
+            except (httpx.HTTPError, OutboundUnavailable, OutboundTargetRejected, ScrapingParsingError, TimeoutError):
+                pass
+    finally:
+        cleared = manager.clear_session()
+    if not cleared and manager.has_cookies():
+        raise HTTPException(503, detail=t('companion.logout_failed'))
     response.delete_cookie('betterilias_session', path='/api')
     response.headers['Cache-Control'] = 'no-store'
-    return {'success': True, 'message': t('Session cleared.') if cleared else t('No active session was found.')}
+    return {'success': True, 'ilias_logout_confirmed': native_logout,
+        'message': t('Session cleared.') if cleared else t('No active session was found.')}

@@ -1,6 +1,7 @@
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 const { t, languages, getLanguage, setLanguage } = BetterIliasI18n;
 document.addEventListener('DOMContentLoaded', async () => {
+  await browserAPI.storage.local.set({ authMethod: 'legacy' });
   const byId = id => document.getElementById(id);
   const badge = byId('ilias-status-badge'), subtitle = byId('ilias-status-sub');
   const autoSyncBadge = byId('auto-sync-badge');
@@ -134,7 +135,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try { appTab = new URL(tab.url).origin === new URL(frontendUrl()).origin; } catch (_) {}
         if (!appTab) continue;
         try {
-          const reply = await browserAPI.tabs.sendMessage(tab.id, { type: 'BETTERILIAS_SESSION_SYNCED', sessionId: data.session_id });
+          const reply = await browserAPI.tabs.sendMessage(tab.id, { type: 'BETTERILIAS_SESSION_SYNCED', sessionId: data.session_id, manual });
           if (reply?.success) continue;
         } catch (_) { /* Reloaded extensions may have no content script in an existing tab. */ }
         if (manual) {

@@ -25,16 +25,22 @@ def test_companion_packages_use_exact_origin_and_preserve_firefox_bridge(tmp_pat
         assert 'https://app.example.com/*' in manifest['host_permissions']
         assert 'https://app.example.com/*' in manifest['content_scripts'][0]['matches']
         assert 'https://*/*' not in manifest['host_permissions']
-        assert 'http://localhost/*' not in manifest['host_permissions']
-        assert manifest['content_scripts'][0]['matches'] == ['https://app.example.com/*']
         if browser == 'safari':
+            assert 'http://localhost/*' not in manifest['host_permissions']
+            assert manifest['content_scripts'][0]['matches'] == ['https://app.example.com/*']
             assert 'https://app.example.com' in (root / 'config.js').read_text()
             assert manifest['content_scripts'][1]['matches'] == ['https://ilias.unibe.ch/*']
             assert manifest['version'] == '1.1.3'
         else:
             assert 'https://app.example.com' in (root / 'popup.html').read_text()
             assert 'https://app.example.com' in (root / 'content.js').read_text()
-            assert manifest['version'] == '1.2.1'
+            assert manifest['version'] == '1.6.0'
+            assert 'http://localhost/*' in manifest['host_permissions']
+            assert 'http://localhost/*' in manifest['content_scripts'][0]['matches']
+            assert "'http://'+'localhost:8000'" in (root/'unibe-popup.js').read_text()
+            assert (root/'language.js').is_file() and (root/'legacy-login.js').is_file()
+            assert (root / 'unibe.js').is_file() and (root / 'unibe-popup.js').is_file()
+            assert (root / 'legacy-popup.html').is_file()
             assert manifest['content_scripts'][1]['matches'] == ['https://login.eduid.ch/*']
             assert manifest['content_scripts'][1]['js'] == ['unisport-callback.js']
             assert 'https://login.eduid.ch/*' in manifest['host_permissions']

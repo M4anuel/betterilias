@@ -225,6 +225,7 @@ def test_website_identity_login_resumes_list_and_ignores_other_accounts(workflow
     page.get_by_role('button',name=tr['unisport.participants'],exact=True).click()
     page.get_by_role('button',name=tr['unisport.website_login'],exact=True).click()
     page.get_by_text(tr['unisport.website_login_waiting'],exact=True).wait_for()
+    page.wait_for_function('loginStarts.length===1')
     assert page.evaluate('loginStarts[0].course')=='3003'
     page.evaluate("postMessage({type:'UNISPORT_PARTICIPANTS_LOGIN_FINISHED',scope:'z'.repeat(64),affiliation:'student',success:true},location.origin)")
     page.wait_for_timeout(50)

@@ -2,6 +2,7 @@ import { t, useLanguage } from './lib/i18n';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ConnectionNotice } from './components/ConnectionNotice';
 import { ErrorNotice } from './components/ErrorNotice';
+import { FeedbackBanner } from './components/ui/FeedbackBanner';
 import { useConnectionRetry } from './lib/connection';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -134,6 +135,19 @@ export function parseStateFromUrl(defaultSemester: string): NavigationState {
 }
 
 export const App: React.FC = () => {
+  const [unisportEnabled, setUnisportEnabled] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch('/api/unisport/availability', { credentials: 'omit', cache: 'no-store',
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) });
+        const value = response.ok ? await response.json() : null;
+        if (!controller.signal.aborted) setUnisportEnabled(value?.enabled === true);
+      } catch { /* Keep optional navigation hidden when availability is unknown. */ }
+    })();
+    return () => controller.abort();
+  }, []);
   const language = useLanguage();
   const approvedHistoryNavigation = useRef(false);
   const isMobile = useMobileViewport();
@@ -254,6 +268,8 @@ export const App: React.FC = () => {
   });
   const [isRevalidatingMaterials, setIsRevalidatingMaterials] = useState(false);
   const [semesterError, setSemesterError] = useState<string | null>(null);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [loadMaterialsError, setLoadMaterialsError] = useState<string | null>(null);
   const materialsRequestSeq = useRef<number>(0);
   const currentNavStateRef = useRef<NavigationState>({
@@ -971,17 +987,17 @@ export const App: React.FC = () => {
     const handleMessage = (event: MessageEvent) => {
       if (event.source === window && event.origin === window.location.origin && event.data?.type === 'BETTERILIAS_SESSION_SYNCED' && event.data?.sessionId) {
         const changed = localStorage.getItem('betterilias_cache_owner') !== event.data.sessionId;
-        cache.setSessionId(event.data.sessionId);
+        if (!cache.acceptSessionSync(event.data.sessionId)) return;
         if (changed) { window.location.reload(); return; }
         reloadContent();
       }
     };
 
     const handleCustomSync = (event: Event) => {
-      const customEvt = event as CustomEvent<{ sessionId?: string }>;
+      const customEvt = event as CustomEvent<{ sessionId?: string; source?: 'unisport' }>;
       if (customEvt.detail?.sessionId) {
         const changed = localStorage.getItem('betterilias_cache_owner') !== customEvt.detail.sessionId;
-        cache.setSessionId(customEvt.detail.sessionId);
+        if (!cache.acceptSessionSync(customEvt.detail.sessionId, customEvt.detail.source)) return;
         if (changed) { window.location.reload(); return; }
         reloadContent();
       }
@@ -1088,11 +1104,13 @@ export const App: React.FC = () => {
 
   // --- Logout Handler ---
   const handleLogout = async () => {
+    if(loggingOut)return;
+    setLogoutError(null);setLoggingOut(true);
     try {
       await api.logout();
     } catch (err: any) {
-      console.error('Logout error', err);
-    }
+      setLogoutError(err instanceof Error ? err.message : t('companion.logout_failed'));
+    } finally {setLoggingOut(false);}
   };
 
   useConnectionRetry(() => {
@@ -1124,7 +1142,7 @@ export const App: React.FC = () => {
 
   // --- Dynamic Document Title ---
   useEffect(() => {
-    if (isUnisportOpen) { document.title = `${t('unisport.title')} - BetterIlias`; return; }
+    if (isUnisportOpen) { document.title = unisportEnabled ? `${t('unisport.title')} - BetterIlias` : 'BetterIlias'; return; }
     if (isRequestsOpen) {
       document.title = `BetterIlias – ${t('requests.title')}`;
     } else if (isLandingOpen) {
@@ -1150,6 +1168,7 @@ export const App: React.FC = () => {
   }, [
     language,
     isUnisportOpen,
+    unisportEnabled,
     isRequestsOpen,
     isLandingOpen,
     myCourses,
@@ -1199,7 +1218,7 @@ export const App: React.FC = () => {
     pushAppHistory(state, '', stateToUrl(state)); setMobileNavigationOpen(false);
   };
   const navigateUnisport = async () => {
-    if (!await navigationGuard.confirmNavigation()) return;
+    if (!unisportEnabled || !await navigationGuard.confirmNavigation()) return;
     setIsUnisportOpen(true); setIsRequestsOpen(false); setIsLandingOpen(false);
     setMyCourses(false); setRepositoryId(null); setIsCalendarOpen(false);
     setSelectedCourseId(null); setCurrentContainerId(null); setActiveExerciseRefId(null); setActiveExerciseTab(null);
@@ -1208,7 +1227,7 @@ export const App: React.FC = () => {
     pushAppHistory(state, '', stateToUrl(state)); setMobileNavigationOpen(false);
   };
   const sidebar = <Sidebar
-    onSelectUnisport={() => { void navigateUnisport(); }} isUnisportSelected={isUnisportOpen}
+    onSelectUnisport={unisportEnabled ? () => { void navigateUnisport(); } : undefined} isUnisportSelected={unisportEnabled && isUnisportOpen}
     onSelectRequests={() => { void navigationGuard.confirmNavigation().then(approved => { if (approved) navigateRequests(); }); }}
     isRequestsSelected={isRequestsOpen}
     width={effectiveSidebarWidth}
@@ -1247,6 +1266,8 @@ export const App: React.FC = () => {
       />
 
       {/* Main Workspace Layout */}
+      {logoutError && <FeedbackBanner tone="error" message={logoutError} />}
+      {loggingOut && <FeedbackBanner tone="info" message={t('companion.logging_out')} />}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Left Sidebar */}
         {isMobile ? <dialog ref={mobileNavigation} id="course-navigation" aria-label={t("Meine Vorlesungen")}
@@ -1262,7 +1283,7 @@ export const App: React.FC = () => {
         <div className="flex min-w-0 flex-1 flex-col">
         <main ref={workspaceRef} className={`@container/workspace min-w-0 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50 ${workspaceWidth < 768 ? 'workspace-compact' : ''}`}>
           <WorkspaceWidth.Provider value={workspaceWidth}>
-          {isUnisportOpen ? <UnisportView /> : isRequestsOpen ? <FeatureRequestsView key={requestId || 'board'} initialSuccess={requestSaved} selectedId={requestId} onSelect={navigateRequests} /> : isLandingOpen ? (
+          {isUnisportOpen && unisportEnabled ? <UnisportView /> : isRequestsOpen ? <FeatureRequestsView key={requestId || 'board'} initialSuccess={requestSaved} selectedId={requestId} onSelect={navigateRequests} /> : isLandingOpen || isUnisportOpen ? (
             <LandingView
               onOpenApp={handleOpenApp}
               onOpenExtensionInfo={() => setIsExtensionModalOpen(true)}
@@ -1357,6 +1378,7 @@ export const App: React.FC = () => {
 
       {/* Nickname & Icon Editor Modal */}
       <NicknameModal
+        unisportEnabled={unisportEnabled}
         semester={selectedSemester}
         courses={allCourses}
         isOpen={isNicknameModalOpen}

@@ -16,6 +16,7 @@ from backend.coordination import coordinated, atomic_json
 from backend.outbound_http import BudgetTransport
 from backend.outbound_budget import OutboundUnavailable
 from backend.outbound_targets import OutboundTargetRejected
+from backend.auth.indicators import authenticated_control
 
 logger = logging.getLogger("ilias.auth")
 
@@ -91,6 +92,16 @@ class SessionManager:
         """Load cookies dictionary from JSON file."""
         data = self._read_data()
         return data.get("cookies", {})
+
+    @coordinated(lambda self, *args, **kwargs: "session:" + str(self.cookie_file.resolve()))
+    def replace_unchanged(self, expected, cookies, metadata) -> bool:
+        """Replace a verified snapshot without resurrecting a revoked capability."""
+        current = self._read_data()
+        if not current.get('cookies') or any(current.get(key) != expected.get(key)
+                for key in ('cookies', 'metadata', 'saved_at', 'ilias_base_url')):
+            return False
+        self.save_cookies(cookies, metadata)
+        return True
 
     def load_metadata(self) -> Dict[str, Any]:
         """Load session metadata."""
@@ -209,9 +220,9 @@ class SessionManager:
                 soup = BeautifulSoup(response.text, "html.parser")
                 # Authenticated pages may contain login/help links or archived
                 # "Kein Zugriffsrecht" notices. Prefer the actual user control.
-                identity = soup.select_one('.il-maincontrols-metabar a.il-user-avatar, #il_mbt_usr, span.il-avatar-initials, a.il-user-avatar')
-                if identity:
-                    return True, identity.get_text(strip=True) or identity.get('title') or t('Angemeldet')
+                identity = authenticated_control(response.text) if response.text.strip() else None
+                if identity is not None:
+                    return True, identity['name'] or self.load_metadata().get('user_name') or t('Angemeldet')
                 if (
                     "cmd=force_login" in text_lower
                     or "login.php?client_id=" in text_lower

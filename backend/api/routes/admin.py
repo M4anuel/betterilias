@@ -115,7 +115,23 @@ def events(before: int | None = Query(default=None, ge=1, le=9223372036854775807
 def summary():
     try:
         return {'diagnostics': get_store().summary(), 'outbound': OutboundBudget().snapshot(),
-                'event_catalogue': EVENTS, 'activity': activity.summary()}
+                'event_catalogue': EVENTS, 'activity': activity.summary(), 'accounts': activity.account_summary()}
+    except (OSError, sqlite3.Error) as exc:
+        emit('runtime.error', component='server', status=503, error=exc)
+        raise HTTPException(503, detail=t('diagnostics.unavailable')) from None
+
+
+class AccountQuery(BaseModel):
+    query: str = Field(default='', max_length=120)
+    offset: int = Field(default=0, ge=0, le=10000)
+    limit: int = Field(default=50, ge=1, le=100)
+
+
+@router.post('/accounts/query', dependencies=[Depends(administrator), Depends(browser_mutation)])
+def accounts(payload: AccountQuery):
+    """Private read query in the body: names never enter request URLs."""
+    try:
+        return activity.account_page(payload.query, payload.offset, payload.limit)
     except (OSError, sqlite3.Error) as exc:
         emit('runtime.error', component='server', status=503, error=exc)
         raise HTTPException(503, detail=t('diagnostics.unavailable')) from None

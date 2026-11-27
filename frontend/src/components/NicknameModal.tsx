@@ -23,6 +23,7 @@ import { cache } from '../lib/cache';
 import { CourseIcon, AVAILABLE_COURSE_ICONS } from './CourseIcon';
 
 interface NicknameModalProps {
+  unisportEnabled?: boolean;
   semester: string;
   courses: CourseItem[];
   isOpen: boolean;
@@ -40,6 +41,7 @@ const DEFAULT_NAV_ITEMS: { id: SidebarDefaultNavItem; type: 'nav' }[] = [
 ];
 
 export const NicknameModal: React.FC<NicknameModalProps> = ({
+  unisportEnabled = false,
   semester,
   courses,
   isOpen,
@@ -372,6 +374,7 @@ export const NicknameModal: React.FC<NicknameModalProps> = ({
               }
 
               // 2. Default Navigation Item Row
+              if (item.type === 'nav' && item.id === 'unisport' && !unisportEnabled) return null;
               if (item.type === 'nav') {
                 const navId = item.id as SidebarDefaultNavItem;
                 const defaultTitle = cache.getDefaultNavTitle(navId);

@@ -47,13 +47,16 @@
       await api.storage.session.remove(key);
       let success = false;
       try {
-        const response = await fetch(pending.backend + '/api/unisport/auth/complete', {
+        const response = await fetch(pending.backend + (pending.kind === 'unibe' ? '/api/auth/unibe/complete' : '/api/unisport/auth/complete'), {
           method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
           headers: { 'Content-Type': 'application/json', 'X-Unisport-Session': pending.credential },
           body: JSON.stringify({ callback }), signal: AbortSignal.timeout(60000),
         });
         success = response.ok;
       } catch (_) { /* An uncertain exchange is never retried. */ }
+      if (pending.kind === 'unibe') {
+        try { await globalThis.BetterIliasUnibe?.completed(pending, success); } catch (_) {}
+      }
       try { await api.tabs.sendMessage(pending.owner, { type: 'UNISPORT_FINISHED', success }); } catch (_) {}
       // Preserve the login tab on failure to aid the user; no callback data is
       // copied to the BetterIlias URL or browser local storage.
@@ -62,6 +65,39 @@
       }
     }
   }
+
+  async function startBridge(message, backend, owner, kind = 'unisport') {
+    const url = new URL(message.authorization_url), params = url.searchParams;
+    if (url.origin !== ISSUER || url.pathname !== '/idp/profile/oidc/authorize' || url.hash || url.username || url.password
+        || params.get('client_id') !== 'unibe-campusapp' || params.get('redirect_uri') !== CALLBACK
+        || params.get('response_type') !== 'code' || params.get('code_challenge_method') !== 'S256'
+        || params.get('response_mode') !== 'form_post'
+        || params.get('state') !== message.state || !/^[A-Za-z0-9_-]{43}$/.test(message.state)
+        || !/^[A-Za-z0-9_-]{43}$/.test(params.get('code_challenge') || '')
+        || !/^[A-Za-z0-9_-]{43}$/.test(message.credential)
+        || [...params.keys()].length !== new Set(params.keys()).size) throw new Error();
+    const stored = await api.storage.session.get(null);
+    for (const [key, value] of Object.entries(stored)) {
+      if (key.startsWith(PREFIX) && (value.expires <= Date.now() || value.owner === owner)) {
+        await api.storage.session.remove(key);
+        try { await api.tabs.remove(value.tab); } catch (_) {}
+      }
+    }
+    const tab = await api.tabs.create({ url: 'about:blank', active: true });
+    await api.storage.session.set({ [PREFIX + message.state]: { tab: tab.id, owner, backend, kind,
+      credential: message.credential, state: message.state, expires: Date.now() + 600000 } });
+    await api.tabs.update(tab.id, { url: url.href });
+  }
+  globalThis.BetterIliasUnisportStart = startBridge;
+  globalThis.BetterIliasCancelLogin = async (backend, credential) => {
+    const stored=await api.storage.session.get(null);
+    for(const [key,pending] of Object.entries(stored)) {
+      if(key.startsWith(PREFIX) && pending.backend===backend && pending.credential===credential) {
+        await api.storage.session.remove(key);
+        try { await api.tabs.remove(pending.tab); } catch (_) {}
+      }
+    }
+  };
 
   api.runtime.onMessage.addListener((message, sender, respond) => {
     if (!['UNISPORT_START', 'UNISPORT_CONTEXT', 'UNISPORT_CALLBACK', 'UNISPORT_PING', 'UNISPORT_CANCEL'].includes(message?.type)) return false;
@@ -81,28 +117,7 @@
             }
             respond({ success: true }); return;
           }
-          const url = new URL(message.authorization_url);
-          const params = url.searchParams;
-          if (url.origin !== ISSUER || url.pathname !== '/idp/profile/oidc/authorize' || url.hash || url.username || url.password
-              || params.get('client_id') !== 'unibe-campusapp' || params.get('redirect_uri') !== CALLBACK
-              || params.get('response_type') !== 'code' || params.get('code_challenge_method') !== 'S256'
-              || params.get('response_mode') !== 'form_post'
-              || params.get('state') !== message.state || !/^[A-Za-z0-9_-]{43}$/.test(message.state)
-              || !/^[A-Za-z0-9_-]{43}$/.test(params.get('code_challenge') || '')
-              || !/^[A-Za-z0-9_-]{43}$/.test(message.credential)
-              || [...params.keys()].length !== new Set(params.keys()).size) throw new Error();
-          const stored = await api.storage.session.get(null);
-          for (const [key, value] of Object.entries(stored)) {
-            if (key.startsWith(PREFIX) && (value.expires <= Date.now() || value.owner === sender.tab.id)) {
-              await api.storage.session.remove(key);
-              try { await api.tabs.remove(value.tab); } catch (_) {}
-            }
-          }
-          const tab = await api.tabs.create({ url: 'about:blank', active: true });
-          const key = PREFIX + message.state;
-          await api.storage.session.set({ [key]: { tab: tab.id, owner: sender.tab.id, backend,
-            credential: message.credential, state: message.state, expires: Date.now() + 600000 } });
-          await api.tabs.update(tab.id, { url: url.href });
+          await startBridge(message, backend, sender.tab.id);
           respond({ success: true });
           return;
         }

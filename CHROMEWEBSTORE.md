@@ -1,19 +1,18 @@
 # BetterIlias Companion store notes
 
-Updated 2026-11-24. Companion 1.2.1 is a prototype source update; this document
+Updated 2026-11-27. Companion 1.6.0 is a prototype source update; this document
 does not mean it has been submitted or approved in either browser store.
 
 ## Store listing
 
 Name: BetterIlias Companion.
 
-Short description: Connect your ILIAS session to BetterIlias and test a separate
-SWITCH connection for UniSport.
+Short description: Sign in once with UniBE to connect ILIAS and UniSport in BetterIlias.
 
-Detailed description: Connect your signed-in University of Bern ILIAS account to
-your chosen BetterIlias instance. The experimental UniSport connection opens
-SWITCH in a separate tab so you can sign in directly with SWITCH, choose your
-affiliation and view your registrations in BetterIlias. Open participant lists
+Detailed description: Sign in directly with SWITCH in a separate tab, choose
+your organisation in the Companion, and connect ILIAS and UniSport to your chosen
+BetterIlias instance. See your name and affiliation choices while signed in,
+and a login button when the login expires. Open participant lists
 inside BetterIlias and search names or offers without leaving the dialog, using
 your existing official UniSport website login. The chosen instance must enable
 UniSport. Automatic login renewal is not included. The
@@ -32,14 +31,15 @@ synthetic test screenshots are not evidence of live account compatibility.
 
 | Permission / host | Purpose |
 | --- | --- |
-| `cookies` | Read ILIAS authentication cookies for the existing connection. Locally fingerprint applicable ZSSW cookies to invalidate participant caches when its browser session changes; ZSSW cookie values are never sent to BetterIlias. UniSport does not read SWITCH cookies. |
-| `storage` | Retain instance settings and ILIAS connection metadata. Keep UniSport login state/tab ownership temporarily in session storage. |
+| `cookies` | Support the explicitly selected deprecated ILIAS browser-cookie login. Locally fingerprint applicable ZSSW cookies to invalidate participant caches when its browser session changes; ZSSW cookie values are never sent to BetterIlias. SWITCH cookies are not read. |
+| `storage` | Retain the supported language preference, unsaved settings/affiliation drafts and instance settings, per-instance BetterIlias connection capabilities and display names. Keep pending login state/tab ownership temporarily in session storage; provider tokens stay on the backend. |
 | `alarms` | Periodically check the existing ILIAS connection. |
 | `tabs` | Find the configured BetterIlias tab and open/close the separate user-initiated SWITCH login tab. |
 | `webRequest` (new) | Observe the final SWITCH login redirect in the companion-owned login tab and deliver its authorization result to the chosen BetterIlias server. Requests are not blocked or modified. |
 | `https://ilias.unibe.ch/*` | Read ILIAS login cookies and detect login changes. |
 | `https://login.eduid.ch/*` (new) | Observe login completion and read only a native-callback form's hidden result fields. Do not read password, OTP or other login inputs. |
 | `https://www.zssw.unibe.ch/*` (1.2.0) | Read the user-requested official participant list using the existing website session. Only fixed Anmeldeliste URLs are fetched; participant content is displayed locally in the chosen BetterIlias tab. |
+| `https://betterilias.ch/*` | Connect the explicit online preset and synchronize the supported language preference with configured app tabs. |
 | `http://localhost/*`, `http://127.0.0.1/*` | Connect local BetterIlias instances; page bridges additionally check exact configured origins/ports. |
 
 Configured remote instance permissions and content-script registration continue
@@ -47,6 +47,12 @@ to use the existing setup flow. Both Chrome and Firefox receive the new bridge;
 Safari does not receive these permissions or this login feature.
 
 ## Privacy and data use
+
+Shared login stores only per-instance BetterIlias capabilities and display
+metadata in the extension; the provider token stays on the configured backend.
+The Companion displays the verified name and domain-only affiliation labels.
+Full affiliation values are used for confirmed requests. Browser-cookie export
+is available only in the explicitly selected deprecated fallback.
 
 Authentication information is processed: ILIAS cookies and, on user request,
 UniSport authorization codes and connection capabilities. The companion sends
@@ -78,6 +84,17 @@ approval is implied by publishing source code.
 
 ## Version history
 
+- 1.4.0 (2026-11-26): Shared UniBE login, name and affiliation selection in the
+  Companion; domain-only affiliation labels and expiry/rejection checks.
+  Browser-cookie login is deprecated and available explicitly in advanced
+  settings. Same-account caches stay intact. Both browser sources are updated;
+  no new permissions. Refresh store screenshots before submission.
+
+- 1.3.0 (2026-11-25): Respect BetterIlias's explicit UniBE-token ILIAS
+  connection preference on startup and automatic cookie sync. A manual sync
+  switches back to browser cookies. Chrome/Firefox parity, no new permissions,
+  no provider token delivered to the extension.
+
 - 1.2.1 (2026-11-24): Guide the separate ZSSW website identity login in an
   official provider tab and resume participant-list loading on return. Track
   fixed return paths and tab ownership in session storage, with cancellation
@@ -91,3 +108,34 @@ approval is implied by publishing source code.
 Before store submission, update authentication-data disclosures, publish matching
 privacy text and complete the store's permission/privacy review. Package only
 the relevant extension folder, excluding `.git`, `.env` and dependencies.
+
+### Verified account usage disclosure (1.4.0)
+
+When the instance has an enabled administrator dashboard, actual authenticated app use records a verified account identifier, display name and last-use timestamp in a private server-side usage index. The identifier is an instance-specific keyed hash of the verified SWITCH issuer, client and subject; raw subjects and provider tokens are not stored in this index. Administrators can see distinct-account totals and explicitly open/search the names. This counts accounts, not guaranteed individual people; legacy cookie-only connections are not attributed. Names and usage records expire 30 days after the last app use. Cleanup runs on access and every five minutes while the backend runs. Login/status polling does not extend retention. The Companion shows this purpose and retention before login when collection is enabled. No names enter diagnostic events, public endpoints or persistent browser analytics storage. The index is bounded to 10,000 most recently used accounts; older rows can be removed earlier at that limit.
+
+This adds no browser permissions. See [PRIVACY.md](PRIVACY.md).
+
+## Companion 1.5.0 (2026-11-27)
+
+Compact shared login/status card and backend warning; deprecated cookies are an
+advanced checkbox that changes the same card. No Companion-owned tab opens for
+login or legacy sync. Official provider pages and explicit app-opening actions
+remain. Both online/local presets work in distributable packages; drafts are
+orange until saved and briefly turn green with a checkmark on success.
+
+Language follows a configured app's supported preference on first use when
+accessible, otherwise browser language, then synchronizes in both directions.
+Only language codes cross this bridge; no auth cookies are used for it. Pending
+transactions remain in session storage while the action popup closes. Store
+submission/signing and updated public screenshots remain separate.
+
+## Companion 1.6.0
+
+Stable backend warnings/retries and bounded Firefox popup width, default UniBE
+affiliation, shorter labels and automatic-sync information. Both auth modes offer
+paired logout in the same popup. Existing cookie permission additionally removes
+ILIAS auth cookies and configured BetterIlias session cookies on explicit logout;
+SWITCH SSO cookies and unrelated-site cookies are not removed. No new host or API
+permission is added. Private app caches and pending callbacks clear on logout,
+and automatic restoration stays paused until an explicit new login. Named usage
+disclosure is in the app privacy/data-usage dialog. Store submission is separate.

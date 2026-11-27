@@ -1,5 +1,20 @@
 # BetterIlias Companion — Firefox Extension
 
+
+Seit Companion 1.6.0 ist die gemeinsame UniBE-Anmeldung der Standard: Companion
+öffnen, bei SWITCH edu-ID anmelden, Zugehörigkeit wählen und ILIAS/UniSport
+verbinden. Name und Domain-Auswahl erscheinen bei gültiger Anmeldung; bei
+abgelaufenem Token erscheint die Anmeldeschaltfläche. Nach einem Quellcode-Update
+die Erweiterung und den BetterIlias-Tab neu laden. Store-Versionen können älter sein.
+
+[Aktuelle Anleitung](../../docs/UNIBE_LOGIN.md) ·
+[Veraltete Browser-Cookie-Anmeldung und Wiederherstellung](../../docs/LEGACY_ILIAS_LOGIN.md)
+
+## Veralteter Browser-Cookie-Rückfallweg
+
+Die folgenden bisherigen Hinweise beschreiben den ausdrücklich auswählbaren
+Rückfallweg unter den erweiterten Einstellungen, nicht den Standard-Login.
+
 Diese Browser-Erweiterung ermöglicht es, deine bestehende Uni Bern ILIAS-Sitzung (via SWITCH edu-ID) in Mozilla Firefox mit nur einem Klick sicher an BetterIlias zu übermitteln.
 
 Das Backend ersetzt gespeicherte Zugangsdaten erst nach einer erfolgreichen
@@ -75,7 +90,7 @@ production hostname before publishing a production extension. Use development
 mode for a local HTTP backend, and same-origin HTTPS for the deployed app/API.
 See [deployment security](../../docs/DEPLOYMENT_SECURITY.md) for exact requirements.
 
-## UniSport participant lists (Companion 1.2.1)
+## UniSport participant lists (Companion 1.3.0)
 
 Reload/install this extension version, accept access to `www.zssw.unibe.ch` and
 reload BetterIlias. Participant lists open inside BetterIlias with live search
@@ -85,3 +100,9 @@ and website login remain separate. Use a regular window without Firefox
 containers; private/container windows retain the official-page fallback.
 The Firefox declaration includes website content and identifying information
 for names displayed locally in BetterIlias. No browser-store publication is implied.
+
+App 1.8.0 also offers **Connect ILIAS with this login** after saving the UniSport
+affiliation. Reload Companion 1.3.0 before using it: startup/automatic cookie sync
+will preserve the explicitly selected token-created ILIAS connection. Manual
+Companion sync switches back to browser cookies. No provider token is sent to
+extension storage; the initial SWITCH login still uses this Companion.
