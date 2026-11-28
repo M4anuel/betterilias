@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 import { cache } from '../lib/cache';
 import { t, useLanguage } from '../lib/i18n';
 import { navigationGuard } from '../lib/navigationGuard';
-import { changeDay, instant, registrationState, sportCategories, sportCategory, sportClock, sportDay, sportDayLabel, sportOfferTypes, type UnisportOffer } from '../lib/unisportOffers';
+import { cardOfferType, cardOfferTypes, changeDay, instant, registrationState, sportCategories, sportCategory, sportClock, sportDay, sportDayLabel, type UnisportOffer } from '../lib/unisportOffers';
 import type { CalendarEvent } from '../types';
 import { Button, IconButton } from './ui/Button';
 import { SportSession, type SessionActions } from './UnisportSession';
@@ -78,7 +78,7 @@ export function UnisportSchedule({ offers, now, isFavourite, isRegistered, getAc
   const filtered = schedule.filter(item => {
     const state = registrationState(item.offer, now);
     return (!sport || item.offer.sport === sport) && (!category || sportCategory(item.offer.sport || item.offer.title) === category)
-      && (!level || item.offer.level === level) && (!offerType || item.offer.offer_type === offerType)
+      && (!level || item.offer.level === level) && (!offerType || cardOfferType(item.offer) === offerType)
       && (!location || item.offer.location === location) && (!dayOfWeek || String(weekday(item.day)) === dayOfWeek)
       && (!startAfter || item.clock >= startAfter) && (!startBefore || item.clock <= startBefore)
       && (!favourites || isFavourite(item.offer)) && (!registered || isRegistered(item.offer))
@@ -179,7 +179,7 @@ export function UnisportSchedule({ offers, now, isFavourite, isRegistered, getAc
           options={sportCategories.map(value => [value, t(`unisport.category_${value}`)])} />
         <SportSelect label={t('unisport.level')} value={level} onChange={value => changeSchedule(() => setLevel(value))} options={options('level')} />
         <SportSelect label={t('unisport.offer_type')} value={offerType} onChange={value => changeSchedule(() => setOfferType(value))}
-          options={sportOfferTypes.map(value => [value, t(`unisport.offer_type_${value}`)])} />
+          options={cardOfferTypes.map(value => [value, t(`unisport.card_type_${value}`)])} />
         <SportSelect label={t('unisport.location')} value={location} onChange={value => changeSchedule(() => setLocation(value))} options={options('location')} />
         <SportSelect label={t('unisport.weekday')} value={dayOfWeek} onChange={value => changeSchedule(() => setDayOfWeek(value))}
           options={Array.from({ length: 7 }, (_, index) => [String((index + 1) % 7),
@@ -200,8 +200,10 @@ export function UnisportSchedule({ offers, now, isFavourite, isRegistered, getAc
     </details>
     {!weekly ? <>
       <h3 className="font-semibold">{sportDayLabel(day, language)}</h3>
-      {visible.map(item => <SportSession key={item.offer.id + ':' + item.offer.begin} offer={item.offer}
-        actions={getActions(item.offer)} compact conflict={conflicts(item)} onDetails={() => openOffer(item.offer)} />)}
+      <div className="grid gap-3 @4xl:grid-cols-2">
+        {visible.map(item => <SportSession key={item.offer.id + ':' + item.offer.begin} offer={item.offer}
+          actions={getActions(item.offer)} conflict={conflicts(item)} onDetails={() => openOffer(item.offer)} />)}
+      </div>
       {!visible.length && <div className="space-y-2 rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-700">
         <p>{t('unisport.no_sessions')}</p>
         {next && <Button onClick={() => setDay(next)}>{t('unisport.next_session_day', { date: sportDayLabel(next, language, 'short') })}</Button>}

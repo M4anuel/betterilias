@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Compass, Dumbbell, Heart, LayoutGrid, LoaderCircle, RefreshCw } from 'lucide-react';
-import { UnisportAutosignIn } from './UnisportAutosignIn';
 import { t, useLanguage } from '../lib/i18n';
 import { unisportCompanion, unisportCredential, unisportFetch } from '../lib/unisport';
 import { Button, IconButton } from './ui/Button';
@@ -229,7 +228,6 @@ export function UnisportView({ route, onNavigate }: { route?: SportRoute; onNavi
     <header className="space-y-2 !p-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 id="unisport-title" className="flex items-center gap-2 text-2xl font-bold"><Dumbbell aria-hidden="true" />{t('unisport.title')}</h1>
-        <UnisportAutosignIn />
       </div>
 
       <nav aria-label={t('unisport.title')} className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 min-[540px]:flex dark:bg-slate-800">

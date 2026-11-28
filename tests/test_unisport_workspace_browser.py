@@ -25,15 +25,20 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
     now = datetime.now(timezone.utc)
     start = (now + timedelta(days=2)).replace(hour=17, minute=30, second=0, microsecond=0)
     end = start + timedelta(minutes=75)
-    reg_open = (now + timedelta(minutes=5)).isoformat()
+    reg_open = (start - timedelta(days=1, hours=3)).isoformat()
     registered = {**offer(), 'title': 'Volley evening', 'sport': 'Volleyball',
                   'begin': start.isoformat(), 'end': end.isoformat(), 'registration_state': 1, 'opens': ''}
     opening = {**offer(2), 'title': 'Flow training', 'sport': 'Yoga', 'opens': reg_open,
+               'closes': (start + timedelta(hours=1)).isoformat(), 'quick_candidate': True,
+               'level': 'N2–N4', 'free_places': '1 place',
                'begin': (start + timedelta(hours=2)).isoformat(), 'end': (end + timedelta(hours=2)).isoformat(),
                'registration_state': 2, 'offer_type': 'training'}
     drop_in = {**offer(3), 'title': 'Drop-in climbing', 'sport': 'Climbing', 'opens': '',
                'begin': (start - timedelta(hours=3)).isoformat(), 'end': (end - timedelta(hours=3)).isoformat(),
                'registration_state': 7, 'offer_type': 'training'}
+    full = {**offer(4), 'title': 'Full workshop', 'sport': 'Yoga', 'opens': reg_open,
+            'begin': (start + timedelta(days=1)).isoformat(), 'end': (end + timedelta(days=1)).isoformat(),
+            'registration_state': 2, 'offer_type': 'dated', 'free_places': '0'}
     application = {**registered, 'status': 8, 'registration': 'Confirmed by provider'}
 
     def mock(route):
@@ -42,7 +47,7 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
         if path.endswith('/connection'):
             data = {'phase': 'connected', 'affiliation': 'student', 'scope': 'a' * 64}
         elif path.endswith('/catalogue'):
-            data = {'items': [registered, opening, drop_in], 'sports': ['Volleyball', 'Yoga', 'Climbing'],
+            data = {'items': [registered, opening, drop_in, full], 'sports': ['Volleyball', 'Yoga', 'Climbing'],
                     'fetched_at': now.timestamp(), 'stale': False}
         elif path.endswith('/applications'):
             data = {'items': [application], 'fetched_at': now.timestamp()}
@@ -66,8 +71,38 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
     }''')
     nav = page.get_by_role('navigation', name=tr['unisport.title'])
     page.get_by_role('heading', name='Volley evening').wait_for()
-    page.get_by_role('timer').wait_for()
-    page.get_by_role('button', name=tr['unisport.save_reminder'], exact=True).click()
+    opening_card = page.get_by_role('article', name='Flow training', exact=True)
+    opening_card.get_by_text(tr['unisport.card_type_daily'], exact=True).wait_for()
+    opening_card.get_by_text(tr['unisport.card_one_place'], exact=True).wait_for()
+    full_card = page.get_by_role('article', name='Full workshop', exact=True)
+    full_card.get_by_text(tr['unisport.card_capacity_full'], exact=True).wait_for()
+    assert full_card.get_by_role('button', name=tr['unisport.card_register'], exact=True).is_disabled()
+    assert opening_card.get_by_text('N2–N4', exact=True).locator('span[style]').count() == 3
+    auto = opening_card.get_by_role('button', name=tr['unisport.autosign_in'], exact=True)
+    assert not auto.is_visible()
+    page.evaluate("""async () => {
+        const {cache} = await import('/src/lib/cache.ts');
+        window.toggleAutoSignIn = enabled => cache.setUnisportAutoSignInEnabled(enabled);
+        toggleAutoSignIn(true);
+    }""")
+    auto.focus()
+    page.keyboard.press('Space')
+    assert auto.get_attribute('aria-pressed') == 'true'
+    auto.locator('.unisport-autosign-check').wait_for()
+    page.evaluate('toggleAutoSignIn(false)')
+    assert not auto.is_visible()
+    page.evaluate('toggleAutoSignIn(true)')
+    assert auto.get_attribute('aria-pressed') == 'true'
+    favourite = opening_card.get_by_role('button', name=tr['unisport.favourite_named'].format(name='Flow training'), exact=True)
+    favourite.click()
+    assert favourite.get_attribute('aria-pressed') == 'true'
+    register = opening_card.get_by_role('button', name=tr['unisport.card_register'], exact=True)
+    register.click()
+    dialog = page.get_by_role('dialog')
+    dialog.get_by_text(tr['unisport.card_reminder_question'], exact=True).wait_for()
+    dialog.get_by_role('button', name=tr['unisport.save_reminder'], exact=True).click()
+    assert register.evaluate('(button) => button === document.activeElement')
+    page.screenshot(path=str(screenshots / f'cards-{width}-{height}-{code}-{scheme}.png'))
 
     nav.get_by_role('button', name=tr['unisport.explore'], exact=True).click()
     category = page.get_by_label(tr['unisport.sport_category'], exact=True)
@@ -96,7 +131,7 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
     page.screenshot(path=str(screenshots / f'week-{width}-{height}-{code}-{scheme}.png'))
 
     nav.get_by_role('button', name=tr['unisport.my_sport'], exact=True).click()
-    page.get_by_role('heading', name='Flow training').wait_for()
+    page.get_by_role('article', name='Flow training', exact=True).get_by_role('button', name=tr['unisport.autosign_in'], exact=True).wait_for()
     page.get_by_role('button', name='Yoga', exact=True).wait_for()
     with page.expect_download() as event:
         page.get_by_role('button', name=tr['unisport.add_calendar'], exact=True).click()

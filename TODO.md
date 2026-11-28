@@ -14,6 +14,11 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Redesign offer cards with a shared layout, availability, registration and
+  per-offer AutoSignIn preference previews behind the main settings toggle (1.13.0).
+  Automatic registration requires provider support to identify complete forms
+  and terms before starting an application.
+
 - [x] Replace the Unisport header account shortcut with an animated autosign-in
   preview (1.12.1). The preview resets when the page is left and does not start
   authentication or change account settings.

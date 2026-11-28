@@ -4,11 +4,12 @@ import { t, useLanguage } from '../lib/i18n';
 import { unisportFetch } from '../lib/unisport';
 import { CATALOGUE_TTL, OFFER_TTL, fresh, readPrivate, writePrivate } from '../lib/unisportCache';
 import {
-  applicationStart, downloadSportCalendar, instant, occurrenceKey, registrationState,
-  sportCategories, sportCategory, sportClock, sportDay, sportDayLabel, sportOfferTypes, unisportDate,
+  applicationStart, autoSignInKey, cardOfferType, cardOfferTypes, downloadSportCalendar, instant, occurrenceKey, registrationState,
+  sportCategories, sportCategory, sportClock, sportDay, sportDayLabel, unisportDate,
   type SportSelection, type SportView, type UnisportApplication, type UnisportCatalogue as Catalogue, type UnisportOffer,
 } from '../lib/unisportOffers';
 import { useUnisportPublic } from '../lib/useUnisportPublic';
+import { useUnisportAutoSignIn } from '../lib/useUnisportAutoSignIn';
 import { navigationGuard } from '../lib/navigationGuard';
 import { Button, IconButton } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -21,8 +22,8 @@ type Saved = { id: number; title: string };
 type Sport = { name: string; offers: UnisportOffer[] };
 type Reminder = { id: number; title: string; opens: string };
 type FavouriteSport = { name: string; offerIds: number[] };
-type Preferences = { sports: FavouriteSport[]; offers: number[]; reminders: Reminder[] };
-const emptyPreferences: Preferences = { sports: [], offers: [], reminders: [] };
+type Preferences = { sports: FavouriteSport[]; offers: number[]; reminders: Reminder[]; autoSignIn: string[] };
+const emptyPreferences: Preferences = { sports: [], offers: [], reminders: [], autoSignIn: [] };
 const noOffers: UnisportOffer[] = [];
 const panel = 'min-w-0 space-y-2 rounded-xl border border-slate-200 p-3 dark:border-slate-700';
 
@@ -31,7 +32,9 @@ function readPreferences(key: string): Preferences {
     const data = JSON.parse(localStorage.getItem(key) || 'null');
     if (Array.isArray(data?.sports) && Array.isArray(data.offers) && Array.isArray(data.reminders)) {
       return {
-        ...data,
+        offers: data.offers,
+        reminders: data.reminders,
+        autoSignIn: Array.isArray(data.autoSignIn) ? data.autoSignIn.filter((key: unknown) => typeof key === 'string') : [],
         sports: (data.sports as FavouriteSport[]).filter(item => typeof item?.name === 'string' && Array.isArray(item.offerIds)),
       };
     }
@@ -106,7 +109,7 @@ function OfferDetail({ offer, credential, actions }: {
   return <div className="space-y-2">
     {detail.loading && <p role="status" className="text-sm">{t('unisport.loading_offer')}</p>}
     {detail.error && <ErrorNotice message={detail.error} connectionInline onRetry={detail.refresh} />}
-    <SportSession offer={displayed} actions={actions(displayed)} />
+    <SportSession offer={displayed} actions={actions(displayed)} hideSport />
     {detail.data && <>
       <p className="text-xs text-slate-500 dark:text-slate-400">{snapshotLabel(detail.data, language, OFFER_TTL)}</p>
       {displayed.address && displayed.address !== displayed.location && <p className="text-sm">{displayed.address}</p>}
@@ -200,6 +203,7 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
     }
     return grouped;
   }, [offers]);
+  const autoSignInEnabled = useUnisportAutoSignIn();
   const byId = useMemo(() => new Map(offers.map(offer => [offer.id, offer])), [offers]);
   const resolvedFavourites = preferences.sports.map(saved => ({
     saved,
@@ -235,10 +239,14 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
     canCancel: personal(offer)?.status === 8, personalStatus: personal(offer)?.registration,
     reminded: preferences.reminders.some(reminder => reminderMatches(reminder, offer)),
     toggleFavourite: () => toggleOffer(offer), toggleReminder: () => toggleReminder(offer), onBookingClosed,
+    autoSignIn: autoSignInEnabled && scope && affiliation && offer.quick_candidate && Number.isFinite(instant(offer.begin)) ? {
+      active: preferences.autoSignIn.includes(autoSignInKey(offer)),
+      toggle: () => update(data => ({ ...data, autoSignIn: toggle(data.autoSignIn, autoSignInKey(offer)) })),
+    } : undefined,
   });
   const matchingSports = [...sports.values()].filter(sport => {
     if (category && sportCategory(sport.name) !== category) return false;
-    if (offerType && !sport.offers.some(offer => offer.offer_type === offerType)) return false;
+    if (offerType && !sport.offers.some(offer => cardOfferType(offer) === offerType)) return false;
     const needle = query.trim().toLocaleLowerCase(language);
     return !needle || sport.name.toLocaleLowerCase(language).includes(needle)
       || sport.offers.some(offer => [offer.title, offer.level, offer.location].some(value => value.toLocaleLowerCase(language).includes(needle)));
@@ -319,7 +327,7 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
           </div>
           {items.map(offer => <div key={offer.id} className="space-y-1">
             {isFavourite(offer) && <Badge tone="info">{t('unisport.favourites')}</Badge>}
-            <SportSession offer={offer} actions={actions(offer)} showOpeningTime={false} onDetails={() => openOffer(offer)} />
+            <SportSession offer={offer} actions={actions(offer)} onDetails={() => openOffer(offer)} />
           </div>)}
         </div>)}</div>
       </details>)}
@@ -365,7 +373,7 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
         <SportSelect label={t('unisport.sport_category')} value={category} onChange={setCategory}
           options={sportCategories.map(value => [value, t(`unisport.category_${value}`)])} />
         <SportSelect label={t('unisport.offer_type')} value={offerType} onChange={setOfferType}
-          options={sportOfferTypes.map(value => [value, t(`unisport.offer_type_${value}`)])} />
+          options={cardOfferTypes.map(value => [value, t(`unisport.card_type_${value}`)])} />
         <p role="status" className="text-xs text-slate-600 dark:text-slate-400">{t(
           matchingSports.length === 1 ? 'unisport.one_sport' : 'unisport.sport_count', { count: matchingSports.length },
         )}</p>
@@ -396,10 +404,10 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
           <h2 ref={heading} tabIndex={-1} className="min-w-0 break-words text-2xl font-bold focus:outline-none">{selection.name}</h2>
           <SportFavourite label={selection.name} active={favouriteNames.has(selection.name)} toggle={() => toggleSport(selection.name)} />
         </div>
-        {groupSessions(selection.offers.filter(offer => !offerType || selectedOffer === offer.id || offer.offer_type === offerType)).map(group => {
+        {groupSessions(selection.offers.filter(offer => !offerType || selectedOffer === offer.id || cardOfferType(offer) === offerType)).map(group => {
           const sessions = group.map(offer => selectedOffer === offer.id
             ? <OfferDetail key={offer.id} offer={offer} credential={credential} actions={actions} />
-            : <SportSession key={offer.id} offer={offer} actions={actions(offer)} onDetails={() => openOffer(offer)} />);
+            : <SportSession key={offer.id} offer={offer} actions={actions(offer)} hideSport onDetails={() => openOffer(offer)} />);
           if (sessions.length === 1) return sessions[0];
           return <details key={group[0].id} open={group.some(offer => offer.id === selectedOffer)} className={panel}>
             <summary className="min-h-11 cursor-pointer break-words py-2 font-semibold">

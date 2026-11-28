@@ -4,6 +4,7 @@ export type UnisportOffer = {
   status: string; free_places: string; cancelled: boolean; url: string | null;
   registration_state?: number | null;
   requires_confirmation?: boolean | null;
+  quick_candidate?: boolean;
   schedule_day?: string; schedule_time?: string; date_range?: string; sport_url?: string | null;
   offer_type?: SportOfferType | null;
   infos?: { title: string; content: string }[]; important?: string; special?: string; outage?: string;
@@ -11,6 +12,7 @@ export type UnisportOffer = {
 export type UnisportCatalogue = { items: UnisportOffer[]; sports: string[] };
 export const sportOfferTypes = ['training', 'date_range', 'dated'] as const;
 export type SportOfferType = (typeof sportOfferTypes)[number];
+export const cardOfferTypes = ['daily', ...sportOfferTypes] as const;
 // Discovery categories curated from the public English and German names.
 // New sports remain discoverable under Other until categorised.
 const categoryNames = {
@@ -86,6 +88,13 @@ export function sportClock(time: number): string {
   return Number.isFinite(time) ? clockFormat.format(time) : '';
 }
 
+export function registrationDate(value: string, language: string): string {
+  const time = instant(value);
+  if (!Number.isFinite(time)) return '';
+  const [year, month, day] = sportDay(time).split('-');
+  return `${[day, month, year].join(language === 'de' ? '.' : '/')}, ${sportClock(time)}`;
+}
+
 export function changeDay(day: string, delta: number): string {
   const time = Date.parse(day);
   return Number.isFinite(time) ? new Date(time + delta * 86_400_000).toISOString().slice(0, 10) : day;
@@ -105,13 +114,45 @@ export function occurrenceKey(id: number | undefined, begin: string): string {
   return JSON.stringify([id, instant(begin)]);
 }
 
+// Provider IDs identify the offer. offerNextDate changes within a weekly series.
+export function autoSignInKey(offer: UnisportOffer): string {
+  return offer.offer_type === 'training' ? String(offer.id) : occurrenceKey(offer.id, offer.begin);
+}
+
+export function cardOfferType(offer: UnisportOffer) {
+  const day = sportDay(instant(offer.begin));
+  if (offer.offer_type !== 'date_range' && offer.registration_state !== 7 && day &&
+    sportDay(instant(offer.opens)) === changeDay(day, -1)) return 'daily';
+  return offer.offer_type ?? null;
+}
+
+export function skillLevels(level: string): number[] {
+  const range = /^N(10|[1-9])\s*[-–—]\s*N?(10|[1-9])$/i.exec(level.trim());
+  if (range && Number(range[2]) >= Number(range[1])) {
+    return Array.from({ length: Number(range[2]) - Number(range[1]) + 1 }, (_, i) => Number(range[1]) + i);
+  }
+  return [...new Set([...level.matchAll(/\bN(10|[1-9])\b/gi)].map(match => Number(match[1])))].sort((a, b) => a - b);
+}
+
+export function offerAvailability(offer: UnisportOffer) {
+  const value = offer.free_places.trim().toLowerCase();
+  if (/^(?:unbeschränkt|unbegrenzt|unlimited|unrestricted)$/.test(value)) return { kind: 'unrestricted' } as const;
+  const count = /^(\d{1,6})(?:\s+(?:freie plätze|freier platz|plätze|platz|(?:free |available )?(?:places?|spots?)|places? (?:free|available)))?$/.exec(value);
+  if (/^(?:ausgebucht|fully booked|sold out)$/.test(value) || count && Number(count[1]) === 0) {
+    return { kind: 'full' } as const;
+  }
+  if (count) return { kind: 'places', count: Number(count[1]) } as const;
+  if (offer.registration_state === 6) return { kind: 'full' } as const;
+  return { kind: 'unknown' } as const;
+}
+
 export function registrationState(offer: UnisportOffer, now: number) {
   const opens = instant(offer.opens), closes = instant(offer.closes);
   if (offer.cancelled) return 'cancelled';
   if (offer.registration_state === 7) return 'drop_in';
   if (closes <= now || instant(offer.begin) <= now || offer.registration_state === 3) return 'closed';
   if (opens > now) return 'opening';
-  if (offer.registration_state === 6) return 'full';
+  if (offer.registration_state === 6 || offerAvailability(offer).kind === 'full') return 'full';
   if (offer.registration_state === 1) return 'available';
   return 'check';
 }

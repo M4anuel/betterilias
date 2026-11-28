@@ -87,6 +87,13 @@ def present_offer(raw, *, detail=False):
         for key, source in [('important', 'importantInfo'), ('special', 'specialInfo'), ('outage', 'outage')]:
             value = text(raw.get(source))
             result[key] = plain_html(value) if value.strip() else ''
+    if recurring and result['requires_confirmation'] is False:
+        infos = raw.get('generalInfos')
+        costs = [plain_html(text(item.get('content'))).strip().casefold()
+                 for item in (infos[:40] if isinstance(infos, list) else [])
+                 if isinstance(item, dict) and text(item.get('title')).strip().casefold() in ('costs', 'kosten')]
+        result['quick_candidate'] = (costs in (['none'], ['keine']) and
+                                     not any(text(raw.get(key)).strip() for key in ('importantInfo', 'specialInfo')))
     return result
 
 

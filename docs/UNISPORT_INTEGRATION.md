@@ -60,7 +60,25 @@ Waiting-list signup and background availability alerts require additional
 provider support. Chromium browser regressions use synthetic timetable and
 booking responses. Live bookings and physical devices need separate acceptance.
 
-### Autosign-in control preview (1.12.1)
+### Offer cards and AutoSignIn preferences (1.13.0)
+
+Offer cards share classification, public capacity, private registration status and
+actions across the catalogue, overview, favourites and schedule agenda. The
+Daily badge uses the Bern calendar date of the published registration start.
+The feed exposes one registration window, and the booking endpoint checks the
+connected affiliation before submitting a manual booking. Reminders are saved
+under My Sport and can be downloaded as calendar events.
+
+The main settings menu reveals the AutoSignIn preference preview for connected
+users on offers with explicit free training terms. The checkmark means the
+preference was saved on this browser for the account and affiliation. Weekly
+training uses the provider's offer ID across changes to its next occurrence.
+Disabling the global setting keeps the saved preferences. The provider can
+return required fields only after beginning an application, so automatic
+submission is unavailable until the necessary form and terms can be verified
+before starting the application.
+
+### Earlier header preview (1.12.1)
 
 Replace the Unisport header's Account shortcut with **Autosign in**. This
 preview demonstrates the interaction while the backend feature is pending.

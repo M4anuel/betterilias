@@ -163,6 +163,16 @@ export const cache = {
     } catch { /* Storage can be disabled in private browsers. */ }
   },
 
+  getUnisportAutoSignInEnabled(): boolean {
+    try { return localStorage.getItem('betterilias_unisport_auto_sign_in') === 'true'; }
+    catch { return false; }
+  },
+
+  setUnisportAutoSignInEnabled(enabled: boolean) {
+    localStorage.setItem('betterilias_unisport_auto_sign_in', String(enabled));
+    window.dispatchEvent(new Event('betterilias-unisport-settings-changed'));
+  },
+
   // --- ILIAS Saver & Cache Timestamping ---
   getIliasSaverEnabled(): boolean {
     try {

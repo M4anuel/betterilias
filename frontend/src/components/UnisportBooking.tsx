@@ -22,6 +22,7 @@ type Operation = {
 type Props = {
   credential: string; scope: string; affiliation: string; offerId: number; begin: string;
   kind?: 'auto' | 'apply' | 'cancel'; quick?: boolean; onChanged?: () => void; onBookingClosed?: () => void;
+  cardAction?: boolean;
 };
 const control = 'min-h-12 w-full rounded-xl border border-slate-400 bg-white px-3 text-base focus-visible:outline-2 focus-visible:outline-teal-500 dark:border-slate-500 dark:bg-slate-950';
 const profileFields: Record<string, string> = {
@@ -33,7 +34,7 @@ const profileFields: Record<string, string> = {
 };
 
 /** One mounted instance owns its form draft and exact account/occurrence receipt. */
-export function UnisportBooking({ credential, scope, affiliation, offerId, begin, kind = 'auto', quick = false, onChanged, onBookingClosed }: Props) {
+export function UnisportBooking({ credential, scope, affiliation, offerId, begin, kind = 'auto', quick = false, onChanged, onBookingClosed, cardAction }: Props) {
   const language = useLanguage();
   const prefix = useId();
   const [operation, setOperation] = useState<Operation | null>(null);
@@ -157,8 +158,10 @@ export function UnisportBooking({ credential, scope, affiliation, offerId, begin
   }
 
   return <>
-    <Button variant={quick ? 'primary' : 'outline'} loading={busy && !open} onClick={start}>
-      {t(kind === 'cancel' ? 'unisport.cancel_registration' : quick ? 'unisport.register_now' : 'unisport.manage_registration')}
+    <Button variant={cardAction ? 'ghost' : quick ? 'primary' : 'outline'} loading={busy && !open} onClick={start}
+      className={cardAction ? `w-full !rounded-none !px-1 ${kind !== 'cancel' ? 'text-teal-800 dark:text-teal-300' : ''}` : undefined}>
+      {t(cardAction ? kind === 'cancel' ? 'unisport.card_cancel' : 'unisport.card_register'
+        : kind === 'cancel' ? 'unisport.cancel_registration' : quick ? 'unisport.register_now' : 'unisport.manage_registration')}
     </Button>
     {open && <DialogShell ref={dialog} title={t(operation?.kind === 'cancel' ? 'unisport.cancel_registration' : 'unisport.manage_registration')}
       closeDisabled={busy} onRequestClose={() => {

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { SettingsGear } from './SettingsGear';
 import { ToggleSwitch } from './ToggleSwitch';
+import { useUnisportAutoSignIn } from '../lib/useUnisportAutoSignIn';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import { cache } from '../lib/cache';
 import { theme, ThemeMode, ACCENT_PRESETS } from '../lib/theme';
@@ -56,6 +57,8 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
   const [currentAccent, setCurrentAccent] = useState<string>(() => theme.getAccentColor());
   const [customHex, setCustomHex] = useState<string>(() => theme.getAccentColor());
   const [saverEnabled, setSaverEnabled] = useState<boolean>(() => cache.getIliasSaverEnabled());
+  const autoSignIn = useUnisportAutoSignIn();
+  const [autoSignInError, setAutoSignInError] = useState(false);
   const [saverTtl, setSaverTtl] = useState<number>(() => cache.getIliasSaverTtl());
   const [showSaverInfo, setShowSaverInfo] = useState<boolean>(false);
   const [customTtlInput, setCustomTtlInput] = useState<string>(() => String(cache.getIliasSaverTtl()));
@@ -422,6 +425,19 @@ export const SettingsDropdown: React.FC<SettingsDropdownProps> = ({
               </div>
             </div>
           )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+          <div>
+            <p className="text-sm font-semibold">{t('unisport.autosign_in')}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-300">{t('unisport.autosign_description')}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-300">{t('unisport.autosign_preview_hint')}</p>
+            {autoSignInError && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{t('unisport.autosign_failed')}</p>}
+          </div>
+          <ToggleSwitch checked={autoSignIn} label={t('unisport.autosign_in')} onChange={() => {
+            try { cache.setUnisportAutoSignInEnabled(!autoSignIn); setAutoSignInError(false); }
+            catch { setAutoSignInError(true); }
+          }} />
         </div>
 
         <MobileSessionShare isAuthenticated={isAuthenticated} />

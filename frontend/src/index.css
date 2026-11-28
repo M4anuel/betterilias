@@ -1,20 +1,22 @@
 @import "tailwindcss";
 
+:root {
+  --sport-level-1: #38BDF8;
+  --sport-level-2: #0369A1;
+  --sport-level-3: #F97316;
+  --sport-level-4: #DC2626;
+  --sport-level-5: #8B5CF6;
+  --sport-level-6: #16A34A;
+  --sport-level-7: #DB2777;
+  --sport-level-8: #EAB308;
+  --sport-level-9: #795548;
+  --sport-level-10: #64748B;
+}
+
 .unisport-autosign-success {
-  color: var(--color-teal-700);
-  stroke: currentColor;
-  transform-origin: center;
+  color: var(--color-green-700);
 }
-.dark .unisport-autosign-success { color: var(--color-teal-300); }
-.unisport-autosign-x {
-  color: var(--color-rose-600);
-  opacity: 0;
-  stroke: currentColor;
-  transform-origin: center;
-}
-.dark .unisport-autosign-x { color: var(--color-rose-400); }
-.unisport-autosign-mark[data-remove="true"] .unisport-autosign-success { opacity: 0; }
-.unisport-autosign-mark[data-remove="true"] .unisport-autosign-x { opacity: 1; }
+.dark .unisport-autosign-success { color: var(--color-green-300); }
 
 @media (prefers-reduced-motion: no-preference) {
   .unisport-autosign-ring, .unisport-autosign-check {
@@ -25,12 +27,6 @@
     animation-duration: 260ms;
     animation-delay: 460ms;
   }
-  .unisport-autosign-success, .unisport-autosign-x {
-    transition: opacity 160ms ease-out, transform 200ms ease-out;
-  }
-  .unisport-autosign-x { transform: scale(.65) rotate(-24deg); }
-  .unisport-autosign-mark[data-remove="true"] .unisport-autosign-success { transform: scale(.75) rotate(18deg); }
-  .unisport-autosign-mark[data-remove="true"] .unisport-autosign-x { transform: none; }
 }
 
 @keyframes unisport-autosign-draw {
