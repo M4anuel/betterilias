@@ -14,6 +14,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Remove duplicate confirmation text where the offer shows Cancel booking (1.13.4).
+
 - [x] Redraw the offer details in the shared dialog with backdrop dismissal,
   linked sport navigation and readable provider information (1.13.3).
 

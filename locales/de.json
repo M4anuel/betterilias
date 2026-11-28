@@ -2617,7 +2617,6 @@
   "unisport.card_capacity_unknown": "Keine Angaben",
   "unisport.card_register": "Anmelden",
   "unisport.card_cancel": "Abmelden",
-  "unisport.card_registered": "Erfolgreich angemeldet",
   "unisport.card_unavailable": "Keine Anmeldung möglich",
   "unisport.card_opening_later": "Anmeldung öffnet später",
   "unisport.card_previous_day": "Anmeldung am Vortag ab {time} Uhr",

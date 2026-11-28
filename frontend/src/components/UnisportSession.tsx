@@ -148,7 +148,7 @@ export function SportSession({ offer, actions, onDetails, onSport, conflict = fa
   const closingTime = type !== 'daily' && Number.isFinite(instant(offer.closes));
   const hideRegistrationStatus = state === 'available' || type === 'daily' && state === 'opening';
   const status = state === 'cancelled' ? t('unisport.state_cancelled')
-    : actions.registered ? actions.canCancel ? t('unisport.card_registered')
+    : actions.registered ? actions.canCancel ? null
       : actions.personalStatus || t('unisport.on_registration_list')
     : hideRegistrationStatus ? null
     : state === 'check' ? t('unisport.card_unavailable')
@@ -177,14 +177,13 @@ export function SportSession({ offer, actions, onDetails, onSport, conflict = fa
   </div>;
   const capacity = <div className={countTone}><InfoRow icon={Users}>{countLabel}</InfoRow></div>;
   const registration = <div className={`${details ? 'text-left' : 'mt-auto text-center'} text-xs text-slate-700 dark:text-slate-300 empty:hidden`} aria-live="polite">
-    {status && <p className={actions.canCancel && state !== 'cancelled' ? 'font-semibold text-green-800 dark:text-green-300' : 'font-semibold'}>{status}</p>}
+    {status && <p className="font-semibold">{status}</p>}
     {state !== 'drop_in' && (openingTime || closingTime) && <div className={`flex flex-col gap-y-0.5 ${details ? '' : 'justify-center lg:flex-row lg:flex-wrap lg:gap-x-4'}`}>
       {openingTime && <p>{type === 'daily'
         ? t('unisport.card_previous_day', { time: sportClock(instant(offer.opens)) })
         : t('unisport.registration_opens', { time: registrationDate(offer.opens, language) })}</p>}
       {closingTime && <p>{t('unisport.registration_closes', { time: registrationDate(offer.closes, language) })}</p>}
     </div>}
-    {actions.registered && actions.personalStatus && (actions.canCancel || state === 'cancelled') && <p>{actions.personalStatus}</p>}
     {showRegistration && !actions.registered && (state === 'available' || state === 'check') && !actions.account.affiliation &&
       <p>{t('unisport.booking_login')}</p>}
   </div>;

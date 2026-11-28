@@ -65,6 +65,8 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
             data = {'items': [application, *tennis_applications], 'fetched_at': now.timestamp()}
         elif path.endswith('/offers/2'):
             data = {'offer': opening, 'fetched_at': now.timestamp()}
+        elif path.endswith('/offers/1'):
+            data = {'offer': registered, 'fetched_at': now.timestamp()}
         elif path.endswith('/bookmarks'):
             data = {'items': []}
         elif path.endswith('/calendar'):
@@ -84,7 +86,15 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
       mountAudit(UnisportView, {});
     }''')
     nav = page.get_by_role('navigation', name=tr['unisport.title'])
-    page.get_by_role('heading', name='Volley evening').wait_for()
+    booked_card = page.get_by_role('article', name='Volley evening', exact=True)
+    booked_card.get_by_role('button', name=tr['unisport.card_cancel'], exact=True).wait_for()
+    assert not booked_card.get_by_text('Confirmed by provider', exact=True).is_visible()
+    booked_card.get_by_role('button', name='Volley evening', exact=True).click()
+    booked_details = page.get_by_role('dialog', name='Volley evening')
+    booked_details.get_by_role('button', name=tr['unisport.card_cancel'], exact=True).wait_for()
+    assert not booked_details.get_by_text('Confirmed by provider', exact=True).is_visible()
+    page.keyboard.press('Escape')
+    booked_details.wait_for(state='hidden')
     opening_card = page.get_by_role('article', name='Flow training', exact=True)
     opening_card.get_by_text(tr['unisport.card_type_daily'], exact=True).wait_for()
     opening_card.get_by_text(tr['unisport.card_one_place'], exact=True).wait_for()

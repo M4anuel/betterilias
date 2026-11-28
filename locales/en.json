@@ -2617,7 +2617,6 @@
   "unisport.card_capacity_unknown": "No information",
   "unisport.card_register": "Register",
   "unisport.card_cancel": "Cancel booking",
-  "unisport.card_registered": "Successfully registered",
   "unisport.card_unavailable": "Registration unavailable",
   "unisport.card_opening_later": "Registration has not opened yet",
   "unisport.card_previous_day": "Registration opens the day before at {time}",
