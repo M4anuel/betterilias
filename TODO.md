@@ -14,6 +14,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Open offer details in a dialog, link the sport label to Explore and
+  promote AutoSignIn previews to weekly for recurring favourites (1.13.2).
+
 - [x] Keep Daily tennis badges across booking states and refine offer card status
   text, action colours and desktop registration dates (1.13.1).
 

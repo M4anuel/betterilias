@@ -2602,7 +2602,7 @@
   "unisport.open_short": "Offen",
   "unisport.timetable_short": "Stundenplan",
   "unisport.autosign_in": "AutoSignIn",
-  "unisport.autosign_description": "Melde dich automatisch für ausgewählte Unisport-Angebote an.",
+  "unisport.autosign_description": "Melde dich automatisch für ausgewählte Unisport-Angebote an. Markiere ein Angebot als Favorit, um dich jede Woche anzumelden.",
   "unisport.autosign_preview_hint": "Einstellungen werden gespeichert. Die automatische Anmeldung ist noch nicht verfügbar.",
   "unisport.card_type_daily": "Daily",
   "unisport.card_type_date_range": "Kurs",
@@ -2622,5 +2622,7 @@
   "unisport.card_reminder_question": "Möchtest du eine Erinnerung für den Anmeldestart speichern?",
   "unisport.card_reminder_local": "Gespeicherte Erinnerungen findest du unter Mein Sport. Dort kannst du sie für deinen Kalender herunterladen.",
   "unisport.autosign_preview": "Vorschau",
+  "unisport.autosign_once": "Einmal",
+  "unisport.autosign_weekly": "Wöchentlich",
   "unisport.autosign_failed": "Die Auto-Anmeldung konnte nicht aktualisiert werden. Versuche es erneut."
 }

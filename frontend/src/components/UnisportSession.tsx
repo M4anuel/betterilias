@@ -20,7 +20,7 @@ export type SessionActions = {
   reminded: boolean;
   toggleFavourite: () => void;
   toggleReminder: () => void;
-  autoSignIn?: { active: boolean; toggle: () => void };
+  autoSignIn?: { active: boolean; weekly: boolean; toggle: () => void };
   onBookingClosed?: () => void;
 };
 
@@ -104,8 +104,8 @@ function InfoRow({ icon: Icon, children }: { icon: typeof Clock; children: React
   </p>;
 }
 
-export function SportSession({ offer, actions, onDetails, conflict = false, hideSport = false }: {
-  offer: UnisportOffer; actions: SessionActions; onDetails?: () => void;
+export function SportSession({ offer, actions, onDetails, onSport, conflict = false, hideSport = false }: {
+  offer: UnisportOffer; actions: SessionActions; onDetails?: () => void; onSport?: () => void;
   conflict?: boolean; hideSport?: boolean;
 }) {
   const language = useLanguage();
@@ -144,15 +144,19 @@ export function SportSession({ offer, actions, onDetails, conflict = false, hide
     : t(`unisport.state_${state}`);
 
   const actionTone = actions.registered ? 'registered' : state === 'available' ? 'open' : state === 'drop_in' ? 'neutral' : 'inactive';
+  const legend = 'unisport-offer-legend absolute -top-px left-2 z-20 max-w-[calc(100%-1rem)] -translate-y-1/2 px-1.5 text-xs font-semibold text-teal-800 dark:text-teal-300';
   return <article aria-labelledby={tooltip} data-registration={actionTone}
-    className="unisport-offer-card relative mt-2 flex min-w-0 flex-col rounded-xl border border-slate-300 dark:border-slate-700">
-    {!hideSport && offer.sport && <span className="unisport-offer-legend absolute -top-px left-2 max-w-[calc(100%-1rem)] -translate-y-1/2 truncate px-1.5 text-xs font-semibold text-teal-800 dark:text-teal-300" title={offer.sport}>
-      {offer.sport}
-    </span>}
-    <div className="flex flex-1 flex-col gap-2 px-3 pb-2 pt-3">
+    className="unisport-offer-card relative isolate mt-3 flex min-w-0 flex-col rounded-xl border border-slate-300 dark:border-slate-700">
+    {!hideSport && offer.sport && (onSport
+      ? <button type="button" onClick={onSport}
+        className={`${legend} min-w-11 cursor-pointer underline decoration-transparent underline-offset-2 hover:decoration-current focus-visible:decoration-current focus-visible:outline-2 focus-visible:outline-teal-500 after:absolute after:-top-0.5 after:-bottom-2.5 after:inset-x-0`}
+        title={offer.sport}><span className="block truncate">{offer.sport}</span></button>
+      : <span className={`${legend} truncate`} title={offer.sport}>{offer.sport}</span>)}
+    <div className="flex flex-1 flex-col gap-2 px-3 pb-2 pt-4">
       <header className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
         <h3 id={tooltip} className="min-w-0 flex-1 basis-32 break-words text-base font-bold leading-snug">{onDetails
-          ? <button type="button" onClick={onDetails} className="relative -my-2 min-h-11 w-full rounded py-2 text-left underline decoration-slate-300 underline-offset-4 focus-visible:outline-2 focus-visible:outline-teal-500">{offer.title}</button>
+          ? <button type="button" onClick={onDetails} aria-haspopup="dialog"
+            className="-my-2 min-h-11 w-full cursor-pointer rounded py-2 text-left underline decoration-slate-300 underline-offset-4 after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-2 focus-visible:outline-teal-500">{offer.title}</button>
           : offer.title}</h3>
         {(offer.level || type) && <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5 text-xs">
           {offer.level && <span className="flex min-w-0 items-center gap-1 break-words font-semibold">
@@ -190,7 +194,7 @@ export function SportSession({ offer, actions, onDetails, conflict = false, hide
           <p>{t('unisport.booking_login')}</p>}
       </div>
     </div>
-    <div className="flex min-w-0 divide-x divide-slate-200 border-t border-slate-200 [border-bottom-left-radius:inherit] [border-bottom-right-radius:inherit] dark:divide-slate-700 dark:border-slate-700">
+    <div className="relative z-10 flex min-w-0 divide-x divide-slate-200 border-t border-slate-200 [border-bottom-left-radius:inherit] [border-bottom-right-radius:inherit] dark:divide-slate-700 dark:border-slate-700">
       <div className={showRegistration || showAuto ? 'w-11 shrink-0' : 'min-w-11 flex-1'}>
         <Button variant="ghost" title={t('unisport.favourite_named', { name: offer.title })}
           aria-label={t('unisport.favourite_named', { name: offer.title })} aria-pressed={actions.favourite} onClick={actions.toggleFavourite}

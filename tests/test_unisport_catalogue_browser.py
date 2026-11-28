@@ -76,6 +76,8 @@ def test_cached_catalogue_filter_details_focus_and_bookmarks(workflow_page,width
     assert page.evaluate('window.unisportInjected') is None
     assert page.get_by_text('Shoes and water. <script>window.unisportInjected=true</script>',exact=True).is_visible()
     shot(page,f'detail-{width}-{height}-{code}-{scheme}')
+    page.get_by_role('dialog', name='Yoga 2').get_by_role('button', name=tr['Schliessen'], exact=True).click()
+    assert page.get_by_role('button', name='Yoga 2', exact=True).evaluate('(element) => element === document.activeElement')
     page.get_by_role('button',name=tr['unisport.back_to_sports'],exact=True).click()
     assert yoga.evaluate('(element)=>document.activeElement===element')
     assert query.input_value()=='Yoga 2'

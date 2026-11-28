@@ -42,10 +42,11 @@ function changeSchedule(change: () => void) {
   void navigationGuard.confirmNavigation().then(allowed => { if (allowed) change(); });
 }
 
-export function UnisportSchedule({ offers, now, isFavourite, isRegistered, getActions, openOffer }: {
+export function UnisportSchedule({ offers, now, isFavourite, isRegistered, getActions, openOffer, openSport }: {
   offers: UnisportOffer[]; now: number; isFavourite: (offer: UnisportOffer) => boolean;
   isRegistered: (offer: UnisportOffer) => boolean; getActions: (offer: UnisportOffer) => SessionActions;
   openOffer: (offer: UnisportOffer) => void;
+  openSport: (name: string) => void;
 }) {
   const language = useLanguage();
   const today = sportDay(now);
@@ -202,7 +203,8 @@ export function UnisportSchedule({ offers, now, isFavourite, isRegistered, getAc
       <h3 className="font-semibold">{sportDayLabel(day, language)}</h3>
       <div className="grid gap-3 @4xl:grid-cols-2">
         {visible.map(item => <SportSession key={item.offer.id + ':' + item.offer.begin} offer={item.offer}
-          actions={getActions(item.offer)} conflict={conflicts(item)} onDetails={() => openOffer(item.offer)} />)}
+          actions={getActions(item.offer)} conflict={conflicts(item)} onDetails={() => openOffer(item.offer)}
+          onSport={() => openSport(item.offer.sport)} />)}
       </div>
       {!visible.length && <div className="space-y-2 rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-700">
         <p>{t('unisport.no_sessions')}</p>

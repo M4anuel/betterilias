@@ -29,7 +29,7 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
     registered = {**offer(), 'title': 'Volley evening', 'sport': 'Volleyball',
                   'begin': start.isoformat(), 'end': end.isoformat(), 'registration_state': 1, 'opens': ''}
     opening = {**offer(2), 'title': 'Flow training', 'sport': 'Yoga', 'opens': reg_open,
-               'closes': (start + timedelta(hours=1)).isoformat(), 'quick_candidate': True,
+               'closes': (start + timedelta(hours=1)).isoformat(),
                'level': 'N2–N4', 'free_places': '1 place',
                'begin': (start + timedelta(hours=2)).isoformat(), 'end': (end + timedelta(hours=2)).isoformat(),
                'registration_state': 2, 'offer_type': 'training'}
@@ -63,6 +63,8 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
                     'fetched_at': now.timestamp(), 'stale': False}
         elif path.endswith('/applications'):
             data = {'items': [application, *tennis_applications], 'fetched_at': now.timestamp()}
+        elif path.endswith('/offers/2'):
+            data = {'offer': opening, 'fetched_at': now.timestamp()}
         elif path.endswith('/bookmarks'):
             data = {'items': []}
         elif path.endswith('/calendar'):
@@ -117,6 +119,9 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
     page.keyboard.press('Space')
     assert auto.get_attribute('aria-pressed') == 'true'
     auto.locator('.unisport-autosign-check').wait_for()
+    once_label = f"{tr['unisport.autosign_preview']} · {tr['unisport.autosign_once']}"
+    weekly_label = f"{tr['unisport.autosign_preview']} · {tr['unisport.autosign_weekly']}"
+    assert auto.get_by_text(once_label, exact=True).is_visible()
     page.evaluate('toggleAutoSignIn(false)')
     assert not auto.is_visible()
     page.evaluate('toggleAutoSignIn(true)')
@@ -124,6 +129,13 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
     favourite = opening_card.get_by_role('button', name=tr['unisport.favourite_named'].format(name='Flow training'), exact=True)
     favourite.click()
     assert favourite.get_attribute('aria-pressed') == 'true'
+    assert auto.get_by_text(weekly_label, exact=True).is_visible()
+    auto.click()
+    auto.click()
+    assert auto.get_by_text(weekly_label, exact=True).is_visible()
+    favourite.click()
+    assert auto.get_by_text(once_label, exact=True).is_visible()
+    favourite.click()
     register = opening_card.get_by_role('button', name=tr['unisport.card_register'], exact=True)
     register.click()
     dialog = page.get_by_role('dialog')
@@ -132,7 +144,22 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
     assert register.evaluate('(button) => button === document.activeElement')
     page.screenshot(path=str(screenshots / f'cards-{width}-{height}-{code}-{scheme}.png'))
 
-    nav.get_by_role('button', name=tr['unisport.explore'], exact=True).click()
+    # Click non-interactive card content instead of the title.
+    capacity = opening_card.get_by_text(tr['unisport.card_one_place'], exact=True)
+    capacity.scroll_into_view_if_needed()
+    box = capacity.bounding_box()
+    page.mouse.click(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+    details = page.get_by_role('dialog', name='Flow training')
+    details.get_by_role('button', name=tr['unisport.card_register'], exact=True).wait_for()
+    assert details.get_by_role('button', name=tr['unisport.autosign_in'], exact=True).get_attribute('aria-pressed') == 'true'
+    assert details.get_by_role('button', name=tr['unisport.favourite_named'].format(name='Flow training')).get_attribute('aria-pressed') == 'true'
+    page.screenshot(path=str(screenshots / f'offer-dialog-{width}-{height}-{code}-{scheme}.png'))
+    page.keyboard.press('Escape')
+    details.wait_for(state='hidden')
+    opening_card.get_by_role('button', name='Yoga', exact=True).click()
+    page.get_by_role('heading', name='Yoga', exact=True).wait_for()
+    assert nav.get_by_role('button', name=tr['unisport.explore'], exact=True).get_attribute('aria-current') == 'page'
+    page.get_by_role('button', name=tr['unisport.back_to_sports'], exact=True).click()
     category = page.get_by_label(tr['unisport.sport_category'], exact=True)
     category.select_option('wellbeing')
     assert not page.get_by_role('button', name='Volleyball', exact=True).is_visible()
@@ -160,8 +187,13 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
 
     nav.get_by_role('button', name=tr['unisport.my_sport'], exact=True).click()
     page.get_by_role('article', name='Flow training', exact=True).get_by_role('button', name=tr['unisport.autosign_in'], exact=True).wait_for()
-    page.get_by_role('button', name='Yoga', exact=True).wait_for()
+    page.get_by_role('listitem').get_by_role('button', name='Yoga', exact=True).wait_for()
     with page.expect_download() as event:
         page.get_by_role('button', name=tr['unisport.add_calendar'], exact=True).click()
     calendar = Path(event.value.path()).read_text(encoding='utf-8')
     assert 'BEGIN:VALARM' in calendar and 'TRIGGER:-PT5M' in calendar and 'Flow training' in calendar
+    opening.update(begin=(start + timedelta(days=7, hours=2)).isoformat(), end=(end + timedelta(days=7, hours=2)).isoformat(),
+                   location='Next week hall')
+    page.get_by_role('button', name=tr['unisport.refresh'], exact=True).click()
+    updated = page.get_by_role('article', name='Flow training', exact=True).filter(has_text='Next week hall')
+    updated.get_by_role('button', name=tr['unisport.autosign_in'], exact=True).get_by_text(weekly_label, exact=True).wait_for()

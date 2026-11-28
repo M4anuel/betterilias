@@ -2,8 +2,9 @@
 import { t } from '../lib/i18n';
 import { Button } from './ui/Button';
 
-export function UnisportAutosignIn({ active, toggle }: { active: boolean; toggle: () => void }) {
+export function UnisportAutosignIn({ active, weekly, toggle }: { active: boolean; weekly: boolean; toggle: () => void }) {
   const description = useId();
+  const mode = t(weekly ? 'unisport.autosign_weekly' : 'unisport.autosign_once');
   return <Button variant="ghost" aria-label={t('unisport.autosign_in')} aria-pressed={active} aria-describedby={description} onClick={toggle}
     className="relative w-full !gap-1 !rounded-none !px-1">
     <span aria-hidden="true" className="grid size-4 shrink-0 place-items-center">
@@ -16,8 +17,8 @@ export function UnisportAutosignIn({ active, toggle }: { active: boolean; toggle
     <span className="min-w-0">
       {t('unisport.autosign_in')}
       <span className="block text-[11px] leading-tight text-slate-600 dark:text-slate-300"
-        title={t('unisport.autosign_preview_hint')}>{t('unisport.autosign_preview')}</span>
-      <span id={description} className="sr-only">{t('unisport.autosign_preview_hint')}</span>
+        title={t('unisport.autosign_preview_hint')}>{t('unisport.autosign_preview')}{active && <> · {mode}</>}</span>
+      <span id={description} className="sr-only">{t('unisport.autosign_preview_hint')} {mode}</span>
     </span>
   </Button>;
 }

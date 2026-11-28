@@ -4,7 +4,7 @@ import { t, useLanguage } from '../lib/i18n';
 import { unisportFetch } from '../lib/unisport';
 import { CATALOGUE_TTL, OFFER_TTL, fresh, readPrivate, writePrivate } from '../lib/unisportCache';
 import {
-  applicationStart, autoSignInKey, cardOfferType, cardOfferTypes, downloadSportCalendar, instant, occurrenceKey, registrationState,
+  applicationStart, cardOfferType, cardOfferTypes, downloadSportCalendar, instant, isWeeklyOffer, occurrenceKey, registrationState,
   sportCategories, sportCategory, sportClock, sportDay, sportDayLabel, unisportDate,
   type SportSelection, type SportView, type UnisportApplication, type UnisportCatalogue as Catalogue, type UnisportOffer,
 } from '../lib/unisportOffers';
@@ -13,6 +13,7 @@ import { useUnisportAutoSignIn } from '../lib/useUnisportAutoSignIn';
 import { navigationGuard } from '../lib/navigationGuard';
 import { Button, IconButton } from './ui/Button';
 import { Badge } from './ui/Badge';
+import { DialogShell } from './ui/DialogShell';
 import { ErrorNotice } from './ErrorNotice';
 import { FeedbackBanner } from './ui/FeedbackBanner';
 import { UnisportSchedule, SportSelect, sportControl } from './UnisportSchedule';
@@ -69,6 +70,19 @@ function toggle<T>(values: T[], value: T) {
   return values.includes(value) ? values.filter(item => item !== value) : [...values, value];
 }
 
+function autoSignInPreference(offer: UnisportOffer, data: Preferences) {
+  const once = occurrenceKey(offer.id, offer.begin);
+  const series = String(offer.id);
+  const weekly = isWeeklyOffer(offer) && data.offers.includes(offer.id);
+  return { once, series, weekly, active: data.autoSignIn.includes(once) || data.autoSignIn.includes(series) };
+}
+
+function saveAutoSignIn(offer: UnisportOffer, data: Preferences, active: boolean) {
+  const { once, series, weekly } = autoSignInPreference(offer, data);
+  const keys = data.autoSignIn.filter(key => key !== once && key !== series);
+  return active ? [...keys, weekly ? series : once] : keys;
+}
+
 function groupSessions(items: UnisportOffer[]) {
   const groups = new Map<string, UnisportOffer[]>();
   for (const offer of items) {
@@ -105,7 +119,12 @@ function OfferDetail({ offer, credential, actions }: {
 }) {
   const language = useLanguage();
   const detail = useUnisportPublic<{ offer: UnisportOffer }>('offers/' + offer.id, credential, OFFER_TTL, data => data.offer?.id === offer.id);
-  const displayed = detail.data?.offer ?? offer;
+  const fetched = detail.data?.offer;
+  // The provider may advance to a new week while an earlier occurrence is
+  // selected. Keep the occurrence and its booking actions tied to the card.
+  const start = instant(offer.begin);
+  const displayed = fetched && (!Number.isFinite(start) || instant(fetched.begin) === start) ? fetched : offer;
+  const information = fetched ?? offer;
   return <div className="space-y-2">
     {detail.loading && <p role="status" className="text-sm">{t('unisport.loading_offer')}</p>}
     {detail.error && <ErrorNotice message={detail.error} connectionInline onRetry={detail.refresh} />}
@@ -113,11 +132,11 @@ function OfferDetail({ offer, credential, actions }: {
     {detail.data && <>
       <p className="text-xs text-slate-500 dark:text-slate-400">{snapshotLabel(detail.data, language, OFFER_TTL)}</p>
       {displayed.address && displayed.address !== displayed.location && <p className="text-sm">{displayed.address}</p>}
-      {(displayed.important || displayed.outage) && <FeedbackBanner tone="warning" message={displayed.important || displayed.outage || ''} />}
-      {displayed.special && <p className="whitespace-pre-wrap break-words text-sm">{displayed.special}</p>}
-      {displayed.sport_url && <a href={displayed.sport_url} target="_blank" rel="noopener noreferrer"
+      {(information.important || displayed.outage) && <FeedbackBanner tone="warning" message={information.important || displayed.outage || ''} />}
+      {information.special && <p className="whitespace-pre-wrap break-words text-sm">{information.special}</p>}
+      {information.sport_url && <a href={information.sport_url} target="_blank" rel="noopener noreferrer"
         className="inline-flex min-h-11 items-center text-sm text-teal-800 underline dark:text-teal-300">{t('unisport.about_sport')}</a>}
-      {displayed.infos?.map((info, index) => <details key={index} className={panel}
+      {information.infos?.map((info, index) => <details key={index} className={panel}
         open={/^(?:costs|fees|cancellation|kosten|gebühren|abmeldung|annullation|stornierung)$/i.test(info.title.trim())}>
         <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">{info.title || t('unisport.more_information')}</summary>
         <p className="whitespace-pre-wrap break-words text-sm">{info.content}</p>
@@ -144,6 +163,7 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
   const [offerType, setOfferType] = useState('');
   const [reverse, setReverse] = useState(false);
   const [localSelection, setLocalSelection] = useState<SportSelection>();
+  const [detailOffer, setDetailOffer] = useState<UnisportOffer | null>(null);
   const selectionState = onSelectSport ? focused : localSelection;
   const selectedOffer = selectionState?.offerId;
   const selectedFromOffer = offers.find(offer => offer.id === selectedOffer);
@@ -227,24 +247,43 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
         : [...data.sports, { name, offerIds: sports.get(name)?.offers.map(offer => offer.id) ?? [] }],
     };
   });
-  const toggleOffer = (offer: UnisportOffer) => update(data => ({ ...data, offers: toggle(data.offers, offer.id) }));
+  // Older previews saved training preferences by offer ID even when the offer
+  // was not a favourite. Move those to the first known occurrence.
+  useEffect(() => {
+    const legacy = offers.filter(offer => !preferences.offers.includes(offer.id) &&
+      preferences.autoSignIn.includes(String(offer.id)) && Number.isFinite(instant(offer.begin)));
+    if (legacy.length) update(data => legacy.reduce((current, offer) => ({
+      ...current, autoSignIn: saveAutoSignIn(offer, current, true),
+    }), data));
+  }, [offers, preferences]);
+  const toggleOffer = (offer: UnisportOffer) => update(data => {
+    const next = { ...data, offers: toggle(data.offers, offer.id) };
+    if (autoSignInPreference(offer, data).active) next.autoSignIn = saveAutoSignIn(offer, next, true);
+    return next;
+  });
   const reminderMatches = (reminder: Reminder, offer: UnisportOffer) => reminder.id === offer.id && reminder.opens === offer.opens;
   const toggleReminder = (offer: UnisportOffer) => update(data => ({
     ...data, reminders: data.reminders.some(reminder => reminderMatches(reminder, offer))
       ? data.reminders.filter(reminder => !reminderMatches(reminder, offer))
       : [...data.reminders, { id: offer.id, title: offer.title, opens: offer.opens }],
   }));
-  const actions = (offer: UnisportOffer): SessionActions => ({
-    now, account, favourite: preferences.offers.includes(offer.id), registered: Boolean(personal(offer)),
-    canCancel: personal(offer)?.status === 8, personalStatus: personal(offer)?.registration,
-    applicationPlaces: personal(offer)?.freePlaces,
-    reminded: preferences.reminders.some(reminder => reminderMatches(reminder, offer)),
-    toggleFavourite: () => toggleOffer(offer), toggleReminder: () => toggleReminder(offer), onBookingClosed,
-    autoSignIn: autoSignInEnabled && scope && affiliation && offer.quick_candidate && Number.isFinite(instant(offer.begin)) ? {
-      active: preferences.autoSignIn.includes(autoSignInKey(offer)),
-      toggle: () => update(data => ({ ...data, autoSignIn: toggle(data.autoSignIn, autoSignInKey(offer)) })),
-    } : undefined,
-  });
+  const actions = (offer: UnisportOffer): SessionActions => {
+    const application = personal(offer);
+    const preview = autoSignInPreference(offer, preferences);
+    const hasRegistration = application || Number.isFinite(instant(offer.opens)) ||
+      [1, 2, 3, 6].includes(offer.registration_state ?? 0);
+    return {
+      now, account, favourite: preferences.offers.includes(offer.id), registered: Boolean(application),
+      canCancel: application?.status === 8, personalStatus: application?.registration,
+      applicationPlaces: application?.freePlaces,
+      reminded: preferences.reminders.some(reminder => reminderMatches(reminder, offer)),
+      toggleFavourite: () => toggleOffer(offer), toggleReminder: () => toggleReminder(offer), onBookingClosed,
+      autoSignIn: autoSignInEnabled && scope && affiliation && hasRegistration && Number.isFinite(instant(offer.begin)) ? {
+        active: preview.active, weekly: preview.weekly,
+        toggle: () => update(data => ({ ...data, autoSignIn: saveAutoSignIn(offer, data, !autoSignInPreference(offer, data).active) })),
+      } : undefined,
+    };
+  };
   const matchingSports = [...sports.values()].filter(sport => {
     if (category && sportCategory(sport.name) !== category) return false;
     if (offerType && !sport.offers.some(offer => cardOfferType(offer) === offerType)) return false;
@@ -265,14 +304,14 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
       setSelection({ sport: name, offerId });
     });
   };
-  const openOffer = (offer: UnisportOffer) => openSport(offer.sport || offer.title, offer.id);
+  const openOffer = (offer: UnisportOffer) => setDetailOffer(offer);
   const leaveSport = () => void navigationGuard.confirmNavigation().then(allowed => {
     if (!allowed) return;
     setSelection(undefined);
     requestAnimationFrame(() => previousFocus.current?.focus());
   });
   const renderSession = (offer: UnisportOffer) => <SportSession key={occurrenceKey(offer.id, offer.begin)}
-    offer={offer} actions={actions(offer)} onDetails={() => openOffer(offer)} />;
+    offer={offer} actions={actions(offer)} onDetails={() => openOffer(offer)} onSport={() => openSport(offer.sport)} />;
 
   const scheduled = [...byId.values()];
   for (const item of registered.values()) {
@@ -330,7 +369,7 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
           </div>
           {items.map(offer => <div key={offer.id} className="space-y-1">
             {isFavourite(offer) && <Badge tone="info">{t('unisport.favourites')}</Badge>}
-            <SportSession offer={offer} actions={actions(offer)} onDetails={() => openOffer(offer)} />
+            {renderSession(offer)}
           </div>)}
         </div>)}</div>
       </details>)}
@@ -423,11 +462,7 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
     </div>}
     {(view === 'schedule' || scheduleVisited) && <div hidden={view !== 'schedule'}>
       <UnisportSchedule offers={scheduled} now={now} isFavourite={isFavourite}
-        isRegistered={offer => Boolean(personal(offer))} getActions={actions} openOffer={offer => {
-          const catalogueOffer = byId.get(offer.id);
-          if (catalogueOffer && instant(catalogueOffer.begin) === instant(offer.begin)) openOffer(catalogueOffer);
-          else onNavigate?.('my_sport');
-        }} />
+        isRegistered={offer => Boolean(personal(offer))} getActions={actions} openOffer={openOffer} openSport={openSport} />
     </div>}
     {view === 'my_sport' && <div className="min-w-0 space-y-4">
       {registrations}
@@ -471,5 +506,12 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
         })}
       </section>}
     </div>}
+    {detailOffer && <DialogShell title={detailOffer.title} description={detailOffer.sport || undefined}
+      className="unisport-booking-dialog" onRequestClose={() => {
+        if (!navigationGuard.hasPendingOperations()) setDetailOffer(null);
+      }}>
+      <OfferDetail offer={scheduled.find(offer => offer.id === detailOffer.id && offer.begin === detailOffer.begin) ?? detailOffer}
+        credential={credential} actions={actions} />
+    </DialogShell>}
   </div>;
 }

@@ -114,21 +114,24 @@ export function occurrenceKey(id: number | undefined, begin: string): string {
   return JSON.stringify([id, instant(begin)]);
 }
 
-// Provider IDs identify the offer. offerNextDate changes within a weekly series.
-export function autoSignInKey(offer: UnisportOffer): string {
-  return offer.offer_type === 'training' ? String(offer.id) : occurrenceKey(offer.id, offer.begin);
+// ZSSw Tennis court slots are booked individually the day before. The
+// catalogue drops registrationTimeSlot once they open or fill up.
+function isTennisCourt(offer: UnisportOffer) {
+  return offer.sport.trim().toLowerCase() === 'tennis' &&
+    /^tennis (?:freies spiel|individual game)$/i.test(offer.title.trim());
+}
+
+export function isWeeklyOffer(offer: UnisportOffer) {
+  return offer.offer_type === 'training' || isTennisCourt(offer) ||
+    cardOfferType(offer) === 'daily' && Boolean(offer.schedule_day && /\d\s*[-–]\s*\d/.test(offer.date_range ?? ''));
 }
 
 export function cardOfferType(offer: UnisportOffer) {
   const day = sportDay(instant(offer.begin));
   if (offer.registration_state !== 7) {
-    // ZSSw Tennis court slots are booked individually the day before. The
-    // catalogue drops registrationTimeSlot once they open or fill up.
-    const tennisCourt = offer.sport.trim().toLowerCase() === 'tennis' &&
-      /^tennis (?:freies spiel|individual game)$/i.test(offer.title.trim());
     const dayBefore = day && sportDay(instant(offer.opens)) === changeDay(day, -1);
     const publishedRule = /\b(?:am vortag|the (?:day before|previous day))\b/i.test(offer.status);
-    if (tennisCourt || publishedRule || offer.offer_type !== 'date_range' && dayBefore) return 'daily';
+    if (isTennisCourt(offer) || publishedRule || offer.offer_type !== 'date_range' && dayBefore) return 'daily';
   }
   return offer.offer_type ?? null;
 }

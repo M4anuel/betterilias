@@ -2602,7 +2602,7 @@
   "unisport.open_short": "Open",
   "unisport.timetable_short": "Timetable",
   "unisport.autosign_in": "AutoSignIn",
-  "unisport.autosign_description": "Automatically register for selected Unisport offers.",
+  "unisport.autosign_description": "Automatically register for selected Unisport offers. favourite it to register every week",
   "unisport.autosign_preview_hint": "Preferences are saved. Automatic registration is not available yet.",
   "unisport.card_type_daily": "Daily",
   "unisport.card_type_date_range": "Course",
@@ -2622,5 +2622,7 @@
   "unisport.card_reminder_question": "Would you like to save a reminder for when registration opens?",
   "unisport.card_reminder_local": "Saved reminders appear in My Sport, where you can download them for your calendar.",
   "unisport.autosign_preview": "Preview",
+  "unisport.autosign_once": "Once",
+  "unisport.autosign_weekly": "Weekly",
   "unisport.autosign_failed": "Could not update autosign in. Try again."
 }
