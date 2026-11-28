@@ -2599,9 +2599,12 @@
   "unisport.category_other": "Weitere Sportarten",
   "unisport.one_sport": "1 Sportart",
   "unisport.other_sports": "Weitere Sportarten",
-  "unisport.account": "Konto",
-  "unisport.account_action": "Konto: Anmeldung und Zugehörigkeit im Companion verwalten",
-  "unisport.sign_in": "Anmelden",
   "unisport.open_short": "Offen",
-  "unisport.timetable_short": "Stundenplan"
+  "unisport.timetable_short": "Stundenplan",
+  "unisport.autosign_in": "Auto-Anmeldung",
+  "unisport.autosign_preview": "Vorschau",
+  "unisport.autosign_preview_hint": "Dieses Bedienelement zeigt die Animation. Deine Anmeldung bleibt unverändert.",
+  "unisport.autosign_enabling": "Auto-Anmeldung wird eingeschaltet …",
+  "unisport.autosign_disabling": "Auto-Anmeldung wird ausgeschaltet …",
+  "unisport.autosign_failed": "Die Auto-Anmeldung konnte nicht aktualisiert werden. Versuche es erneut."
 }

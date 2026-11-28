@@ -2599,9 +2599,12 @@
   "unisport.category_other": "Other sports",
   "unisport.one_sport": "1 sport",
   "unisport.other_sports": "Other sports",
-  "unisport.account": "Account",
-  "unisport.account_action": "Account: manage login and affiliation in Companion",
-  "unisport.sign_in": "Sign in",
   "unisport.open_short": "Open",
-  "unisport.timetable_short": "Timetable"
+  "unisport.timetable_short": "Timetable",
+  "unisport.autosign_in": "Autosign in",
+  "unisport.autosign_preview": "Preview",
+  "unisport.autosign_preview_hint": "This control demonstrates the animation. It does not change your sign-in.",
+  "unisport.autosign_enabling": "Turning on autosign in…",
+  "unisport.autosign_disabling": "Turning off autosign in…",
+  "unisport.autosign_failed": "Could not update autosign in. Try again."
 }

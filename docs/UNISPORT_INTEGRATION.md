@@ -60,6 +60,26 @@ Waiting-list signup and background availability alerts require additional
 provider support. Chromium browser regressions use synthetic timetable and
 booking responses. Live bookings and physical devices need separate acceptance.
 
+### Autosign-in control preview (1.12.1)
+
+Replace the Unisport header's Account shortcut with **Autosign in**. This
+preview demonstrates the interaction while the backend feature is pending.
+The button reserves a fixed slot for the icon and keeps the same width,
+label and hit area in every state.
+
+| State | Appearance and interaction |
+| --- | --- |
+| Off | Empty icon slot. Hover uses the normal button highlight. |
+| Enabling | The button is disabled while the request is pending. |
+| Enabled | After confirmation, draw the open ring anticlockwise, then draw the check through its gap. A subsequent mouse hover changes the check to a red X. |
+| Disabling | Show a spinner in the icon slot and disable the button until confirmation. Then return to Off. |
+| Request fails | Keep the last confirmed state, announce the error and enable the button again. |
+
+Keyboard and touch activate the same toggle. Reduced motion shows the final
+symbols immediately and uses a static spinner. The preview simulates
+confirmation in the page and makes no authentication requests. The future
+backend integration can supply an async update and keep the same interaction.
+
 ## Try it locally
 
 1. Install the updated backend requirements (`python -m pip install -r requirements.txt`

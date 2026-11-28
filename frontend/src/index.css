@@ -1,5 +1,43 @@
 @import "tailwindcss";
 
+.unisport-autosign-success {
+  color: var(--color-teal-700);
+  stroke: currentColor;
+  transform-origin: center;
+}
+.dark .unisport-autosign-success { color: var(--color-teal-300); }
+.unisport-autosign-x {
+  color: var(--color-rose-600);
+  opacity: 0;
+  stroke: currentColor;
+  transform-origin: center;
+}
+.dark .unisport-autosign-x { color: var(--color-rose-400); }
+.unisport-autosign-mark[data-remove="true"] .unisport-autosign-success { opacity: 0; }
+.unisport-autosign-mark[data-remove="true"] .unisport-autosign-x { opacity: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .unisport-autosign-ring, .unisport-autosign-check {
+    stroke-dasharray: 1;
+    animation: unisport-autosign-draw 460ms ease-out both;
+  }
+  .unisport-autosign-check {
+    animation-duration: 260ms;
+    animation-delay: 460ms;
+  }
+  .unisport-autosign-success, .unisport-autosign-x {
+    transition: opacity 160ms ease-out, transform 200ms ease-out;
+  }
+  .unisport-autosign-x { transform: scale(.65) rotate(-24deg); }
+  .unisport-autosign-mark[data-remove="true"] .unisport-autosign-success { transform: scale(.75) rotate(18deg); }
+  .unisport-autosign-mark[data-remove="true"] .unisport-autosign-x { transform: none; }
+}
+
+@keyframes unisport-autosign-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
 .ui-dialog { width: calc(100vw - 2rem); max-height: min(90dvh, calc(var(--visible-height, 100dvh) - 2rem)); }
 .ui-dialog > header { min-height: 0; padding: 1rem; }
 .ui-dialog:modal { overscroll-behavior: contain; }

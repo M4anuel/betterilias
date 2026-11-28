@@ -14,6 +14,10 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Replace the Unisport header account shortcut with an animated autosign-in
+  preview (1.12.1). The preview resets when the page is left and does not start
+  authentication or change account settings.
+
 - [x] Add the Overview, Explore, Schedule and My Sport workspace (1.12.0).
   Include responsive sport details, sport and offer favourites, daily and
   weekly scheduling with timetable conflicts, registration countdowns,

@@ -121,7 +121,7 @@ def test_app_navigation_and_history_without_ilias_login(workflow_page, width):
       const {App}=await import('/src/App.tsx');mountAudit(App,{});
     }''')
     page.get_by_role('heading',name=tr['unisport.title'],exact=True).wait_for()
-    page.get_by_role('button',name=tr['unibe.login'],exact=True).wait_for()
+    page.get_by_role('button',name=tr['unisport.autosign_in'],exact=True).wait_for()
     assert page.locator('dialog[open]').count()==0
     if width<768: page.get_by_role('button',name=tr['Sidebar umschalten'],exact=True).click()
     nav=page.get_by_role('button',name=tr['unisport.title'],exact=True)
@@ -340,22 +340,55 @@ def test_unibe_selection_survives_legacy_companion_before_cache_initialization(w
     assert result=={'selected':'p'*43,'stored':'p'*43,'ignored':True,'draft':'synthetic draft','manual':True,'afterManual':'manual-companion-session'}
 
 
-@pytest.mark.parametrize('code,scheme',[('en','light'),('de','dark')])
-@pytest.mark.parametrize('connected',[False,True])
-def test_primary_unisport_login_opens_companion_without_page_first_form(workflow_page,code,scheme,connected):
-    page=workflow_page;page.set_viewport_size({'width':320,'height':740});tr=language(page,code,scheme)
-    _,writes=mount(page,connected=connected,legacy=False)
-    page.evaluate('''()=>{
-      window.openedSharedLogin=[];
-      addEventListener('message',e=>{
-        if(e.data?.type==='UNIBE_OPEN_FROM_PAGE'){
-          openedSharedLogin.push(e.data);
-          postMessage({type:'UNISPORT_REPLY',requestId:e.data.requestId,success:true},location.origin);
-        }
+@pytest.mark.parametrize('width,height', [(320,740),(390,844),(430,844),(768,850),(1280,900),(844,390)])
+@pytest.mark.parametrize('code,scheme', [('en','light'),('de','dark')])
+def test_autosign_preview_has_stable_width_and_no_authentication_side_effects(workflow_page,width,height,code,scheme):
+    page = workflow_page
+    page.set_viewport_size({'width':width, 'height':height})
+    tr = language(page,code,scheme)
+    reduced = width in (430, 844)
+    page.emulate_media(color_scheme=scheme, reduced_motion='reduce' if reduced else 'no-preference')
+    _, writes = mount(page,connected=width > 400,legacy=False)
+    page.evaluate("""() => {
+      window.accountRequests = [];
+      addEventListener('message', e => {
+        if (e.data?.type === 'UNIBE_OPEN_FROM_PAGE') accountRequests.push(e.data.type);
       });
-    }''')
-    button=page.get_by_role('button',name=tr['unisport.account_action' if connected else 'unibe.login'],exact=True)
-    button.click();page.wait_for_function('openedSharedLogin.length===1')
-    assert page.locator('#unisport-affiliation').count()==0
-    assert not any(path.endswith('/auth/start') for path,_,_ in writes)
-    shot(page,f'primary-companion-login-{connected}-{code}-{scheme}')
+    }""")
+    button = page.get_by_role('button', name=tr['unisport.autosign_in'], exact=True)
+    mark = button.locator('.unisport-autosign-mark')
+    button.wait_for()
+    width_before = button.bounding_box()['width']
+    button.hover()
+    assert button.locator('svg').count() == 0
+    if width == 430:
+        button.focus()
+        page.keyboard.press('Space')
+    else:
+        button.click()
+    assert button.is_disabled() and button.get_attribute('aria-pressed') == 'false'
+    mark.wait_for()
+    assert not button.is_disabled()
+    assert button.get_attribute('aria-pressed') == 'true' and mark.get_attribute('data-remove') == 'false'
+    assert button.bounding_box()['width'] == width_before
+    ring = mark.locator('.unisport-autosign-ring')
+    check = mark.locator('.unisport-autosign-check')
+    assert ring.evaluate('(el) => getComputedStyle(el).animationName') == ('none' if reduced else 'unisport-autosign-draw')
+    if not reduced:
+        assert check.evaluate('(el) => getComputedStyle(el).animationDelay') == '0.46s'
+    page.evaluate("Promise.all(document.querySelector('.unisport-autosign-mark').getAnimations({subtree:true}).map(a => a.finished))")
+    shot(page, f'autosign-{width}-{height}-{code}-{scheme}')
+    page.mouse.move(2,2)
+    button.hover()
+    assert mark.get_attribute('data-remove') == 'true'
+    if width == 320:
+        page.evaluate("Promise.all(document.querySelector('.unisport-autosign-mark').getAnimations({subtree:true}).map(a => a.finished))")
+        shot(page, f'autosign-remove-{width}-{height}-{code}-{scheme}')
+    button.click()
+    assert button.is_disabled() and button.get_attribute('aria-pressed') == 'true'
+    assert button.locator('.lucide-loader-circle').count() == 1
+    assert button.bounding_box()['width'] == width_before
+    page.wait_for_function("document.querySelector('button[aria-pressed][aria-busy]')?.getAttribute('aria-busy') === 'false'")
+    assert button.get_attribute('aria-pressed') == 'false' and button.locator('svg').count() == 0
+    assert button.bounding_box()['width'] == width_before
+    assert writes == [] and page.evaluate('accountRequests') == []

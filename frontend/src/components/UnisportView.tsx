@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Compass, Dumbbell, Heart, LayoutGrid, LoaderCircle, RefreshCw, UserRound } from 'lucide-react';
+import { CalendarDays, Compass, Dumbbell, Heart, LayoutGrid, LoaderCircle, RefreshCw } from 'lucide-react';
+import { UnisportAutosignIn } from './UnisportAutosignIn';
 import { t, useLanguage } from '../lib/i18n';
 import { unisportCompanion, unisportCredential, unisportFetch } from '../lib/unisport';
 import { Button, IconButton } from './ui/Button';
@@ -228,12 +229,7 @@ export function UnisportView({ route, onNavigate }: { route?: SportRoute; onNavi
     <header className="space-y-2 !p-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 id="unisport-title" className="flex items-center gap-2 text-2xl font-bold"><Dumbbell aria-hidden="true" />{t('unisport.title')}</h1>
-        {!legacyLogin && <Button loading={busy}
-          aria-label={t(connection.phase === 'connected' ? 'unisport.account_action' : 'unibe.login')}
-          onClick={() => void run(async () => { await unisportCompanion({ type: 'UNIBE_OPEN_FROM_PAGE' }); })}>
-          <UserRound size={16} aria-hidden="true" />
-          {t(connection.phase === 'connected' ? 'unisport.account' : 'unisport.sign_in')}
-        </Button>}
+        <UnisportAutosignIn />
       </div>
 
       <nav aria-label={t('unisport.title')} className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 min-[540px]:flex dark:bg-slate-800">
