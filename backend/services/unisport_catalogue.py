@@ -13,7 +13,7 @@ import sqlite3
 import time
 from urllib.parse import urlsplit
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
 from backend.config import settings
 from backend.coordination import SharedLock
@@ -25,14 +25,59 @@ CATALOGUE_TTL = 900
 DETAIL_TTL = 300
 STALE_TTL = 7 * 86400
 MAX_DETAILS = 128
+FORMAT_TAGS = {
+    'p': 'p', 'div': 'div', 'br': 'br', 'ul': 'ul', 'ol': 'ol', 'li': 'li',
+    'b': 'strong', 'strong': 'strong', 'i': 'em', 'em': 'em',
+    'u': 'u', 's': 's', 'sub': 'sub', 'sup': 'sup',
+}
 
 
 @safe_parser('unisport_public_text')
-def plain_html(html):
+def offer_html(html, *, formatted=False):
     soup = BeautifulSoup(html, 'lxml')
     for node in soup(['script', 'style', 'iframe', 'object']):
-        node.decompose()
-    return soup.get_text(separator='\n', strip=True)
+        if not node.decomposed:
+            node.decompose()
+    content = {'content': soup.get_text(separator='\n', strip=True)}
+    if not formatted:
+        return content
+
+    for node in soup(['template', 'svg', 'math']):
+        if not node.decomposed:
+            node.decompose()
+    remaining = 2000
+
+    def project(nodes, depth):
+        nonlocal remaining
+        if depth > 24:
+            raise OverflowError
+        for node in nodes:
+            remaining -= 1
+            if remaining < 0:
+                raise OverflowError
+            if isinstance(node, Comment):
+                continue
+            if isinstance(node, NavigableString):
+                yield str(node)
+            elif isinstance(node, Tag):
+                kind = FORMAT_TAGS.get(node.name)
+                children = list(project(node.children, depth + 1))
+                if kind and (children or kind == 'br'):
+                    yield {'kind': kind, 'children': children}
+                else:
+                    yield from children
+
+    try:
+        nodes = list(project((soup.body or soup).children, 0))
+    except OverflowError:
+        return content
+    if any(isinstance(node, dict) for node in nodes):
+        content['format'] = nodes
+    return content
+
+
+def plain_html(html):
+    return offer_html(html)['content']
 
 
 def text(value):
@@ -52,7 +97,7 @@ def public_url(value):
     return None
 
 
-def present_offer(raw, *, detail=False):
+def present_offer(raw, *, detail=False, formatted=False):
     if not isinstance(raw, dict) or type(raw.get('id')) is not int or raw['id'] <= 0 or not isinstance(raw.get('title'), str):
         raise UnisportReadError('invalid_response')
     def nested(key, field):
@@ -81,12 +126,15 @@ def present_offer(raw, *, detail=False):
         sport_link = sport.get('moreInfo') if isinstance(sport, dict) else None
         result['sport_url'] = public_url(sport_link.get('url')) if isinstance(sport_link, dict) else None
         infos = raw.get('generalInfos')
-        result['infos'] = [dict(title=text(item.get('title')), content=plain_html(text(item['content'])))
+        result['infos'] = [dict(title=text(item.get('title')), **offer_html(text(item['content']), formatted=formatted))
             for item in (infos[:40] if isinstance(infos, list) else [])
             if isinstance(item, dict) and text(item.get('content')).strip()]
         for key, source in [('important', 'importantInfo'), ('special', 'specialInfo'), ('outage', 'outage')]:
             value = text(raw.get(source))
-            result[key] = plain_html(value) if value.strip() else ''
+            projected = offer_html(value, formatted=formatted) if value.strip() else {'content': ''}
+            result[key] = projected['content']
+            if 'format' in projected:
+                result[f'{key}_format'] = projected['format']
     if recurring and result['requires_confirmation'] is False:
         infos = raw.get('generalInfos')
         costs = [plain_html(text(item.get('content'))).strip().casefold()
@@ -167,5 +215,5 @@ async def offer(offer_id, locale, *, refresh=False):
             raw = await client.offer(offer_id, locale, public=True)
         if raw.get('id') != offer_id:
             raise UnisportReadError('invalid_response')
-        return {'offer': present_offer(raw, detail=True)}
+        return {'offer': present_offer(raw, detail=True, formatted=True)}
     return await cached(f'offer:{locale}:{offer_id}', load, DETAIL_TTL, refresh)

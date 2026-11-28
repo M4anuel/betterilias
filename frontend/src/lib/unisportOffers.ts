@@ -1,3 +1,5 @@
+export type UnisportFormatNode = string | { kind: string; children: UnisportFormatNode[] };
+
 export type UnisportOffer = {
   id: number; title: string; sport: string; begin: string; end: string;
   opens: string; closes: string; level: string; location: string; address: string;
@@ -7,7 +9,9 @@ export type UnisportOffer = {
   quick_candidate?: boolean;
   schedule_day?: string; schedule_time?: string; date_range?: string; sport_url?: string | null;
   offer_type?: SportOfferType | null;
-  infos?: { title: string; content: string }[]; important?: string; special?: string; outage?: string;
+  infos?: { title: string; content: string; format?: UnisportFormatNode[] }[];
+  important?: string; special?: string; outage?: string;
+  important_format?: UnisportFormatNode[]; special_format?: UnisportFormatNode[]; outage_format?: UnisportFormatNode[];
 };
 export type UnisportCatalogue = { items: UnisportOffer[]; sports: string[] };
 export const sportOfferTypes = ['training', 'date_range', 'dated'] as const;

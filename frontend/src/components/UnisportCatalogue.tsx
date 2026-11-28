@@ -16,6 +16,7 @@ import { Badge } from './ui/Badge';
 import { DialogShell } from './ui/DialogShell';
 import { ErrorNotice } from './ErrorNotice';
 import { UnisportSchedule, SportSelect, sportControl } from './UnisportSchedule';
+import { UnisportInformation } from './UnisportInformation';
 import { OfficialSportLink, SportExploreLink, SportFavourite, SportSession, type SessionActions } from './UnisportSession';
 
 type Saved = { id: number; title: string };
@@ -141,9 +142,9 @@ function OfferDetail({ offer, credential, actions, onSport, onClose }: {
     </span>}
   </div>;
   const sections = [
-    ...(displayed.outage ? [{ title: t('unisport.state_cancelled'), content: displayed.outage, notice: true }] : []),
-    ...(information.important ? [{ title: t('unisport.offer_important'), content: information.important, notice: true }] : []),
-    ...(information.special ? [{ title: t('unisport.offer_special'), content: information.special, notice: false }] : []),
+    ...(displayed.outage ? [{ title: t('unisport.state_cancelled'), content: displayed.outage, format: displayed.outage_format, notice: true }] : []),
+    ...(information.important ? [{ title: t('unisport.offer_important'), content: information.important, format: information.important_format, notice: true }] : []),
+    ...(information.special ? [{ title: t('unisport.offer_special'), content: information.special, format: information.special_format, notice: false }] : []),
     ...(information.infos ?? []).map(info => ({ ...info, notice: false })),
   ];
   const body = <div className="space-y-4">
@@ -153,7 +154,7 @@ function OfferDetail({ offer, credential, actions, onSport, onClose }: {
     {sections.filter(info => info.content.trim()).map((info, index) => <section key={index}
       className={info.notice ? 'rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/35' : undefined}>
       <h3 className="font-semibold [overflow-wrap:anywhere]">{info.title || t('unisport.more_information')}</h3>
-      <p className="mt-1 max-w-[48ch] whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">{info.content}</p>
+      <UnisportInformation content={info.content} format={info.format} />
     </section>)}
     {(displayed.url || detail.data) && <footer className="flex flex-wrap items-center justify-between gap-x-3 border-t border-slate-200 pt-2 dark:border-slate-700">
       {displayed.url && <OfficialSportLink url={displayed.url} />}

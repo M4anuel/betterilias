@@ -38,6 +38,28 @@ def test_projection_is_plain_safe_and_drops_personal_flags():
     with pytest.raises(UnisportReadError):public.present_offer({'id':True,'title':'bad'})
 
 
+def test_public_offer_format_keeps_lists_and_emphasis_without_markup_or_attributes():
+    value = raw()
+    value['generalInfos'] = [{'title': 'Equipment', 'content':
+        '<ol start="7"><li>Bring <b onclick="ignored()">shoes</b> and <i>water</i>.</li></ol>'
+        '<script>hidden()</script><iframe src="https://example.test">hidden</iframe>'
+        '<p>Read <a href="javascript:ignored()">the rules</a><!-- hidden -->.</p>'}]
+    value['importantInfo'] = '<strong>Student ID</strong><br>Required'
+    public_offer = public.present_offer(value, detail=True, formatted=True)
+    info = public_offer['infos'][0]
+    assert info['format'] == [
+        {'kind': 'ol', 'children': [{'kind': 'li', 'children': [
+            'Bring ', {'kind': 'strong', 'children': ['shoes']}, ' and ',
+            {'kind': 'em', 'children': ['water']}, '.',
+        ]}]},
+        {'kind': 'p', 'children': ['Read ', 'the rules', '.']},
+    ]
+    assert public_offer['important_format'] == [
+        {'kind': 'strong', 'children': ['Student ID']}, {'kind': 'br', 'children': []}, 'Required',
+    ]
+    assert public.present_offer(value, detail=True)['infos'] == [{'title': 'Equipment', 'content': info['content']}]
+
+
 @pytest.fixture
 def upstream(monkeypatch):
     calls=[]
@@ -98,7 +120,11 @@ def test_public_api_without_login_and_private_account_guards(upstream,monkeypatc
     response=client.get('/api/unisport/catalogue',headers=headers)
     assert response.status_code==200 and response.headers['cache-control']=='no-store'
     assert len(response.json()['items'])==3
-    assert client.get('/api/unisport/offers/1',headers=headers).status_code==200
+    detail = client.get('/api/unisport/offers/1', headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()['offer']['infos'][0]['format'] == [
+        {'kind': 'p', 'children': ['Shoes']}, {'kind': 'p', 'children': ['Water']},
+    ]
     assert client.get('/api/unisport/offers/0',headers=headers).status_code==422
     assert client.get('/api/unisport/bookmarks',headers=headers).status_code==401
     owner=auth.digest(credential);state='state';data=dict(phase='connected',token='synthetic-token',subject='account-one',affiliation='student')

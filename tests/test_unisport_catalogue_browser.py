@@ -27,9 +27,16 @@ def mock(page):
         if control['fail']:
             route.fulfill(status=502,content_type='application/json',body=json.dumps({'detail':'Synthetic refresh unavailable'}));return
         if path.endswith('/catalogue'):data={'items':[offer(i) for i in range(1,26)],'sports':['Ball sports','Yoga'],'fetched_at':time.time(),'stale':False}
-        elif '/offers/' in path:data={'offer':{**offer(int(path.rsplit('/',1)[-1])),
-            'sport_url':'https://sport.unibe.ch/yoga', 'important':'Bring your student ID.'},
-            'fetched_at':time.time(),'stale':False}
+        elif '/offers/' in path:
+            item = offer(int(path.rsplit('/', 1)[-1]))
+            item['infos'].append({'title': 'What to bring', 'content': 'Shoes and water', 'format': [
+                {'kind': 'ul', 'children': [{'kind': 'li', 'children': [
+                    {'kind': 'strong', 'children': ['Shoes']}, ' and ', {'kind': 'em', 'children': ['water']},
+                ]}]},
+                {'kind': 'img', 'children': [], 'src': 'https://example.test/photo.png'},
+            ]})
+            data = {'offer': {**item, 'sport_url': 'https://sport.unibe.ch/yoga', 'important': 'Bring your student ID.'},
+                    'fetched_at': time.time(), 'stale': False}
         else:
             assert request.headers['x-unisport-scope']=='a'*64
             if control['delay_saved']:control['deferred']=route;return
@@ -85,6 +92,10 @@ def test_cached_catalogue_filter_details_focus_and_bookmarks(workflow_page,width
     assert modal.locator('footer').get_by_role('link', name=tr['unisport.official_offer'], exact=True).is_visible()
     assert page.evaluate('window.unisportInjected') is None
     assert page.get_by_text('Shoes and water. <script>window.unisportInjected=true</script>',exact=True).is_visible()
+    supplied_list = modal.get_by_role('listitem').filter(has_text='Shoes and water')
+    assert supplied_list.locator('strong').inner_text() == 'Shoes'
+    assert supplied_list.locator('em').inner_text() == 'water'
+    assert modal.locator('img').count() == 0
     shot(page,f'detail-{width}-{height}-{code}-{scheme}')
     page.mouse.click(1, 1)
     modal.wait_for(state='hidden')
