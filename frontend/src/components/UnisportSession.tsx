@@ -16,6 +16,7 @@ export type SessionActions = {
   registered: boolean;
   canCancel: boolean;
   personalStatus?: string;
+  applicationPlaces?: unknown;
   reminded: boolean;
   toggleFavourite: () => void;
   toggleReminder: () => void;
@@ -52,7 +53,7 @@ export function RegistrationAction({ offer, actions, cardAction = false }: { off
   if ((state === 'opening' || cardAction && reminderOpen) && !registered) {
     if (cardAction) return <>
       <Button variant="ghost" disabled={offerAvailability(offer).kind === 'full'}
-        className="w-full !rounded-none !px-1 text-slate-500 dark:text-slate-400"
+        className="unisport-register-button w-full !rounded-none !px-1 text-slate-600 dark:text-slate-300"
         aria-haspopup="dialog" onClick={() => setReminderOpen(true)}>{t('unisport.card_register')}</Button>
       {reminderOpen && <DialogShell title={t('unisport.card_opening_later')} size="small" onRequestClose={() => setReminderOpen(false)}
         description={t('unisport.card_reminder_question')} className="unisport-booking-dialog">
@@ -81,12 +82,12 @@ export function RegistrationAction({ offer, actions, cardAction = false }: { off
       onBookingClosed={actions.onBookingClosed} />;
   }
   if (bookingAllowed && !account.affiliation) {
-    if (cardAction) return <Button variant="ghost" disabled className="w-full !rounded-none !px-1"
+    if (cardAction) return <Button variant="ghost" disabled className="unisport-register-button w-full !rounded-none !px-1"
       title={t('unisport.booking_login')}>{t('unisport.card_register')}</Button>;
     return <span className="text-sm text-slate-600 dark:text-slate-400">{t('unisport.booking_login')}</span>;
   }
   return cardAction && !registered
-    ? <Button variant="ghost" disabled className="w-full !rounded-none !px-1">{t('unisport.card_register')}</Button> : null;
+    ? <Button variant="ghost" disabled className="unisport-register-button w-full !rounded-none !px-1">{t('unisport.card_register')}</Button> : null;
 }
 
 const typeTone = {
@@ -112,7 +113,7 @@ export function SportSession({ offer, actions, onDetails, conflict = false, hide
   const state = registrationState(offer, actions.now);
   const type = cardOfferType(offer);
   const levels = skillLevels(offer.level);
-  const availability = offerAvailability(offer);
+  const availability = offerAvailability(offer, actions.applicationPlaces);
   const start = instant(offer.begin), end = instant(offer.end);
   const weekday = Number.isFinite(start) ? new Intl.DateTimeFormat(language === 'de' ? 'de-CH' : 'en-GB', {
     weekday: 'short', timeZone: 'Europe/Zurich',
@@ -131,17 +132,21 @@ export function SportSession({ offer, actions, onDetails, conflict = false, hide
   const showAuto = actions.autoSignIn && state !== 'drop_in' && state !== 'cancelled';
   const location = offer.location || offer.address;
   const openingTime = Number.isFinite(instant(offer.opens));
-  const closingTime = Number.isFinite(instant(offer.closes));
+  const closingTime = type !== 'daily' && Number.isFinite(instant(offer.closes));
+  const hideRegistrationStatus = state === 'available' || type === 'daily' && state === 'opening';
   const status = state === 'cancelled' ? t('unisport.state_cancelled')
     : actions.registered ? actions.canCancel ? t('unisport.card_registered')
       : actions.personalStatus || t('unisport.on_registration_list')
+    : hideRegistrationStatus ? null
     : state === 'check' ? t('unisport.card_unavailable')
     : state === 'opening' ? t('unisport.card_opening_later')
     : state === 'full' ? t('unisport.card_unavailable')
     : t(`unisport.state_${state}`);
 
-  return <article aria-labelledby={tooltip} className="relative mt-2 flex min-w-0 flex-col rounded-xl border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900">
-    {!hideSport && offer.sport && <span className="absolute -top-2.5 left-2 max-w-[calc(100%-1rem)] truncate rounded px-1.5 text-xs font-semibold text-teal-800 bg-white dark:bg-slate-900 dark:text-teal-300" title={offer.sport}>
+  const actionTone = actions.registered ? 'registered' : state === 'available' ? 'open' : state === 'drop_in' ? 'neutral' : 'inactive';
+  return <article aria-labelledby={tooltip} data-registration={actionTone}
+    className="unisport-offer-card relative mt-2 flex min-w-0 flex-col rounded-xl border border-slate-300 dark:border-slate-700">
+    {!hideSport && offer.sport && <span className="unisport-offer-legend absolute -top-px left-2 max-w-[calc(100%-1rem)] -translate-y-1/2 truncate px-1.5 text-xs font-semibold text-teal-800 dark:text-teal-300" title={offer.sport}>
       {offer.sport}
     </span>}
     <div className="flex flex-1 flex-col gap-2 px-3 pb-2 pt-3">
@@ -172,20 +177,20 @@ export function SportSession({ offer, actions, onDetails, conflict = false, hide
       </div>
       {conflict && <div><Badge tone="warning">{t('unisport.timetable_conflict')}</Badge></div>}
       {!onDetails && offer.url && <div><OfficialSportLink url={offer.url} /></div>}
-      <div className="mt-auto space-y-0.5 pt-1 text-center text-xs text-slate-700 dark:text-slate-300" aria-live="polite">
-        <p className={actions.canCancel && state !== 'cancelled' ? 'font-semibold text-green-800 dark:text-green-300' : 'font-semibold'}>{status}</p>
-        {state !== 'drop_in' && <>
+      <div className="mt-auto text-center text-xs text-slate-700 dark:text-slate-300 empty:hidden" aria-live="polite">
+        {status && <p className={actions.canCancel && state !== 'cancelled' ? 'font-semibold text-green-800 dark:text-green-300' : 'font-semibold'}>{status}</p>}
+        {state !== 'drop_in' && (openingTime || closingTime) && <div className="flex flex-col justify-center gap-y-0.5 lg:flex-row lg:flex-wrap lg:gap-x-4">
           {openingTime && <p>{type === 'daily'
             ? t('unisport.card_previous_day', { time: sportClock(instant(offer.opens)) })
             : t('unisport.registration_opens', { time: registrationDate(offer.opens, language) })}</p>}
           {closingTime && <p>{t('unisport.registration_closes', { time: registrationDate(offer.closes, language) })}</p>}
-        </>}
+        </div>}
         {actions.registered && actions.personalStatus && (actions.canCancel || state === 'cancelled') && <p>{actions.personalStatus}</p>}
         {showRegistration && !actions.registered && (state === 'available' || state === 'check') && !actions.account.affiliation &&
           <p>{t('unisport.booking_login')}</p>}
       </div>
     </div>
-    <div className="flex min-w-0 divide-x divide-slate-200 border-t border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+    <div className="flex min-w-0 divide-x divide-slate-200 border-t border-slate-200 [border-bottom-left-radius:inherit] [border-bottom-right-radius:inherit] dark:divide-slate-700 dark:border-slate-700">
       <div className={showRegistration || showAuto ? 'w-11 shrink-0' : 'min-w-11 flex-1'}>
         <Button variant="ghost" title={t('unisport.favourite_named', { name: offer.title })}
           aria-label={t('unisport.favourite_named', { name: offer.title })} aria-pressed={actions.favourite} onClick={actions.toggleFavourite}
@@ -193,7 +198,7 @@ export function SportSession({ offer, actions, onDetails, conflict = false, hide
           <Star size={19} fill={actions.favourite ? 'currentColor' : 'none'} aria-hidden="true" className="motion-safe:transition-transform active:scale-90" />
         </Button>
       </div>
-      {showRegistration && <div className="min-w-11 flex-1"><RegistrationAction offer={offer} actions={actions} cardAction /></div>}
+      {showRegistration && <div className="unisport-registration-action min-w-11 flex-1"><RegistrationAction offer={offer} actions={actions} cardAction /></div>}
       {showAuto && actions.autoSignIn && <div className="min-w-0 flex-[1.25]"><UnisportAutosignIn {...actions.autoSignIn} /></div>}
     </div>
   </article>;

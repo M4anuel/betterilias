@@ -38,8 +38,19 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
                'registration_state': 7, 'offer_type': 'training'}
     full = {**offer(4), 'title': 'Full workshop', 'sport': 'Yoga', 'opens': reg_open,
             'begin': (start + timedelta(days=1)).isoformat(), 'end': (end + timedelta(days=1)).isoformat(),
-            'registration_state': 2, 'offer_type': 'dated', 'free_places': '0'}
+            'closes': end.isoformat(), 'registration_state': 2, 'offer_type': 'dated', 'free_places': '0'}
+    tennis_title = 'Tennis Freies Spiel' if code == 'de' else 'Tennis Individual game'
+    tennis = {**offer(5), 'title': tennis_title, 'sport': 'Tennis', 'opens': '', 'offer_type': 'dated',
+              'begin': (start - timedelta(hours=6)).isoformat(), 'end': (start - timedelta(hours=5)).isoformat(),
+              'registration_state': 6, 'free_places': 'Ausgebucht' if code == 'de' else 'Fully booked'}
+    next_tennis = {**tennis, 'id': 6, 'begin': (start + timedelta(days=7)).isoformat(),
+                   'end': (end + timedelta(days=7)).isoformat(), 'free_places': '1 freie Platz',
+                   'registration_state': 1}
+    open_tennis = {**next_tennis, 'id': 7}
     application = {**registered, 'status': 8, 'registration': 'Confirmed by provider'}
+    tennis_applications = [{**tennis, 'status': 8}, {**tennis, 'id': 6, 'status': 8, 'freePlaces': '0',
+                           'begin': (start - timedelta(hours=5)).isoformat(),
+                           'end': (start - timedelta(hours=4)).isoformat()}]
 
     def mock(route):
         path = urlsplit(route.request.url).path
@@ -47,10 +58,11 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
         if path.endswith('/connection'):
             data = {'phase': 'connected', 'affiliation': 'student', 'scope': 'a' * 64}
         elif path.endswith('/catalogue'):
-            data = {'items': [registered, opening, drop_in, full], 'sports': ['Volleyball', 'Yoga', 'Climbing'],
+            data = {'items': [registered, opening, drop_in, full, tennis, next_tennis, open_tennis],
+                    'sports': ['Volleyball', 'Yoga', 'Climbing', 'Tennis'],
                     'fetched_at': now.timestamp(), 'stale': False}
         elif path.endswith('/applications'):
-            data = {'items': [application], 'fetched_at': now.timestamp()}
+            data = {'items': [application, *tennis_applications], 'fetched_at': now.timestamp()}
         elif path.endswith('/bookmarks'):
             data = {'items': []}
         elif path.endswith('/calendar'):
@@ -74,9 +86,25 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
     opening_card = page.get_by_role('article', name='Flow training', exact=True)
     opening_card.get_by_text(tr['unisport.card_type_daily'], exact=True).wait_for()
     opening_card.get_by_text(tr['unisport.card_one_place'], exact=True).wait_for()
+    assert not opening_card.get_by_text(tr['unisport.card_opening_later'], exact=True).is_visible()
+    assert opening_card.get_by_text(tr['unisport.registration_closes'].split('{time}')[0], exact=False).count() == 0
+    tennis_cards = page.get_by_role('article', name=tennis_title, exact=True)
+    assert tennis_cards.count() == 4  # Two booked occurrences and two open slots.
+    for card in tennis_cards.all():
+        card.get_by_text(tr['unisport.card_type_daily'], exact=True).wait_for()
+        if card.get_by_role('button', name=tr['unisport.card_cancel'], exact=True).is_visible():
+            assert card.get_by_text(tr['unisport.card_capacity_full'], exact=True).is_visible()
+            assert card.get_attribute('data-registration') == 'registered'
+        else:
+            assert card.get_by_text(tr['unisport.card_one_place'], exact=True).is_visible()
+            assert not card.get_by_text(tr['unisport.state_available'], exact=True).is_visible()
+            assert card.get_attribute('data-registration') == 'open'
     full_card = page.get_by_role('article', name='Full workshop', exact=True)
     full_card.get_by_text(tr['unisport.card_capacity_full'], exact=True).wait_for()
     assert full_card.get_by_role('button', name=tr['unisport.card_register'], exact=True).is_disabled()
+    opens_y = full_card.get_by_text(tr['unisport.registration_opens'].split('{time}')[0], exact=False).bounding_box()['y']
+    closes_y = full_card.get_by_text(tr['unisport.registration_closes'].split('{time}')[0], exact=False).bounding_box()['y']
+    assert (opens_y == closes_y) if width >= 1024 else (opens_y < closes_y)
     assert opening_card.get_by_text('N2–N4', exact=True).locator('span[style]').count() == 3
     auto = opening_card.get_by_role('button', name=tr['unisport.autosign_in'], exact=True)
     assert not auto.is_visible()

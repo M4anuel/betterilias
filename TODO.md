@@ -14,6 +14,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Keep Daily tennis badges across booking states and refine offer card status
+  text, action colours and desktop registration dates (1.13.1).
+
 - [x] Redesign offer cards with a shared layout, availability, registration and
   per-offer AutoSignIn preference previews behind the main settings toggle (1.13.0).
   Automatic registration requires provider support to identify complete forms

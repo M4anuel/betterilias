@@ -159,7 +159,8 @@ export function UnisportBooking({ credential, scope, affiliation, offerId, begin
 
   return <>
     <Button variant={cardAction ? 'ghost' : quick ? 'primary' : 'outline'} loading={busy && !open} onClick={start}
-      className={cardAction ? `w-full !rounded-none !px-1 ${kind !== 'cancel' ? 'text-teal-800 dark:text-teal-300' : ''}` : undefined}>
+      className={cardAction ? `unisport-register-button w-full !rounded-none !px-1 ${kind === 'cancel'
+        ? 'text-rose-800 dark:text-rose-200' : 'text-teal-800 dark:text-teal-300'}` : undefined}>
       {t(cardAction ? kind === 'cancel' ? 'unisport.card_cancel' : 'unisport.card_register'
         : kind === 'cancel' ? 'unisport.cancel_registration' : quick ? 'unisport.register_now' : 'unisport.manage_registration')}
     </Button>

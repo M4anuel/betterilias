@@ -13,6 +13,43 @@
   --sport-level-10: #64748B;
 }
 
+.unisport-offer-card {
+  --offer-surface: var(--color-white);
+  background: var(--offer-surface);
+}
+.unisport-offer-card[data-registration="open"] { --offer-surface: var(--color-emerald-50); }
+.unisport-offer-card[data-registration="inactive"] { --offer-surface: var(--color-slate-50); }
+.dark .unisport-offer-card { --offer-surface: var(--color-slate-900); }
+.dark .unisport-offer-card[data-registration="open"] {
+  --offer-surface: color-mix(in oklab, var(--color-emerald-950) 35%, var(--color-slate-900));
+}
+.dark .unisport-offer-card[data-registration="inactive"] {
+  --offer-surface: color-mix(in oklab, var(--color-slate-800) 30%, var(--color-slate-900));
+}
+.unisport-offer-legend {
+  background: linear-gradient(to bottom, transparent calc(50% - 1px), var(--offer-surface) calc(50% - 1px));
+}
+.unisport-registration-action:last-child { border-bottom-right-radius: inherit; }
+.unisport-registration-action .unisport-register-button { border-bottom-right-radius: inherit !important; }
+.unisport-offer-card[data-registration="open"] .unisport-registration-action {
+  background: var(--color-emerald-100);
+}
+.unisport-offer-card[data-registration="inactive"] .unisport-registration-action {
+  background: var(--color-slate-200);
+}
+.unisport-offer-card[data-registration="registered"] .unisport-registration-action {
+  background: var(--color-rose-50);
+}
+.dark .unisport-offer-card[data-registration="open"] .unisport-registration-action {
+  background: color-mix(in oklab, var(--color-emerald-900) 50%, var(--color-slate-900));
+}
+.dark .unisport-offer-card[data-registration="inactive"] .unisport-registration-action {
+  background: var(--color-slate-800);
+}
+.dark .unisport-offer-card[data-registration="registered"] .unisport-registration-action {
+  background: color-mix(in oklab, var(--color-rose-950) 55%, var(--color-slate-900));
+}
+
 .unisport-autosign-success {
   color: var(--color-green-700);
 }

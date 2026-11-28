@@ -237,6 +237,7 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
   const actions = (offer: UnisportOffer): SessionActions => ({
     now, account, favourite: preferences.offers.includes(offer.id), registered: Boolean(personal(offer)),
     canCancel: personal(offer)?.status === 8, personalStatus: personal(offer)?.registration,
+    applicationPlaces: personal(offer)?.freePlaces,
     reminded: preferences.reminders.some(reminder => reminderMatches(reminder, offer)),
     toggleFavourite: () => toggleOffer(offer), toggleReminder: () => toggleReminder(offer), onBookingClosed,
     autoSignIn: autoSignInEnabled && scope && affiliation && offer.quick_candidate && Number.isFinite(instant(offer.begin)) ? {
@@ -281,7 +282,9 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
     scheduled.push({
       id: item.id!, title: item.title || source?.title || t('unisport.offer'), sport: source?.sport || '',
       begin, end: item.end || item.offerNextDate?.end || '', opens: '', closes: '', level: source?.level || '',
-      location: '', address: '', status: '', free_places: '', cancelled: false, url: source?.url ?? null,
+      location: source?.location || '', address: source?.address || '',
+      offer_type: source?.offer_type, schedule_day: source?.schedule_day,
+      status: '', free_places: '', cancelled: false, url: source?.url ?? null,
     });
   }
   const upcoming = scheduled.filter(offer => personal(offer) && instant(offer.begin) >= now)

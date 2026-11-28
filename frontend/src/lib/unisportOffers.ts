@@ -69,7 +69,7 @@ export function readSportRoute(params: URLSearchParams): SportRoute {
 
 export type UnisportApplication = {
   id?: number; title?: string; status?: number; registration?: string; begin?: string;
-  end?: string; offerNextDate?: { begin?: string; end?: string };
+  end?: string; freePlaces?: unknown; offerNextDate?: { begin?: string; end?: string };
 };
 
 const zone = 'Europe/Zurich';
@@ -121,8 +121,15 @@ export function autoSignInKey(offer: UnisportOffer): string {
 
 export function cardOfferType(offer: UnisportOffer) {
   const day = sportDay(instant(offer.begin));
-  if (offer.offer_type !== 'date_range' && offer.registration_state !== 7 && day &&
-    sportDay(instant(offer.opens)) === changeDay(day, -1)) return 'daily';
+  if (offer.registration_state !== 7) {
+    // ZSSw Tennis court slots are booked individually the day before. The
+    // catalogue drops registrationTimeSlot once they open or fill up.
+    const tennisCourt = offer.sport.trim().toLowerCase() === 'tennis' &&
+      /^tennis (?:freies spiel|individual game)$/i.test(offer.title.trim());
+    const dayBefore = day && sportDay(instant(offer.opens)) === changeDay(day, -1);
+    const publishedRule = /\b(?:am vortag|the (?:day before|previous day))\b/i.test(offer.status);
+    if (tennisCourt || publishedRule || offer.offer_type !== 'date_range' && dayBefore) return 'daily';
+  }
   return offer.offer_type ?? null;
 }
 
@@ -134,16 +141,22 @@ export function skillLevels(level: string): number[] {
   return [...new Set([...level.matchAll(/\bN(10|[1-9])\b/gi)].map(match => Number(match[1])))].sort((a, b) => a - b);
 }
 
-export function offerAvailability(offer: UnisportOffer) {
-  const value = offer.free_places.trim().toLowerCase();
+function readAvailability(raw: unknown) {
+  const value = (typeof raw === 'string' ? raw : typeof raw === 'number' ? String(raw) : '').trim().toLowerCase();
   if (/^(?:unbeschränkt|unbegrenzt|unlimited|unrestricted)$/.test(value)) return { kind: 'unrestricted' } as const;
-  const count = /^(\d{1,6})(?:\s+(?:freie plätze|freier platz|plätze|platz|(?:free |available )?(?:places?|spots?)|places? (?:free|available)))?$/.exec(value);
+  const count = /^(\d{1,6})(?:\s+(?:freie plätze|freier? platz|plätze|platz|(?:free |available )?(?:places?|spaces?|spots?)|places? (?:free|available)))?$/.exec(value);
   if (/^(?:ausgebucht|fully booked|sold out)$/.test(value) || count && Number(count[1]) === 0) {
     return { kind: 'full' } as const;
   }
   if (count) return { kind: 'places', count: Number(count[1]) } as const;
+  return null;
+}
+
+export function offerAvailability(offer: UnisportOffer, applicationPlaces?: unknown) {
+  const capacity = readAvailability(offer.free_places);
+  if (capacity) return capacity;
   if (offer.registration_state === 6) return { kind: 'full' } as const;
-  return { kind: 'unknown' } as const;
+  return readAvailability(applicationPlaces) ?? { kind: 'unknown' } as const;
 }
 
 export function registrationState(offer: UnisportOffer, now: number) {
