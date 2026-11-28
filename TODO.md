@@ -14,6 +14,9 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Redraw the offer details in the shared dialog with backdrop dismissal,
+  linked sport navigation and readable provider information (1.13.3).
+
 - [x] Open offer details in a dialog, link the sport label to Explore and
   promote AutoSignIn previews to weekly for recurring favourites (1.13.2).
 

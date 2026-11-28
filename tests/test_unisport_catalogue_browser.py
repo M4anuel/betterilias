@@ -27,7 +27,9 @@ def mock(page):
         if control['fail']:
             route.fulfill(status=502,content_type='application/json',body=json.dumps({'detail':'Synthetic refresh unavailable'}));return
         if path.endswith('/catalogue'):data={'items':[offer(i) for i in range(1,26)],'sports':['Ball sports','Yoga'],'fetched_at':time.time(),'stale':False}
-        elif '/offers/' in path:data={'offer':offer(int(path.rsplit('/',1)[-1])),'fetched_at':time.time(),'stale':False}
+        elif '/offers/' in path:data={'offer':{**offer(int(path.rsplit('/',1)[-1])),
+            'sport_url':'https://sport.unibe.ch/yoga', 'important':'Bring your student ID.'},
+            'fetched_at':time.time(),'stale':False}
         else:
             assert request.headers['x-unisport-scope']=='a'*64
             if control['delay_saved']:control['deferred']=route;return
@@ -72,11 +74,20 @@ def test_cached_catalogue_filter_details_focus_and_bookmarks(workflow_page,width
     yoga.click()
     page.get_by_role('heading',name='Yoga',exact=True).wait_for()
     page.get_by_role('button',name='Yoga 2',exact=True).click()
-    page.get_by_text('Equipment',exact=True).click()
+    modal = page.get_by_role('dialog', name='Yoga 2')
+    modal.get_by_role('heading', name='Equipment', exact=True).wait_for()
+    assert modal.locator('details, article').count() == 0
+    modal.get_by_role('heading', name=tr['unisport.offer_important'], exact=True).wait_for()
+    info_link = modal.get_by_role('link', name=tr['unisport.about_sport'], exact=True)
+    assert info_link.get_attribute('href') == 'https://sport.unibe.ch/yoga'
+    info_link.focus()
+    assert modal.get_by_text(tr['unisport.about_sport'], exact=True).is_visible()
+    assert modal.locator('footer').get_by_role('link', name=tr['unisport.official_offer'], exact=True).is_visible()
     assert page.evaluate('window.unisportInjected') is None
     assert page.get_by_text('Shoes and water. <script>window.unisportInjected=true</script>',exact=True).is_visible()
     shot(page,f'detail-{width}-{height}-{code}-{scheme}')
-    page.get_by_role('dialog', name='Yoga 2').get_by_role('button', name=tr['Schliessen'], exact=True).click()
+    page.mouse.click(1, 1)
+    modal.wait_for(state='hidden')
     assert page.get_by_role('button', name='Yoga 2', exact=True).evaluate('(element) => element === document.activeElement')
     page.get_by_role('button',name=tr['unisport.back_to_sports'],exact=True).click()
     assert yoga.evaluate('(element)=>document.activeElement===element')
@@ -88,6 +99,9 @@ def test_cached_catalogue_filter_details_focus_and_bookmarks(workflow_page,width
     page.get_by_role('button',name='Yoga 2',exact=True).click()
     page.get_by_text('Equipment',exact=True).wait_for()
     assert calls.count('/api/unisport/offers/2') == 1
+    modal.get_by_role('link', name='Yoga', exact=True).click()
+    modal.wait_for(state='hidden')
+    page.get_by_role('heading', name='Yoga', exact=True).wait_for()
 
 
 def test_refresh_failure_keeps_cache_and_new_account_rejects_old_response(workflow_page):

@@ -156,7 +156,9 @@ def test_explore_schedule_conflicts_and_opening_reminders(workflow_page, width, 
     page.screenshot(path=str(screenshots / f'offer-dialog-{width}-{height}-{code}-{scheme}.png'))
     page.keyboard.press('Escape')
     details.wait_for(state='hidden')
-    opening_card.get_by_role('button', name='Yoga', exact=True).click()
+    sport_link = opening_card.get_by_role('link', name='Yoga', exact=True)
+    assert 'sportView=explore&sport=Yoga' in sport_link.get_attribute('href')
+    sport_link.click()
     page.get_by_role('heading', name='Yoga', exact=True).wait_for()
     assert nav.get_by_role('button', name=tr['unisport.explore'], exact=True).get_attribute('aria-current') == 'page'
     page.get_by_role('button', name=tr['unisport.back_to_sports'], exact=True).click()

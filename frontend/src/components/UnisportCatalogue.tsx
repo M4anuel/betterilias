@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowDownUp, ChevronRight, RefreshCw, Search } from 'lucide-react';
+import { ArrowLeft, ArrowDownUp, ChevronRight, Info, RefreshCw, Search } from 'lucide-react';
 import { t, useLanguage } from '../lib/i18n';
 import { unisportFetch } from '../lib/unisport';
 import { CATALOGUE_TTL, OFFER_TTL, fresh, readPrivate, writePrivate } from '../lib/unisportCache';
@@ -15,9 +15,8 @@ import { Button, IconButton } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { DialogShell } from './ui/DialogShell';
 import { ErrorNotice } from './ErrorNotice';
-import { FeedbackBanner } from './ui/FeedbackBanner';
 import { UnisportSchedule, SportSelect, sportControl } from './UnisportSchedule';
-import { SportFavourite, SportSession, type SessionActions } from './UnisportSession';
+import { OfficialSportLink, SportExploreLink, SportFavourite, SportSession, type SessionActions } from './UnisportSession';
 
 type Saved = { id: number; title: string };
 type Sport = { name: string; offers: UnisportOffer[] };
@@ -114,8 +113,9 @@ function OpeningCountdown({ opens }: { opens: number }) {
   })}</span></Badge>;
 }
 
-function OfferDetail({ offer, credential, actions }: {
+function OfferDetail({ offer, credential, actions, onSport, onClose }: {
   offer: UnisportOffer; credential: string; actions: (offer: UnisportOffer) => SessionActions;
+  onSport: (sport: string) => void; onClose?: () => void;
 }) {
   const language = useLanguage();
   const detail = useUnisportPublic<{ offer: UnisportOffer }>('offers/' + offer.id, credential, OFFER_TTL, data => data.offer?.id === offer.id);
@@ -125,24 +125,44 @@ function OfferDetail({ offer, credential, actions }: {
   const start = instant(offer.begin);
   const displayed = fetched && (!Number.isFinite(start) || instant(fetched.begin) === start) ? fetched : offer;
   const information = fetched ?? offer;
-  return <div className="space-y-2">
+  const sport = displayed.sport || offer.sport;
+  const sportLink = t('unisport.about_sport');
+  const meta = <div className="relative mt-1 flex min-w-0 items-center gap-1 text-sm">
+    {sport && <SportExploreLink sport={sport} onNavigate={() => onSport(sport)}
+      className="flex min-h-11 min-w-0 items-center rounded font-semibold text-teal-800 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-teal-500 dark:text-teal-300" />}
+    {information.sport_url && <span className="group">
+      <a href={information.sport_url} target="_blank" rel="noopener noreferrer" aria-label={sportLink}
+        className="grid size-11 place-items-center rounded-lg text-teal-800 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-teal-500 dark:text-teal-300 dark:hover:bg-slate-800">
+        <Info size={17} aria-hidden="true" />
+      </a>
+      <span aria-hidden="true" className="pointer-events-none absolute left-0 top-full z-20 hidden w-max max-w-44 rounded bg-slate-800 px-2 py-1 text-center text-xs text-white group-hover:block group-focus-within:block">
+        {sportLink}
+      </span>
+    </span>}
+  </div>;
+  const sections = [
+    ...(displayed.outage ? [{ title: t('unisport.state_cancelled'), content: displayed.outage, notice: true }] : []),
+    ...(information.important ? [{ title: t('unisport.offer_important'), content: information.important, notice: true }] : []),
+    ...(information.special ? [{ title: t('unisport.offer_special'), content: information.special, notice: false }] : []),
+    ...(information.infos ?? []).map(info => ({ ...info, notice: false })),
+  ];
+  const body = <div className="space-y-4">
     {detail.loading && <p role="status" className="text-sm">{t('unisport.loading_offer')}</p>}
     {detail.error && <ErrorNotice message={detail.error} connectionInline onRetry={detail.refresh} />}
-    <SportSession offer={displayed} actions={actions(displayed)} hideSport />
-    {detail.data && <>
-      <p className="text-xs text-slate-500 dark:text-slate-400">{snapshotLabel(detail.data, language, OFFER_TTL)}</p>
-      {displayed.address && displayed.address !== displayed.location && <p className="text-sm">{displayed.address}</p>}
-      {(information.important || displayed.outage) && <FeedbackBanner tone="warning" message={information.important || displayed.outage || ''} />}
-      {information.special && <p className="whitespace-pre-wrap break-words text-sm">{information.special}</p>}
-      {information.sport_url && <a href={information.sport_url} target="_blank" rel="noopener noreferrer"
-        className="inline-flex min-h-11 items-center text-sm text-teal-800 underline dark:text-teal-300">{t('unisport.about_sport')}</a>}
-      {information.infos?.map((info, index) => <details key={index} className={panel}
-        open={/^(?:costs|fees|cancellation|kosten|gebühren|abmeldung|annullation|stornierung)$/i.test(info.title.trim())}>
-        <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">{info.title || t('unisport.more_information')}</summary>
-        <p className="whitespace-pre-wrap break-words text-sm">{info.content}</p>
-      </details>)}
-    </>}
+    <SportSession offer={displayed} actions={actions(displayed)} details />
+    {sections.filter(info => info.content.trim()).map((info, index) => <section key={index}
+      className={info.notice ? 'rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/35' : undefined}>
+      <h3 className="font-semibold [overflow-wrap:anywhere]">{info.title || t('unisport.more_information')}</h3>
+      <p className="mt-1 max-w-[48ch] whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">{info.content}</p>
+    </section>)}
+    {(displayed.url || detail.data) && <footer className="flex flex-wrap items-center justify-between gap-x-3 border-t border-slate-200 pt-2 dark:border-slate-700">
+      {displayed.url && <OfficialSportLink url={displayed.url} />}
+      {detail.data && <p className="text-xs text-slate-500 dark:text-slate-400">{snapshotLabel(detail.data, language, OFFER_TTL)}</p>}
+    </footer>}
   </div>;
+  return onClose
+    ? <DialogShell title={offer.title} headerMeta={meta} dismissOnBackdrop onRequestClose={onClose}>{body}</DialogShell>
+    : <section className={panel}><h3 className="break-words font-bold">{offer.title}</h3>{meta}{body}</section>;
 }
 
 export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoaded, view = 'explore', onNavigate,
@@ -301,6 +321,7 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
         previousFocus.current = opener instanceof HTMLElement ? opener : null;
       }
       if (!onSelectSport && view !== 'explore') onNavigate?.('explore');
+      setDetailOffer(null);
       setSelection({ sport: name, offerId });
     });
   };
@@ -448,7 +469,7 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
         </div>
         {groupSessions(selection.offers.filter(offer => !offerType || selectedOffer === offer.id || cardOfferType(offer) === offerType)).map(group => {
           const sessions = group.map(offer => selectedOffer === offer.id
-            ? <OfferDetail key={offer.id} offer={offer} credential={credential} actions={actions} />
+            ? <OfferDetail key={offer.id} offer={offer} credential={credential} actions={actions} onSport={openSport} />
             : <SportSession key={offer.id} offer={offer} actions={actions(offer)} hideSport onDetails={() => openOffer(offer)} />);
           if (sessions.length === 1) return sessions[0];
           return <details key={group[0].id} open={group.some(offer => offer.id === selectedOffer)} className={panel}>
@@ -506,12 +527,9 @@ export function UnisportCatalogue({ credential, scope, affiliation, onOffersLoad
         })}
       </section>}
     </div>}
-    {detailOffer && <DialogShell title={detailOffer.title} description={detailOffer.sport || undefined}
-      className="unisport-booking-dialog" onRequestClose={() => {
+    {detailOffer && <OfferDetail offer={scheduled.find(offer => offer.id === detailOffer.id && offer.begin === detailOffer.begin) ?? detailOffer}
+      credential={credential} actions={actions} onSport={openSport} onClose={() => {
         if (!navigationGuard.hasPendingOperations()) setDetailOffer(null);
-      }}>
-      <OfferDetail offer={scheduled.find(offer => offer.id === detailOffer.id && offer.begin === detailOffer.begin) ?? detailOffer}
-        credential={credential} actions={actions} />
-    </DialogShell>}
+      }} />}
   </div>;
 }
