@@ -14,6 +14,8 @@ Unchecked items are unfinished; completed work is listed separately below. Curre
 
 ## Unisport integration (in progress)
 
+- [x] Space UniSport cards apart and reserve the title underline for the sport link (1.13.5).
+
 - [x] Remove duplicate confirmation text where the offer shows Cancel booking (1.13.4).
 
 - [x] Redraw the offer details in the shared dialog with backdrop dismissal,

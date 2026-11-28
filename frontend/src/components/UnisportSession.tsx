@@ -212,16 +212,16 @@ export function SportSession({ offer, actions, onDetails, onSport, conflict = fa
 
   const legend = 'unisport-offer-legend absolute -top-px left-2 z-20 max-w-[calc(100%-1rem)] -translate-y-1/2 px-1.5 text-xs font-semibold text-teal-800 dark:text-teal-300';
   return <article aria-labelledby={tooltip} data-registration={actionTone}
-    className="unisport-offer-card relative isolate mt-3 flex min-w-0 flex-col rounded-xl border border-slate-300 dark:border-slate-700">
+    className="unisport-offer-card relative isolate mt-5 flex min-w-0 flex-col rounded-xl border border-slate-300 dark:border-slate-700">
     {!hideSport && offer.sport && (onSport
       ? <SportExploreLink sport={offer.sport} onNavigate={onSport}
-        className={`${legend} min-w-11 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-teal-500 after:absolute after:-top-0.5 after:-bottom-2.5 after:inset-x-0`} />
+        className={`${legend} min-w-11 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-teal-500 after:absolute after:-top-2.5 after:-bottom-0.5 after:inset-x-0`} />
       : <span className={`${legend} truncate`} title={offer.sport}>{offer.sport}</span>)}
-    <div className="flex flex-1 flex-col gap-2 px-3 pb-2 pt-4">
+    <div className="flex flex-1 flex-col gap-2 px-3 pb-2 pt-2">
       <header className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
         <h3 id={tooltip} className="min-w-0 flex-1 basis-32 break-words text-base font-bold leading-snug">{onDetails
           ? <button type="button" onClick={onDetails} aria-haspopup="dialog"
-            className="-my-2 min-h-11 w-full cursor-pointer rounded py-2 text-left underline decoration-slate-300 underline-offset-4 after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-2 focus-visible:outline-teal-500">{offer.title}</button>
+            className="-my-2 min-h-11 w-full cursor-pointer rounded py-2 text-left after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-2 focus-visible:outline-teal-500">{offer.title}</button>
           : offer.title}</h3>
         {badges}
       </header>
